@@ -1,0 +1,15 @@
+{
+  "name": "bmo-gate",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "bun-types": "^1.4.0",
+    "typescript": "^7.0.2"
+  },
+  "scripts": {
+    "check:types": "bunx tsc --noEmit",
+    "test": "bun test",
+    "check": "bun run check:types && bun run test"
+  }
+}

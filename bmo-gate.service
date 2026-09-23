@@ -1,0 +1,23 @@
+[Unit]
+Description=bmo-gate — 열 게이트 증류 데이터 생성
+After=network-online.target
+Wants=network-online.target
+# A gate that cannot be written at all — a model the account may not use, a login gone — fails the
+# same way however often it is tried. Ten tries an hour and then the unit stays failed, where it is
+# visible, rather than asking codex the same impossible thing for a day.
+StartLimitIntervalSec=3600
+StartLimitBurst=10
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/repos/ahas/bmo-gate
+Environment=PATH=%h/.bun/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+# Always resumed, never overwritten: the unit is restarted by a crash, a failure or a reboot, and
+# every one of those must take up at the batch after the last one frozen. An overwrite here would
+# throw away a day's work on the first restart.
+ExecStart=%h/.bun/bin/bun scripts/laya-synth.ts --run full-1 --rows 9000 --batch 20 --resume
+Restart=on-failure
+RestartSec=60
+
+[Install]
+WantedBy=default.target

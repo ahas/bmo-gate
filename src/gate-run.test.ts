@@ -1,0 +1,469 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { describe, expect, test } from "bun:test";
+
+import { clearGate, driveGates, readRunStanding, standingLines } from "./gate-run";
+import { gateFolder, gatesFolderName } from "./roots";
+import { batchName, batchesFolder, freezeBatch, noTokens, progressFile, readProgress } from "./laya-synth-run";
+import { splitFiles } from "./laya-frozen";
+import { synthesisFor } from "./laya-synth";
+import { scratchDir } from "./scratch";
+
+import type { GateSynthesis, LanguageBucket, SynthAsk, SynthRow } from "./laya-synth";
+import type { SynthAnswer, SynthAsker } from "./laya-synth-run";
+
+function scratch(): string {
+  return scratchDir("bmo-gate-run-");
+}
+
+function gate(name: string): GateSynthesis {
+  const found = synthesisFor(name);
+
+  if (found === null) {
+    throw new Error(`no gate ${name}`);
+  }
+
+  return found;
+}
+
+// Two gates that are handed no transcript, so a stand-in can write their state in whichever
+// language a batch asked for without having to invent a transcript line shape. They also differ
+// in what they answer — one yes or no, the other one of four — so the driver is not only ever
+// seen carrying one kind of gate.
+const sanitizer = gate("sanitizer");
+const notes = gate("knowledge-classifier");
+
+function textFor(language: LanguageBucket, tag: string): string {
+  if (language === "english") {
+    return `I want to back up the router settings before the weekend. marker ${tag}`;
+  }
+
+  if (language === "mixed") {
+    return [
+      "백업 로그를 붙일게요.",
+      "the backup finished with two warnings about permissions",
+      "the second warning names a file the account cannot read",
+      `이 줄이 마지막입니다. 표식 ${tag}`,
+    ].join("\n");
+  }
+
+  return `라우터 설정을 주말 전에 백업해 두려고 합니다. 표식 ${tag}`;
+}
+
+// A state of the shape that gate is really handed: a bare string where the gate takes one, and
+// the gate's own fields filled in where it takes those, with the free text carrying the language
+// the batch asked for.
+function stateFor(spec: GateSynthesis, language: LanguageBucket, tag: string): SynthRow["state"] {
+  const said = textFor(language, tag);
+
+  if (typeof spec.example.state === "string") {
+    return said;
+  }
+
+  return { ...(spec.example.state as Record<string, unknown>), note: said };
+}
+
+function rowsFor(spec: GateSynthesis, ask: SynthAsk, count: number): SynthRow[] {
+  return Array.from({ length: count }, (_, index) => ({
+    state: stateFor(spec, ask.language, `${ask.seed}-${index}`),
+    questions: JSON.parse(JSON.stringify(spec.example.questions)) as SynthRow["questions"],
+    gold: JSON.parse(JSON.stringify(spec.example.gold)) as SynthRow["gold"],
+  }));
+}
+
+// A stand-in that answers every batch, and says which gate was asked and when, so a test can see
+// that two gates were in the air at the same time rather than one after the other.
+function standIn(watch?: { started: string[]; finished: string[]; hold?: Map<string, Promise<void>> }): SynthAsker {
+  return async (spec, ask) => {
+    watch?.started.push(spec.gate);
+
+    await watch?.hold?.get(spec.gate);
+
+    watch?.finished.push(spec.gate);
+
+    return {
+      text: JSON.stringify(rowsFor(spec, ask, ask.count)),
+      sessionId: `thread-${spec.gate}`,
+      tokens: { inputTokens: 100, outputTokens: 400, cacheReadTokens: 900, cacheWriteTokens: 50 },
+    } satisfies SynthAnswer;
+  };
+}
+
+// Every row a gate has frozen, across the three splits, which is what a reader of the dataset
+// would get.
+function frozenRows(root: string, gate: string): number {
+  return Object.values(splitFiles).reduce((all, name) => {
+    const path = join(gateFolder(root, gate), name);
+
+    return all + (existsSync(path) ? readFileSync(path, "utf8").split("\n").filter((line) => line.trim() !== "").length : 0);
+  }, 0);
+}
+
+const driving = (root: string, extra: Partial<Parameters<typeof driveGates>[0]> = {}) => ({
+  root,
+  gates: [sanitizer, notes],
+  rows: 4,
+  batchSize: 2,
+  model: "gpt-5.6-terra",
+  effort: "high",
+  shares: { calibration: 0.15, test: 0.15 },
+  atOnce: 10,
+  resume: false,
+  overwrite: false,
+  ...extra,
+});
+
+describe("the gates written beside each other", () => {
+  test("each one lands in a folder of its own", async () => {
+    const root = scratch();
+
+    await driveGates(driving(root), standIn());
+
+    for (const spec of [sanitizer, notes]) {
+      expect(existsSync(join(gateFolder(root, spec.gate), splitFiles.train))).toBe(true);
+    }
+  });
+
+  test("no gate's batches, progress or thread land in another's folder", async () => {
+    const root = scratch();
+
+    await driveGates(driving(root), standIn());
+
+    for (const spec of [sanitizer, notes]) {
+      const progress = readProgress(gateFolder(root, spec.gate))!;
+
+      expect(Object.keys(progress.gates)).toEqual([spec.gate]);
+      expect(progress.gates[spec.gate]!.sessionId).toBe(`thread-${spec.gate}`);
+    }
+  });
+
+  test("they are in the air together rather than one after the other", async () => {
+    const root = scratch();
+    const watch = { started: [] as string[], finished: [] as string[], hold: new Map<string, Promise<void>>() };
+    let release = (): void => {};
+
+    // The first gate asked is held until the other has been asked too. If the driver ran them one
+    // after another this would never come back, because the second would be waiting on the first.
+    watch.hold.set(sanitizer.gate, new Promise<void>((settle) => {
+      release = settle;
+    }));
+
+    const running = driveGates(driving(root), standIn(watch));
+
+    while (!watch.started.includes(notes.gate)) {
+      await new Promise((settle) => setTimeout(settle, 1));
+    }
+
+    expect(watch.finished).not.toContain(sanitizer.gate);
+    release();
+    await running;
+
+    expect(watch.finished).toContain(sanitizer.gate);
+  });
+
+  test("one lane at a time is still every gate, just not at once", async () => {
+    const root = scratch();
+
+    const outcomes = await driveGates(driving(root, { atOnce: 1 }), standIn());
+
+    expect(outcomes.map((one) => one.state)).toEqual(["done", "done"]);
+  });
+
+  test("the outcomes come back in the order the gates were given", async () => {
+    const root = scratch();
+
+    const outcomes = await driveGates(driving(root, { atOnce: 1 }), standIn());
+
+    expect(outcomes.map((one) => one.gate)).toEqual([sanitizer.gate, notes.gate]);
+  });
+});
+
+describe("a gate that falls over", () => {
+  const breaks: SynthAsker = async (spec, ask) => {
+    if (spec.gate === sanitizer.gate) {
+      throw new Error("codex 가 묶음을 쓰지 못했습니다");
+    }
+
+    return { text: JSON.stringify(rowsFor(spec, ask, ask.count)), sessionId: "held", tokens: noTokens };
+  };
+
+  test("costs only itself, and the others finish", async () => {
+    const root = scratch();
+
+    const outcomes = await driveGates(driving(root), breaks);
+
+    expect(outcomes.find((one) => one.gate === sanitizer.gate)!.state).toBe("failed");
+    expect(outcomes.find((one) => one.gate === notes.gate)!.state).toBe("done");
+    expect(existsSync(join(gateFolder(root, notes.gate), splitFiles.train))).toBe(true);
+  });
+
+  test("says what stopped it rather than just that it stopped", async () => {
+    const root = scratch();
+
+    const outcomes = await driveGates(driving(root), breaks);
+
+    expect(outcomes.find((one) => one.gate === sanitizer.gate)!.fault).toContain("codex 가 묶음을 쓰지 못했습니다");
+  });
+});
+
+describe("taking a run up again", () => {
+  // A gate that got two batches in and then died.
+  async function halfWritten(root: string): Promise<void> {
+    await driveGates(driving(root, { rows: 6 }), async (spec, ask) => {
+      if (spec.gate === sanitizer.gate && ask.seed.endsWith("-3")) {
+        throw new Error("세션이 끊겼습니다");
+      }
+
+      return { text: JSON.stringify(rowsFor(spec, ask, ask.count)), sessionId: "held", tokens: noTokens };
+    });
+  }
+
+  test("the interrupted gate goes on from its next batch", async () => {
+    const root = scratch();
+
+    await halfWritten(root);
+
+    const seeds: string[] = [];
+
+    await driveGates(driving(root, { rows: 6, resume: true }), async (spec, ask) => {
+      seeds.push(ask.seed);
+
+      return { text: JSON.stringify(rowsFor(spec, ask, ask.count)), sessionId: "held", tokens: noTokens };
+    });
+
+    expect(seeds).toEqual([`${sanitizer.gate}-3`]);
+  });
+
+  test("the gates that finished are left exactly as they stand", async () => {
+    const root = scratch();
+
+    await halfWritten(root);
+
+    const landed = join(gateFolder(root, notes.gate), splitFiles.train);
+    const before = readFileSync(landed, "utf8");
+
+    const outcomes = await driveGates(driving(root, { rows: 6, resume: true }), standIn());
+
+    expect(outcomes.find((one) => one.gate === notes.gate)!.state).toBe("stands");
+    expect(readFileSync(landed, "utf8")).toBe(before);
+  });
+
+  test("a finished gate is not an error, so a run of nine finished and one to go still comes back", async () => {
+    const root = scratch();
+
+    await halfWritten(root);
+
+    const outcomes = await driveGates(driving(root, { rows: 6, resume: true }), standIn());
+
+    expect(outcomes.map((one) => one.state).sort()).toEqual(["done", "stands"]);
+  });
+});
+
+describe("a folder that is not this run's to write", () => {
+  test("a frozen gate is refused when nothing said to overwrite it", async () => {
+    const root = scratch();
+
+    await driveGates(driving(root), standIn());
+
+    const outcomes = await driveGates(driving(root), standIn());
+
+    expect(outcomes.map((one) => one.state)).toEqual(["refused", "refused"]);
+    expect(outcomes[0]!.refusal).toContain("이미 굳은 데이터가 있습니다");
+  });
+
+  test("a half-written gate is refused too, and the refusal names both ways out", async () => {
+    const root = scratch();
+    const folder = gateFolder(root, sanitizer.gate);
+
+    mkdirSync(folder, { recursive: true });
+    writeFileSync(join(folder, progressFile), "{}");
+
+    const outcomes = await driveGates(driving(root, { gates: [sanitizer] }), standIn());
+
+    expect(outcomes[0]!.state).toBe("refused");
+    expect(outcomes[0]!.refusal).toContain("--resume");
+    expect(outcomes[0]!.refusal).toContain("--overwrite");
+  });
+
+  test("a refused gate has nothing written into it", async () => {
+    const root = scratch();
+
+    await driveGates(driving(root, { gates: [sanitizer] }), standIn());
+
+    const landed = join(gateFolder(root, sanitizer.gate), splitFiles.train);
+    const before = readFileSync(landed, "utf8");
+
+    await driveGates(driving(root, { gates: [sanitizer] }), standIn());
+
+    expect(readFileSync(landed, "utf8")).toBe(before);
+  });
+});
+
+describe("a gate told to start over", () => {
+  test("keeps nothing of the run it replaces", async () => {
+    const root = scratch();
+
+    await driveGates(driving(root, { gates: [sanitizer], rows: 6 }), standIn());
+
+    // A batch of the old run that the new, shorter plan would never write over. Read back at
+    // freezing time it would put the replaced run's rows into the replacement's dataset.
+    const stale = join(gateFolder(root, sanitizer.gate), batchesFolder, batchName(sanitizer.gate, 2));
+
+    expect(existsSync(stale)).toBe(true);
+
+    await driveGates(driving(root, { gates: [sanitizer], rows: 2, overwrite: true }), standIn());
+
+    expect(existsSync(stale)).toBe(false);
+  });
+
+  test("the dataset it leaves holds only what it wrote", async () => {
+    const root = scratch();
+
+    await driveGates(driving(root, { gates: [sanitizer], rows: 6 }), standIn());
+
+    expect(frozenRows(root, sanitizer.gate)).toBe(6);
+
+    // Two rows replacing six. Freezing reads every batch standing in the folder, so a run that
+    // left the replaced run's batches behind would freeze all eight ids and call it one dataset.
+    await driveGates(driving(root, { gates: [sanitizer], rows: 2, overwrite: true }), standIn());
+
+    expect(frozenRows(root, sanitizer.gate)).toBe(2);
+  });
+
+  test("the clearing refuses any folder that is not under this run's own gates", () => {
+    const root = scratch();
+    const elsewhere = scratch();
+
+    // The guard is on the path rather than on the flag, so an overwrite can only ever take away
+    // a gate folder of the run that asked for it.
+    expect(() => clearGate(root, elsewhere)).toThrow("이 실행의 게이트 폴더가 아닙니다");
+    expect(() => clearGate(root, root)).toThrow();
+    expect(() => clearGate(root, join(root, gatesFolderName))).toThrow();
+    expect(existsSync(elsewhere)).toBe(true);
+  });
+
+  test("the clearing takes away the gate folder it is given", () => {
+    const root = scratch();
+    const folder = gateFolder(root, sanitizer.gate);
+
+    mkdirSync(folder, { recursive: true });
+    writeFileSync(join(folder, progressFile), "{}");
+
+    clearGate(root, folder);
+
+    expect(existsSync(folder)).toBe(false);
+  });
+});
+
+describe("how far a run got, read off the folder", () => {
+  test("a gate nobody has started has not started", () => {
+    const root = scratch();
+
+    expect(readRunStanding(root, [sanitizer])[0]).toMatchObject({ state: "not started", done: 0, planned: 0, kept: 0 });
+  });
+
+  test("a finished gate reads as frozen, with its batches and rows counted", async () => {
+    const root = scratch();
+
+    await driveGates(driving(root, { gates: [sanitizer], rows: 6 }), standIn());
+
+    expect(readRunStanding(root, [sanitizer])[0]).toMatchObject({ state: "frozen", done: 3, planned: 3, kept: 6 });
+  });
+
+  test("an interrupted gate reads as still going, at the batch it reached", async () => {
+    const root = scratch();
+
+    await driveGates(driving(root, { gates: [sanitizer], rows: 6 }), async (spec, ask) => {
+      if (ask.seed.endsWith("-3")) {
+        throw new Error("세션이 끊겼습니다");
+      }
+
+      return { text: JSON.stringify(rowsFor(spec, ask, ask.count)), sessionId: "held", tokens: noTokens };
+    });
+
+    expect(readRunStanding(root, [sanitizer])[0]).toMatchObject({ state: "running", done: 2, planned: 3, kept: 4 });
+  });
+
+  test("it counts the batches on disk, not the count a killed run left behind", async () => {
+    const root = scratch();
+
+    await driveGates(driving(root, { gates: [sanitizer], rows: 6 }), standIn());
+
+    // What a run killed between freezing a batch and recording it leaves: the batch stands, the
+    // count is one behind.
+    const folder = gateFolder(root, sanitizer.gate);
+    const progress = readProgress(folder)!;
+
+    progress.gates[sanitizer.gate]!.done = 1;
+    writeFileSync(join(folder, progressFile), JSON.stringify(progress));
+
+    expect(readRunStanding(root, [sanitizer])[0]!.done).toBe(3);
+  });
+
+  test("a lost batch is counted where it happened", async () => {
+    const root = scratch();
+
+    await driveGates(driving(root, { gates: [sanitizer], rows: 4 }), async () => ({
+      text: "행 목록이 아니라 그냥 할 말",
+      sessionId: "held",
+      tokens: noTokens,
+    }));
+
+    expect(readRunStanding(root, [sanitizer])[0]).toMatchObject({ lostBatches: 2, kept: 0 });
+  });
+
+  test("the thread a gate rode is visible, which is what says the prefix is cached", async () => {
+    const root = scratch();
+
+    await driveGates(driving(root, { gates: [sanitizer], rows: 2 }), standIn());
+
+    expect(readRunStanding(root, [sanitizer])[0]!.threadHeld).toBe(true);
+  });
+
+  test("what it says matches what is in the folder", async () => {
+    const root = scratch();
+
+    await driveGates(driving(root, { rows: 4 }), standIn());
+
+    const lines = standingLines(readRunStanding(root, [sanitizer, notes]));
+
+    expect(lines[0]).toContain(`${sanitizer.gate}: 굳음`);
+    expect(lines[0]).toContain("묶음 2/2");
+    expect(lines.at(-1)).toContain("묶음 4/4");
+    expect(lines.at(-1)).toContain("행 8");
+  });
+
+  test("refusals are broken out by reason rather than lumped into a count", () => {
+    const root = scratch();
+    const folder = gateFolder(root, sanitizer.gate);
+
+    mkdirSync(folder, { recursive: true });
+    freezeBatch(folder, sanitizer.gate, 0, []);
+    writeFileSync(join(folder, progressFile), JSON.stringify({
+      started: "2026-09-23T00:00:00.000Z",
+      model: "gpt-5.6-terra",
+      effort: "high",
+      road: "codex",
+      rows: 2,
+      batchSize: 2,
+      shares: { calibration: 0.15, test: 0.15 },
+      gates: { [sanitizer.gate]: { done: 1, sessionId: null, kept: 0, refused: { "wrong-language": 3, "too-large": 1 }, unreadable: 0, lostBatches: 0, tokens: noTokens } },
+    }));
+
+    expect(standingLines(readRunStanding(root, [sanitizer]))[0]).toContain("버린 행 too-large 1, wrong-language 3");
+  });
+});
+
+describe("where a run's folders stand", () => {
+  test("every gate's folder is under the run's own gates folder", async () => {
+    const root = scratch();
+
+    await driveGates(driving(root), standIn());
+
+    for (const spec of [sanitizer, notes]) {
+      expect(gateFolder(root, spec.gate)).toBe(join(root, gatesFolderName, spec.gate));
+      expect(existsSync(gateFolder(root, spec.gate))).toBe(true);
+    }
+  });
+});
