@@ -148,15 +148,15 @@ run here trains one gate's model on a card of its own, so there is nothing for D
 
 - **The machines:** nodes `n2` to `n5` (BMO's `docs/nodes.md`), 192.0.2.17 to .20 — four of the same
   build, Ubuntu on the metal, an RTX 4070 with 12 GB, 62 GB of RAM, a C compiler and CUDA. `n6` is of
-  the same build and is not a training machine: it carries the served Laya API, and a training run
-  would take its card.
+  the same build and is not a training machine: it carries the house LLM service
+  (`docs/llm-server.md`), and a training run would take its card.
 - **The venv stands on uv's own Python, never on the system's.** torch's native Triton kernels are
   compiled on the node at the first step against the interpreter's development headers, and uv's
   interpreter carries its own while the system's are installed on one node and missing on the next.
   A venv found standing on the system Python is reported as not ready and is made again.
-- All four are jake nodes, so each is reached through its hub rather than by SSH: the
-  console is the jake checkout's own (`~/repos/ahas/infra/jake`), `jake exec -a <node> '<command>'`
-  runs a command and `jake upload` / `jake download` carry a file across.
+- All four are jake nodes, so each is reached through its hub rather than by SSH. The console is
+  the owner's jake checkout, run as `bun ~/repos/ahas/jake/src/console/main.ts`: its `exec -a <node>
+  '<command>'` runs a command and `upload` / `download` carry a file across.
 - **What a node carries is read off the node, not from here.** The GPU, the free VRAM, the CUDA and
   python versions and the installed package versions move with the machine, so the setup verb reports
   the nodes side by side rather than this document stating them (`docs/laya-train-run.md`).

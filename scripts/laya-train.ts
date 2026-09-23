@@ -1,7 +1,8 @@
 import { basename, join } from "node:path";
 
 import { allOf, asksUsage, lastOf, readFlags } from "../src/flags";
-import { spawnRunner, TRAINING_NODES } from "../src/laya-nodes";
+import { spawnRunner } from "../src/jake";
+import { notTrainingNodes, TRAINING_NODES } from "../src/laya-nodes";
 import { gateSyntheses } from "../src/laya-synth";
 import {
   datasetIsRehearsal,
@@ -63,6 +64,12 @@ const folder = data.startsWith("/") ? data : dataPath("laya-rehearsal", data);
 const run = value("--run") ?? basename(folder);
 const gates = many("--gate").length > 0 ? many("--gate") : gateSyntheses.map((one) => one.gate);
 const nodes = many("--node").length > 0 ? many("--node") : [...TRAINING_NODES];
+const refused = notTrainingNodes(nodes);
+
+if (refused !== null) {
+  console.error(`laya-train: ${refused}`);
+  process.exit(2);
+}
 
 if (argv.includes("--dry-run")) {
   console.log(`처음: ${nodes.slice(0, gates.length).map((node, index) => `${node} → ${gates[index]}`).join(", ")}`);

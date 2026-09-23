@@ -32,9 +32,9 @@ import {
 
 import { scratchDir } from "./scratch";
 
-import type { NodeRunner, RunResult } from "./laya-nodes";
+import type { NodeRunner, RunResult } from "./jake";
 
-const CONSOLE = "/home/ahas/repos/ahas/infra/jake/src/console/main.ts";
+const CONSOLE = "/home/ahas/repos/ahas/jake/src/console/main.ts";
 
 // One directory for the file, asked for at the one door that takes it away again, and a room of its
 // own under it for each case.
@@ -573,6 +573,13 @@ describe("carrying the checkpoints off the node", () => {
 });
 
 describe("driving a whole run", () => {
+  test("a run is not put on a node that is not a training node", async () => {
+    const { runner, seen } = fakeNode(["done"]);
+
+    await expect(driveRun(["a"], ["n2", "n6"], driving(runner))).rejects.toThrow("n6 은(는) 학습 노드가 아니에요");
+    expect(seen).toEqual([]);
+  });
+
   test("a node out of reach loses its own gate and no other", async () => {
     const runner: NodeRunner = async (argv) => {
       const node = argv[4];

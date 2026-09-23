@@ -1,0 +1,14 @@
+[Unit]
+Description=The house LLM service's tunnel door on main-host (docs/llm-server.md in the bmo-gate repository)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/repos/ahas/bmo-gate
+Environment=PATH=%h/.bun/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/.bun/bin/bun scripts/llm-bridge.ts
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

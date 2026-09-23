@@ -2,7 +2,10 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { homeDir, sourceRoot } from "./roots";
+import { homeCommand, jakeExecArgs, jakeUploadArgs, parseHome } from "./jake";
+import { sourceRoot } from "./roots";
+
+import type { NodeRunner, RunResult } from "./jake";
 
 // The training environment on the nodes that train the split gates (docs/laya-train-run.md, 「One gate
 // to a node, in rounds」): what each node carries, what has to be put there, and whether it is ready
@@ -15,8 +18,19 @@ import { homeDir, sourceRoot } from "./roots";
 
 // The four machines the ten gates are trained on. They are named rather than read from the node table
 // because the table holds every machine BMO reaches and only these four train. n6 is not among them:
-// it carries the served Laya API, and a training run would take its card.
+// it carries the house LLM service (docs/llm-server.md), and a training run would take its card.
 export const TRAINING_NODES: readonly string[] = ["n2", "n3", "n4", "n5"];
+
+/** Why these nodes may not be given Laya's work, or null where every one of them is a training node.
+ * Every command that sets up, reads, trains on or collects from a node asks this first, so a node
+ * named by hand cannot put a run on a card another service holds. */
+export function notTrainingNodes(nodes: readonly string[]): string | null {
+  const others = nodes.filter((node) => !TRAINING_NODES.includes(node));
+
+  return others.length === 0
+    ? null
+    : `${others.join(", ")} 은(는) 학습 노드가 아니에요 — Laya 학습과 측정은 ${TRAINING_NODES.join(", ")} 에서만 해요`;
+}
 
 // The account's own folder on a node. No sudo, no system package, nothing outside it.
 export const NODE_DIR = "bmo-laya";
@@ -35,24 +49,6 @@ export const REQUIRED_PACKAGES: readonly string[] = ["laya", "torch", "transform
 
 // Room for a run's own checkpoints: each keeps its newest two step checkpoints beside the model.
 export const NEEDED_DISK_GB = 20;
-
-export interface RunResult {
-  code: number;
-  stdout: string;
-  stderr: string;
-}
-
-/** How a command reaches a node. The one boundary this module has to the world, so a test hands it a
- * stand-in and every decision below is read without a machine. */
-export type NodeRunner = (argv: readonly string[]) => Promise<RunResult>;
-
-/** The runner the commands use: the jake console, spoken to as a process. */
-export const spawnRunner: NodeRunner = async (argv) => {
-  const going = Bun.spawn([...argv], { stdout: "pipe", stderr: "pipe" });
-  const [stdout, stderr] = await Promise.all([new Response(going.stdout).text(), new Response(going.stderr).text()]);
-
-  return { code: await going.exited, stdout, stderr };
-};
 
 export interface NodeProbe {
   host: string;
@@ -77,20 +73,6 @@ export interface NodeProbe {
   setupRunning: boolean;
 }
 
-/** The jake console this repository drives the nodes with. It is the owner's own checkout, outside
- * this one, which is where the machines and their access are kept. */
-export function jakeConsole(): string {
-  return join(homeDir(), "repos", "ahas", "infra", "jake", "src", "console", "main.ts");
-}
-
-export function jakeExecArgs(console: string, agent: string, command: string): string[] {
-  return ["bun", console, "exec", "-a", agent, command];
-}
-
-export function jakeUploadArgs(console: string, agent: string, local: string, remote: string): string[] {
-  return ["bun", console, "upload", local, remote, "-a", agent];
-}
-
 /** Where a file of ours sits on a node, as a path the node's own shell expands. Good for a command,
  * which is read by a shell; not for an upload, which is not. */
 export function nodePath(...parts: string[]): string {
@@ -101,18 +83,6 @@ export function nodePath(...parts: string[]): string {
  * way, so a tilde in it would be a directory of that name. */
 export function nodeFilePath(home: string, name: string): string {
   return [home.replace(/\/+$/, ""), NODE_DIR, name].join("/");
-}
-
-/** Where the account's own folder is, asked of the node itself rather than assumed, since only the
- * node knows what its home is called. */
-export function homeCommand(): string {
-  return "echo HOME=$HOME";
-}
-
-export function parseHome(text: string): string | null {
-  const said = /(?:^|\n)HOME=(\/\S+)/.exec(text)?.[1];
-
-  return said === undefined || said === "" ? null : said;
 }
 
 export function makeDirCommand(): string {
@@ -309,6 +279,11 @@ export interface StandOptions {
  * before anything is written to it, put across only the files that differ, and install only where the
  * reading says something is short. A node already right is read twice and touched not at all. */
 export async function standNode(node: string, options: StandOptions): Promise<NodeOutcome> {
+  const refused = notTrainingNodes([node]);
+  if (refused !== null) {
+    throw new Error(refused);
+  }
+
   const now = options.now ?? (() => Date.now());
   const say = options.say ?? (() => {});
   const started = now();
@@ -412,6 +387,12 @@ export async function standNode(node: string, options: StandOptions): Promise<No
 }
 
 export async function standNodes(nodes: readonly string[], options: StandOptions): Promise<NodeOutcome[]> {
+  // Refused as a whole before any node is touched, so a list with one wrong name changes nothing.
+  const refused = notTrainingNodes(nodes);
+  if (refused !== null) {
+    throw new Error(refused);
+  }
+
   return Promise.all(nodes.map((node) => standNode(node, options)));
 }
 

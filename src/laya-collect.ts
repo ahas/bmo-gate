@@ -2,10 +2,11 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { homeCommand, jakeExecArgs, nodePath, parseHome } from "./laya-nodes";
+import { homeCommand, jakeDownloadArgs, jakeExecArgs, parseHome } from "./jake";
+import { nodePath, notTrainingNodes } from "./laya-nodes";
 import { workbenchPath } from "./roots";
 
-import type { NodeRunner, RunResult } from "./laya-nodes";
+import type { NodeRunner, RunResult } from "./jake";
 
 // A checkpoint carried off the node that made it (docs/laya-train-run.md, 「Checkpoint naming and
 // collection」). A node that dies must not be the only copy of a step, and a checkpoint is a folder
@@ -189,6 +190,11 @@ const out = (result: RunResult) => (result.stderr || result.stdout).trim().slice
  * against the hash the node gave, unpacked under a partial name and only then given its own, so a
  * transfer cut short leaves nothing that reads as a collected checkpoint. */
 export async function collectCheckpoint(ask: CollectAsk): Promise<Collected | string> {
+  const refused = notTrainingNodes([ask.node]);
+  if (refused !== null) {
+    return refused;
+  }
+
   const root = ask.root ?? collectionRoot();
   const now = ask.now ?? (() => new Date());
   const say = ask.say ?? (() => {});
@@ -221,7 +227,7 @@ export async function collectCheckpoint(ask: CollectAsk): Promise<Collected | st
   const carried = join(root, ".incoming", `${ask.run}-${ask.gate}-${stepName(ask.step)}.tar`);
 
   say(`${ask.node}: ${ask.gate} ${stepName(ask.step)} 를 가져오는 중 (${(packed.bytes / 1e6).toFixed(0)}MB)`);
-  const brought = await ask.runner(downloadArgs(ask.console, ask.node, `${home}/bmo-laya/${tarball}`, carried));
+  const brought = await ask.runner(jakeDownloadArgs(ask.console, ask.node, `${home}/bmo-laya/${tarball}`, carried));
 
   if (brought.code !== 0) {
     return `가져오지 못했어요 — ${out(brought)}`;
@@ -277,12 +283,6 @@ export async function collectCheckpoint(ask: CollectAsk): Promise<Collected | st
   say(`${ask.node}: ${ask.gate} ${stepName(ask.step)} 를 ${target} 에 두었어요`);
 
   return { folder: target, manifest };
-}
-
-/** The transfer that brings a file back. It is the one call that reads from a node rather than
- * writing to it, and it is composed here beside the one that writes. */
-export function downloadArgs(console: string, agent: string, remote: string, local: string): string[] {
-  return ["bun", console, "download", remote, local, "-a", agent];
 }
 
 export function collectLines(manifests: readonly CheckpointManifest[]): string[] {

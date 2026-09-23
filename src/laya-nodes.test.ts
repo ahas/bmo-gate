@@ -1,14 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
+import { jakeExecArgs, jakeUploadArgs, parseHome } from "./jake";
 import {
   NODE_FILES,
-  jakeExecArgs,
-  jakeUploadArgs,
   nodeBusy,
   nodeFilePath,
   nodePath,
-  parseHome,
   nodeTable,
+  notTrainingNodes,
   outdatedFiles,
   parseProbe,
   parseSetupEnd,
@@ -19,11 +18,11 @@ import {
   standNode,
   standNodes,
   type NodeOutcome,
-  type NodeRunner,
-  type RunResult,
 } from "./laya-nodes";
 
-const CONSOLE = "/home/ahas/repos/ahas/infra/jake/src/console/main.ts";
+import type { NodeRunner, RunResult } from "./jake";
+
+const CONSOLE = "/home/ahas/repos/ahas/jake/src/console/main.ts";
 const FOLDER = "/checkout/laya-server";
 
 // What this checkout's files come to, as the probe would report them back.
@@ -323,7 +322,7 @@ describe("standing a node up", () => {
       tail: () => answer("[10:03] installing what pyproject pins\nLAYA-SETUP-DONE failed:install\n"),
     });
 
-    const outcome = await standNode("n6", standing(runner));
+    const outcome = await standNode("n4", standing(runner));
 
     expect(outcome.setup).toBe("failed");
     expect(outcome.fault).toContain("install");
@@ -336,7 +335,7 @@ describe("standing a node up", () => {
       tail: () => answer("[10:03] installing what pyproject pins\n"),
     });
 
-    const outcome = await standNode("n6", standing(runner));
+    const outcome = await standNode("n4", standing(runner));
 
     expect(outcome.setup).toBe("failed");
     expect(outcome.fault).toContain("setup.log");
@@ -345,7 +344,7 @@ describe("standing a node up", () => {
   test("a setup that finished and left the node short is not called ready", async () => {
     const { runner } = fakeRunner({ probe: () => answer(probeText({ "pkg.torch": "none" })) });
 
-    const outcome = await standNode("n6", standing(runner));
+    const outcome = await standNode("n4", standing(runner));
 
     expect(outcome.setup).toBe("failed");
     expect(outcome.ready).toBe(false);
@@ -392,11 +391,21 @@ describe("standing a node up", () => {
       return command.includes("node-probe.sh") ? answer(probeText({ host: `${node}.labuser.local` })) : answer("");
     };
 
-    const outcomes = await standNodes(["n2", "n5", "n6"], standing(runner));
+    const outcomes = await standNodes(["n2", "n5", "n3"], standing(runner));
 
-    expect(outcomes.map((one) => one.node)).toEqual(["n2", "n5", "n6"]);
+    expect(outcomes.map((one) => one.node)).toEqual(["n2", "n5", "n3"]);
     expect(outcomes.map((one) => one.ready)).toEqual([true, false, true]);
     expect(outcomes[1]!.setup).toBe("unreachable");
+  });
+
+  test("a node that is not a training node is refused before anything reaches it", async () => {
+    const { runner, seen } = fakeRunner({ probe: () => answer(probeText({})) });
+
+    expect(notTrainingNodes(["n2", "n5"])).toBeNull();
+    expect(notTrainingNodes(["n2", "n6"])).toContain("n6 은(는) 학습 노드가 아니에요");
+    await expect(standNode("n6", standing(runner))).rejects.toThrow("학습 노드가 아니에요");
+    await expect(standNodes(["n2", "n6"], standing(runner))).rejects.toThrow("n6");
+    expect(seen).toEqual([]);
   });
 });
 

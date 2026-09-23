@@ -6,7 +6,8 @@ import {
   collectionRoot,
   type CheckpointKind,
 } from "../src/laya-collect";
-import { jakeConsole, spawnRunner } from "../src/laya-nodes";
+import { jakeConsole, spawnRunner } from "../src/jake";
+import { notTrainingNodes } from "../src/laya-nodes";
 import { checkpointOnNode, readTrainLedger } from "../src/laya-train";
 import { dataPath } from "../src/roots";
 
@@ -62,6 +63,13 @@ const step = Number(value("--step"));
 if (node === null || gate === null || run === null || !Number.isInteger(step) || step < 0) {
   console.error("laya-collect: --node, --gate, --run, --step 을 모두 주세요.");
   console.error(usage);
+  process.exit(2);
+}
+
+const refused = notTrainingNodes([node]);
+
+if (refused !== null) {
+  console.error(`laya-collect: ${refused}`);
   process.exit(2);
 }
 

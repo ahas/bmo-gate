@@ -148,8 +148,10 @@ comparison and the verdict record. This document adds no mechanism to either.
 
 ## One gate to a node, in rounds
 
-- **Four nodes, n2 to n5.** n6 is not one of them: it carries the served Laya API, so no training
-  and no measurement is put on it.
+- **Four nodes, n2 to n5.** n6 is not one of them: it carries the house LLM service
+  (`docs/llm-server.md`), and a training run would take its card. Every node command — setting up,
+  reading, training, the curve's passes and collecting — refuses a node outside these four by name
+  before anything reaches it.
 - **A node holds one gate at a time** and a run takes its card to itself. Each node takes the next
   gate waiting the moment its own is done, so a node that drew a small gate is not left idle beside
   one that drew a large one — the gates run from minutes to hours. A gate's

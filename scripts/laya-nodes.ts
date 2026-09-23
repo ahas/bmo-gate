@@ -2,13 +2,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { allOf, asksUsage, readFlags } from "../src/flags";
+import { jakeConsole, spawnRunner } from "../src/jake";
 import {
   TRAINING_NODES,
-  jakeConsole,
   localDigests,
   nodeTable,
+  notTrainingNodes,
   pinnedLaya,
-  spawnRunner,
   standNodes,
 } from "../src/laya-nodes";
 import { sourceRoot } from "../src/roots";
@@ -48,6 +48,13 @@ if (!reading.ok || reading.loose.length > 0) {
 
 const wanted = allOf(reading, "--node");
 const nodes = wanted.length > 0 ? wanted : [...TRAINING_NODES];
+const refused = notTrainingNodes(nodes);
+
+if (refused !== null) {
+  console.error(`laya-nodes: ${refused}`);
+  process.exit(2);
+}
+
 const check = argv.includes("--check");
 const folder = join(sourceRoot(), "laya-server");
 

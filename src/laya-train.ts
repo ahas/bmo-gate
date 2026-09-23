@@ -3,12 +3,13 @@ import { join } from "node:path";
 
 import { collectCheckpoint, collectionRoot } from "./laya-collect";
 import { splitFiles } from "./laya-frozen";
-import { jakeConsole, jakeExecArgs, jakeUploadArgs, homeCommand, nodePath, parseHome, printedWidth } from "./laya-nodes";
+import { homeCommand, jakeConsole, jakeExecArgs, jakeUploadArgs, parseHome } from "./jake";
+import { nodePath, notTrainingNodes, printedWidth } from "./laya-nodes";
 import { rehearsalFolder, runWord } from "./laya-rehearsal";
 import { synthesisFor } from "./laya-synth";
 
 import type { DatasetSplit } from "./laya-dataset";
-import type { NodeRunner, RunResult } from "./laya-nodes";
+import type { NodeRunner, RunResult } from "./jake";
 
 // One gate to one node, each node taking the next gate as its own finishes (docs/laya-train-run.md,
 // 「One gate to a node, in rounds」). This is the driver: it cuts the dataset into one folder a gate,
@@ -575,6 +576,11 @@ export async function driveGate(gate: string, node: string, round: number, optio
 export async function driveRun(
   gates: readonly string[], nodes: readonly string[], options: DriveOptions,
 ): Promise<TrainLedger> {
+  const refused = notTrainingNodes(nodes);
+  if (refused !== null) {
+    throw new Error(refused);
+  }
+
   const now = options.now ?? (() => new Date());
   const started = now().toISOString();
   const waiting = [...gates];

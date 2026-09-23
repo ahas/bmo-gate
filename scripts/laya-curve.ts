@@ -5,7 +5,8 @@ import { claimGate, releaseGate } from "../src/gate-claim";
 import { growingCounts } from "../src/gate-merge";
 import { allOf, asksUsage, lastOf, readFlags } from "../src/flags";
 import { choosePass, curveFloor, curveGrowth, curveLines, readCurve, runPass } from "../src/laya-curve";
-import { jakeConsole, localDigests, pinnedLaya, spawnRunner, standNodes, TRAINING_NODES } from "../src/laya-nodes";
+import { jakeConsole, spawnRunner } from "../src/jake";
+import { localDigests, notTrainingNodes, pinnedLaya, standNodes, TRAINING_NODES } from "../src/laya-nodes";
 import { trainOnNodes } from "../src/laya-train";
 import { dataPath, runFolder, sourceRoot } from "../src/roots";
 
@@ -79,6 +80,13 @@ if (argv.includes("--dry-run")) {
 
 const wanted = allOf(reading, "--node");
 const nodes = wanted.length > 0 ? wanted : [...TRAINING_NODES];
+const refused = notTrainingNodes(nodes);
+
+if (refused !== null) {
+  console.error(`laya-curve: ${refused}`);
+  process.exit(2);
+}
+
 const server = join(sourceRoot(), "laya-server");
 
 // One pass at a time: a pass started by hand beside the timer's would put two gates on one card. A

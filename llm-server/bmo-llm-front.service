@@ -1,0 +1,16 @@
+[Unit]
+Description=The house LLM service's MCP and OpenAI-compatible front (docs/llm-server.md in the bmo-gate repository)
+After=bmo-llm-vllm.service
+Wants=bmo-llm-vllm.service
+
+[Service]
+Type=simple
+WorkingDirectory=%h/bmo-llm
+# LLM_KEY and VLLM_API_KEY come from here.
+EnvironmentFile=%h/.config/bmo-llm/env
+ExecStart=%h/bmo-llm/.venv/bin/python %h/bmo-llm/front.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

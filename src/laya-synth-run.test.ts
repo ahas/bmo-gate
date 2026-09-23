@@ -29,7 +29,6 @@ import {
   lostAnswerName,
   mendedAnswerName,
   runSynthesis,
-  synthRun,
 } from "./laya-synth-run";
 import { splitFiles, whatStands } from "./laya-frozen";
 
@@ -97,33 +96,15 @@ const options = (folder: string, extra: Partial<Parameters<typeof runSynthesis>[
   gates: [sanitizer],
   rows: 6,
   batchSize: 2,
-  model: "claude-opus-5",
+  model: "gpt-5.6-luna",
   effort: "medium",
-  road: "claude" as const,
+  road: "codex" as const,
   shares: { calibration: 0.15, test: 0.15 },
   resume: false,
   ...extra,
 });
 
 describe("the run one batch is", () => {
-  test("holds its session, unlike a one-shot judgement", () => {
-    const run = synthRun("claude-opus-5", "medium", "/prompts/x.md", "묶음", null, "/cwd", {});
-
-    expect(run.keepSession).toBe(true);
-    expect(run.resumeSessionId).toBeNull();
-  });
-
-  test("carries the session the last batch came back with", () => {
-    expect(synthRun("m", "medium", "/p.md", "묶음", "abc123", "/cwd", {}).resumeSessionId).toBe("abc123");
-  });
-
-  test("asks for no tools and the harness's own commands stay off", () => {
-    const run = synthRun("m", "medium", "/p.md", "묶음", null, "/cwd", {});
-
-    expect(run.toolsShown).toBe("");
-    expect(run.hostCommands).toBe(false);
-  });
-
   test("the gate's fixed prefix is the system prompt and the batch's ask is the prompt", () => {
     const first = batchPrompts(sanitizer, plannedBatches(sanitizer, 4, 2)[0]!);
     const second = batchPrompts(sanitizer, plannedBatches(sanitizer, 4, 2)[1]!);
@@ -134,8 +115,8 @@ describe("the run one batch is", () => {
 });
 
 describe("which road holds a session", () => {
-  test("the Claude road does and J3090 does not", () => {
-    expect(roadHoldsSession("claude")).toBe(true);
+  test("the codex road does and J3090 does not", () => {
+    expect(roadHoldsSession("codex")).toBe(true);
     expect(roadHoldsSession("j3090")).toBe(false);
   });
 });
@@ -320,9 +301,9 @@ describe("a whole run against a stand-in", () => {
 
     const meta = JSON.parse(readFileSync(join(folder, metaFile), "utf8")) as SynthMeta;
 
-    expect(meta.model).toBe("claude-opus-5");
+    expect(meta.model).toBe("gpt-5.6-luna");
     expect(meta.effort).toBe("medium");
-    expect(meta.road).toBe("claude");
+    expect(meta.road).toBe("codex");
     expect(Date.parse(meta.written)).toBeGreaterThan(0);
     expect(Date.parse(meta.started)).toBeGreaterThan(0);
     expect(meta.gates.map((one) => one.gate)).toEqual(["sanitizer"]);
@@ -419,7 +400,7 @@ describe("the J3090 road", () => {
     expect(resumed).toEqual([null, null, null]);
   });
 
-  test("the Claude road carries the last batch's session into the next", async () => {
+  test("the codex road carries the last batch's thread into the next", async () => {
     const folder = scratch();
     const resumed: (string | null)[] = [];
 

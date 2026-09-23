@@ -248,10 +248,10 @@ gate on each road, same bar, same audit.
 | repeats | 0.00 | 0.00 | 0.00 | 0.00 | ≤ 0.05 |
 | lost batches | 1 | 0 | 0 | 0 | none |
 
-- **`claude-opus-5` at medium effort writes the rows.** It meets all five on both gates; qwen misses
-  the language on both and the balance on one. That is the second outcome registered above, reached
-  by the rule rather than by preference, and it is what 하스's own conditional settles once qwen has
-  been measured and found short.
+- **`claude-opus-5` at medium effort met the bar in the pilot.** It meets all five on both gates;
+  qwen misses the language on both and the balance on one. That is the second outcome registered
+  above, reached by the rule rather than by preference. The rows themselves are written on the two
+  roads `docs/gate-data.md` names, codex and J3090; no road carries claude.
 - **What the language figure is worth.** At a hundred rows one batch is a fifth of the run, so a
   language drawn to five per cent cannot be hit at all and the drift cannot fall below about fifteen
   points however good the model is. opus reached the bar by mixing languages inside a batch rather

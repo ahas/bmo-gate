@@ -4,7 +4,6 @@ import { basename, dirname, join } from "node:path";
 import { frozenHere, refuseOverwrite, splitFiles, whatStands } from "./laya-frozen";
 import { answersOf, datasetRowOf, languageBuckets, languageOf, readSynthBatch, roomKinds, stateText, synthPrefix, synthSuffix, validateSynthRow } from "./laya-synth";
 
-import type { HarnessRun } from "./harness";
 import type { DatasetRow, DatasetSplit, SplitShares } from "./laya-dataset";
 import type { GateSynthesis, LanguageBucket, SynthAsk, SynthRefusal } from "./laya-synth";
 
@@ -16,10 +15,10 @@ import type { GateSynthesis, LanguageBucket, SynthAsk, SynthRefusal } from "./la
 // last frozen one. The plan is a pure function of the gate, the row count and the batch size, so a
 // resumed run asks for exactly what the dead one would have asked for next.
 
-// Which road the rows are written on. The two differ in more than their model: one holds a session
-// across a gate's batches and reads its fixed prefix out of the prompt cache, and the other keeps
-// no session at all and reads the whole prefix afresh on every call.
-export type SynthRoad = "claude" | "codex" | "j3090";
+// Which road the rows are written on (docs/gate-data.md). The two differ in more than their model:
+// codex holds a thread across a gate's batches and reads its fixed prefix out of the prompt cache,
+// and J3090 keeps no session at all and reads the whole prefix afresh on every call.
+export type SynthRoad = "codex" | "j3090";
 
 export function roadHoldsSession(road: SynthRoad): boolean {
   return road !== "j3090";
@@ -51,39 +50,6 @@ export interface SynthAnswer {
 }
 
 export type SynthAsker = (spec: GateSynthesis, ask: SynthAsk, resumeSessionId: string | null) => Promise<SynthAnswer>;
-
-// The run one batch is, as this repository's own harness reads a run. It keeps its session so the
-// next batch of the same gate resumes it and reads the fixed prefix out of the cache rather than
-// afresh; `teacherRun` keeps none, which is right for a one-shot judgement and wrong here.
-export function synthRun(
-  model: string,
-  effort: string,
-  systemPromptPath: string,
-  prompt: string,
-  resumeSessionId: string | null,
-  cwd: string,
-  env: Record<string, string | undefined>,
-): HarnessRun {
-  return {
-    line: "gate",
-    model,
-    effort,
-    systemPromptPath,
-    toolsShown: "",
-    toolsAllowed: null,
-    toolsDenied: null,
-    mcpConfigPath: null,
-    prompt,
-    promptDelivery: "input",
-    resumeSessionId,
-    keepSession: true,
-    hostCommands: false,
-    thinking: true,
-    answerShape: "object",
-    cwd,
-    env,
-  };
-}
 
 // A fixed stride over the batches, so the languages are interleaved rather than written in three
 // blocks: a run stopped halfway then holds something of every language instead of all of one.

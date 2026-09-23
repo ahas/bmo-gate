@@ -1,0 +1,13 @@
+[project]
+name = "bmo-llm"
+version = "0.1.0"
+description = "The house LLM service on n6: vLLM behind an MCP and OpenAI-compatible front (docs/llm-server.md)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "vllm==0.30.0",
+  "mcp==2.2.0",
+  "starlette==1.7.0",
+  "uvicorn==0.53.0",
+  "httpx==0.28.1",
+  "websockets==17.1",
+]

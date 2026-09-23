@@ -10,7 +10,6 @@ import {
   collectedCheckpoints,
   collectedPath,
   collectionRoot,
-  downloadArgs,
   manifestFile,
   packCommand,
   parsePacked,
@@ -19,12 +18,13 @@ import {
   type CheckpointManifest,
   type CollectAsk,
 } from "./laya-collect";
+import { jakeDownloadArgs } from "./jake";
 
 import { scratchDir } from "./scratch";
 
-import type { NodeRunner, RunResult } from "./laya-nodes";
+import type { NodeRunner, RunResult } from "./jake";
 
-const CONSOLE = "/home/ahas/repos/ahas/infra/jake/src/console/main.ts";
+const CONSOLE = "/home/ahas/repos/ahas/jake/src/console/main.ts";
 const TAR = "the bytes of a checkpoint's tar";
 const SHA = createHash("sha256").update(TAR).digest("hex");
 
@@ -156,7 +156,7 @@ describe("the calls a collection is made of", () => {
   });
 
   test("a download names the remote whole, since no shell reads it", () => {
-    expect(downloadArgs(CONSOLE, "n2", "/home/labuser/bmo-laya/collect/x.tar", "/here/x.tar"))
+    expect(jakeDownloadArgs(CONSOLE, "n2", "/home/labuser/bmo-laya/collect/x.tar", "/here/x.tar"))
       .toEqual(["bun", CONSOLE, "download", "/home/labuser/bmo-laya/collect/x.tar", "/here/x.tar", "-a", "n2"]);
   });
 
@@ -173,6 +173,20 @@ describe("the calls a collection is made of", () => {
 });
 
 describe("carrying one back", () => {
+  test("nothing is asked of a node that is not a training node", async () => {
+    const root = folder();
+
+    try {
+      const { runner, seen } = fakeNode();
+      const collected = await collectCheckpoint(asking(runner, root, { node: "n6" }));
+
+      expect(collected).toContain("n6 은(는) 학습 노드가 아니에요");
+      expect(seen).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("it is packed, brought over, checked and unpacked with its manifest", async () => {
     const root = folder();
 
