@@ -309,6 +309,10 @@ A run is a name, a set of gates, a number of rows per gate and a batch size.
   built again asking for more.
 - **A gate that falls over costs only itself.** The other nine keep writing, what the fallen one
   had frozen stands, and the run says which gates did not finish.
+- **How many gates run at once is a count held, not a roster cut into groups.** A gate that finishes
+  is replaced by the next one waiting. Cut into fixed groups, the run stands on the slowest gate of
+  each group while the ones that finished sit idle beside it — and the gates are nothing like the
+  same size, one running to thousands of batches and another to eighty.
 - **Starting a gate over takes away what stood in its folder first.** Freezing reads every batch
   present, so a batch of the replaced run left behind would land in the replacement's dataset —
   and a gate rebuilt because it missed its bars would carry the very rows that missed them.

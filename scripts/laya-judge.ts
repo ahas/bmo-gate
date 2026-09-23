@@ -216,9 +216,19 @@ async function runGate(gate: string): Promise<void> {
   }
 }
 
-for (let start = 0; start < gates.length; start += atOnce) {
-  await Promise.all(gates.slice(start, start + atOnce).map((gate) => runGate(gate)));
+// As many gates judging at once as the run asked for, and a gate that finishes is replaced rather
+// than waited on. Cutting the roster into fixed groups instead leaves the whole run standing on the
+// slowest gate of each group: a gate of six thousand batches and a gate of eighty are not two
+// halves of anything, and the ones that finished sit idle beside the one that has not.
+const waiting = [...gates];
+
+async function takeGates(): Promise<void> {
+  for (let gate = waiting.shift(); gate !== undefined; gate = waiting.shift()) {
+    await runGate(gate);
+  }
 }
+
+await Promise.all(Array.from({ length: Math.min(atOnce, gates.length) }, () => takeGates()));
 
 if (trouble.length > 0) {
   process.exit(1);
