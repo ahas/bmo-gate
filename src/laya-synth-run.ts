@@ -399,10 +399,44 @@ export interface SynthMeta {
   tokens: TokenTally;
 }
 
-// The batches become the three files: every row once, the duplicates counted rather than written
-// twice, and the language of each row kept beside them under its id.
-export function freezeSplits(folder: string, progress: SynthProgress): SynthMeta {
-  const frozen = readFrozenBatches(folder);
+// The batches of one gate a reader may take while its writer is still going: the run of whole
+// batches from the first, stopping at the first one missing. A batch is renamed into place whole,
+// so any batch file that can be seen is complete; one past a gap belongs to another plan, and one
+// removed between the listing and the reading — a gate being started over — ends the run there
+// rather than failing the reader.
+export function readWholeBatches(folder: string, gate: string): { batches: number; rows: FrozenRow[] } {
+  const rows: FrozenRow[] = [];
+  let batches = 0;
+
+  for (;;) {
+    let text: string;
+
+    try {
+      text = readFileSync(batchPath(folder, gate, batches), "utf8");
+    } catch {
+      break;
+    }
+
+    rows.push(...text.split("\n").filter((line) => line.trim() !== "").map((line) => JSON.parse(line) as FrozenRow));
+    batches += 1;
+  }
+
+  return { batches, rows };
+}
+
+// The three splits as the frozen batches make them, held in memory. Freezing writes this; a cut
+// taken while the gate is still being written reads it without writing anything into the gate's
+// folder, where a split file standing would read as a gate already finished.
+export interface FrozenSplits {
+  splits: Record<DatasetSplit, DatasetRow[]>;
+  languages: Array<{ id: string; language: LanguageBucket }>;
+  meta: SynthMeta;
+}
+
+// Every row once, the duplicates counted rather than kept twice, and the language of each row
+// kept beside it under its id. A row's split is the one its input hash fixed when the row was
+// built, so a row lands in the same split however many batches stand beside it.
+export function splitsOf(frozen: readonly FrozenRow[], progress: SynthProgress): FrozenSplits {
   const seen = new Map<string, FrozenRow>();
   const duplicates = new Map<string, number>();
 
@@ -415,16 +449,11 @@ export function freezeSplits(folder: string, progress: SynthProgress): SynthMeta
   }
 
   const kept = [...seen.values()];
+  const splits = { train: [], calibration: [], test: [] } as Record<DatasetSplit, DatasetRow[]>;
 
-  for (const [split, name] of Object.entries(splitFiles) as [DatasetSplit, string][]) {
-    const rows = kept.filter((one) => one.row.split === split).map((one) => JSON.stringify(one.row));
-
-    writeFileSync(join(folder, name), rows.length === 0 ? "" : `${rows.join("\n")}\n`);
+  for (const one of kept) {
+    splits[one.row.split].push(one.row);
   }
-
-  const languages = kept.map((one) => JSON.stringify({ id: one.row.id, language: one.language }));
-
-  writeFileSync(join(folder, languageFile), languages.length === 0 ? "" : `${languages.join("\n")}\n`);
 
   const meta: SynthMeta = {
     model: progress.model,
@@ -442,9 +471,25 @@ export function freezeSplits(folder: string, progress: SynthProgress): SynthMeta
     tokens: Object.values(progress.gates).reduce((all, one) => addTokens(all, one.tokens), noTokens),
   };
 
-  writeFileSync(join(folder, metaFile), `${JSON.stringify(meta, null, 2)}\n`);
+  return { splits, languages: kept.map((one) => ({ id: one.row.id, language: one.language })), meta };
+}
 
-  return meta;
+function jsonLines(values: readonly unknown[]): string {
+  return values.length === 0 ? "" : `${values.map((value) => JSON.stringify(value)).join("\n")}\n`;
+}
+
+// The batches become the three files, the language sidecar and the meta.
+export function freezeSplits(folder: string, progress: SynthProgress): SynthMeta {
+  const made = splitsOf(readFrozenBatches(folder), progress);
+
+  for (const [split, name] of Object.entries(splitFiles) as [DatasetSplit, string][]) {
+    writeFileSync(join(folder, name), jsonLines(made.splits[split]));
+  }
+
+  writeFileSync(join(folder, languageFile), jsonLines(made.languages));
+  writeFileSync(join(folder, metaFile), `${JSON.stringify(made.meta, null, 2)}\n`);
+
+  return made.meta;
 }
 
 function figuresFor(gate: string, kept: readonly FrozenRow[], progress: SynthProgress, duplicates: number): GateFigures {

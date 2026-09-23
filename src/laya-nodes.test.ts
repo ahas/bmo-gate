@@ -46,6 +46,7 @@ function probeText(changes: Record<string, string> = {}): string {
     uv: "0.12.17",
     disk_free_gb: "199",
     venv_python: "3.12.13",
+    venv_managed: "yes",
     "pkg.laya": "0.3.5",
     "pkg.torch": "2.14.0",
     "pkg.transformers": "5.1.0",
@@ -191,6 +192,18 @@ describe("reading what a node carries", () => {
 describe("whether a node can take a gate", () => {
   test("a node with everything is ready", () => {
     expect(readiness(parseProbe(probeText()), "0.3.5", digests)).toEqual({ ready: true, missing: [] });
+  });
+
+  test("a venv standing on the system python is not ready, since it builds against headers the node may lack", () => {
+    const verdict = readiness(parseProbe(probeText({ venv_managed: "no" })), "0.3.5", digests);
+
+    expect(verdict.ready).toBe(false);
+    expect(verdict.missing).toEqual(["가상 환경이 uv 파이썬이 아니라 시스템 파이썬 위에 서 있어요"]);
+  });
+
+  test("a probe that cannot tell whose python the venv stands on is not held against the node", () => {
+    expect(parseProbe(probeText({ venv_managed: "none" }))!.venvManaged).toBeNull();
+    expect(readiness(parseProbe(probeText({ venv_managed: "none" })), "0.3.5", digests).ready).toBe(true);
   });
 
   test("a package that is not there is named", () => {

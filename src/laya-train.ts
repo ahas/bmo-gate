@@ -1,19 +1,21 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { collectCheckpoint, collectionRoot } from "./laya-collect";
 import { splitFiles } from "./laya-frozen";
-import { jakeExecArgs, jakeUploadArgs, homeCommand, nodePath, parseHome, printedWidth } from "./laya-nodes";
+import { jakeConsole, jakeExecArgs, jakeUploadArgs, homeCommand, nodePath, parseHome, printedWidth } from "./laya-nodes";
 import { rehearsalFolder, runWord } from "./laya-rehearsal";
 import { synthesisFor } from "./laya-synth";
 
 import type { DatasetSplit } from "./laya-dataset";
 import type { NodeRunner, RunResult } from "./laya-nodes";
 
-// One gate to one node, the ten gates over two rounds (docs/laya-train-run.md, 「One gate to a node,
-// two rounds」). This is the driver: it cuts the dataset into one folder a gate, puts a gate's folder
-// on the node that will train it, starts the training detached, watches the log, carries on a run
-// that died from its newest step checkpoint rather than from the base model, calibrates what
-// finished, and writes down for every gate what it cost — which is the per-node table in raw form.
+// One gate to one node, each node taking the next gate as its own finishes (docs/laya-train-run.md,
+// 「One gate to a node, in rounds」). This is the driver: it cuts the dataset into one folder a gate,
+// puts a gate's folder on the node that will train it, starts the training detached, watches the
+// log, carries on a run that died from its newest step checkpoint rather than from the base model,
+// calibrates what finished, and writes down for every gate what it cost — which is the per-node
+// table in raw form.
 //
 // The shell of a run lives in the committed `node-train.sh`; what is here composes the calls, reads
 // what comes back, and decides what to do next. Everything but the running is therefore read without
@@ -69,21 +71,6 @@ export function writeGateDataset(from: string, gate: string, to: string): GateDa
   }
 
   return { gate, folder: to, rows };
-}
-
-/** The rounds: a node holds one gate at a time, so the gates are dealt out five at a time and each
- * round is run through before the next one starts. */
-export function planRounds(gates: readonly string[], nodes: readonly string[]): Array<Array<{ gate: string; node: string }>> {
-  if (nodes.length === 0) {
-    return [];
-  }
-  const rounds: Array<Array<{ gate: string; node: string }>> = [];
-
-  for (let at = 0; at < gates.length; at += nodes.length) {
-    rounds.push(gates.slice(at, at + nodes.length).map((gate, index) => ({ gate, node: nodes[index]! })));
-  }
-
-  return rounds;
 }
 
 export function runName(dataset: string, gate: string): string {
@@ -393,6 +380,20 @@ export interface CollectAsk {
   source: string;
 }
 
+function unfinishedRow(
+  gate: string, node: string, round: number, options: DriveOptions, startedAt: string | null,
+): TrainLedgerRow {
+  return {
+    gate, node, round, dataset: options.dataset, rehearsal: options.rehearsal, state: "failed",
+    startedAt, endedAt: null, steps: null, epochs: null, resumes: 0, seconds: null,
+    peakReservedBytes: null, peakAllocatedBytes: null, microBatch: null, accumulate: null,
+    effectiveBatch: null, precision: null, device: null, items: null,
+    checkpoint: checkpointOnNode(options.dataset, gate),
+    trainLog: trainLogOnNode(options.dataset, gate), calibrateLog: calibrateLogOnNode(options.dataset, gate),
+    calibration: null, report: null, collected: [], collectFault: null, fault: null,
+  };
+}
+
 /** One gate trained on one node, from putting its data across to reading what the calibration came
  * to. Everything it decides comes out of the node's own answers, so a run somebody else started, or
  * one this driver started and lost, is picked up rather than begun again. */
@@ -406,15 +407,7 @@ export async function driveGate(gate: string, node: string, round: number, optio
   const args = options.args ?? [];
   const startedAt = now().toISOString();
 
-  const row: TrainLedgerRow = {
-    gate, node, round, dataset: options.dataset, rehearsal: options.rehearsal, state: "failed",
-    startedAt, endedAt: null, steps: null, epochs: null, resumes: 0, seconds: null,
-    peakReservedBytes: null, peakAllocatedBytes: null, microBatch: null, accumulate: null,
-    effectiveBatch: null, precision: null, device: null, items: null,
-    checkpoint: checkpointOnNode(options.dataset, gate),
-    trainLog: trainLogOnNode(options.dataset, gate), calibrateLog: calibrateLogOnNode(options.dataset, gate),
-    calibration: null, report: null, collected: [], collectFault: null, fault: null,
-  };
+  const row = unfinishedRow(gate, node, round, options, startedAt);
 
   // A checkpoint is carried off the node at the two moments its copy there could become the only one:
   // when a run has died and might not come back, and when a run has finished.
@@ -477,7 +470,10 @@ export async function driveGate(gate: string, node: string, round: number, optio
   let calibrating = false;
   let launched = false;
 
-  for (let poll = 0; poll <= polls; poll += 1) {
+  // A run is waited on while it moves, however long that is — the largest gates train for hours —
+  // and given up on once nothing about it has moved for the whole bound: no new line in its log, no
+  // new step, no change from training to calibrating.
+  for (let still = 0; still <= polls;) {
     const move = nextMove(state, uploaded);
 
     if (move === "stuck") {
@@ -561,37 +557,105 @@ export async function driveGate(gate: string, node: string, round: number, optio
     if (read === null) {
       return ended("학습 상태를 읽지 못했어요.", "unreachable");
     }
+    const moved = read.lines !== state.lines || read.step !== state.step || read.training !== state.training
+      || read.calibrating !== state.calibrating || read.finished !== state.finished;
+
+    still = moved ? 0 : still + 1;
     state = read;
   }
 
-  return ended(`${Math.round(polls * everyMs / 1000)}초가 지나도 끝나지 않았어요 — 마지막 줄: ${state.last}`, "failed");
+  return ended(`${Math.round(polls * everyMs / 1000)}초 동안 아무것도 움직이지 않았어요 — 마지막 줄: ${state.last}`, "failed");
 }
 
-/** One round: every gate of it at once, one to a node. A node that cannot be reached loses its own
- * gate's round and no other, since each gate's run is its own. */
-export async function driveRound(
-  pairs: ReadonlyArray<{ gate: string; node: string }>, round: number, options: DriveOptions,
-): Promise<TrainLedgerRow[]> {
-  return Promise.all(pairs.map((pair) => driveGate(pair.gate, pair.node, round, options)));
-}
-
+/** The whole run. Each node takes the next gate waiting the moment its own gate is done, so a node
+ * that drew a small gate is not left idle beside one that drew a large one; a gate's round is how
+ * many gates its node had taken by then. A node whose gate did not finish — out of reach, or a
+ * training that fell over — takes no other: a node that fails in seconds would otherwise take every
+ * gate still waiting and fail each of them the same way, while the nodes that work sat idle. */
 export async function driveRun(
   gates: readonly string[], nodes: readonly string[], options: DriveOptions,
 ): Promise<TrainLedger> {
   const now = options.now ?? (() => new Date());
   const started = now().toISOString();
-  const rounds = planRounds(gates, nodes);
-  const rows: TrainLedgerRow[] = [];
+  const waiting = [...gates];
+  const driven = new Map<string, TrainLedgerRow>();
 
-  for (const [index, pairs] of rounds.entries()) {
-    options.say?.(`${index + 1}번째 차례: ${pairs.map((one) => `${one.node}→${one.gate}`).join(", ")}`);
-    rows.push(...await driveRound(pairs, index + 1, options));
-  }
+  await Promise.all(nodes.map(async (node) => {
+    for (let round = 1; ; round += 1) {
+      const gate = waiting.shift();
+
+      if (gate === undefined) {
+        return;
+      }
+      options.say?.(`${node}: ${round}번째 게이트로 ${gate}`);
+      const row = await driveGate(gate, node, round, options);
+
+      driven.set(gate, row);
+      if (row.state !== "done") {
+        return;
+      }
+    }
+  }));
 
   return {
     run: options.dataset, dataset: options.dataset, rehearsal: options.rehearsal,
-    started, ended: now().toISOString(), nodes: [...nodes], rows,
+    started, ended: now().toISOString(), nodes: [...nodes],
+    // A gate no node was left to take keeps its line, because a ledger quietly holding fewer gates
+    // than were asked for is a ledger that has been read wrong.
+    rows: gates.map((gate) => driven.get(gate)
+      ?? { ...unfinishedRow(gate, "—", 0, options, null), fault: "맡을 노드가 남지 않았어요." }),
   };
+}
+
+export interface TrainOnNodes {
+  gates: readonly string[];
+  nodes: readonly string[];
+  // The run's name, which is also what its data, checkpoints and logs are called on the nodes.
+  run: string;
+  // Where the ledger goes on this machine.
+  runRoot: string;
+  gateFolders: Record<string, string>;
+  rehearsal: boolean;
+  args?: readonly string[];
+  runner: NodeRunner;
+  say?: (line: string) => void;
+}
+
+/** A whole training run: the gates driven over the nodes, every checkpoint carried back the moment
+ * its copy on the node could become the only one, and the ledger written. */
+export async function trainOnNodes(options: TrainOnNodes): Promise<TrainLedger> {
+  const say = options.say ?? (() => {});
+  const ledger = await driveRun(options.gates, options.nodes, {
+    runner: options.runner,
+    console: jakeConsole(),
+    dataset: options.run,
+    gateFolders: options.gateFolders,
+    rehearsal: options.rehearsal,
+    args: options.args,
+    collect: async (ask) => {
+      const carried = await collectCheckpoint({
+        runner: options.runner,
+        console: jakeConsole(),
+        node: ask.node,
+        gate: ask.gate,
+        run: options.run,
+        step: ask.step,
+        checkpoint: ask.kind,
+        source: ask.source,
+        dataset: options.run,
+        rehearsal: options.rehearsal,
+        root: collectionRoot(),
+        say,
+      });
+
+      return typeof carried === "string" ? carried : { folder: carried.folder };
+    },
+    say,
+  });
+
+  writeTrainLedger(options.runRoot, ledger);
+
+  return ledger;
 }
 
 export function writeTrainLedger(folder: string, ledger: TrainLedger): string {

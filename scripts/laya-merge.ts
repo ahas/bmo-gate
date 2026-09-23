@@ -7,11 +7,12 @@ import { datasetFolder, runFolder } from "../src/roots";
 
 // The run's gates into the one dataset folder the training driver is handed.
 
-const usage = `usage: bun scripts/laya-merge.ts <실행> [--gate <게이트>]… [--into <폴더>] [--overwrite]
+const usage = `usage: bun scripts/laya-merge.ts <실행> [--gate <게이트>]… [--into <폴더>] [--growing] [--overwrite]
 
 실행 폴더 아래 게이트별로 굳은 데이터를 하나의 데이터셋 폴더로 묶는다.
 <실행> 은 런타임 데이터 뿌리 아래의 이름이거나 절대 경로다.
---gate 를 주면 그 게이트만 묶는다. 주지 않으면 굳어 있는 게이트 전부.
+--gate 를 주면 그 게이트만 묶는다. 주지 않으면 굳어 있는 게이트 전부(--growing 이면 판정을 시작한 게이트 전부).
+--growing 은 판정 중인 게이트도 지금까지 통째로 굳은 묶음까지로 잘라 묶는다. 게이트 폴더에는 아무것도 쓰지 않는다.
 --into 는 묶어 넣을 폴더(기본: 실행 폴더 아래 dataset).
 --overwrite 는 이미 굳은 데이터셋을 덮어쓴다. 주지 않으면 아무것도 쓰지 않는다.`;
 
@@ -22,7 +23,7 @@ if (asksUsage(argv)) {
   process.exit(0);
 }
 
-const reading = readFlags(argv, { "--gate": true, "--into": true, "--overwrite": false });
+const reading = readFlags(argv, { "--gate": true, "--into": true, "--growing": false, "--overwrite": false });
 
 if (!reading.ok || reading.loose.length !== 1) {
   console.error(`laya-merge: ${reading.trouble ?? "묶을 실행 하나를 주세요."}`);
@@ -52,6 +53,7 @@ const report = mergeGates({
   into,
   gates: wanted.length === 0 ? null : wanted,
   overwrite: asked(reading, "--overwrite"),
+  growing: asked(reading, "--growing"),
 });
 
 if (typeof report === "string") {

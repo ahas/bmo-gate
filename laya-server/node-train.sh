@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One gate's training run on one node, in the four moves the driver makes (docs/laya-train-run.md,
-# 「One gate to a node, two rounds」):
+# 「One gate to a node, in rounds」):
 #
 #   node-train.sh launch    <데이터> <체크포인트> <로그> [옵션…]   학습을 떼어 놓고 시작한다
 #   node-train.sh resume    <체크포인트> <데이터> <로그> [옵션…]  끊긴 학습을 이어서 시작한다

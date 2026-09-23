@@ -14,8 +14,9 @@ account level, rides the J3090 road instead.
   judged, the roads, a run and its folders, the bars a gate must clear, and the commands.
 - `docs/laya-gates.md` — the specification the rows answer to: what each of the ten gates receives,
   asks, and may answer, and the language mix and answer balance its data is drawn to.
-- `docs/laya-train-run.md` — the run across the five training nodes: the rehearsal, the checkpoints
-  and their collection, the resume contract, the ledger, and the two tables a gate is judged on.
+- `docs/laya-train-run.md` — the run across the four training nodes: the rehearsal, the checkpoints
+  and their collection, the resume contract, the ledger, the two tables a gate is judged on, and the
+  passes that train the gates while their judging runs and keep the score curve.
 - `docs/laya-server.md` — the server on home-pc, what it was measured at, the training loop and its
   fixed settings, the calibration, and what the savings cost.
 
@@ -30,6 +31,8 @@ account level, rides the J3090 road instead.
   shares nothing with the Bun side.
 - `bmo-gate.service` is the unit a full run is carried by, symlinked into the user's own unit
   directory. A full run is a day's work and belongs to no session.
+- `bmo-gate-curve.service` and its `.timer` run a training pass every thirty minutes while the
+  judging goes on, symlinked the same way.
 
 ## Checking a change
 

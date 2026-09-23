@@ -142,19 +142,24 @@ run here trains one gate's model on a card of its own, so there is nothing for D
 
 - **Any Linux host with a CUDA GPU and Python 3.10 or later** runs the same scripts in the same venv.
   home-pc's 3080 has the server beside it and holds a run at micro-batch 4 with the unit stopped; the
-  training machines are n2 to n6.
+  training machines are n2 to n5.
 
 ## Training on the nodes
 
-- **The machines:** nodes `n2` to `n6` (BMO's `docs/nodes.md`), 192.0.2.17 to .21 — five of the same
-  build, Ubuntu on the metal, an RTX 4070 with 12 GB, 62 GB of RAM, a system Python of 3.10 or later
-  with its development headers (torch's native Triton kernels are built against them), a C compiler
-  and CUDA. All five are jake nodes, so each is reached through its hub rather than by SSH: the
+- **The machines:** nodes `n2` to `n5` (BMO's `docs/nodes.md`), 192.0.2.17 to .20 — four of the same
+  build, Ubuntu on the metal, an RTX 4070 with 12 GB, 62 GB of RAM, a C compiler and CUDA. `n6` is of
+  the same build and is not a training machine: it carries the served Laya API, and a training run
+  would take its card.
+- **The venv stands on uv's own Python, never on the system's.** torch's native Triton kernels are
+  compiled on the node at the first step against the interpreter's development headers, and uv's
+  interpreter carries its own while the system's are installed on one node and missing on the next.
+  A venv found standing on the system Python is reported as not ready and is made again.
+- All four are jake nodes, so each is reached through its hub rather than by SSH: the
   console is the jake checkout's own (`~/repos/ahas/infra/jake`), `jake exec -a <node> '<command>'`
   runs a command and `jake upload` / `jake download` carry a file across.
 - **What a node carries is read off the node, not from here.** The GPU, the free VRAM, the CUDA and
   python versions and the installed package versions move with the machine, so the setup verb reports
-  the five side by side rather than this document stating them (`docs/laya-train-run.md`).
+  the nodes side by side rather than this document stating them (`docs/laya-train-run.md`).
 - **What is put there:** `~/bmo-laya` in the node's own account — `finetune.py`, `calibrate.py`,
   `compare.py`, the resume bookkeeping they share and `pyproject.toml`, a uv venv built from it with
   `laya` pinned, and the dataset folders under `data/`. No server, no unit and no token: a node
@@ -207,9 +212,9 @@ pass, it is settled, and it is not run again per gate.**
 
 ## One gate to a node
 
-- **Each gate is its own training run**, and a run takes a card to itself. All five nodes stand as
-  jake nodes, so one gate goes to one node and five run at once, and the gates of
-  `docs/laya-gates.md` take as many rounds as that comes to.
-- **The run across the five has a document of its own** — `docs/laya-train-run.md`: what a checkpoint
+- **Each gate is its own training run**, and a run takes a card to itself. All four nodes stand as
+  jake nodes, so one gate goes to one node and four run at once, and each node takes the next gate
+  of `docs/laya-gates.md` as its own finishes.
+- **The run across the four has a document of its own** — `docs/laya-train-run.md`: what a checkpoint
   carries and how a killed run is resumed from it, how the gates are assigned and what the run ledger
   records, where the checkpoints are collected, and the two tables the run is judged on.

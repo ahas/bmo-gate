@@ -1,11 +1,12 @@
 # The split-gate training run
 
-The gates of `docs/laya-gates.md`, each trained as a Laya model of its own across the five
+The gates of `docs/laya-gates.md`, each trained as a Laya model of its own across the four
 training nodes, calibrated, and measured into two tables. This document is the run: what it trains
 on, what a checkpoint carries, how a killed run carries on, how the gates are spread over the nodes,
-and what the tables say. `docs/laya-server.md` is the training loop and the settings every run here
-uses, and BMO's `docs/laya.md` is the canonical account of the filter as a gate asks it — the modes,
-the τ comparison and the verdict record. This document adds no mechanism to either.
+what the tables say, and how the gates are trained again and again while their judging still runs.
+`docs/laya-server.md` is the training loop and the settings every run here uses, and BMO's
+`docs/laya.md` is the canonical account of the filter as a gate asks it — the modes, the τ
+comparison and the verdict record. This document adds no mechanism to either.
 
 - **What the tables are for:** they are the evidence for whether a gate's trained model is worth
   putting in service at all. A run that produces checkpoints and no tables has produced nothing to
@@ -145,20 +146,30 @@ the τ comparison and the verdict record. This document adds no mechanism to eit
 - **Ten checkpoints fit comfortably.** A finished Laya checkpoint is a 322M-parameter model saved in
   half precision, and both the nodes and this machine have hundreds of gigabytes free.
 
-## One gate to a node, two rounds
+## One gate to a node, in rounds
 
-- **Five nodes, two rounds.** A node holds one gate at a time and a run takes its card to itself, so
-  a round is as many gates as there are nodes and the rest go in the round after.
-- **The environment is stood up before a round** by `bun scripts/laya-nodes.ts`, and `--check` reads
-  the five and installs nothing — it does put the probe script across where a node has none, that
+- **Four nodes, n2 to n5.** n6 is not one of them: it carries the served Laya API, so no training
+  and no measurement is put on it.
+- **A node holds one gate at a time** and a run takes its card to itself. Each node takes the next
+  gate waiting the moment its own is done, so a node that drew a small gate is not left idle beside
+  one that drew a large one — the gates run from minutes to hours. A gate's
+  round is how many gates its node had taken by then.
+- **A node whose gate did not finish takes no other gate in that run** — out of reach, or a training
+  that fell over. A node failing in seconds would otherwise take every gate still waiting and fail
+  each the same way while the nodes that work sat idle. A gate no node was left to take keeps its
+  line in the ledger and says so.
+- **The environment is stood up before a run** by `bun scripts/laya-nodes.ts`, and `--check` reads
+  the nodes and installs nothing — it does put the probe script across where a node has none, that
   being how a node is read at all. It asks each node what it carries, puts across only the files that
   differ from this checkout, builds or refreshes the venv from the pinned project file, and prints
-  the five side by side — GPU, free VRAM, CUDA, python, the installed package versions, free disk,
+  the nodes side by side — GPU, free VRAM, CUDA, python, the installed package versions, free disk,
   and what is on the card.
   - **It installs into the account alone:** no sudo, no system package, and nothing written to the
     account's shell profile. CUDA goes on the path of the run rather than of the account.
   - **Every node's venv is the same interpreter**, fetched by uv rather than taken from the system,
-    so a figure measured on one node means the same on the next.
+    so a figure measured on one node means the same on the next, and the kernels compiled at the
+    first step find their headers in the interpreter rather than in whatever the system carries. A
+    venv standing on the system's interpreter is read as not ready and is made again.
   - **A node whose card already carries a process is left exactly as it is** — no file put across, no
     install started — because the process is another gate's run or somebody else's work.
   - **An install already in flight is waited on, not started again**, so the verb can be run as often
@@ -182,18 +193,75 @@ the τ comparison and the verdict record. This document adds no mechanism to eit
   finished is calibrated, a run that died with a step checkpoint is carried on from it rather than
   from the base model, and a run that died leaving nothing to carry on from is named rather than
   written over — removing somebody's checkpoint is nobody's to do quietly.
+- **A run is waited on while it moves.** The largest gates train for hours, so no clock bounds the
+  wait; a run whose log has grown by no line, whose step has not moved and which has not passed from
+  training to calibrating for an hour is given up on with the log's last line.
 - **A run is carried on a bounded number of times.** A gate that keeps dying is given up on with the
   count and the log's last line, rather than being restarted for ever.
 - **A calibration counts as this training's** only where its log is newer than the training that
   finished. One left by an earlier run of the same name says nothing about this one and is not read
   as its figures.
-- **A node out of reach loses its own gate's round and nothing else.** The other four carry on, and
-  the gate it was holding is picked up again when the node answers.
+- **A node out of reach loses the gate it took and nothing else.** The other nodes carry on, and the
+  gate is picked up by the next run over the same name, which reads the node afresh — or, for a
+  gate trained while its judging runs, by the next pass.
 - **The run ledger** records, per gate: the node it ran on, the round, when it started and ended, how
   many steps it took, how many times it was resumed, the elapsed seconds, the peak VRAM, the batch
   shape, the precision, the card it ran on, the checkpoint and the logs on the node, and what the
   calibration came to. It is written beside the run's own per-gate folders under the runtime data
   root, and it is the raw form of the per-node table.
+
+## Training while the judging runs
+
+A gate's judging is hours to days, and a gate need not wait for it to finish to be trained: what it
+has frozen so far is already data. The gates are trained on what they hold now, trained again as
+they grow, and every training leaves a point on a curve of what more data buys.
+
+- **A pass is `bun scripts/laya-curve.ts <실행>`**, and the timer `bmo-gate-curve` runs one every
+  thirty minutes, so the curve grows with the judging and nobody starts it. `--dry-run` says which
+  gates the pass would train and why the rest wait; `--show` prints the curve.
+- **A pass cuts every gate at its whole batches**, finished or not (`bun scripts/laya-merge.ts
+  --growing` is the same cut on its own). A batch is renamed into place whole, so every batch that
+  can be seen is complete; the cut reads the run of batches from the first and stops at the first one
+  missing, and one being started over under it ends the run there rather than failing the pass. The
+  split files a finished gate writes are not read, since the judging writes them in place and a reader
+  beside it could catch one half-written; the batches are what they are made of. Nothing is written
+  into a gate's folder, where a split file standing would read as a gate already finished. The
+  judging needs no GPU, so the only thing the two share is that folder, and this is the whole of how
+  they keep out of each other's way.
+- **A row's split is the one its input hash fixed when the row was built**, at the run's own shares,
+  so a row held out for the test in one pass is held out in every pass after it. Each pass measures on
+  a test set that only grows, and two points of one gate are on the same footing.
+- **A gate under a thousand rows is not trained**, nor one with any of the three splits empty. At the
+  fifteen per cent held out for each of the calibration and the test, a thousand rows is about a
+  hundred and fifty test rows; with the rarer answer a fifth of them, one standard error of the
+  balanced accuracy is about four points there and widens past five under a hundred rows. Below the
+  floor two passes would differ by chance more than by what the data taught.
+- **A gate is trained again once it has grown by a quarter** since its last point. A learning curve
+  moves with the logarithm of the data, so points a constant ratio apart are evenly spaced along it,
+  and the cost of every pass a gate ever gets is bounded by a few times the cost of its last one
+  rather than by how often the timer fires. A pass with nothing grown enough trains nothing and
+  writes nothing.
+- **A gate whose training failed is tried once more on the next pass**, since most failures are a
+  node's rather than the gate's; failed twice on the same rows, it waits for a new row, so a gate that
+  cannot be trained is not sent to a node every thirty minutes once its judging has stopped.
+- **A gate started over is a series of its own.** A point carries when its gate's judging began, and
+  a gate is only held to the points of its own series.
+- **The nodes are stood up at the start of every pass**, the files that differ from this checkout put
+  across, and a node whose card is busy is left out of that pass rather than shared.
+- **Each pass is a training run of its own**, `<실행>-p0001` and on, with its dataset, its per-gate
+  folders and its ledger under the runtime data root's `laya-runs`, so `bun scripts/laya-tables.ts
+  --run <실행>-p0001` makes a pass's tables like any run's. A new name every pass is what lets the data
+  go across once per run and never again while it lives.
+- **One pass at a time.** A pass claims the curve before it starts, the way a gate is claimed before
+  it is written, and a second one stands down while the first lives. Standing down is not a
+  failure — the pass already going is doing the work — so the timer's unit does not read as failed
+  for it.
+- **The curve is `curve.jsonl`** under the runtime data root's `laya-curve/<실행>`, one point a gate a
+  pass, appended in one write and never rewritten: the pass, when, the training run's name, the gate,
+  when its judging began and whether it had finished, the rows it was cut at and how many of them
+  each split holds, the node, whether the training finished, the agreement, the balanced accuracy and the
+  calibration error, the seconds, and the fault where there was one. A point that failed keeps its
+  line and says why.
 
 ## The two tables
 

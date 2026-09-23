@@ -17,7 +17,6 @@ import {
   trainLedgerLines,
   lastJsonObject,
   nextMove,
-  planRounds,
   parseRunState,
   readTrainLedger,
   reportOf,
@@ -124,31 +123,6 @@ const driving = (runner: NodeRunner, changes: Partial<DriveOptions> = {}): Drive
 
 const commands = (seen: Seen[]) => seen.map((one) => one.command);
 const did = (seen: Seen[], what: string) => commands(seen).some((command) => command.includes(what));
-
-describe("dealing the gates out", () => {
-  test("ten gates over five nodes are two rounds, one gate to a node", () => {
-    const rounds = planRounds(
-      ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"], ["n2", "n3", "n4", "n5", "n6"]);
-
-    expect(rounds.length).toBe(2);
-    expect(rounds[0]).toEqual([
-      { gate: "a", node: "n2" }, { gate: "b", node: "n3" }, { gate: "c", node: "n4" },
-      { gate: "d", node: "n5" }, { gate: "e", node: "n6" },
-    ]);
-    expect(rounds[1]!.map((one) => one.gate)).toEqual(["f", "g", "h", "i", "j"]);
-    for (const round of rounds) {
-      expect(new Set(round.map((one) => one.node)).size).toBe(round.length);
-    }
-  });
-
-  test("fewer gates than nodes is one round, and a node is left idle", () => {
-    expect(planRounds(["a", "b"], ["n2", "n3", "n4"])).toEqual([[{ gate: "a", node: "n2" }, { gate: "b", node: "n3" }]]);
-  });
-
-  test("no node is no round at all", () => {
-    expect(planRounds(["a"], [])).toEqual([]);
-  });
-});
 
 describe("one gate's own data", () => {
   test("a gate is given its rows and nobody else's", () => {
@@ -513,13 +487,24 @@ describe("driving one gate", () => {
     expect(did(seen, "node-train.sh launch")).toBe(false);
   });
 
-  test("a run that never finishes is not waited on for ever", async () => {
-    const { runner } = fakeNode([stateText({ training: "yes", exists: "yes", last: "epoch 1/4" })]);
+  test("a run that stops moving is not waited on for ever", async () => {
+    const { runner } = fakeNode([stateText({ training: "yes", exists: "yes", lines: "40", last: "epoch 1/4" })]);
 
     const row = await driveGate("reply-wanted", "n2", 1, driving(runner, { polls: 3 }));
 
     expect(row.state).toBe("failed");
-    expect(row.fault).toContain("끝나지 않았어요");
+    expect(row.fault).toContain("아무것도 움직이지 않았어요");
+  });
+
+  test("a run whose log keeps growing is waited on past the bound", async () => {
+    const going = Array.from({ length: 8 }, (_, at) =>
+      stateText({ training: "yes", exists: "yes", step: "step-000002", lines: String(10 + at) }));
+    const { runner } = fakeNode([...going, stateText({ finished: "yes", exists: "yes", step: "step-000008", calibrated: "yes" })],
+      { calibrate: REPORT, train: TRAIN_META });
+
+    const row = await driveGate("reply-wanted", "n2", 1, driving(runner, { polls: 3 }));
+
+    expect(row.state).toBe("done");
   });
 });
 
@@ -621,5 +606,64 @@ describe("driving a whole run", () => {
     ]);
     expect(ledger.rows.map((row) => row.round)).toEqual([1, 1, 2]);
     expect(ledger.rehearsal).toBe(true);
+  });
+
+  test("a node whose gate finished takes the next one waiting rather than standing idle", async () => {
+    const polled = new Map<string, number>();
+    const runner: NodeRunner = async (argv) => {
+      const command = argv[5] ?? "";
+
+      if (command.startsWith("echo HOME")) {
+        return answer("HOME=/home/labuser\n");
+      }
+      if (command.includes(" state ")) {
+        const slow = command.includes("rehearsal-713-a ");
+        const asked = (polled.get(command) ?? 0) + 1;
+
+        polled.set(command, asked);
+
+        return answer(stateText(slow && asked < 20
+          ? { training: "yes", exists: "yes", step: "step-000002" }
+          : { finished: "yes", exists: "yes", step: "step-000008", calibrated: "yes" }));
+      }
+      if (command.includes("-calibrate.log")) {
+        return answer(REPORT);
+      }
+      if (command.includes("-train.log")) {
+        return answer(TRAIN_META);
+      }
+
+      return answer("launched");
+    };
+
+    const ledger = await driveRun(["a", "b", "c", "d"], ["n2", "n3"], driving(runner, {
+      gateFolders: { a: "/x/a", b: "/x/b", c: "/x/c", d: "/x/d" },
+      polls: 30,
+    }));
+
+    expect(ledger.rows.map((row) => [row.gate, row.node, row.round, row.state])).toEqual([
+      ["a", "n2", 1, "done"], ["b", "n3", 1, "done"], ["c", "n3", 2, "done"], ["d", "n3", 3, "done"],
+    ]);
+  });
+
+  test("a node whose training falls over takes no other gate, and a gate nobody was left to take keeps its line", async () => {
+    const runner: NodeRunner = async (argv) => {
+      const command = argv[5] ?? "";
+
+      if (command.startsWith("echo HOME")) {
+        return answer("HOME=/home/labuser\n");
+      }
+      if (command.includes(" state ")) {
+        // Nothing ever stands: every launch falls over as it starts.
+        return answer(stateText());
+      }
+
+      return answer("launched");
+    };
+
+    const ledger = await driveRun(["a", "b"], ["n2"], driving(runner, { gateFolders: { a: "/x/a", b: "/x/b" } }));
+
+    expect(ledger.rows.map((row) => [row.gate, row.node, row.state])).toEqual([["a", "n2", "failed"], ["b", "—", "failed"]]);
+    expect(ledger.rows[1]!.fault).toBe("맡을 노드가 남지 않았어요.");
   });
 });

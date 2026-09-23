@@ -508,7 +508,10 @@ behind it has nothing else, and the shape it writes is the shape the training re
 - `bun scripts/laya-status.ts` — how far a run got: batches done against planned, rows kept, lost
   batches, refusals by reason, the road each gate is riding and whether it is still riding a thread.
   It reads the folders and attaches to nothing, so it answers while a run is still going.
-- `bun scripts/laya-merge.ts` — the per-gate folders into the one dataset folder.
+- `bun scripts/laya-merge.ts` — the per-gate folders into the one dataset folder. `--growing` takes
+  the gates still being judged as well, each cut at the whole batches it has frozen so far, and
+  writes nothing into any gate's folder (`docs/laya-train-run.md`, 「Training while the judging
+  runs」).
 - `bun scripts/laya-audit.ts` — the figures per gate, and the verdict against the bars.
 - `bun scripts/laya-ledger.ts` — the ledger for a run.
 
@@ -526,7 +529,8 @@ When it has finished, the three readings that close a run are the merge, the ver
 ledger, in that order. A gate the verdict names is built again on its own and the three are run
 once more.
 
-What happens to the merged dataset afterwards — the rehearsal it is tried against, the five nodes
-it is trained on, how a killed run is taken up again, where the checkpoints are collected and the
-two tables the run is judged on — is `docs/laya-train-run.md`. The server the trained checkpoint is
+What happens to the merged dataset afterwards — the rehearsal it is tried against, the four nodes
+it is trained on, how a killed run is taken up again, where the checkpoints are collected, the two
+tables the run is judged on, and the passes that train the gates while their judging still runs —
+is `docs/laya-train-run.md`. The server the trained checkpoint is
 served from, and the loop and the settings it is trained with, are `docs/laya-server.md`.

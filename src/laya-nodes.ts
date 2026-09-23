@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { homeDir, sourceRoot } from "./roots";
 
 // The training environment on the nodes that train the split gates (docs/laya-train-run.md, 「One gate
-// to a node, two rounds」): what each node carries, what has to be put there, and whether it is ready
+// to a node, in rounds」): what each node carries, what has to be put there, and whether it is ready
 // to take a gate. A node is reached through its jake hub rather than by SSH, so everything here is a
 // command handed to the jake console and an answer read back from it.
 //
@@ -13,9 +13,10 @@ import { homeDir, sourceRoot } from "./roots";
 // setup installs — so what runs on a node is a file somebody can read rather than a string assembled
 // here. This module composes the calls, reads the answers, and says what is missing.
 
-// The five machines the ten gates are trained on. They are named rather than read from the node table
-// because the table holds every machine BMO reaches and only these five train.
-export const TRAINING_NODES: readonly string[] = ["n2", "n3", "n4", "n5", "n6"];
+// The four machines the ten gates are trained on. They are named rather than read from the node table
+// because the table holds every machine BMO reaches and only these four train. n6 is not among them:
+// it carries the served Laya API, and a training run would take its card.
+export const TRAINING_NODES: readonly string[] = ["n2", "n3", "n4", "n5"];
 
 // The account's own folder on a node. No sudo, no system package, nothing outside it.
 export const NODE_DIR = "bmo-laya";
@@ -45,6 +46,14 @@ export interface RunResult {
  * stand-in and every decision below is read without a machine. */
 export type NodeRunner = (argv: readonly string[]) => Promise<RunResult>;
 
+/** The runner the commands use: the jake console, spoken to as a process. */
+export const spawnRunner: NodeRunner = async (argv) => {
+  const going = Bun.spawn([...argv], { stdout: "pipe", stderr: "pipe" });
+  const [stdout, stderr] = await Promise.all([new Response(going.stdout).text(), new Response(going.stderr).text()]);
+
+  return { code: await going.exited, stdout, stderr };
+};
+
 export interface NodeProbe {
   host: string;
   os: string;
@@ -59,6 +68,8 @@ export interface NodeProbe {
   cc: string;
   uv: string;
   venvPython: string;
+  /** Whether the venv stands on uv's own interpreter; null where there is no venv or it cannot be told. */
+  venvManaged: boolean | null;
   diskFreeGb: number | null;
   packages: Record<string, string>;
   digests: Record<string, string>;
@@ -187,6 +198,7 @@ export function parseProbe(text: string): NodeProbe | null {
     cc: said("cc"),
     uv: said("uv"),
     venvPython: said("venv_python"),
+    venvManaged: said("venv_managed") === "none" ? null : said("venv_managed") === "yes",
     diskFreeGb: numberOf(values.get("disk_free_gb")),
     packages: under("pkg."),
     digests: under("sha."),
@@ -226,6 +238,8 @@ export function readiness(probe: NodeProbe | null, pinned: string | null, digest
   }
   if (probe.venvPython === "none") {
     missing.push("가상 환경이 없어요");
+  } else if (probe.venvManaged === false) {
+    missing.push("가상 환경이 uv 파이썬이 아니라 시스템 파이썬 위에 서 있어요");
   }
   for (const name of REQUIRED_PACKAGES) {
     const version = probe.packages[name] ?? "none";
@@ -428,7 +442,7 @@ export function setupWord(outcome: SetupOutcome): string {
   return SETUP_WORDS[outcome];
 }
 
-/** The five side by side: one line a reading, one column a node, so what differs between them is read
+/** The nodes side by side: one line a reading, one column a node, so what differs between them is read
  * across rather than hunted for. */
 export function nodeTable(outcomes: readonly NodeOutcome[]): string {
   const rows: Array<[string, (one: NodeOutcome) => string]> = [

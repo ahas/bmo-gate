@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # What one training node carries, read and never changed (docs/laya-train-run.md, 「One gate to a node,
-# two rounds」). One `key=value` a line, every value present — what is missing says `none` rather than
+# in rounds」). One `key=value` a line, every value present — what is missing says `none` rather than
 # leaving its line out, so the reader never has to tell an absent value from an absent line.
 set -uo pipefail
 
@@ -41,6 +41,15 @@ say disk_free_gb "$(df -BG --output=avail "$HOME" | tail -1 | tr -dc '0-9')"
 venv="$here/.venv/bin/python"
 if [ -x "$venv" ]; then
   say venv_python "$("$venv" -V 2>&1 | awk '{print $2}')"
+  # Whether the venv stands on uv's own interpreter. One on the system python compiles against
+  # whatever headers the system happens to carry, and a node without them fails its first kernel.
+  managed="$(command -v uv >/dev/null 2>&1 && uv python dir 2>/dev/null || true)"
+  base="$("$venv" -c 'import sys; print(sys.base_prefix)' 2>/dev/null || true)"
+  if [ -n "$managed" ] && [ -n "$base" ]; then
+    case "$base" in "$managed"/*) say venv_managed yes ;; *) say venv_managed no ;; esac
+  else
+    say venv_managed none
+  fi
   "$venv" - <<'PY'
 import importlib.metadata as meta
 for name in ("laya", "torch", "transformers", "safetensors", "bitsandbytes", "numpy"):
@@ -51,6 +60,7 @@ for name in ("laya", "torch", "transformers", "safetensors", "bitsandbytes", "nu
 PY
 else
   say venv_python none
+  say venv_managed none
   for name in laya torch transformers safetensors bitsandbytes numpy; do say "pkg.$name" none; done
 fi
 

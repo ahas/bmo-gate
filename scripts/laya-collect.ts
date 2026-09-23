@@ -6,7 +6,7 @@ import {
   collectionRoot,
   type CheckpointKind,
 } from "../src/laya-collect";
-import { jakeConsole, type NodeRunner, type RunResult } from "../src/laya-nodes";
+import { jakeConsole, spawnRunner } from "../src/laya-nodes";
 import { checkpointOnNode, readTrainLedger } from "../src/laya-train";
 import { dataPath } from "../src/roots";
 
@@ -78,15 +78,8 @@ const row = ledger?.rows.find((one) => one.gate === gate);
 const source = value("--source")
   ?? (kind === "final" ? checkpointOnNode(run, gate) : `${checkpointOnNode(run, gate)}/steps/step-${String(step).padStart(6, "0")}`);
 
-const runner: NodeRunner = async (args): Promise<RunResult> => {
-  const going = Bun.spawn([...args], { stdout: "pipe", stderr: "pipe" });
-  const [stdout, stderr] = await Promise.all([new Response(going.stdout).text(), new Response(going.stderr).text()]);
-
-  return { code: await going.exited, stdout, stderr };
-};
-
 const collected = await collectCheckpoint({
-  runner,
+  runner: spawnRunner,
   console: jakeConsole(),
   node,
   gate,

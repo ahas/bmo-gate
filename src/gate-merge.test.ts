@@ -7,7 +7,7 @@ import { auditFrozen } from "./laya-audit";
 import { driveGates } from "./gate-run";
 import { frozenGatesUnder, gatesTrainingWouldRefuse, mergeGates, readsAsRehearsal } from "./gate-merge";
 import { rehearsalMetaFile } from "./laya-rehearsal";
-import { languageFile, metaFile } from "./laya-synth-run";
+import { batchName, freezeBatch, languageFile, metaFile, writeProgress } from "./laya-synth-run";
 import { splitFiles } from "./laya-frozen";
 import { datasetFolder, gateFolder } from "./roots";
 import { synthesisFor } from "./laya-synth";
@@ -443,6 +443,68 @@ describe("what the audit makes of the dataset", () => {
     for (const one of audit.gates) {
       expect(one.sidecarMismatch).toBe(0);
       expect(one.unreadable).toBe(0);
+    }
+  });
+});
+
+describe("a cut taken while the judging goes on", () => {
+  // A gate part-way through: the batches named are frozen, the rest are not there yet.
+  function judgingGate(root: string, batches: readonly number[]): string {
+    const folder = gateFolder(root, "sanitizer");
+
+    writeProgress(folder, {
+      started: "2026-09-23T13:23:29.866Z", model: "gpt-5.6-terra", effort: "high", road: "codex", rows: 40, batchSize: 5,
+      shares: { calibration: 0.15, test: 0.15 },
+      gates: { sanitizer: { done: batches.length, sessionId: null, kept: 0, refused: {}, unreadable: 0, lostBatches: 0,
+        tokens: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 } } },
+    });
+    for (const index of batches) {
+      freezeBatch(folder, "sanitizer", index, [0, 1].map((at) => ({
+        row: { id: `sanitizer:${index}-${at}`, gate: "sanitizer", split: at === 0 ? "train" : "test", state: "s", questions: "{}",
+          gold: JSON.stringify({ q: { label: "true" } }) },
+        language: "korean" as const,
+      })));
+    }
+
+    return folder;
+  }
+
+  test("a gate still being judged is refused without the word, and the refusal names it", () => {
+    const root = scratch();
+
+    judgingGate(root, [0, 1]);
+
+    expect(merged(root, { gates: ["sanitizer"] })).toContain("--growing");
+  });
+
+  test("is cut at the last whole batch before a gap, and writes nothing into the gate's folder", () => {
+    const root = scratch();
+    const folder = judgingGate(root, [0, 1, 3]);
+
+    // A batch being written stands under a hidden name until it is whole, and is not read.
+    writeFileSync(join(folder, "batches", `.${batchName("sanitizer", 2)}.writing`), "{broken");
+
+    const report = merged(root, { growing: true });
+
+    expect(typeof report === "string" ? report : report.parts).toEqual([{
+      gate: "sanitizer", rows: { train: 2, calibration: 0, test: 2 }, finished: false, started: "2026-09-23T13:23:29.866Z",
+    }]);
+    expect(rowsIn(datasetFolder(root), "test").map((row) => row.id)).toEqual(["sanitizer:0-1", "sanitizer:1-1"]);
+    expect(existsSync(join(folder, splitFiles.train))).toBe(false);
+  });
+
+  test("a finished gate cut from its batches holds exactly the rows its split files hold", async () => {
+    const root = await runOf([sanitizer]);
+    const whole = join(scratch(), "whole");
+    const cut = join(scratch(), "cut");
+
+    merged(root, { into: whole });
+
+    const report = merged(root, { into: cut, growing: true });
+
+    expect(typeof report === "string" ? report : report.parts[0]!.finished).toBe(true);
+    for (const split of ["train", "calibration", "test"] as const) {
+      expect(rowsIn(cut, split)).toEqual(rowsIn(whole, split));
     }
   });
 });

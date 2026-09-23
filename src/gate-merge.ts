@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { refuseOverwrite, splitFiles } from "./laya-frozen";
 import { rehearsalMetaFile } from "./laya-rehearsal";
-import { addTokens, languageFile, metaFile, noTokens, roadsOf } from "./laya-synth-run";
+import { addTokens, languageFile, metaFile, noTokens, progressFile, readProgress, readWholeBatches, roadsOf, splitsOf } from "./laya-synth-run";
 import { gateFolder, gatesFolderName } from "./roots";
 
 import type { DatasetRow, DatasetSplit } from "./laya-dataset";
@@ -25,6 +25,9 @@ export interface MergeOptions {
   // The gates to merge, or null for every gate that has frozen something.
   gates: readonly string[] | null;
   overwrite: boolean;
+  // Whether a gate still being judged goes in with the batches it has frozen so far. Without it
+  // only a finished gate goes in, and a gate still being written is refused.
+  growing?: boolean;
 }
 
 export interface MergeReport {
@@ -37,6 +40,18 @@ export interface MergeReport {
   // into a gate's own duplicate count — that one means the model wrote a row twice, and the bar
   // for repeats is read off it.
   duplicates: number;
+  // Each gate's own rows in each split and whether the gate had finished, so a cut taken while the
+  // judging goes on says how far each gate had got.
+  parts: MergedPart[];
+}
+
+export interface MergedPart {
+  gate: string;
+  rows: Record<DatasetSplit, number>;
+  finished: boolean;
+  // When the gate's writing began. A gate started over is a new series of rows, and this is what
+  // tells two cuts of the same gate apart as belonging to one series or not.
+  started: string;
 }
 
 // What a gate's frozen folder holds, as the merge reads it.
@@ -46,6 +61,7 @@ interface GatePart {
   meta: SynthMeta;
   rows: Record<DatasetSplit, DatasetRow[]>;
   languages: Map<string, LanguageBucket>;
+  finished: boolean;
 }
 
 function readLines(path: string): string[] {
@@ -64,32 +80,43 @@ export function frozenGatesUnder(root: string): string[] {
   return readdirSync(gates).sort().filter((gate) => existsSync(join(gates, gate, splitFiles.train)));
 }
 
-function readPart(root: string, gate: string): GatePart | string {
-  const folder = gateFolder(root, gate);
-  const meta = join(folder, metaFile);
+// Every gate whose writing has begun under a run, finished or not, which is what a growing cut reads
+// when nothing named the gates.
+export function growingGatesUnder(root: string): string[] {
+  const gates = join(root, gatesFolderName);
 
-  if (!existsSync(meta)) {
-    return `${gate}: ${folder} 에 굳은 데이터가 없습니다.`;
+  if (!existsSync(gates)) {
+    return [];
   }
 
-  if (existsSync(join(folder, rehearsalMetaFile))) {
-    return `${gate}: 리허설 데이터입니다. 진짜 데이터와 섞을 수 없습니다.`;
+  return readdirSync(gates).sort().filter((gate) => existsSync(join(gates, gate, progressFile)));
+}
+
+// Why a gate's folder may not hand a row on, or null where it may.
+function refuseRow(gate: string, where: string, row: DatasetRow & { rehearsal?: boolean }): string | null {
+  // A rehearsal row travels with its own mark, and one of them anywhere in a dataset is enough for
+  // the training driver to read the whole thing as a rehearsal.
+  if (row.rehearsal === true) {
+    return `${gate}: ${where} 에 리허설 행이 섞여 있습니다.`;
   }
 
+  if (row.gate !== gate) {
+    return `${gate}: ${where} 에 ${row.gate} 게이트의 행이 있습니다.`;
+  }
+
+  return null;
+}
+
+function readFinished(folder: string, gate: string, meta: string): GatePart | string {
   const rows = { train: [], calibration: [], test: [] } as Record<DatasetSplit, DatasetRow[]>;
 
   for (const [split, name] of Object.entries(splitFiles) as [DatasetSplit, string][]) {
     for (const line of readLines(join(folder, name))) {
       const row = JSON.parse(line) as DatasetRow & { rehearsal?: boolean };
+      const refusal = refuseRow(gate, name, row);
 
-      // A rehearsal row travels with its own mark, and one of them anywhere in a dataset is
-      // enough for the training driver to read the whole thing as a rehearsal.
-      if (row.rehearsal === true) {
-        return `${gate}: ${name} 에 리허설 행이 섞여 있습니다.`;
-      }
-
-      if (row.gate !== gate) {
-        return `${gate}: ${name} 에 ${row.gate} 게이트의 행이 있습니다.`;
+      if (refusal !== null) {
+        return refusal;
       }
 
       rows[split].push(row);
@@ -104,7 +131,59 @@ function readPart(root: string, gate: string): GatePart | string {
     languages.set(said.id, said.language);
   }
 
-  return { gate, folder, meta: JSON.parse(readFileSync(meta, "utf8")) as SynthMeta, rows, languages };
+  return { gate, folder, meta: JSON.parse(readFileSync(meta, "utf8")) as SynthMeta, rows, languages, finished: true };
+}
+
+// A gate read off its whole batches rather than off its split files. The judging writes the split
+// files in place when a gate finishes, so a reader beside it could catch one half-written; a batch
+// is renamed into place whole, and the splits are made of nothing else. So a growing cut reads
+// every gate this way, finished or not, and never writes into the gate's folder.
+function readBatches(folder: string, gate: string, finished: boolean): GatePart | string {
+  const progress = readProgress(folder);
+
+  if (progress === null) {
+    return `${gate}: ${folder} 에서 판정을 시작한 적이 없습니다.`;
+  }
+
+  const whole = readWholeBatches(folder, gate);
+
+  for (const one of whole.rows) {
+    const refusal = refuseRow(gate, "묶음", one.row);
+
+    if (refusal !== null) {
+      return refusal;
+    }
+  }
+
+  const made = splitsOf(whole.rows, progress);
+
+  return {
+    gate,
+    folder,
+    meta: made.meta,
+    rows: made.splits,
+    languages: new Map(made.languages.map((one) => [one.id, one.language])),
+    finished,
+  };
+}
+
+function readPart(root: string, gate: string, growing: boolean): GatePart | string {
+  const folder = gateFolder(root, gate);
+  const meta = join(folder, metaFile);
+
+  if (existsSync(join(folder, rehearsalMetaFile))) {
+    return `${gate}: 리허설 데이터입니다. 진짜 데이터와 섞을 수 없습니다.`;
+  }
+
+  if (growing) {
+    return readBatches(folder, gate, existsSync(meta));
+  }
+
+  if (!existsSync(meta)) {
+    return `${gate}: ${folder} 에 굳은 데이터가 없습니다. 판정 중인 게이트를 지금까지로 잘라 묶으려면 --growing 을 주세요.`;
+  }
+
+  return readFinished(folder, gate, meta);
 }
 
 // The fields that say the parts belong to one run. A dataset stitched from two runs is not one
@@ -139,20 +218,17 @@ function refuseDisagreement(parts: readonly GatePart[]): string | null {
   return null;
 }
 
-// The merge, or the refusal to make one. Every refusal is a sentence saying what is wrong, because
-// a merge that goes ahead on parts that do not belong together produces a dataset nobody can tell
-// is wrong by looking at it.
-export function mergeGates(options: MergeOptions): MergeReport | string {
-  const wanted = options.gates ?? frozenGatesUnder(options.root);
+function readParts(root: string, gates: readonly string[] | null, growing: boolean): GatePart[] | string {
+  const wanted = gates ?? (growing ? growingGatesUnder(root) : frozenGatesUnder(root));
 
   if (wanted.length === 0) {
-    return `${options.root} 아래에 굳은 게이트가 없습니다.`;
+    return growing ? `${root} 아래에 판정을 시작한 게이트가 없습니다.` : `${root} 아래에 굳은 게이트가 없습니다.`;
   }
 
   const parts: GatePart[] = [];
 
   for (const gate of wanted) {
-    const part = readPart(options.root, gate);
+    const part = readPart(root, gate, growing);
 
     if (typeof part === "string") {
       return part;
@@ -161,10 +237,34 @@ export function mergeGates(options: MergeOptions): MergeReport | string {
     parts.push(part);
   }
 
-  const disagreement = refuseDisagreement(parts);
+  return refuseDisagreement(parts) ?? parts;
+}
 
-  if (disagreement !== null) {
-    return disagreement;
+function countsOf(part: GatePart): MergedPart {
+  return {
+    gate: part.gate,
+    rows: { train: part.rows.train.length, calibration: part.rows.calibration.length, test: part.rows.test.length },
+    finished: part.finished,
+    started: part.meta.started,
+  };
+}
+
+// How far every gate under a run has got, read the way a growing cut reads it and writing nothing,
+// so what to cut can be decided before anything is cut.
+export function growingCounts(root: string): MergedPart[] | string {
+  const parts = readParts(root, null, true);
+
+  return typeof parts === "string" ? parts : parts.map(countsOf);
+}
+
+// The merge, or the refusal to make one. Every refusal is a sentence saying what is wrong, because
+// a merge that goes ahead on parts that do not belong together produces a dataset nobody can tell
+// is wrong by looking at it.
+export function mergeGates(options: MergeOptions): MergeReport | string {
+  const parts =readParts(options.root, options.gates, options.growing === true);
+
+  if (typeof parts === "string") {
+    return parts;
   }
 
   const refusal = refuseOverwrite(options.into, options.overwrite);
@@ -236,6 +336,7 @@ export function mergeGates(options: MergeOptions): MergeReport | string {
     gates: parts.map((part) => part.gate),
     rows: { train: kept.train.length, calibration: kept.calibration.length, test: kept.test.length },
     duplicates,
+    parts: parts.map(countsOf),
   };
 }
 
