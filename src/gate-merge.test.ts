@@ -5,7 +5,8 @@ import { describe, expect, test } from "bun:test";
 
 import { auditFrozen } from "./laya-audit";
 import { driveGates } from "./gate-run";
-import { frozenGatesUnder, gatesTrainingWouldRefuse, mergeGates, readsAsRehearsal, rehearsalMetaFile } from "./gate-merge";
+import { frozenGatesUnder, gatesTrainingWouldRefuse, mergeGates, readsAsRehearsal } from "./gate-merge";
+import { rehearsalMetaFile } from "./laya-rehearsal";
 import { languageFile, metaFile } from "./laya-synth-run";
 import { splitFiles } from "./laya-frozen";
 import { datasetFolder, gateFolder } from "./roots";

@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { join } from "node:path";
 
 import { refuseOverwrite, splitFiles } from "./laya-frozen";
+import { rehearsalMetaFile } from "./laya-rehearsal";
 import { addTokens, languageFile, metaFile, noTokens, roadsOf } from "./laya-synth-run";
 import { gateFolder, gatesFolderName } from "./roots";
 
@@ -15,10 +16,6 @@ import type { SynthMeta, TokenTally } from "./laya-synth-run";
 //
 // Nothing here rewrites a row. A row frozen by its gate is the row that lands in the dataset, and
 // the merge only decides which folders go in and whether they belong to one another.
-
-// What the rehearsal data carries so it is never mistaken for the real thing. A merged folder must
-// carry neither, or the training driver takes the whole dataset for a rehearsal.
-export const rehearsalMetaFile = "rehearsal.meta.json";
 
 export interface MergeOptions {
   // The run's folder, which is where the gates' own folders stand.

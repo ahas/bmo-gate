@@ -9,11 +9,32 @@ export function sourceRoot(): string {
   return dirname(import.meta.dir);
 }
 
+// The home directory as the environment names it now. A process that has moved its home since it
+// started — a test, whose preload moves it before its first line — must see the move, so `HOME` is
+// asked on every call rather than read once.
+export function homeDir(): string {
+  const named = process.env.HOME;
+
+  return named === undefined || named === "" ? homedir() : named;
+}
+
 // The root the bot's runtime data stands under, shared with everything else that writes there.
 export function dataRoot(): string {
   const named = process.env.BMO_DATA_DIR;
 
-  return named === undefined || named === "" ? join(homedir(), ".local", "share", "bmo", "data") : resolve(named);
+  return named === undefined || named === "" ? join(homeDir(), ".local", "share", "bmo", "data") : resolve(named);
+}
+
+// A place under the runtime data root, named part by part.
+export function dataPath(...parts: string[]): string {
+  return join(dataRoot(), ...parts);
+}
+
+// A worker's workbench: what its runs keep across sessions — collected checkpoints among them.
+// Under the data root so no checkout holds it, since what sits untracked inside a checkout is one
+// `git clean` from gone.
+export function workbenchPath(worker: string): string {
+  return dataPath("workbench", worker);
 }
 
 // Where the frozen datasets live, which is also where the training driver goes looking.

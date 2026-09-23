@@ -16,18 +16,18 @@ train on.
 
 ## What it answers to
 
-- **The specification is BMO's `docs/laya-gates.md`** — which gate asks what, of which transcript
-  shape, with which answers, drawn to which language mix and which answer balance.
-- **This repository does not restate that specification and does not amend it.** The gate
-  descriptions, the row shape, the batch plan, the fourteen reasons a row is refused and the
-  figures an audit reports all come across as they stand.
+- **The specification is this repository's own `docs/laya-gates.md`** — which gate asks what, of which
+  transcript shape, with which answers, drawn to which language mix and which answer balance. The
+  gate technician in `src/laya-synth.ts` says the same thing on the code side, and the two are held
+  together by the tests.
 - **Where this document and the specification differ, the specification is right.** Numbers repeated
   here are repeated so a reader can see what the code enforces without leaving the page; they are
   not a second source.
-- **No τ is chosen here, and no gate is moved off `shadow`.** Those are 하스's.
-- **Nothing in BMO is written by anything in this repository.** Its checkout is read for the
-  specification and nothing else. The data lands in the shared runtime data root, which is where
-  BMO's training driver looks for it.
+- **No τ is chosen here, and no gate is moved off `shadow`.** Those are 하스's, and BMO is where a
+  gate's mode and τ are configured (BMO's `docs/laya.md`).
+- **Nothing in BMO is written by anything in this repository.** Its archive is opened read-only for
+  the real rows and for nothing else. The data lands in the shared runtime data root, which is where
+  the training driver here looks for it.
 
 ## The real conversation source
 
@@ -409,6 +409,36 @@ the road, the model and the effort that wrote it; and the wall time.
   finishing. Gates written beside each other take the time of the longest, not the sum, and a
   ledger adding them together would report ten hours for a run that took one.
 
+## Invented data
+
+A gate that does not run yet has decided nothing, so the rooms may hold too little of it to build on.
+Its data can be invented instead: a model is given what the gate asks and writes the inputs and the
+answers together, against `docs/laya-gates.md` — the split gates, each with its input, its question,
+its answers and its asymmetry, and the language mix and answer balance its rows are drawn to. **No
+gate's data is built this way today**: the rooms are the source, and a gate they cannot fill waits
+for them rather than being filled with written rows. The road is kept because a gate with no rooms
+behind it has nothing else, and the shape it writes is the shape the training reads.
+
+- **One gate rides one session.** The gate's rules, the row format and its worked example are the
+  system prompt and never move while that gate is being written, so every batch after the first
+  reads them out of the prompt cache. The J3090 road keeps no session and reads the whole prefix
+  afresh on every call, and a run on it says so rather than leaving a cache-read of zero to be
+  explained later.
+- **A run that dies is resumed, not restarted.** The batch plan is fixed by the gate, the rows wanted
+  and the batch size, so a resumed run asks for exactly what the dead one would have asked next.
+- **Every row is refused unless it answers its own gate**: the gold naming exactly the answers the
+  question declares, the row fitting one Laya call, the transcript in the shape that gate really
+  receives, and the language the batch asked for. What was refused and why is counted in the meta.
+- **Nothing invented is measured on a gate that already runs.** For the gates with no code there is
+  nothing else to measure on, and what stands in for a verification there is a sample audit against
+  the specification rather than agreement with a record that does not exist.
+- **What audits it** is `bun scripts/laya-audit.ts`, which reports two shares and they are not the
+  same one. The first is read off the run's own meta and says what share of everything the model
+  wrote survived the generator, which is what says whether the model was any good. The second is
+  read off a fresh sample of the frozen rows and says whether what was kept still answers its own
+  gate. Beside them stand the answer balance and the three languages against what that gate is drawn
+  to, and whether the row floors are met.
+
 ## Running it
 
 - `bun scripts/laya-real.ts` — count what the rooms hold for each gate, and, given a run name,
@@ -443,3 +473,8 @@ in this repository and is symlinked into the user's own unit directory:
 When it has finished, the three readings that close a run are the merge, the verdict and the
 ledger, in that order. A gate the verdict names is built again on its own and the three are run
 once more.
+
+What happens to the merged dataset afterwards — the rehearsal it is tried against, the five nodes
+it is trained on, how a killed run is taken up again, where the checkpoints are collected and the
+two tables the run is judged on — is `docs/laya-train-run.md`. The server the trained checkpoint is
+served from, and the loop and the settings it is trained with, are `docs/laya-server.md`.
