@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
+import { claimGate, releaseGate } from "./gate-claim";
 import { frozenHere } from "./laya-frozen";
 import { gateFolder, gatesFolderName } from "./roots";
 import { gateOnDisk, guardFolder, plannedBatches, readProgress, roadHoldsSession, roadsOf, runSynthesis } from "./laya-synth-run";
@@ -116,6 +117,17 @@ export async function driveGates(options: DriveOptions, ask: SynthAsker): Promis
       say(`${spec.gate}: 있던 것을 지우고 처음부터 씁니다.`);
     }
 
+    // Claimed after the folder has been cleared, since starting a gate over takes the folder away
+    // and would take a claim laid down before it with it.
+    const held = claimGate(folder);
+
+    if (held !== null) {
+      outcomes.set(spec.gate, { gate: spec.gate, state: "refused", refusal: held, fault: null, meta: null });
+      say(`${spec.gate}: ${held}`);
+
+      return;
+    }
+
     try {
       const report = await runSynthesis({
         folder,
@@ -138,6 +150,8 @@ export async function driveGates(options: DriveOptions, ask: SynthAsker): Promis
 
       outcomes.set(spec.gate, { gate: spec.gate, state: "failed", refusal: null, fault, meta: null });
       say(`${spec.gate}: 멈췄습니다 — ${fault}`);
+    } finally {
+      releaseGate(folder);
     }
   });
 

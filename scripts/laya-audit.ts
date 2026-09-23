@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 
 import { auditFrozen, auditLines, freshSeed } from "../src/laya-audit";
-import { gatesToRebuild, verdictLines, verdictsFor } from "../src/gate-verdict";
+import { gatesToRebuild, judgedNothing, verdictLines, verdictsFor } from "../src/gate-verdict";
 import { asksUsage, allOf, asked, lastOf, readFlags } from "../src/flags";
 import { gateSyntheses, synthesisFor } from "../src/laya-synth";
 import { runFolder } from "../src/roots";
@@ -66,6 +66,11 @@ if (asked(reading, "--json")) {
   console.log(auditLines(audit).join("\n"));
   console.log("");
   console.log(verdictLines(verdicts).join("\n"));
+}
+
+if (judgedNothing(verdicts)) {
+  console.error(`laya-audit: ${folder} 아래에서 잴 수 있는 게이트를 찾지 못했습니다.`);
+  process.exit(1);
 }
 
 if (gatesToRebuild(verdicts).length > 0) {

@@ -158,6 +158,11 @@ A run is a name, a set of gates, a number of rows per gate and a batch size.
 
 - **The ten gates run at once**, one per thread, one per folder. Nothing a gate writes is read or
   written by another.
+- **A gate another run is writing is left out.** One run folder can be driven by two runs at once —
+  sanitiser on its own road beside the other nine on codex — and the run that is not writing a gate
+  is told to leave it out, so neither ever asks for the other's batch. A run names the gates it
+  leaves out rather than the ones it keeps, because what it is for is "the rest of them" and a list
+  of the rest is a second roster to keep in step with the first.
 - **Rows per gate defaults to what the specification asks for.** The driver does not invent a
   different number; a smaller one is asked for by hand, which is what a smoke run does.
 - **A batch is frozen the moment it lands**, so nothing the model has already answered is asked for
@@ -228,6 +233,12 @@ Everything a run makes stands under one folder named for the run.
 - **A resumed run takes up at the batch after the last one frozen.** The batch plan is a pure
   function of the gate, the rows wanted and the batch size, so a resumed run asks for exactly what
   the dead one would have asked for next.
+- **A gate is written by one living process at a time.** Where two runs share a run folder, both
+  read the same last frozen batch and both take up at the one after it: the same batch is bought
+  from the model twice, and the answer that lands second is written over rows that were already
+  good. So a gate is claimed before it is written and the claim is given up when the gate finishes
+  or falls over. A gate a living process already holds is refused, and the refusal names what holds
+  it. A claim whose process is gone is no claim, and the next run takes it.
 - **What stands in the folder settles where a gate takes up, not the count the dead run kept of
   itself.** A run killed between freezing a batch and recording that it did leaves a count one
   behind the batches on disk, and a resume trusting the count would buy that batch from the model a
@@ -276,6 +287,10 @@ carrying the rarer answer, at least 1,000 held out for evaluation.
   training rows and a gate short of held-out rows are put right by different things.
 - **The reading ends badly when any gate missed**, so the rebuild can be driven off the verdict
   rather than off somebody having read it.
+- **A reading that judged no gate has not passed either.** A folder holding no frozen gate — a run
+  that never got that far, or a path a letter out — leaves the reading with nothing to say about
+  the bars, and saying nothing must not come back reading as yes. It ends badly and says which
+  folder it found nothing in.
 - **A gate whose run left no meta does not pass.** The three figures read off what the model wrote
   stood only in that meta, so without it they are not zero and not cleared — they cannot be read
   at all, and a gate nobody can judge has not been judged.

@@ -5,10 +5,9 @@ import { codexAsker, codexEffort, codexModel, codexTimeoutMs, emptyCwd } from ".
 import { j3090Asker, j3090Effort, j3090Model, j3090TimeoutMs } from "../src/j3090-road";
 import { driveGates } from "../src/gate-run";
 import { asksUsage, allOf, asked, lastOf, readFlags } from "../src/flags";
-import { gateSyntheses, synthesisFor } from "../src/laya-synth";
+import { gatesChosen } from "../src/laya-synth";
 import { refuseInsideCheckout, runFolder } from "../src/roots";
 
-import type { GateSynthesis } from "../src/laya-synth";
 import type { SynthAsker, SynthRoad } from "../src/laya-synth-run";
 
 // The ten gates' distilled data, written on the codex account (docs/gate-data.md). One gate to a
@@ -22,13 +21,15 @@ import type { SynthAsker, SynthRoad } from "../src/laya-synth-run";
 const defaultRows = 7_500;
 const defaultBatch = 20;
 
-const usage = `usage: bun scripts/laya-synth.ts --run <이름> [--gate <게이트>]… [--rows <n>] [--batch <n>]
+const usage = `usage: bun scripts/laya-synth.ts --run <이름> [--gate <게이트>]… [--except <게이트>]…
+                                 [--rows <n>] [--batch <n>]
                                  [--road codex|j3090] [--at-once <n>] [--model <모델>] [--effort <노력>]
                                  [--timeout <초>] [--resume] [--overwrite]
 
 게이트마다 실 하나를 붙들고 증류 데이터를 지어 <이름> 실행 폴더 아래에 굳힌다.
 --run 은 런타임 데이터 뿌리 아래의 이름이거나 절대 경로다. 체크아웃 안에는 쓰지 않는다.
 --gate 는 지을 게이트를 고른다(여러 번). 주지 않으면 열 개 전부.
+--except 는 빼고 지을 게이트다(여러 번). 다른 실행이 제 길로 짓고 있는 게이트를 빼는 데 쓴다.
 --rows 는 게이트당 지을 행 수(기본 ${defaultRows}), --batch 는 한 번에 받을 행 수(기본 ${defaultBatch}).
 --road 는 codex(기본, 실을 붙들어 캐시를 쓴다) 또는 j3090(집의 qwen, 세션도 캐시도 없다).
   codex 가 계정 차원에서 거부하는 게이트를 codex 아닌 길로 이어 지을 때 j3090 을 쓴다.
@@ -49,7 +50,7 @@ if (asksUsage(argv)) {
 }
 
 const reading = readFlags(argv, {
-  "--run": true, "--gate": true, "--rows": true, "--batch": true, "--road": true, "--at-once": true,
+  "--run": true, "--gate": true, "--except": true, "--rows": true, "--batch": true, "--road": true, "--at-once": true,
   "--model": true, "--effort": true, "--timeout": true, "--resume": false, "--overwrite": false,
 });
 
@@ -74,19 +75,14 @@ if (inside !== null) {
   process.exit(2);
 }
 
-const wanted = allOf(reading, "--gate");
-const gates: GateSynthesis[] = wanted.length === 0
-  ? [...gateSyntheses]
-  : wanted.map((name) => {
-      const spec = synthesisFor(name);
+const chosen = gatesChosen(allOf(reading, "--gate"), allOf(reading, "--except"));
 
-      if (spec === null) {
-        console.error(`laya-synth: ${name} 은 게이트 이름이 아닙니다. 하나를 고르세요: ${gateSyntheses.map((one) => one.gate).join(", ")}`);
-        process.exit(2);
-      }
+if (typeof chosen === "string") {
+  console.error(`laya-synth: ${chosen}`);
+  process.exit(2);
+}
 
-      return spec;
-    });
+const gates = chosen;
 
 const road = (lastOf(reading, "--road") ?? "codex") as SynthRoad;
 

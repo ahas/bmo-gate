@@ -12,10 +12,14 @@ StartLimitBurst=10
 Type=oneshot
 WorkingDirectory=%h/repos/ahas/bmo-gate
 Environment=PATH=%h/.bun/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+# Sanitiser is left out: it rides the J3090 road in a unit of its own, because codex refuses its
+# attack rows at the account level. Both units write gates under the one run folder, so the gate
+# one of them writes is the gate the other is told to leave alone.
+#
 # Always resumed, never overwritten: the unit is restarted by a crash, a failure or a reboot, and
 # every one of those must take up at the batch after the last one frozen. An overwrite here would
 # throw away a day's work on the first restart.
-ExecStart=%h/.bun/bin/bun scripts/laya-synth.ts --run full-1 --rows 9000 --batch 20 --resume
+ExecStart=%h/.bun/bin/bun scripts/laya-synth.ts --run full-1 --except sanitizer --rows 9000 --batch 20 --resume
 Restart=on-failure
 RestartSec=60
 

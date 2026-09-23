@@ -135,6 +135,10 @@ export function verdictLines(verdicts: readonly GateVerdict[]): string[] {
     ...one.missed.map((miss) => `  ${miss.said}`),
   ]);
 
+  if (verdicts.length === 0) {
+    return [...lines, "", "기준을 잰 게이트가 하나도 없습니다. 굳은 게이트가 있는 폴더인지 보세요."];
+  }
+
   const short = verdicts.filter((one) => !one.passed);
 
   return [
@@ -149,4 +153,12 @@ export function verdictLines(verdicts: readonly GateVerdict[]): string[] {
 // The gates to build again, which is what a verdict is for.
 export function gatesToRebuild(verdicts: readonly GateVerdict[]): string[] {
   return verdicts.filter((one) => !one.passed).map((one) => one.gate);
+}
+
+// Whether the reading came to a verdict at all. A folder holding no frozen gate leaves nothing to
+// judge, and a reading with nothing to judge has said nothing about the bars — which must not come
+// back reading as every bar cleared. There is no gate to name for a rebuild in that case, so the
+// gates to build again cannot carry it and it is asked separately.
+export function judgedNothing(verdicts: readonly GateVerdict[]): boolean {
+  return verdicts.length === 0;
 }

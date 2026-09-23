@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
+import { claimsIn } from "./gate-claim";
 import { clearGate, driveGates, readRunStanding, standingLines } from "./gate-run";
 import { gateFolder, gatesFolderName } from "./roots";
 import { batchName, batchesFolder, freezeBatch, noTokens, progressFile, readProgress } from "./laya-synth-run";
@@ -518,6 +519,85 @@ describe("how far a run got, read off the folder", () => {
     }));
 
     expect(standingLines(readRunStanding(root, [sanitizer]))[0]).toContain("버린 행 too-large 1, wrong-language 3");
+  });
+});
+
+describe("a gate another run is already writing", () => {
+  // The claim of a process that is certainly there and is certainly not this one. A writer nobody
+  // here may signal is somebody else's and counts as living, which is the whole point of it.
+  function claimedElsewhere(root: string, gate: string): void {
+    const folder = gateFolder(root, gate);
+
+    mkdirSync(folder, { recursive: true });
+    writeFileSync(join(folder, ".writer.1.1"), "");
+  }
+
+  test("is refused rather than written beside", async () => {
+    const root = scratch();
+
+    claimedElsewhere(root, sanitizer.gate);
+
+    const outcomes = await driveGates(driving(root), standIn());
+    const held = outcomes.find((one) => one.gate === sanitizer.gate)!;
+
+    expect(held.state).toBe("refused");
+    expect(held.refusal).toContain("pid 1");
+  });
+
+  test("costs only itself — the other gate is written as it would have been", async () => {
+    const root = scratch();
+
+    claimedElsewhere(root, sanitizer.gate);
+
+    const outcomes = await driveGates(driving(root), standIn());
+
+    expect(outcomes.find((one) => one.gate === notes.gate)!.state).toBe("done");
+    expect(frozenRows(root, notes.gate)).toBeGreaterThan(0);
+  });
+
+  test("has no batch bought for it", async () => {
+    const root = scratch();
+    const watch = { started: [] as string[], finished: [] as string[] };
+
+    claimedElsewhere(root, sanitizer.gate);
+    await driveGates(driving(root), standIn(watch));
+
+    expect(watch.started).not.toContain(sanitizer.gate);
+    expect(existsSync(join(gateFolder(root, sanitizer.gate), batchesFolder, batchName(sanitizer.gate, 0)))).toBe(false);
+  });
+
+  test("a claim its writer left behind stops nothing", async () => {
+    const root = scratch();
+    const folder = gateFolder(root, sanitizer.gate);
+
+    mkdirSync(folder, { recursive: true });
+    writeFileSync(join(folder, `.writer.1.${0x7fff_ffff}`), "");
+
+    const outcomes = await driveGates(driving(root), standIn());
+
+    expect(outcomes.find((one) => one.gate === sanitizer.gate)!.state).toBe("done");
+  });
+});
+
+describe("what a gate leaves behind when this run is done with it", () => {
+  test("no claim, so the next run takes it up without waiting for anything to go stale", async () => {
+    const root = scratch();
+
+    await driveGates(driving(root), standIn());
+
+    expect(claimsIn(gateFolder(root, sanitizer.gate))).toEqual([]);
+  });
+
+  test("a gate that fell over gives its claim up too", async () => {
+    const root = scratch();
+    const breaks: SynthAsker = async () => {
+      throw new Error("codex 가 묶음을 쓰지 못했습니다");
+    };
+
+    const outcomes = await driveGates(driving(root, { gates: [sanitizer] }), breaks);
+
+    expect(outcomes[0]!.state).toBe("failed");
+    expect(claimsIn(gateFolder(root, sanitizer.gate))).toEqual([]);
   });
 });
 

@@ -6,6 +6,7 @@ import {
   candidateOf,
   datasetRowOf,
   gateSyntheses,
+  gatesChosen,
   inTranscriptShape,
   languageBuckets,
   languageOf,
@@ -585,5 +586,40 @@ describe("the gold a choice question carries", () => {
 
       expect(validateSynthRow(spec, row, languageWanted(spec))).toEqual({ ok: true });
     }
+  });
+});
+
+describe("which gates a run writes", () => {
+  const namesOf = (chosen: ReturnType<typeof gatesChosen>): string[] =>
+    typeof chosen === "string" ? [chosen] : chosen.map((one) => one.gate);
+
+  test("nothing chosen and nothing left out is every gate", () => {
+    expect(namesOf(gatesChosen([], []))).toEqual(gateSyntheses.map((one) => one.gate));
+  });
+
+  test("a gate left out is every other gate, in the roster order", () => {
+    const kept = namesOf(gatesChosen([], ["sanitizer"]));
+
+    expect(kept).not.toContain("sanitizer");
+    expect(kept).toEqual(gateSyntheses.map((one) => one.gate).filter((name) => name !== "sanitizer"));
+  });
+
+  test("a gate chosen outright is the only one written", () => {
+    expect(namesOf(gatesChosen(["sanitizer"], []))).toEqual(["sanitizer"]);
+  });
+
+  test("what is left out is left out of what was chosen too", () => {
+    expect(namesOf(gatesChosen(["sanitizer", "room-rules"], ["sanitizer"]))).toEqual(["room-rules"]);
+  });
+
+  test("a name that is no gate is said back, whichever side it was given on", () => {
+    for (const chosen of [gatesChosen(["sanitiser"], []), gatesChosen([], ["sanitiser"])]) {
+      expect(chosen).toContain("sanitiser");
+      expect(chosen).toContain("sanitizer");
+    }
+  });
+
+  test("leaving every gate out is refused rather than run as a run of nothing", () => {
+    expect(gatesChosen([], gateSyntheses.map((one) => one.gate))).toContain("남는 게이트가 없습니다");
   });
 });

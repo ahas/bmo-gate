@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { auditFloors } from "./laya-audit";
-import { bars, gatesToRebuild, verdictFor, verdictLines, verdictsFor } from "./gate-verdict";
+import { bars, gatesToRebuild, judgedNothing, verdictFor, verdictLines, verdictsFor } from "./gate-verdict";
 
 import type { GateAudit, GenerationReading } from "./laya-audit";
 
@@ -207,6 +207,27 @@ describe("the verdict over a whole dataset", () => {
 
   test("every gate clearing is said as such", () => {
     expect(verdictLines(verdictsFor({ ...audit, gates: [clears()] })).at(-1)).toContain("모두 기준을 넘었습니다");
+  });
+});
+
+describe("a reading that judged no gate", () => {
+  // What an audit pointed at a folder holding no frozen gate comes back with.
+  const nothing = { folder: "/어딘가", seed: "씨앗", sample: 200, gates: [] };
+
+  test("is not a reading that passed", () => {
+    expect(judgedNothing(verdictsFor(nothing))).toBe(true);
+    expect(judgedNothing(verdictsFor({ ...nothing, gates: [clears()] }))).toBe(false);
+  });
+
+  test("names no gate to build again, so the gates to rebuild cannot carry it", () => {
+    expect(gatesToRebuild(verdictsFor(nothing))).toEqual([]);
+  });
+
+  test("says it judged nothing rather than that every bar was cleared", () => {
+    const lines = verdictLines(verdictsFor(nothing));
+
+    expect(lines.at(-1)).toContain("기준을 잰 게이트가 하나도 없습니다");
+    expect(lines.at(-1)).not.toContain("넘었습니다");
   });
 });
 

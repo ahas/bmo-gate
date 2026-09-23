@@ -950,3 +950,27 @@ export const gateSyntheses: readonly GateSynthesis[] = [
 export function synthesisFor(gate: string): GateSynthesis | null {
   return gateSyntheses.find((one) => one.gate === gate) ?? null;
 }
+
+// Which gates a run writes: the ones it was told to, less the ones it was told to leave out. A run
+// sharing a folder with another names what it leaves out rather than what it keeps, so the roster
+// stands in one place and adding a gate does not have to be remembered in a second one.
+//
+// A name that is no gate's is said back rather than passed over, whichever side it was given on: a
+// misspelt gate left out is a gate that goes on being written, which is the very thing the run was
+// told to stop doing.
+export function gatesChosen(wanted: readonly string[], leftOut: readonly string[]): GateSynthesis[] | string {
+  const unknown = [...wanted, ...leftOut].filter((name) => synthesisFor(name) === null);
+
+  if (unknown.length > 0) {
+    return `${unknown.join(", ")} 은 게이트 이름이 아닙니다. 이 중에서 고르세요: ${gateSyntheses.map((one) => one.gate).join(", ")}`;
+  }
+
+  const chosen = wanted.length === 0 ? [...gateSyntheses] : wanted.map((name) => synthesisFor(name)!);
+  const kept = chosen.filter((one) => !leftOut.includes(one.gate));
+
+  if (kept.length === 0) {
+    return "남는 게이트가 없습니다. --gate 와 --except 를 다시 보세요.";
+  }
+
+  return kept;
+}
