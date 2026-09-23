@@ -7,8 +7,8 @@ import { answersPerBatch, gateFor, judgeBatches, judgePrompt, judgeSystem, judge
 import { j3090Effort, j3090JudgeRoad, j3090Model } from "../src/j3090-road";
 import { languageOf, stateText } from "../src/laya-synth";
 import {
-  addTokens, freezeBatch, freezeSplits, gateOnDisk, guardFolder, keepBarrenAnswer, keepLostAnswer,
-  noTokens, readProgress, writeProgress,
+  addTokens, freezeBatch, freezeSplits, frozenState, gateOnDisk, guardFolder, keepBarrenAnswer,
+  keepLostAnswer, noTokens, readProgress, writeProgress,
 } from "../src/laya-synth-run";
 import { realMetaFile, unjudgedFile } from "../src/real-rows";
 import { gateFolder, runFolder } from "../src/roots";
@@ -104,6 +104,16 @@ async function judgeGate(gate: string): Promise<string | null> {
   const refusal = guardFolder(folder, wants);
 
   if (refusal !== null) {
+    // A gate whose folder already holds its three splits is a gate that finished, and a run told to
+    // take up where it left off has nothing to take up in it. That is not trouble: counting it as
+    // trouble ends every later run of the set in failure over work that is done, and the unit
+    // carrying the run restarts for ever on the strength of it.
+    if (wants.resume && frozenState(folder) === "frozen") {
+      console.log(`${gate}: 이미 끝났습니다.`);
+
+      return null;
+    }
+
     return refusal;
   }
 

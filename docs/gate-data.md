@@ -129,6 +129,10 @@ Every label is made afresh, on a road, against the gate exactly as it stands.
   it or to write the gate over.
 - **A gate that falls says so the moment it falls.** The gates beside it run for hours yet, and a
   failure held back until every one of them has finished is a failure nobody sees all day.
+- **A gate that has already finished is not a gate that failed.** A run told to take up where it
+  left off has nothing to take up in a folder that already holds its three splits, and says so and
+  moves on. Counting that as trouble would end every later run of the set in failure over work that
+  is done, and the unit carrying the run would restart for ever on the strength of it.
 
 ## The roads
 
