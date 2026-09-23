@@ -219,8 +219,17 @@ describe("the transcript shapes", () => {
     expect(inTranscriptShape("plain", "민서 (id 4471902): 첫 줄\n둘째 줄\n하스 (id 90000001): 응")).toBe(true);
   });
 
-  test("a transcript whose marked lines are the minority does not", () => {
-    expect(inTranscriptShape("plain", "민서 (id 4471902): 첫 줄\n둘째 줄\n셋째 줄\n넷째 줄")).toBe(false);
+  test("one long message reads as its shape, however many lines it runs to", () => {
+    expect(inTranscriptShape("plain", "민서 (id 4471902): 첫 줄\n둘째 줄\n셋째 줄\n넷째 줄")).toBe(true);
+  });
+
+  test("a message numbered from below reads, since the archive holds such numbers", () => {
+    expect(inTranscriptShape("room", "[2026-09-01T02:55:43.000Z] #-998950394 하스 (id 90000001, OWNER): /start")).toBe(true);
+  });
+
+  test("prose that opens with no sender at all does not", () => {
+    expect(inTranscriptShape("plain", "첫 줄\n민서 (id 4471902): 둘째 줄")).toBe(false);
+    expect(inTranscriptShape("room", "오늘 저녁 뭐 먹지")).toBe(false);
   });
 
   test("an unknown sender number is allowed", () => {

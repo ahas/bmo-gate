@@ -203,21 +203,29 @@ function lines(value: unknown): string[] {
 // a bracket is the room shape's time and never a plain line, and without that guard the room shape
 // reads as the plain one too — the name would simply swallow the time and the message number.
 const plainLine = /^(?!\[).{1,64}? \(id (?:\d{1,20}|unknown)\): /;
-const roomLine = /^\[[^\]]{1,40}\] #\d{1,20} .{1,64}? \(id (?:\d{1,20}|unknown)(?:, OWNER)?\): /;
+// A message's own number may be negative: the archive numbers some of what it holds from below, and
+// the room shape writes the number it was given rather than one of its own.
+const roomLine = /^\[[^\]]{1,40}\] #-?\d{1,20} .{1,64}? \(id (?:\d{1,20}|unknown)(?:, OWNER)?\): /;
 
 export function transcriptLineShape(shape: TranscriptShape): RegExp {
   return shape === "plain" ? plainLine : roomLine;
 }
 
-// Whether a transcript is written in the shape its gate really receives. A message may carry a
-// newline of its own, and its later lines then stand without a prefix, so a transcript is read as
-// its gate's where at least one line carries the prefix and the lines that do are not the minority.
+// Whether a transcript is written in the shape its gate really receives. A transcript opens with a
+// message, so the first line carrying the prefix is the whole of the test: every line after it
+// either opens the next message or belongs to the message above it, and nothing about the text can
+// tell those two apart. A state that is prose rather than a transcript is what this refuses, and
+// prose does not open with a sender and a number.
+//
+// Counting the prefixed lines against the rest would be the wrong test however it were weighted:
+// one message of BMO's is routinely a dozen lines, so a real turn of a real room has far more
+// continuation lines than prefixed ones — and refusing it would refuse the very shape the gate is
+// handed at every turn it runs.
 export function inTranscriptShape(shape: TranscriptShape, text: string): boolean {
   const marker = transcriptLineShape(shape);
-  const all = text.split("\n").filter((line) => line.trim() !== "");
-  const marked = all.filter((line) => marker.test(line));
+  const first = text.split("\n").find((line) => line.trim() !== "");
 
-  return marked.length >= 1 && marked.length * 2 >= all.length;
+  return first !== undefined && marker.test(first);
 }
 
 export type SynthRefusal =

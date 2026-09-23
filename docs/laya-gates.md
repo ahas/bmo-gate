@@ -33,6 +33,16 @@ balance its distilled training data is to be drawn to.
 Three different line shapes are handed to gates today, and a gate's data is written in the shape
 that gate really receives.
 
+- **A message is one entry, not one line.** Its own text may carry newlines, and one answer of BMO's
+  routinely runs to a dozen of them; those later lines stand without a prefix and belong to the
+  entry above them. So a transcript stands in its gate's shape when the first line of it carries the
+  prefix, and nothing is read off how many of the lines after it do — a real turn of a real room has
+  far more continuation lines than prefixed ones, and weighing the two against each other refuses
+  the very shape the gate is handed at every turn it runs. What that test refuses is a state that is
+  prose rather than a transcript, and prose does not open with a sender and a number.
+- **A message's own number may be negative.** The archive numbers some of what it holds from below,
+  and both the shape and the test on it carry the number as given rather than one of their own.
+
 - **The plain shape** — one line per message, the sender's name, the sender's number and the text:
 
   ```
