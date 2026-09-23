@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { join } from "node:path";
 
 import { refuseOverwrite, splitFiles } from "./laya-frozen";
-import { addTokens, languageFile, metaFile, noTokens } from "./laya-synth-run";
+import { addTokens, languageFile, metaFile, noTokens, roadsOf } from "./laya-synth-run";
 import { gateFolder, gatesFolderName } from "./roots";
 
 import type { DatasetRow, DatasetSplit } from "./laya-dataset";
@@ -110,10 +110,17 @@ function readPart(root: string, gate: string): GatePart | string {
   return { gate, folder, meta: JSON.parse(readFileSync(meta, "utf8")) as SynthMeta, rows, languages };
 }
 
-// The fields that say which run a dataset came out of. A dataset stitched from two runs is not one
+// The fields that say the parts belong to one run. A dataset stitched from two runs is not one
 // dataset — its figures are the average of two different things and belong to neither — so the
 // parts must agree on every one of these before they are put together.
-const runWide = ["model", "effort", "road", "rowsAsked", "batchSize"] as const;
+//
+// The road, the model and the effort are not among them: a gate carries its own, and one run may
+// build different gates on different roads on purpose. Sanitizer is written on J3090 while the
+// other nine ride codex, because codex refuses sanitizer's attack rows at the account level; the
+// gates still merge into one dataset, since what makes them one run is the row count, the batch
+// size and the split shares they were all cut to, not the model that wrote each one. What road
+// wrote what is kept — every part's roads are gathered onto the merged meta — rather than enforced.
+const runWide = ["rowsAsked", "batchSize"] as const;
 
 function refuseDisagreement(parts: readonly GatePart[]): string | null {
   const first = parts[0]!;
@@ -200,6 +207,9 @@ export function mergeGates(options: MergeOptions): MergeReport | string {
     model: first.meta.model,
     effort: first.meta.effort,
     road: first.meta.road,
+    // Every road any gate was written on, so a dataset built across roads says so plainly rather
+    // than reading as though the first gate's road wrote all of it.
+    roads: [...new Set(parts.flatMap((part) => roadsOf(part.meta)))].sort(),
     sessionHeld: parts.every((part) => part.meta.sessionHeld),
     cacheReused: parts.every((part) => part.meta.cacheReused),
     written: new Date().toISOString(),

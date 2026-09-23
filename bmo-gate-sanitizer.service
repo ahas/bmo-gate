@@ -1,0 +1,25 @@
+[Unit]
+Description=bmo-gate-sanitizer — sanitizer 게이트를 codex 아닌 길(j3090)로 지음
+After=network-online.target
+Wants=network-online.target
+# The sanitizer gate alone, on the J3090 road, because codex refuses its attack rows at the account
+# level however the model is set. It runs beside the codex unit, which keeps writing the other nine;
+# the two never contend, since codex cannot freeze a sanitizer batch and this one only ever does.
+# A network or service fault is transient and is resumed; a fault that cannot be written past fails
+# the same way every try, so the unit gives up after a bounded number of tries in an hour.
+StartLimitIntervalSec=3600
+StartLimitBurst=10
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/repos/ahas/bmo-gate
+Environment=PATH=%h/.bun/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+# Always resumed, never overwritten: the twelve codex batches already frozen stand, and every
+# restart takes up at the batch after the last one frozen on either road. An overwrite here would
+# throw away both the codex rows and whatever qwen had written since.
+ExecStart=%h/.bun/bin/bun scripts/laya-synth.ts --run full-1 --gate sanitizer --road j3090 --rows 9000 --batch 20 --resume
+Restart=on-failure
+RestartSec=60
+
+[Install]
+WantedBy=default.target

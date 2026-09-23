@@ -521,6 +521,76 @@ describe("a run that dies", () => {
   });
 });
 
+describe("resuming a gate onto a different road", () => {
+  // A gate started on codex and stopped, taken up on J3090 — the shape of moving sanitizer off the
+  // road its rows are refused on, without rebuilding what codex already wrote.
+  async function stoppedOnCodex(folder: string): Promise<void> {
+    await expect(runSynthesis(options(folder, { road: "codex", model: "gpt-5.6-terra", effort: "high" }), async (spec, ask) => {
+      if (ask.seed.endsWith("-3")) {
+        throw new Error("codex refused");
+      }
+
+      return { text: JSON.stringify(rowsFor(ask, ask.count)), sessionId: "codex-thread", tokens: { inputTokens: 5, outputTokens: 6, cacheReadTokens: 7, cacheWriteTokens: 0 } };
+    })).rejects.toThrow();
+  }
+
+  test("the frozen batches stand and only the rest are asked for on the new road", async () => {
+    const folder = scratch();
+
+    await stoppedOnCodex(folder);
+
+    const seeds: string[] = [];
+    const report = await runSynthesis(options(folder, { resume: true, road: "j3090", model: "qwen3.8-27b", effort: "none" }), standIn((ask) => seeds.push(ask.seed)));
+
+    expect(seeds).toEqual(["sanitizer-3"]);
+    expect(report.meta.gates[0]!.rows).toBe(6);
+  });
+
+  test("both roads are recorded, the one now driving is the road", async () => {
+    const folder = scratch();
+
+    await stoppedOnCodex(folder);
+
+    const report = await runSynthesis(options(folder, { resume: true, road: "j3090", model: "qwen3.8-27b", effort: "none" }), standIn());
+
+    expect(report.meta.road).toBe("j3090");
+    expect(report.meta.roads).toEqual(["codex", "j3090"]);
+    expect(report.meta.model).toBe("qwen3.8-27b");
+  });
+
+  test("the new road is never handed the dead road's session", async () => {
+    const folder = scratch();
+
+    await stoppedOnCodex(folder);
+
+    const resumed: (string | null)[] = [];
+
+    await runSynthesis(options(folder, { resume: true, road: "j3090", model: "qwen3.8-27b" }), async (spec, ask, sessionId) => {
+      resumed.push(sessionId);
+
+      return { text: JSON.stringify(rowsFor(ask, ask.count)), sessionId: null, tokens: noTokens };
+    });
+
+    expect(resumed).toEqual([null]);
+  });
+
+  test("a resume on the same road keeps that one road", async () => {
+    const folder = scratch();
+
+    await expect(runSynthesis(options(folder, { road: "codex", model: "gpt-5.6-terra" }), async (spec, ask) => {
+      if (ask.seed.endsWith("-3")) {
+        throw new Error("끊김");
+      }
+
+      return { text: JSON.stringify(rowsFor(ask, ask.count)), sessionId: "codex-thread", tokens: noTokens };
+    })).rejects.toThrow();
+
+    const report = await runSynthesis(options(folder, { resume: true, road: "codex", model: "gpt-5.6-terra" }), standIn());
+
+    expect(report.meta.roads).toEqual(["codex"]);
+  });
+});
+
 describe("a batch that read and kept nothing", () => {
   // A row-shaped thing the gate will refuse outright: it reads as a row, so the batch is not lost,
   // and it survives nothing, so the batch freezes empty.

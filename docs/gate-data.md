@@ -19,9 +19,15 @@ whether what came out is good enough to train on.
   specification and nothing else. The data lands in the shared runtime data root, which is where
   BMO's training driver looks for it.
 
+## The roads
+
+A gate's rows are written on a road. There are two: codex, which most gates ride, and J3090, for a
+gate codex will not write. A run is told which road to drive with, and a gate stopped on one road is
+taken up on the other, its frozen batches left as they stand.
+
 ## The codex road
 
-The rows are written by `codex exec`, driven directly rather than through any provider switch.
+Most gates' rows are written by `codex exec`, driven directly rather than through any provider switch.
 
 - **One held thread per gate.** A gate's whole run rides one codex thread. The first batch opens it;
   every later batch resumes it by its thread id.
@@ -86,6 +92,9 @@ forbidding any other — and a row's questions and its gold are keyed by the nam
 questions carry. Those differ from gate to gate and cannot be written down in one schema that
 serves ten. A schema leaving any object open is refused outright, before the model is reached.
 
+The reading of that text is the same on both roads, so it is described once here and holds for J3090
+too.
+
 So the answer arrives as ordinary text and the reading is what has to be robust. It is:
 
 - **The list is found by walking the brackets**, not by taking everything between the first `[` and
@@ -100,6 +109,48 @@ So the answer arrives as ordinary text and the reading is what has to be robust.
   punctuation, and a batch thrown away over them is a batch bought and burnt.
 - **A row is refused, never fatal.** Every part of a row is looked at before it is used, so a
   question or a gold the model left half-written costs that row and not the gate's whole run.
+
+## The J3090 road
+
+One gate cannot be written on codex at all. The sanitiser gate decides whether a message carries a
+security intrusion, so its rows are wall-to-wall attack sentences, and the codex account reads a
+batch of them as security work and refuses it — not for the model chosen, but at the account's own
+policy, which no model inside codex gets past. The rows are the gate's whole point and are not
+softened to slip by; the road is changed instead.
+
+The second road is J3090, the qwen model that runs at home. It is not claude, which is the one thing
+the choice was told to avoid, and it writes the same attack rows without flinching. It is reached as
+one HTTPS request per batch against a small MCP service.
+
+- **One request, one batch, no thread.** The road holds no session and reads no cache: every batch
+  carries the gate's whole fixed prefix afresh and the answer comes back as text. So a gate on this
+  road is a run of independent batches rather than one held conversation, and nothing here resumes a
+  thread.
+- **The service serves one model and takes no model argument.** The request names the gate's prefix,
+  the batch's ask and an answer slot, and nothing else. The one model the service lists is checked
+  once against the model this road claims to write on, so a service that swapped its model out cannot
+  label another model's rows as qwen's.
+- **The answer slot is sized for a batch, not a verdict.** A batch of twenty invented rows is a long
+  answer, and an answer cut off mid-list holds no rows at all, so the slot is set well past what one
+  batch needs.
+- **A batch the service does not answer stops its gate**, the same as on the codex road: it throws
+  rather than freezing an empty answer, and the gate is taken up again where it left off.
+- **The road reports no tokens.** The MCP answer carries the text alone and no usage, so a gate on
+  this road tallies no tokens. The zero is the absence of a reading, not a batch that cost nothing —
+  the same as the flat-rate codex login reports no price.
+
+### A gate carried across roads
+
+A gate stopped on one road is taken up on the other without rebuilding what the first road wrote.
+
+- **The frozen batches stand.** Freezing is per batch, so the batches a gate already froze on its
+  first road are read back as they are, and the run takes up at the batch after the last frozen one.
+  Nothing rewrites a frozen batch, whichever road wrote it.
+- **The batches ahead ride the new road.** What drives forward — the road, its model, its effort —
+  becomes the new road's, and the roads already driven are kept beside it, so a gate built by two
+  roads records both rather than claiming the road it happens to be on now wrote all of it.
+- **The rows are one gate's either way.** Every row conforms to the same gate specification whatever
+  road wrote it, so the audit and the merge read a two-road gate as one gate's data.
 
 ## A run
 
@@ -149,8 +200,12 @@ Everything a run makes stands under one folder named for the run.
   and token tally; `progress.json` with how far it got and which thread it rode.
 - **The merged folder holds the same three splits and the same two sidecars**, with every gate's rows
   in them together and one meta whose gate list covers all ten.
-- **The merge refuses to stitch two different runs together.** Model, effort, road, rows asked, batch
-  size and split shares must agree across the per-gate metas, or there is no single dataset to make.
+- **The merge refuses to stitch two different runs together.** Rows asked, batch size and split
+  shares must agree across the per-gate metas, or there is no single dataset to make — those are the
+  shape every gate was cut to. The road, the model and the effort are not among them: they belong to
+  a gate, and one run builds sanitiser on J3090 while the other nine ride codex on purpose. Every
+  road any gate was written on is gathered onto the merged meta, so a dataset built across roads says
+  so plainly rather than reading as though the first gate's road wrote all of it.
 - **Nothing in the merged folder marks it as a rehearsal**, so the training driver reads it as the
   real data it is. The mark travels two ways — a meta file of its own, and a mark on the rows —
   and a gate carrying either is kept out rather than quietly turning the whole dataset into a

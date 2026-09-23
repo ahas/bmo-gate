@@ -225,20 +225,40 @@ describe("parts that do not belong to one another", () => {
     return root;
   }
 
-  test("a different model is refused", async () => {
+  // The model, the effort and the road belong to a gate, not to a run: one run may build different
+  // gates on different generators on purpose — sanitizer on J3090, the rest on codex — so a gate
+  // whose meta names another model is merged, not refused. What must agree is the run's shape.
+  test("a different model across gates is merged, not refused", async () => {
     const root = await twoRuns((meta) => {
       meta.model = "gpt-5.6-sol";
     });
 
-    expect(merged(root)).toContain("다른 실행의 데이터는 하나로 묶지 않습니다");
+    const report = merged(root);
+
+    expect(typeof report).not.toBe("string");
+    expect(typeof report === "string" ? "" : report.gates.sort()).toEqual([notes.gate, sanitizer.gate].sort());
   });
 
-  test("a different effort is refused", async () => {
+  test("a different effort across gates is merged, not refused", async () => {
     const root = await twoRuns((meta) => {
       meta.effort = "medium";
     });
 
-    expect(merged(root)).toContain("다른 실행의 데이터는 하나로 묶지 않습니다");
+    expect(typeof merged(root)).not.toBe("string");
+  });
+
+  test("gates written on different roads merge and both roads are recorded", async () => {
+    const root = await twoRuns((meta) => {
+      meta.road = "j3090";
+      meta.roads = ["j3090"];
+      meta.sessionHeld = false;
+      meta.cacheReused = false;
+    });
+
+    const report = merged(root);
+
+    expect(typeof report).not.toBe("string");
+    expect(typeof report === "string" ? [] : report.meta.roads).toEqual(["codex", "j3090"]);
   });
 
   test("a different batch size is refused", async () => {
@@ -259,7 +279,7 @@ describe("parts that do not belong to one another", () => {
 
   test("nothing is written when the parts are refused", async () => {
     const root = await twoRuns((meta) => {
-      meta.model = "gpt-5.6-sol";
+      meta.batchSize = 20;
     });
 
     merged(root);

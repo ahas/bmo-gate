@@ -7,7 +7,7 @@ import { gateOnDisk, guardFolder, plannedBatches, readProgress, runSynthesis } f
 
 import type { SplitShares } from "./laya-dataset";
 import type { GateSynthesis } from "./laya-synth";
-import type { SynthAsker, SynthMeta, TokenTally } from "./laya-synth-run";
+import type { SynthAsker, SynthMeta, SynthRoad, TokenTally } from "./laya-synth-run";
 
 // Ten gates at once, one thread and one folder each (docs/gate-data.md 「A run」). The gates are
 // run beside each other rather than one after another because they share nothing: no gate reads
@@ -26,6 +26,10 @@ export interface DriveOptions {
   batchSize: number;
   model: string;
   effort: string;
+  // The road these gates are driven on. The asker must be the one that speaks it: the driver hands
+  // in both, and this is what a gate's own progress and meta record. Codex unless a run says
+  // otherwise, which is what sanitizer's own run does when it moves off codex onto J3090.
+  road?: SynthRoad;
   shares: SplitShares;
   // How many gates write at the same time. All of them, unless a reason is given to hold back.
   atOnce: number;
@@ -120,7 +124,7 @@ export async function driveGates(options: DriveOptions, ask: SynthAsker): Promis
         batchSize: options.batchSize,
         model: options.model,
         effort: options.effort,
-        road: "codex",
+        road: options.road ?? "codex",
         shares: options.shares,
         resume: options.resume,
         say,

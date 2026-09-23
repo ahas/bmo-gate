@@ -2,13 +2,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { generationOf } from "./laya-audit";
-import { addTokens, metaFile, noTokens } from "./laya-synth-run";
+import { addTokens, metaFile, noTokens, roadsOf } from "./laya-synth-run";
 import { gateFolder } from "./roots";
 import { readRunStanding } from "./gate-run";
 
 import type { DatasetSplit } from "./laya-dataset";
 import type { GateSynthesis } from "./laya-synth";
-import type { SynthMeta, TokenTally } from "./laya-synth-run";
+import type { SynthMeta, SynthRoad, TokenTally } from "./laya-synth-run";
 
 // What a run cost and what it made, gate by gate (docs/gate-data.md 「The ledger」).
 //
@@ -36,6 +36,8 @@ export interface GateLedgerRow {
   tokens: TokenTally;
   seconds: number;
   threadHeld: boolean;
+  // The road or roads this gate was written on. More than one for a gate carried across roads.
+  roads: SynthRoad[];
 }
 
 export interface RunLedger {
@@ -43,6 +45,8 @@ export interface RunLedger {
   model: string;
   effort: string;
   road: string;
+  // Every road any of the run's gates was written on.
+  roads: SynthRoad[];
   gates: GateLedgerRow[];
   totals: {
     written: number;
@@ -114,6 +118,7 @@ export function readLedger(root: string, gates: readonly GateSynthesis[]): RunLe
       tokens: one.tokens,
       seconds: secondsBetween(meta?.started, meta?.written),
       threadHeld: one.threadHeld,
+      roads: meta === null ? [] : roadsOf(meta),
     });
   }
 
@@ -126,6 +131,7 @@ export function readLedger(root: string, gates: readonly GateSynthesis[]): RunLe
     model,
     effort,
     road,
+    roads: [...new Set(rows.flatMap((one) => one.roads))].sort(),
     gates: rows,
     totals: {
       written: rows.reduce((all, one) => all + one.written, 0),
@@ -159,13 +165,13 @@ export function ledgerLines(ledger: RunLedger): string[] {
       `  지은 행 ${one.written} · 산 행 ${one.kept} (학습 ${one.splits.train} · 보정 ${one.splits.calibration} · 시험 ${one.splits.test})`,
       `  묶음 ${one.batchesDone}/${one.batchesPlanned} · 날린 묶음 ${one.lostBatches} · 버린 행 ${refused === "" ? "없음" : refused}`,
       `  새 입력 ${one.tokens.inputTokens} · 캐시읽기 ${one.tokens.cacheReadTokens} · 캐시쓰기 ${one.tokens.cacheWriteTokens} · 출력 ${one.tokens.outputTokens}`,
-      `  ${clock(one.seconds)} · ${one.threadHeld ? "실 하나를 붙들었습니다" : "실을 붙들지 않았습니다"}`,
+      `  길 ${one.roads.join(" → ") || "?"} · ${clock(one.seconds)} · ${one.threadHeld ? "실 하나를 붙들었습니다" : "실을 붙들지 않았습니다"}`,
     ];
   });
 
   return [
     `${ledger.root}`,
-    `모델 ${ledger.model} (${ledger.effort}), 길 ${ledger.road}`,
+    `모델 ${ledger.model} (${ledger.effort}), 길 ${ledger.roads.join(", ") || ledger.road}`,
     "",
     ...lines,
     "",

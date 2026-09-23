@@ -2,12 +2,14 @@ import { appendFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { codexAsker, codexEffort, codexModel, codexTimeoutMs, emptyCwd } from "../src/codex-road";
+import { j3090Asker, j3090Effort, j3090Model, j3090TimeoutMs } from "../src/j3090-road";
 import { driveGates } from "../src/gate-run";
 import { asksUsage, allOf, asked, lastOf, readFlags } from "../src/flags";
 import { gateSyntheses, synthesisFor } from "../src/laya-synth";
 import { refuseInsideCheckout, runFolder } from "../src/roots";
 
 import type { GateSynthesis } from "../src/laya-synth";
+import type { SynthAsker, SynthRoad } from "../src/laya-synth-run";
 
 // The ten gates' distilled data, written on the codex account (docs/gate-data.md). One gate to a
 // thread, all of them at once, every one frozen a batch at a time into a folder of its own.
@@ -21,15 +23,18 @@ const defaultRows = 7_500;
 const defaultBatch = 20;
 
 const usage = `usage: bun scripts/laya-synth.ts --run <이름> [--gate <게이트>]… [--rows <n>] [--batch <n>]
-                                 [--at-once <n>] [--model <모델>] [--effort <노력>]
+                                 [--road codex|j3090] [--at-once <n>] [--model <모델>] [--effort <노력>]
                                  [--timeout <초>] [--resume] [--overwrite]
 
-게이트마다 codex 실 하나를 붙들고 증류 데이터를 지어 <이름> 실행 폴더 아래에 굳힌다.
+게이트마다 실 하나를 붙들고 증류 데이터를 지어 <이름> 실행 폴더 아래에 굳힌다.
 --run 은 런타임 데이터 뿌리 아래의 이름이거나 절대 경로다. 체크아웃 안에는 쓰지 않는다.
 --gate 는 지을 게이트를 고른다(여러 번). 주지 않으면 열 개 전부.
 --rows 는 게이트당 지을 행 수(기본 ${defaultRows}), --batch 는 한 번에 받을 행 수(기본 ${defaultBatch}).
+--road 는 codex(기본, 실을 붙들어 캐시를 쓴다) 또는 j3090(집의 qwen, 세션도 캐시도 없다).
+  codex 가 계정 차원에서 거부하는 게이트를 codex 아닌 길로 이어 지을 때 j3090 을 쓴다.
 --at-once 는 동시에 쓸 게이트 수(기본: 고른 게이트 전부).
 --resume 은 쓰다 만 실행을 그다음 묶음부터 이어 간다. 이미 굳은 게이트는 그대로 둔다.
+  다른 길로 이어 지어도 굳은 묶음은 그대로 두고 그다음부터 새 길로 짓는다.
 --overwrite 는 게이트 폴더를 지우고 처음부터 다시 쓴다.
 둘 다 없으면 비어 있지 않은 폴더에는 아무것도 쓰지 않는다.
 
@@ -44,7 +49,7 @@ if (asksUsage(argv)) {
 }
 
 const reading = readFlags(argv, {
-  "--run": true, "--gate": true, "--rows": true, "--batch": true, "--at-once": true,
+  "--run": true, "--gate": true, "--rows": true, "--batch": true, "--road": true, "--at-once": true,
   "--model": true, "--effort": true, "--timeout": true, "--resume": false, "--overwrite": false,
 });
 
@@ -83,12 +88,24 @@ const gates: GateSynthesis[] = wanted.length === 0
       return spec;
     });
 
+const road = (lastOf(reading, "--road") ?? "codex") as SynthRoad;
+
+if (road !== "codex" && road !== "j3090") {
+  console.error("laya-synth: --road 는 codex 또는 j3090 입니다.");
+  process.exit(2);
+}
+
+// Each road brings its own model, its own effort and its own wait, and the asker that speaks it.
+const roadDefaults = road === "j3090"
+  ? { model: j3090Model, effort: j3090Effort, timeoutSeconds: j3090TimeoutMs / 1000 }
+  : { model: codexModel, effort: codexEffort, timeoutSeconds: codexTimeoutMs / 1000 };
+
 const rows = Number(lastOf(reading, "--rows") ?? String(defaultRows));
 const batchSize = Number(lastOf(reading, "--batch") ?? String(defaultBatch));
 const atOnce = Number(lastOf(reading, "--at-once") ?? String(gates.length));
-const model = lastOf(reading, "--model") ?? codexModel;
-const effort = lastOf(reading, "--effort") ?? codexEffort;
-const timeoutMs = Number(lastOf(reading, "--timeout") ?? String(codexTimeoutMs / 1000)) * 1000;
+const model = lastOf(reading, "--model") ?? roadDefaults.model;
+const effort = lastOf(reading, "--effort") ?? roadDefaults.effort;
+const timeoutMs = Number(lastOf(reading, "--timeout") ?? String(roadDefaults.timeoutSeconds)) * 1000;
 
 for (const [what, value] of [["--rows", rows], ["--batch", batchSize], ["--at-once", atOnce], ["--timeout", timeoutMs]] as const) {
   if (!Number.isFinite(value) || value <= 0) {
@@ -110,8 +127,16 @@ function say(line: string): void {
 
 const started = Date.now();
 
+// The asker for the chosen road. Codex works in a directory holding nothing so no checkout's
+// AGENTS.md is carried into a batch; J3090 is one request over HTTPS and has no such directory.
+const asker: SynthAsker = road === "j3090"
+  ? j3090Asker({ model, timeoutMs })
+  : codexAsker({ model, effort, timeoutMs });
+
 say(`${root}: ${gates.length}게이트, 게이트당 ${rows}행, 한 묶음 ${batchSize}행, 동시에 ${Math.min(atOnce, gates.length)}개.`);
-say(`모델 ${model} (${effort}), 길 codex. 작업 폴더 ${emptyCwd()}.`);
+say(road === "j3090"
+  ? `모델 ${model} (${effort}), 길 j3090.`
+  : `모델 ${model} (${effort}), 길 codex. 작업 폴더 ${emptyCwd()}.`);
 
 const outcomes = await driveGates({
   root,
@@ -120,12 +145,13 @@ const outcomes = await driveGates({
   batchSize,
   model,
   effort,
+  road,
   shares: { calibration: 0.15, test: 0.15 },
   atOnce,
   resume: asked(reading, "--resume"),
   overwrite: asked(reading, "--overwrite"),
   say,
-}, codexAsker({ model, effort, timeoutMs }));
+}, asker);
 
 say("");
 say(`${Math.round((Date.now() - started) / 1000)}초 걸렸습니다.`);

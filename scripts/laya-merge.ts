@@ -61,7 +61,7 @@ if (typeof report === "string") {
 
 console.log(`${report.folder} 에 ${report.gates.length}게이트를 묶었습니다.`);
 console.log(`학습 ${report.rows.train} · 보정 ${report.rows.calibration} · 시험 ${report.rows.test}`);
-console.log(`모델 ${report.meta.model} (${report.meta.effort}), 길 ${report.meta.road}`);
+console.log(`모델 ${report.meta.model} (${report.meta.effort}), 길 ${(report.meta.roads ?? [report.meta.road]).join(", ")}`);
 console.log(`캐시읽기 ${report.meta.tokens.cacheReadTokens} 새 입력 ${report.meta.tokens.inputTokens} 출력 ${report.meta.tokens.outputTokens}`);
 
 if (report.duplicates > 0) {

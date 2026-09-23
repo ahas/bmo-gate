@@ -166,10 +166,23 @@ export interface SynthProgress {
   model: string;
   effort: string;
   road: SynthRoad;
+  // Every road that has driven this run, in the order they first drove it. A gate resumed onto a
+  // different road — sanitizer off codex and onto J3090, where codex refused its attack rows at the
+  // account level — carries both, because the batches already frozen were written on the first road
+  // and the batches still to come on the second. `road` is only the one driving now; `roads` is the
+  // honest account of what wrote the gate's rows. Absent on a run written before this was recorded,
+  // which is read as the single `road` it names.
+  roads?: SynthRoad[];
   rows: number;
   batchSize: number;
   shares: SplitShares;
   gates: Record<string, GateProgress>;
+}
+
+// The roads a run has been driven on, taking a run written before `roads` was recorded as the one
+// road it named.
+export function roadsOf(progress: { road: SynthRoad; roads?: readonly SynthRoad[] }): SynthRoad[] {
+  return progress.roads !== undefined && progress.roads.length > 0 ? [...progress.roads] : [progress.road];
 }
 
 export const progressFile = "progress.json";
@@ -359,6 +372,10 @@ export interface SynthMeta {
   model: string;
   effort: string;
   road: SynthRoad;
+  // Every road the rows were written on. One road for a gate built on one road; more than one for
+  // a gate carried across roads, and more than one for a merged dataset whose gates did not all
+  // share a road. Absent on data written before this was recorded, read as the single `road`.
+  roads?: SynthRoad[];
   // The two things the J3090 road cannot do, said outright rather than left to be inferred from
   // a cache-read count of zero.
   sessionHeld: boolean;
@@ -403,6 +420,7 @@ export function freezeSplits(folder: string, progress: SynthProgress): SynthMeta
     model: progress.model,
     effort: progress.effort,
     road: progress.road,
+    roads: roadsOf(progress),
     sessionHeld: roadHoldsSession(progress.road),
     cacheReused: roadHoldsSession(progress.road),
     written: new Date().toISOString(),
@@ -492,11 +510,30 @@ export async function runSynthesis(options: SynthOptions, ask: SynthAsker): Prom
     model: options.model,
     effort: options.effort,
     road: options.road,
+    roads: [options.road],
     rows: options.rows,
     batchSize: options.batchSize,
     shares: options.shares,
     gates: {},
   };
+
+  // A resumed run may be driving a different road than the one that started it: the batches ahead
+  // are the new road's, so what drives forward — the road, its model, its effort — becomes the new
+  // road's, and the roads already driven are kept beside it. The rows already frozen keep the road
+  // that wrote them; nothing here rewrites a frozen batch.
+  if (held !== null) {
+    const roads = roadsOf(held);
+
+    if (!roads.includes(options.road)) {
+      roads.push(options.road);
+      say(`${held.road} 로 짓다 만 것을 ${options.road} 로 이어 짓습니다. 굳은 묶음은 그대로 두고 그다음부터 새 길로 짓습니다.`);
+    }
+
+    progress.road = options.road;
+    progress.model = options.model;
+    progress.effort = options.effort;
+    progress.roads = roads;
+  }
 
   if (!roadHoldsSession(options.road)) {
     say("이 길은 세션을 붙들지 않습니다. 묶음마다 프롬프트를 처음부터 다시 읽으므로 캐시를 쓰지 못합니다.");
