@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { gateFor, judgePrompt, judgeSystem, judgedRows, readJudgements } from "./gate-judge";
+import { gateFor, judgeBatches, judgePrompt, judgeSystem, judgedRows, readJudgements } from "./gate-judge";
 import { unjudgedRowOf } from "./real-rows";
 
 import type { JudgeItem } from "./gate-judge";
@@ -118,5 +118,43 @@ describe("judgedRows", () => {
 
     expect(outcome.rows).toEqual([]);
     expect(outcome.unanswered).toBe(1);
+  });
+});
+
+describe("judgeBatches", () => {
+  const asking = (many: number, name: string): UnjudgedRow => ({
+    id: `people-search:${name}`,
+    gate: "people-search",
+    split: "train",
+    state: "말",
+    questions: Object.fromEntries(Array.from({ length: many }, (_, at) => [
+      `piece-${at}`,
+      { type: "noul" as const, instructions: "이 대화에 답하려면 이 인물 기록이 필요한가?" },
+    ])),
+  });
+
+  test("counts a batch in answers, so a gate asking many questions of a row takes fewer rows", () => {
+    const plan = judgeBatches(Array.from({ length: 12 }, (_, at) => asking(20, `a${at}`)), 20, 100);
+
+    expect(plan.map((batch) => batch.length)).toEqual([5, 5, 2]);
+  });
+
+  test("stops at the rows it was asked for where the answers are few", () => {
+    const plan = judgeBatches(Array.from({ length: 5 }, (_, at) => asking(1, `b${at}`)), 2, 100);
+
+    expect(plan.map((batch) => batch.length)).toEqual([2, 2, 1]);
+  });
+
+  test("takes a row that is past the cap on its own, since a plan with a hole in it is worse", () => {
+    const plan = judgeBatches([asking(300, "c0"), asking(1, "c1")], 20, 100);
+
+    expect(plan.map((batch) => batch.length)).toEqual([1, 1]);
+  });
+
+  test("puts every row in exactly one batch, in the order they stand", () => {
+    const rows = [asking(60, "d0"), asking(60, "d1"), asking(1, "d2"), asking(1, "d3")];
+    const plan = judgeBatches(rows, 20, 100);
+
+    expect(plan.flat().map((one) => one.id)).toEqual(rows.map((one) => one.id));
   });
 });

@@ -175,6 +175,16 @@ export interface SynthProgress {
   roads?: SynthRoad[];
   rows: number;
   batchSize: number;
+  // The answers one batch may ask for, which is the other half of how a judging pass cuts its
+  // batches: a gate that asks one question of a row and one that asks eighty are the same number of
+  // rows and eighty times the answer. Absent on a generation run, whose batches are counted in rows
+  // alone because what it asks for is rows the model has yet to write.
+  answerCap?: number;
+  // When the rows these batches were cut from were built, off the run's own build meta. A judging
+  // pass plans over rows somebody else wrote, and rows rebuilt under it are rows its frozen batches
+  // were never cut from — so a resume counting batches against them takes up at a batch holding
+  // other rows than the one it counted. Absent on a generation run, which writes its own rows.
+  builtAt?: string;
   shares: SplitShares;
   gates: Record<string, GateProgress>;
 }

@@ -37,6 +37,44 @@ export function judgeItemOf(row: UnjudgedRow): JudgeItem {
   return { id: row.id, state: row.state, questions: row.questions };
 }
 
+// How many answers one batch may ask for at once. A batch is counted in answers rather than in
+// rows because what the judge has to write is one answer a question, and a gate that asks eighty
+// questions of a row asks eighty times what a gate asking one does. Twenty rows of the person book
+// is sixteen hundred answers in one reply, and codex hands back every row's gold empty rather than
+// writing them — which costs the batch whole and reads, from outside, as a gate that judges
+// nothing at all.
+export const answersPerBatch = 100;
+
+// The batches one gate's rows are judged in, in order. A batch takes rows while it stays under both
+// bounds, and always takes one row however many answers that row alone asks for: a row past the cap
+// on its own is still a row, and a plan that skipped it would leave a hole nothing can fill.
+export function judgeBatches(rows: readonly UnjudgedRow[], batchSize: number, answerCap: number): UnjudgedRow[][] {
+  const size = Math.max(1, batchSize);
+  const cap = Math.max(1, answerCap);
+  const plan: UnjudgedRow[][] = [];
+  let taking: UnjudgedRow[] = [];
+  let answers = 0;
+
+  for (const row of rows) {
+    const asks = Object.keys(row.questions).length;
+
+    if (taking.length > 0 && (taking.length >= size || answers + asks > cap)) {
+      plan.push(taking);
+      taking = [];
+      answers = 0;
+    }
+
+    taking.push(row);
+    answers += asks;
+  }
+
+  if (taking.length > 0) {
+    plan.push(taking);
+  }
+
+  return plan;
+}
+
 // What one batch asks. The gate's line about what it decides stands at the top, then every item
 // whole, then the answers each question may take — a judge left to guess the answers of a yes/no
 // writes "yes" and "no" and the batch cannot be read back at all.

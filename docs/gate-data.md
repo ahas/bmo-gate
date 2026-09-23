@@ -49,6 +49,15 @@ asked, with no answer on either.
   the verdict record kept. The brain moves; a row written against today's library would be a row no
   turn of that room ever saw, and reading the brain directly would put this repository inside BMO's
   own structure, which it is not.
+- **A row is offered as many candidates as its gate says it offers**, never as many as the record
+  holds. What the record keeps for a room is every candidate that room was ever offered, which for
+  the person book runs to dozens against a gate that is handed twenty; a row carrying the lot is a
+  row no turn of that gate ever saw, the gate's own specification refuses it, and the judgement
+  bought for it was bought for nothing. The recorded set is cut into sets of the gate's own maximum,
+  and a remainder short of the gate's minimum reaches back over the set before it rather than being
+  dropped — so every candidate the room was offered stands in some row, and the overlap costs only a
+  candidate being asked about twice. A room offered fewer than the gate's minimum builds no row of
+  that gate at all.
 - **The formatting gate's material is what went out.** One judgement decides the fold, so the
   message people received — its markdown, the text the reader saw, and whether it was folded — is
   that judgement's own record, and it outlives every log.
@@ -94,10 +103,32 @@ Every label is made afresh, on a road, against the gate exactly as it stands.
 - **The answer balance is the rooms' own.** Real conversation is lopsided, and nothing here evens it
   out by writing rows. The training loop's own balance step is what holds one answer from swamping
   another, and the audit reports the balance as it stands.
+- **A batch is counted in the answers it asks for, not in the rows it carries.** What the judge has
+  to write is one answer a question, so a gate asking eighty questions of a row asks eighty times
+  what a gate asking one does off the same twenty rows. Twenty rows of the person book is sixteen
+  hundred answers in one reply, and the model hands back every row's gold empty rather than writing
+  them — which reads from outside as a gate judging nothing at all. A batch takes rows while it
+  stays under both the row bound and the answer bound, and always takes one row however many answers
+  that row alone asks for, because a plan that skipped it would leave a hole nothing can fill.
+- **The judging pass holds no thread.** A judging batch carries no fixed prefix worth caching: the
+  system prompt is a few lines, the gate's own is a few more, and everything else in the ask is that
+  batch's own rows, which are never sent twice. A held thread would buy that nothing back on every
+  batch at the price of the whole conversation so far — and grow until it fills the model's context
+  window, at which point every batch after it fails and the gate is dead. Writing rows is the
+  opposite case and holds its thread; the two are told apart by what stands in front of the ask.
 - **A batch is frozen the moment it lands**, and a run taken up again takes up at the batch after
   the last one frozen. Nothing rewrites a frozen batch, and a folder that already holds a frozen
   gate is refused unless the run says outright that it means to write over it. This is what makes
   the judging a unit's work rather than a session's.
+- **A resume is refused where the plan has moved under it.** The plan is a pure function of the rows
+  and the two bounds, so taking a run up under bounds its frozen batches were not cut to — or over
+  rows rebuilt since they were cut — would start at a batch holding other rows than the one it
+  counted, and the rows between the two plans would be left unjudged with nothing saying so. A
+  judging pass plans over rows somebody else wrote, so both bounds and the moment the rows were
+  built are recorded beside the progress, and a run that disagrees with any of them is told to match
+  it or to write the gate over.
+- **A gate that falls says so the moment it falls.** The gates beside it run for hours yet, and a
+  failure held back until every one of them has finished is a failure nobody sees all day.
 
 ## The roads
 
@@ -109,8 +140,11 @@ taken up on the other, its frozen batches left as they stand.
 
 Most gates' rows are written by `codex exec`, driven directly rather than through any provider switch.
 
-- **One held thread per gate.** A gate's whole run rides one codex thread. The first batch opens it;
-  every later batch resumes it by its thread id.
+- **One held thread per gate, while rows are being written.** A gate's whole writing run rides one
+  codex thread: the first batch opens it, every later batch resumes it by its thread id. A judging
+  pass rides the same road and holds no thread at all, because what stands in front of a judging ask
+  is a few lines rather than a gate's whole prefix — and a thread nobody reads a prefix out of grows
+  until it fills the context window and takes the gate with it.
 - **The gate's fixed prefix is the thread's first message.** That prefix is the gate's rules, the row
   shape and the worked example — the part that is the same in every batch of that gate. Sending it
   once and resuming means the model reads it out of the cache afterwards instead of being told it
@@ -133,7 +167,7 @@ Most gates' rows are written by `codex exec`, driven directly rather than throug
 - **The per-batch timeout is sized for a long answer**, not for a gate's one-word verdict: a batch of
   twenty invented rows is minutes of writing.
 
-The shape of it, per gate:
+The shape of it, per gate, where the rows are being written:
 
 ```
 thread = null
@@ -143,6 +177,14 @@ for each batch in the gate's plan:
         thread = the thread id the run reported
     else:
         answer = codex exec resume thread (this batch's ask)     # prefix read from cache
+    freeze whatever rows the answer held
+```
+
+And where the rows are being judged, which has no prefix to read out of a cache:
+
+```
+for each batch in the gate's plan:
+    answer = codex exec (the fixed lines + this batch's rows)   # a thread of its own, left behind
     freeze whatever rows the answer held
 ```
 
@@ -447,9 +489,11 @@ behind it has nothing else, and the shape it writes is the shape the training re
   which are still short. It needs 하스's and BMO's own numbers, from the environment or from
   `--owner` and `--bmo`.
 - `bun scripts/laya-judge.ts` — judge those rows on a road, freezing each batch as it lands and
-  writing the three splits when a gate is done. `--resume` takes up at the batch after the last one
-  frozen; without `--overwrite` it writes nothing into a folder that already holds a frozen gate.
-  A full run is hours and is carried by the unit `bmo-gate-judge`, never by a session.
+  writing the three splits when a gate is done. A batch is bounded two ways, `--batch` in rows and
+  `--answers` in the answers those rows ask for, and the tighter of the two settles it. `--resume`
+  takes up at the batch after the last one frozen and is refused where either bound has moved since;
+  without `--overwrite` it writes nothing into a folder that already holds a frozen gate. A full run
+  is hours and is carried by the unit `bmo-gate-judge`, never by a session.
 - `bun scripts/laya-synth.ts` — write the gates' rows, one codex thread and one folder each. How
   many write at the same time is given, so one gate can be rebuilt on its own or all ten run
   together. It writes its own log beside the data.

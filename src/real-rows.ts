@@ -5,9 +5,10 @@ import { splitOf } from "./laya-dataset";
 import { indexOf, plainShapeLine, roomShapeLine } from "./room-shape";
 import { scrubText } from "./pii";
 import { roomKindOf } from "./archive";
-import { synthesisFor } from "./laya-synth";
+import { candidateOf, synthesisFor } from "./laya-synth";
 
 import type { ArchivedMessage, RecordedQuestions } from "./archive";
+import type { GateSynthesis } from "./laya-synth";
 import type { LayaQuestion, LayaRequest, LayaState } from "./laya";
 import type { DatasetSplit, SplitShares } from "./laya-dataset";
 import type { ShapeWho } from "./room-shape";
@@ -78,14 +79,21 @@ export function newestFitting(lines: readonly string[], build: (kept: readonly s
   return [...lines.slice(lines.length - taken)];
 }
 
-// One gate's question as it always asks it, out of the gate's own specification, so no question's
-// wording is written here a second time.
-function questionsOf(gate: string): Record<string, LayaQuestion> {
+// One gate's specification, which is where every shape a row is held to is written down.
+function specOf(gate: string): GateSynthesis {
   const spec = synthesisFor(gate);
 
   if (spec === null) {
     throw new Error(`${gate} 는 이 저장소가 아는 게이트가 아닙니다.`);
   }
+
+  return spec;
+}
+
+// One gate's question as it always asks it, out of the gate's own specification, so no question's
+// wording is written here a second time.
+function questionsOf(gate: string): Record<string, LayaQuestion> {
+  const spec = specOf(gate);
 
   return Object.fromEntries(spec.questions.map((question) => [
     question.id,
@@ -231,21 +239,86 @@ export function isReferenceGate(gate: string): gate is ReferenceGate {
   return (referenceGates as readonly string[]).includes(gate);
 }
 
-// The candidate sets one gate really offered, kept per room. A room with none offered the gate
-// nothing that was ever recorded, and no row of that gate is built from its turns.
-export function candidateSetsByRoom(recorded: readonly RecordedQuestions[]): Map<number, Record<string, LayaQuestion>[]> {
+// One recorded set's candidates, in the order the record names them, each with the question ids it
+// was asked under. A slug the record asked something other than this gate's own questions of is not
+// a candidate of this gate and is left out.
+function candidatesIn(gate: GateSynthesis, set: Record<string, LayaQuestion>): { slug: string; ids: string[] }[] {
+  const order: string[] = [];
+  const asked = new Map<string, string[]>();
+
+  for (const id of Object.keys(set)) {
+    const named = candidateOf(gate, id);
+
+    if (named === null) {
+      continue;
+    }
+
+    const held = asked.get(named.slug);
+
+    if (held === undefined) {
+      order.push(named.slug);
+      asked.set(named.slug, [id]);
+    } else {
+      held.push(id);
+    }
+  }
+
+  return order
+    .map((slug) => ({ slug, ids: asked.get(slug)! }))
+    .filter((one) => one.ids.length === gate.questions.length);
+}
+
+// The sets one recorded set really stands for, each holding as many candidates as the gate says it
+// offers (docs/laya-gates.md, 「Candidates per row」). A room's record holds every candidate that
+// room was ever offered, which for the person book runs to dozens, and the gate itself is never
+// handed more than its own maximum — so a row carrying the lot is a row no turn of that gate ever
+// saw, and the gate's own specification refuses it outright.
+//
+// The candidates are cut into groups of the gate's maximum. A remainder short of the minimum
+// reaches back over the group before it rather than being dropped, so every candidate the room was
+// offered stands in some set and the overlap costs only a candidate being asked about twice.
+export function offeredSets(gate: GateSynthesis, set: Record<string, LayaQuestion>): Record<string, LayaQuestion>[] {
+  const range = gate.candidates;
+
+  if (range === null) {
+    return Object.keys(set).length === 0 ? [] : [set];
+  }
+
+  const candidates = candidatesIn(gate, set);
+
+  if (candidates.length < range.min) {
+    return [];
+  }
+
+  const sets: Record<string, LayaQuestion>[] = [];
+
+  for (let at = 0; at < candidates.length; at += range.max) {
+    const taken = candidates.length - at < range.min
+      ? candidates.slice(candidates.length - range.min)
+      : candidates.slice(at, at + range.max);
+
+    sets.push(Object.fromEntries(taken.flatMap((one) => one.ids.map((id) => [id, set[id]!]))));
+  }
+
+  return sets;
+}
+
+// The candidate sets one gate really offered, kept per room and cut to what the gate offers. A room
+// with none offered the gate nothing that was ever recorded, and no row of that gate is built from
+// its turns.
+export function candidateSetsByRoom(gate: GateSynthesis, recorded: readonly RecordedQuestions[]): Map<number, Record<string, LayaQuestion>[]> {
   const byRoom = new Map<number, Record<string, LayaQuestion>[]>();
 
   for (const one of recorded) {
-    const questions = one.questions as Record<string, LayaQuestion>;
+    const sets = offeredSets(gate, one.questions as Record<string, LayaQuestion>);
 
-    if (Object.keys(questions).length === 0) {
+    if (sets.length === 0) {
       continue;
     }
 
     const held = byRoom.get(one.chatId) ?? [];
 
-    held.push(questions);
+    held.push(...sets);
     byRoom.set(one.chatId, held);
   }
 
@@ -386,7 +459,7 @@ export function realRows(reads: ArchiveReads, settings: RealSettings, gates: rea
     }
 
     const sets = isReferenceGate(gate) || gate === "situation-rules"
-      ? candidateSetsByRoom(reads.recorded(gate))
+      ? candidateSetsByRoom(specOf(gate), reads.recorded(gate))
       : new Map<number, Record<string, LayaQuestion>[]>();
 
     for (const chatId of reads.rooms()) {

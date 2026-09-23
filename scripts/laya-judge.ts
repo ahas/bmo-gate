@@ -3,12 +3,12 @@ import { join } from "node:path";
 
 import { asksUsage, allOf, asked, lastOf, readFlags } from "../src/flags";
 import { codexEffort, codexJudgeRoad, codexModel } from "../src/codex-road";
-import { gateFor, judgePrompt, judgeSystem, judgedRows, readJudgements } from "../src/gate-judge";
+import { answersPerBatch, gateFor, judgeBatches, judgePrompt, judgeSystem, judgedRows, readJudgements } from "../src/gate-judge";
 import { j3090Effort, j3090JudgeRoad, j3090Model } from "../src/j3090-road";
 import { languageOf, stateText } from "../src/laya-synth";
 import {
   addTokens, freezeBatch, freezeSplits, gateOnDisk, guardFolder, keepBarrenAnswer, keepLostAnswer,
-  noTokens, readProgress, roadHoldsSession, writeProgress,
+  noTokens, readProgress, writeProgress,
 } from "../src/laya-synth-run";
 import { realMetaFile, unjudgedFile } from "../src/real-rows";
 import { gateFolder, runFolder } from "../src/roots";
@@ -25,12 +25,13 @@ import type { RealMeta, UnjudgedRow } from "../src/real-rows";
 // It writes into the same folders a generation writes, batch by batch, so the status, the merge,
 // the verdict and the ledger read a judged gate exactly as they read a written one.
 
-const usage = `usage: bun scripts/laya-judge.ts <실행> [--gate <게이트>]… [--road codex|j3090] [--batch <n>] [--at-once <n>] [--resume] [--overwrite] [--limit <n>]
+const usage = `usage: bun scripts/laya-judge.ts <실행> [--gate <게이트>]… [--road codex|j3090] [--batch <n>] [--answers <n>] [--at-once <n>] [--resume] [--overwrite] [--limit <n>]
 
 실행 폴더의 게이트마다 unjudged.jsonl 을 읽어 지금 게이트 구조 그대로 판정하고, 묶음이 올 때마다 굳힌다.
 <실행> 은 런타임 데이터 뿌리 아래의 이름이거나 절대 경로다. laya-real.ts 가 먼저 그 폴더를 채워야 한다.
 --gate 는 게이트를 고른다(여러 번). 없으면 실행 폴더에 unjudged.jsonl 이 있는 게이트 전부.
---road 는 판정을 맡을 길(기본 codex). --batch 는 한 번에 판정시킬 행 수(기본 20).
+--road 는 판정을 맡을 길(기본 codex). --batch 는 한 묶음의 최대 행 수(기본 20).
+--answers 는 한 묶음이 물을 수 있는 최대 답 수(기본 ${answersPerBatch}). 후보마다 질문이 붙는 게이트는 이쪽이 묶음을 정한다.
 --at-once 는 동시에 판정할 게이트 수(기본 1). --limit 은 게이트당 판정할 행 수, 연습 실행용.
 --resume 은 굳은 묶음 다음부터 이어 간다. --overwrite 는 이미 굳은 폴더를 다시 쓴다.`;
 
@@ -42,7 +43,7 @@ if (asksUsage(argv)) {
 }
 
 const reading = readFlags(argv, {
-  "--gate": true, "--road": true, "--batch": true, "--at-once": true, "--limit": true,
+  "--gate": true, "--road": true, "--batch": true, "--answers": true, "--at-once": true, "--limit": true,
   "--resume": false, "--overwrite": false,
 });
 
@@ -71,6 +72,7 @@ const road: JudgeRoad = roadName === "codex" ? codexJudgeRoad() : j3090JudgeRoad
 const model = roadName === "codex" ? codexModel : j3090Model;
 const effort = roadName === "codex" ? codexEffort : j3090Effort;
 const batchSize = Number(lastOf(reading, "--batch") ?? "20");
+const answerCap = Number(lastOf(reading, "--answers") ?? String(answersPerBatch));
 const atOnce = Math.max(1, Number(lastOf(reading, "--at-once") ?? "1"));
 const limit = Number(lastOf(reading, "--limit") ?? "0");
 const wanted = allOf(reading, "--gate");
@@ -98,10 +100,7 @@ async function judgeGate(gate: string): Promise<string | null> {
   const spec = gateFor(gate);
   const folder = gateFolder(root, gate);
   const rows = unjudgedOf(gate);
-  const plan: UnjudgedRow[][] = Array.from(
-    { length: Math.ceil(rows.length / batchSize) },
-    (_, index) => rows.slice(index * batchSize, index * batchSize + batchSize),
-  );
+  const plan = judgeBatches(rows, batchSize, answerCap);
   const refusal = guardFolder(folder, wants);
 
   if (refusal !== null) {
@@ -109,10 +108,23 @@ async function judgeGate(gate: string): Promise<string | null> {
   }
 
   const held = wants.resume ? readProgress(folder) : null;
+
+  // The plan is a pure function of the rows and the two bounds, so a resume under bounds the frozen
+  // batches were not cut to — or over rows built since they were cut — would take up at a batch
+  // holding other rows than the one it counted, and the rows between the two plans would be left
+  // unjudged with nothing saying so.
+  if (held !== null && (held.batchSize !== batchSize || (held.answerCap ?? answerCap) !== answerCap)) {
+    return `${gate}: 굳은 묶음은 --batch ${held.batchSize} --answers ${held.answerCap ?? answerCap} 로 잘렸습니다. 같은 값으로 이어 가거나 --overwrite 로 다시 쓰세요.`;
+  }
+
+  if (held !== null && held.builtAt !== undefined && held.builtAt !== built.built) {
+    return `${gate}: 굳은 묶음은 ${held.builtAt} 에 세운 행에서 잘렸고 지금 행은 ${built.built} 에 세운 것입니다. --overwrite 로 다시 쓰세요.`;
+  }
+
   const progress: SynthProgress = held ?? {
     started: new Date().toISOString(),
     model, effort, road: roadName, roads: [roadName],
-    rows: built.limit, batchSize, shares: built.shares, gates: {},
+    rows: built.limit, batchSize, answerCap, builtAt: built.built, shares: built.shares, gates: {},
   };
   const standing = progress.gates[gate] ?? {
     done: 0, sessionId: null, kept: 0, refused: {}, unreadable: 0, lostBatches: 0, tokens: noTokens,
@@ -125,9 +137,11 @@ async function judgeGate(gate: string): Promise<string | null> {
   // that batch a second time and write the answer over rows that were already good.
   standing.done = Math.min(standing.done, gateOnDisk(folder, gate, plan.length).done);
 
-  if (!roadHoldsSession(roadName)) {
-    standing.sessionId = null;
-  }
+  // A judging batch carries no fixed prefix worth holding a thread for — the system prompt is a few
+  // lines and the gate's own is a few more, and everything else in the ask is that batch's own rows,
+  // which are never sent twice. So a held thread buys nothing here and costs the whole conversation
+  // back on every batch, until the thread fills the model's context window and the gate dies of it.
+  standing.sessionId = null;
 
   for (let index = standing.done; index < plan.length; index += 1) {
     const batch = plan[index]!;
@@ -135,12 +149,11 @@ async function judgeGate(gate: string): Promise<string | null> {
     let answer: Awaited<ReturnType<JudgeRoad>>;
 
     try {
-      answer = await road(judgeSystem, judgePrompt(spec, items), standing.sessionId);
+      answer = await road(judgeSystem, judgePrompt(spec, items), null);
     } catch (error) {
-      return `${gate}: ${error instanceof Error ? error.message : String(error)}`;
+      return `${gate}: ${index + 1}/${plan.length} 에서 섰습니다 — ${error instanceof Error ? error.message : String(error)}`;
     }
 
-    standing.sessionId = answer.sessionId ?? standing.sessionId;
     standing.tokens = addTokens(standing.tokens, answer.tokens);
 
     const judged = readJudgements(answer.text, items);
@@ -181,13 +194,22 @@ async function judgeGate(gate: string): Promise<string | null> {
 
 const trouble: string[] = [];
 
-for (let start = 0; start < gates.length; start += atOnce) {
-  const said = await Promise.all(gates.slice(start, start + atOnce).map((gate) => judgeGate(gate)));
+// A gate that falls says so the moment it falls. The gates beside it run for hours yet, and a
+// failure held back until every one of them is finished is a failure nobody sees all day — which
+// is exactly how five gates stood dead in a run that looked, from its log, to be going fine.
+async function runGate(gate: string): Promise<void> {
+  const said = await judgeGate(gate);
 
-  trouble.push(...said.filter((one): one is string => one !== null));
+  if (said !== null) {
+    console.error(said);
+    trouble.push(said);
+  }
+}
+
+for (let start = 0; start < gates.length; start += atOnce) {
+  await Promise.all(gates.slice(start, start + atOnce).map((gate) => runGate(gate)));
 }
 
 if (trouble.length > 0) {
-  console.error(trouble.join("\n"));
   process.exit(1);
 }

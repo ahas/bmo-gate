@@ -3,8 +3,8 @@ import { describe, expect, test } from "bun:test";
 import { inTranscriptShape, languageOf, stateText, synthesisFor, validateSynthRow } from "./laya-synth";
 import { pseudonyms } from "./pii";
 import {
-  contentJudgeRows, newestFitting, outputFormatRows, realRows, realSourceGates, referenceRows,
-  replyWantedRows, situationRows, unjudgedRowOf,
+  candidateSetsByRoom, contentJudgeRows, newestFitting, offeredSets, outputFormatRows, realRows,
+  realSourceGates, referenceRows, replyWantedRows, situationRows, unjudgedRowOf,
 } from "./real-rows";
 
 import type { ArchivedMessage } from "./archive";
@@ -142,6 +142,71 @@ describe("referenceRows", () => {
   });
 });
 
+describe("offeredSets", () => {
+  const people = synthesisFor("people-search")!;
+  const situation = synthesisFor("situation-rules")!;
+
+  function bookOf(many: number): Record<string, LayaQuestion> {
+    return Object.fromEntries(Array.from({ length: many }, (_, at) => [
+      `p51078230-piece-${at}`,
+      { type: "noul" as const, instructions: "이 대화에 답하려면 이 인물 기록이 필요한가? 기록" },
+    ]));
+  }
+
+  test("cuts a set past what the gate offers into sets the gate accepts", () => {
+    const sets = offeredSets(people, bookOf(80));
+
+    expect(sets.length).toBe(4);
+    expect(sets.every((set) => Object.keys(set).length === people.candidates!.max)).toBe(true);
+  });
+
+  test("offers nothing where the room was recorded offering fewer than the gate's least", () => {
+    expect(offeredSets(people, bookOf(1))).toEqual([]);
+  });
+
+  test("reaches back over the group before it rather than dropping a short remainder", () => {
+    const sets = offeredSets(people, bookOf(21));
+
+    expect(sets.map((set) => Object.keys(set).length)).toEqual([20, 2]);
+    expect(Object.keys(sets[1]!)).toEqual(["p51078230-piece-19", "p51078230-piece-20"]);
+  });
+
+  test("counts candidates rather than questions where a gate asks several of each", () => {
+    const rules = Object.fromEntries(Array.from({ length: 10 }, (_, at) => [
+      [`rule-${at}:applies`, { type: "noul" as const, instructions: "이 규칙의 조건이 지금 상황에 맞는가?" }],
+      [`rule-${at}:spent`, { type: "noul" as const, instructions: "이 규칙은 이제 안 써도 되는가?" }],
+    ]).flat());
+    const sets = offeredSets(situation, rules);
+
+    expect(sets.map((set) => Object.keys(set).length)).toEqual([16, 4]);
+  });
+
+  test("every set it cuts stands as its own gate's row", () => {
+    for (const set of offeredSets(people, bookOf(80))) {
+      const gold = Object.fromEntries(Object.keys(set).map((id) => [
+        id,
+        { type: "noul" as const, label: "true" as const, noul: 0.9, probabilities: { true: 0.9, false: 0.1 } },
+      ]));
+      const verdict = validateSynthRow(people, { state: "세영 (id 3391044): 비모야 유진이 번호 뭐였지", questions: set, gold }, "korean");
+
+      expect(verdict.ok ? "ok" : `${verdict.refusal} — ${verdict.detail}`).toBe("ok");
+    }
+  });
+});
+
+describe("candidateSetsByRoom", () => {
+  test("keeps a room's sets under the room that was offered them, cut to what the gate offers", () => {
+    const people = synthesisFor("people-search")!;
+    const book = Object.fromEntries(Array.from({ length: 40 }, (_, at) => [
+      `p51078230-piece-${at}`,
+      { type: "noul" as const, instructions: "이 대화에 답하려면 이 인물 기록이 필요한가? 기록" },
+    ]));
+    const byRoom = candidateSetsByRoom(people, [{ chatId: -1_000, questions: book }]);
+
+    expect(byRoom.get(-1_000)!.length).toBe(2);
+  });
+});
+
 describe("situationRows", () => {
   test("reads the situation in the room shape, which is what a condition's moment is read off", () => {
     const rules: Record<string, LayaQuestion> = {
@@ -189,6 +254,20 @@ describe("realRows", () => {
     const built = realRows(reads, settings(), [...realSourceGates]);
 
     expect([...built.keys()].sort()).toEqual([...realSourceGates].sort());
+  });
+
+  test("offers a gate no more candidates than that gate says it offers", () => {
+    const book = Object.fromEntries(Array.from({ length: 80 }, (_, at) => [
+      `p51078230-piece-${at}`,
+      { type: "noul" as const, instructions: "이 대화에 답하려면 이 인물 기록이 필요한가? 기록" },
+    ]));
+    const many: ArchiveReads = { ...reads, recorded: () => [{ chatId: -1_000, questions: book }] };
+    const rows = realRows(many, settings(), ["people-search"]).get("people-search")!;
+    const range = synthesisFor("people-search")!.candidates!;
+
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((row) => Object.keys(row.questions).length <= range.max)).toBe(true);
+    expect(rows.every((row) => Object.keys(row.questions).length >= range.min)).toBe(true);
   });
 
   test("every row it builds answers its own gate once a gold is on it", () => {
