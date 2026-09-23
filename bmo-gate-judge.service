@@ -1,0 +1,27 @@
+[Unit]
+Description=bmo-gate-judge — 실제 대화로 세운 게이트 입력을 codex 로 판정
+After=network-online.target
+Wants=network-online.target
+# A batch that cannot be judged at all — a model the account may not use, a login gone — fails the
+# same way however often it is tried. Ten tries an hour and then the unit stays failed, where it is
+# visible, rather than asking codex the same impossible thing for a day.
+StartLimitIntervalSec=3600
+StartLimitBurst=10
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/repos/ahas/bmo-gate
+Environment=PATH=%h/.bun/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+# The run folder is filled first, by hand, with `bun scripts/laya-real.ts real-1`: building the
+# rows is minutes and needs 하스's and 비모's own numbers in the environment, and judging them is
+# hours and needs neither. The two are separate commands for that reason.
+#
+# Always resumed, never overwritten: the unit is restarted by a crash, a failure or a reboot, and
+# every one of those must take up at the batch after the last one frozen. An overwrite here would
+# throw away a day of judgements on the first restart.
+ExecStart=%h/.bun/bin/bun scripts/laya-judge.ts real-1 --road codex --batch 20 --at-once 4 --resume
+Restart=on-failure
+RestartSec=60
+
+[Install]
+WantedBy=default.target

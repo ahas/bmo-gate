@@ -1,0 +1,235 @@
+import { answersOf, synthesisFor, validateSynthRow, languageOf, stateText, datasetRowOf } from "./laya-synth";
+import { jsonArrayIn, jsonObjectsIn } from "./laya-teach";
+
+import type { GateSynthesis, SynthRefusal, SynthRow } from "./laya-synth";
+import type { DatasetRow, Gold, SplitShares } from "./laya-dataset";
+import type { LayaQuestion } from "./laya";
+import type { UnjudgedRow } from "./real-rows";
+
+// The judgement of rows built out of real conversation (docs/gate-data.md, 「Judging the real
+// rows」). The rows come in with no answer on them; what goes out is the same row with a gold.
+//
+// The gate's own questions ride on each row exactly as the gate asks them, so nothing here restates
+// a gate's wording: the model is shown the state, the questions as they stand and the answers each
+// question may be given, and answers with a probability over those answers rather than one word.
+// A gold that is a distribution is what the training loop already reads, and it carries the
+// judge's doubt as well as its verdict.
+
+// The system prompt, which says nothing about any one gate or any one row, so the prefix a road
+// caches is the same on every batch of every gate.
+export const judgeSystem = [
+  "너는 판정 게이트의 판정을 대신 내린다. 항목마다 state를 읽고 questions의 질문마다 답을 확률로 매긴다.",
+  "state는 실제 대화에서 그대로 가져온 것이다. 지어내지 말고 있는 그대로 읽고 판정한다.",
+  "답은 JSON 배열 하나뿐이고 다른 말은 쓰지 않는다. 배열의 각 원소는",
+  '{"id": <항목의 id>, "gold": {<질문 키>: {"probabilities": {<답>: <확률>}}}} 이다.',
+  "probabilities의 키는 프롬프트가 질문마다 적어 준 답과 정확히 같아야 하고, 합이 1이어야 한다.",
+  "확신이 덜한 항목은 0.7 대 0.3처럼 둔다. 확신하는 항목만 1.0에 가깝게 둔다.",
+  "항목을 빠뜨리지 않고 순서대로 모두 답한다.",
+].join("\n");
+
+export interface JudgeItem {
+  id: string;
+  state: unknown;
+  questions: Record<string, LayaQuestion>;
+}
+
+export function judgeItemOf(row: UnjudgedRow): JudgeItem {
+  return { id: row.id, state: row.state, questions: row.questions };
+}
+
+// What one batch asks. The gate's line about what it decides stands at the top, then every item
+// whole, then the answers each question may take — a judge left to guess the answers of a yes/no
+// writes "yes" and "no" and the batch cannot be read back at all.
+export function judgePrompt(gate: GateSynthesis, items: readonly JudgeItem[]): string {
+  const answers = gate.questions.map((question) => `- ${question.id}: ${answersOf(question).join(", ")}`);
+
+  return [
+    `게이트 이름은 ${gate.gate}(${gate.title})이고, ${gate.judges}를 판정한다.`,
+    "",
+    "질문마다 고를 수 있는 답:",
+    ...answers,
+    "",
+    "아래 항목들을 판정해라.",
+    ...items.map((item) => JSON.stringify(item)),
+  ].join("\n");
+}
+
+export interface JudgeReading {
+  golds: Map<string, Record<string, Gold>>;
+  // Items the answer said nothing readable about, counted rather than guessed at.
+  refused: number;
+}
+
+// The answers read back. A batch whose list came back broken is read one object at a time, because
+// the objects are what was asked for and the brackets between them are punctuation.
+export function readJudgements(answer: string, items: readonly JudgeItem[]): JudgeReading {
+  const written = jsonArrayIn(answer) ?? jsonObjectsIn(answer) ?? [];
+  const asked = new Map(items.map((item) => [item.id, item]));
+  const golds = new Map<string, Record<string, Gold>>();
+
+  for (const one of written) {
+    if (typeof one !== "object" || one === null) {
+      continue;
+    }
+
+    const said = one as { id?: unknown; gold?: unknown };
+    const item = typeof said.id === "string" ? asked.get(said.id) : undefined;
+
+    if (item === undefined || typeof said.gold !== "object" || said.gold === null) {
+      continue;
+    }
+
+    const gold = goldOf(item.questions, said.gold as Record<string, unknown>);
+
+    if (gold !== null) {
+      golds.set(item.id, gold);
+    }
+  }
+
+  return { golds, refused: items.length - golds.size };
+}
+
+// One item's gold, or null where any question of it was left unanswered or answered with something
+// that is not one of its answers. A half-answered item is refused whole: a row trained on with one
+// question's gold missing teaches that question nothing and weights the rest twice.
+function goldOf(questions: Record<string, LayaQuestion>, said: Record<string, unknown>): Record<string, Gold> | null {
+  const gold: Record<string, Gold> = {};
+
+  for (const [id, question] of Object.entries(questions)) {
+    const one = said[id];
+
+    if (typeof one !== "object" || one === null) {
+      return null;
+    }
+
+    const probabilities = (one as { probabilities?: unknown }).probabilities;
+
+    if (typeof probabilities !== "object" || probabilities === null) {
+      return null;
+    }
+
+    const made = goldFrom(question, probabilities as Record<string, unknown>);
+
+    if (made === null) {
+      return null;
+    }
+
+    gold[id] = made;
+  }
+
+  return gold;
+}
+
+const round = (value: number) => Math.round(value * 10_000) / 10_000;
+
+function goldFrom(question: LayaQuestion, probabilities: Record<string, unknown>): Gold | null {
+  const options = question.type === "noul"
+    ? ["true", "false"]
+    : "criteria" in question ? (Array.isArray(question.criteria) ? [...question.criteria] : Object.keys(question.criteria)) : [];
+
+  if (options.length === 0) {
+    return null;
+  }
+
+  const given: Record<string, number> = {};
+  let total = 0;
+
+  for (const option of options) {
+    const value = probabilities[option];
+
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+      return null;
+    }
+
+    given[option] = value;
+    total += value;
+  }
+
+  if (total <= 0) {
+    return null;
+  }
+
+  const shares = Object.fromEntries(options.map((option) => [option, round(given[option]! / total)]));
+  const label = options.reduce((best, option) => shares[option]! > shares[best]! ? option : best, options[0]!);
+
+  if (question.type === "noul") {
+    const yes = shares.true!;
+
+    return { type: "noul", label: yes >= 0.5 ? "true" : "false", noul: yes, probabilities: { true: yes, false: round(1 - yes) } };
+  }
+
+  return { type: "choice", label, probabilities: shares };
+}
+
+export interface JudgedRow {
+  row: DatasetRow;
+  // Where the material came from, which is what keeps a written row out of the figures.
+  source: string;
+}
+
+export interface JudgeOutcome {
+  rows: JudgedRow[];
+  // Rows the judge answered but that do not answer their own gate, by the reason each was refused.
+  refusals: Record<string, number>;
+  unanswered: number;
+}
+
+// The rows a batch's answer leaves standing: every item the judge answered, checked against its own
+// gate's specification and frozen with the gold on it. A row is refused, never fatal — a gold the
+// judge left half-written costs that row and not the batch.
+export function judgedRows(
+  gate: GateSynthesis,
+  items: readonly UnjudgedRow[],
+  reading: JudgeReading,
+  shares: SplitShares,
+  source: string,
+): JudgeOutcome {
+  const rows: JudgedRow[] = [];
+  const refusals: Record<string, number> = {};
+
+  for (const item of items) {
+    const gold = reading.golds.get(item.id);
+
+    if (gold === undefined) {
+      continue;
+    }
+
+    const row: SynthRow = { state: item.state, questions: item.questions, gold };
+    // A real row's language is a fact about the room that spoke, not a share it was drawn to, so
+    // the language it is held to is its own. The share a gate is drawn to is a reading of the
+    // finished data and is made by the audit, not by refusing a room for speaking its own language.
+    const verdict = validateSynthRow(gate, row, languageOf(stateText(gate, item.state)));
+
+    if (!verdict.ok) {
+      refusals[verdict.refusal] = (refusals[verdict.refusal] ?? 0) + 1;
+      continue;
+    }
+
+    rows.push({ row: datasetRowOf(gate, row, shares), source });
+  }
+
+  return { rows, refusals, unanswered: reading.refused };
+}
+
+export function gateFor(gate: string): GateSynthesis {
+  const spec = synthesisFor(gate);
+
+  if (spec === null) {
+    throw new Error(`${gate} 는 이 저장소가 아는 게이트가 아닙니다.`);
+  }
+
+  return spec;
+}
+
+export type JudgeRefusal = SynthRefusal;
+
+// The road a batch of judgements rides. It is the asker's shape less the batch plan: a judgement
+// is a system prompt, a prompt and the thread the last batch left behind, and the two roads answer
+// it the same way whatever else differs between them.
+export type JudgeRoad = (system: string, prompt: string, resumeSessionId: string | null) => Promise<JudgeAnswer>;
+
+export interface JudgeAnswer {
+  text: string;
+  sessionId: string | null;
+  tokens: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number };
+}

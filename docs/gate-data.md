@@ -1,8 +1,18 @@
 # The ten gates' distilled data
 
-What this repository is: a generator that writes the distilled training data for the ten Laya split
-gates, a runner that drives ten of them at once on the codex account, and the reading that says
-whether what came out is good enough to train on.
+What this repository is: the training data for the ten Laya split gates, built out of the rooms'
+own conversation, judged afresh on a road, and read to say whether what came out is good enough to
+train on.
+
+- **The inputs are real.** Every row's state is a turn that really happened, rebuilt in the shape
+  that gate really receives, and every candidate a gate is offered is one that room was really
+  offered. Nothing is invented.
+- **The labels are made afresh.** The verdicts the archive holds were given by gates whose prompts
+  and structure have since moved, so they are not what today's gate would answer and are not gold.
+  They say which turns a gate was asked about, and that is the whole of what they are used for.
+- **A gate the rooms cannot fill is left short.** It is not filled with written rows. It keeps
+  J3090 as its gate until the rooms have said enough, and the gates that are full are trained and
+  moved to Laya first. Which gates those are is counted, not guessed at.
 
 ## What it answers to
 
@@ -18,6 +28,76 @@ whether what came out is good enough to train on.
 - **Nothing in BMO is written by anything in this repository.** Its checkout is read for the
   specification and nothing else. The data lands in the shared runtime data root, which is where
   BMO's training driver looks for it.
+
+## The real conversation source
+
+The rows come out of BMO's archive, which is opened read-only and never written. What is built is
+one row per turn: the state that gate would have been given, and the questions it would have been
+asked, with no answer on either.
+
+- **Each gate is built in the shape it really receives.** The room shape for the gates that judge a
+  room's situation, the plain shape for the four that pick documents out of a library, and the
+  message-and-markup pair for the formatting gate. The shapes are built from the archive's own rows
+  rather than described, because a row whose lines are nearly the shape teaches a shape no gate
+  ever sends.
+- **A turn with nothing in front of it is no row.** Every gate that reads a room's recent messages
+  is given them; a state whose transcript is empty is refused by the gate's own specification, and
+  leaving it out is what stops a judgement being bought for it.
+- **The window is what fits one Laya call**, newest first to go in and oldest first to stay out,
+  which is how the gates themselves cut it.
+- **A gate's candidates are what that room was really offered**, read back out of the probe inputs
+  the verdict record kept. The brain moves; a row written against today's library would be a row no
+  turn of that room ever saw, and reading the brain directly would put this repository inside BMO's
+  own structure, which it is not.
+- **The formatting gate's material is what went out.** One judgement decides the fold, so the
+  message people received — its markdown, the text the reader saw, and whether it was folded — is
+  that judgement's own record, and it outlives every log.
+- **Nothing is read of the brain, and nothing is written to the archive.**
+
+## What leaves the rooms
+
+A row built from a real turn carries the people who were in the room. The rows travel to a training
+node and are read by whoever trains on them, so the question is not whether the material is
+sensitive but which parts of it a gate actually judges by.
+
+- **What the gate reads is kept**: the words, the code, the logs, the shape of the talk, who is
+  speaking and in what language, the owner tag, the message's own number, and BMO's own name —
+  which is the very word the reply-or-not gate turns on.
+- **What only names an account is replaced.** Every display name but BMO's becomes a stand-in of
+  the same script, held to the same stand-in everywhere so a room still reads as the same people;
+  every sender number becomes a stand-in number, the owner's included, since the room shape already
+  says which line is his.
+- **What identifies somebody outside the room is replaced by a placeholder of its own shape**: a
+  key, a token, a password, a mail address, a phone number, a card, an account, a national number.
+  A line that carried an address still reads as a line that carried an address.
+- **A calendar date is ordinary talk and stays.** An account number and a date are the same shape
+  and are told apart by the last run of digits, because a room is full of dates and no gate has
+  ever judged by an account number.
+- **A stand-in is a name, not a placeholder.** `사용자1` would teach the model that rooms are full
+  of placeholders, which is not what any room looks like.
+
+## Judging the real rows
+
+Every label is made afresh, on a road, against the gate exactly as it stands.
+
+- **The gate's own questions ride on the row**, so the judge is shown the question in the gate's own
+  words and nothing restates them.
+- **The answers each question may take are named outright in the prompt.** A judge left to guess the
+  answers of a yes/no writes "yes" and "no", and the batch cannot be read back at all.
+- **The gold is a distribution, not one answer** — the soft target the training loop already reads —
+  so what the student learns carries the judge's doubt as well as its verdict.
+- **A row is refused, never fatal.** A gold the judge left half-written costs that row and not the
+  batch, and every judged row is checked against its own gate's specification before it is frozen.
+- **A real row's language is a fact, not a share it was drawn to.** The row is held to its own
+  language; what share of a gate's rows came out in which language is the audit's reading of the
+  finished data, not a reason to refuse a room for speaking its own language.
+- **The answer balance is the rooms' own.** Real conversation is lopsided, and nothing here evens it
+  out by writing rows. The training loop's own balance step is what holds one answer from swamping
+  another, and the audit reports the balance as it stands.
+- **A batch is frozen the moment it lands**, and a run taken up again takes up at the batch after
+  the last one frozen. Nothing rewrites a frozen batch, and a folder that already holds a frozen
+  gate is refused unless the run says outright that it means to write over it. This is what makes
+  the judging a unit's work rather than a session's.
 
 ## The roads
 
@@ -331,6 +411,15 @@ the road, the model and the effort that wrote it; and the wall time.
 
 ## Running it
 
+- `bun scripts/laya-real.ts` — count what the rooms hold for each gate, and, given a run name,
+  write each gate's unjudged rows into that run's folders. With no run name it counts and writes
+  nothing, which is how a build starts: the count is what says which gates can be trained now and
+  which are still short. It needs 하스's and BMO's own numbers, from the environment or from
+  `--owner` and `--bmo`.
+- `bun scripts/laya-judge.ts` — judge those rows on a road, freezing each batch as it lands and
+  writing the three splits when a gate is done. `--resume` takes up at the batch after the last one
+  frozen; without `--overwrite` it writes nothing into a folder that already holds a frozen gate.
+  A full run is hours and is carried by the unit `bmo-gate-judge`, never by a session.
 - `bun scripts/laya-synth.ts` — write the gates' rows, one codex thread and one folder each. How
   many write at the same time is given, so one gate can be rebuilt on its own or all ten run
   together. It writes its own log beside the data.

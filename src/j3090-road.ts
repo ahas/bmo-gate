@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { batchPrompts, noTokens } from "./laya-synth-run";
 import { dataRoot } from "./roots";
 
+import type { JudgeRoad } from "./gate-judge";
 import type { SynthAnswer, SynthAsker } from "./laya-synth-run";
 
 // A second road for a gate whose rows codex will not write: `llm_query` on the J3090 MCP service,
@@ -187,6 +188,40 @@ function withDefaults(settings: Partial<J3090Settings>): J3090Settings {
     timeoutMs: settings.timeoutMs ?? j3090TimeoutMs,
     readKey: settings.readKey ?? (() => readJ3090Key()),
     fetch: settings.fetch ?? ((input, init) => fetch(input, init)),
+  };
+}
+
+// The road a judging pass rides here: one batch of real rows in, one answer out, and no session
+// between them, so every batch carries the whole prefix afresh. A batch the service does not answer
+// throws rather than coming back empty, which is the same contract the codex road keeps.
+export function j3090JudgeRoad(settings: Partial<J3090Settings> = {}): JudgeRoad {
+  const full = withDefaults(settings);
+  let confirmed = false;
+
+  return async (system, prompt) => {
+    const key = full.readKey();
+
+    if (!confirmed) {
+      await confirmModel(full, key);
+      confirmed = true;
+    }
+
+    const response = await full.fetch(full.mcpUrl, {
+      method: "POST",
+      headers: headers(key),
+      body: j3090Body(system, prompt, full.answerTokens),
+      signal: AbortSignal.timeout(full.timeoutMs),
+    });
+
+    if (!response.ok) {
+      throw new Error(`J3090 이 판정 묶음에 ${response.status} 로 답했습니다.`);
+    }
+
+    return {
+      text: readJ3090Answer(await response.text(), response.headers.get("content-type")),
+      sessionId: null,
+      tokens: noTokens,
+    };
   };
 }
 

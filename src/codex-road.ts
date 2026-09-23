@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { batchPrompts, noTokens } from "./laya-synth-run";
 
+import type { JudgeRoad } from "./gate-judge";
 import type { SynthAnswer, SynthAsker, TokenTally } from "./laya-synth-run";
 
 // The road the rows are written on: `codex exec`, driven straight rather than through anything
@@ -207,6 +208,26 @@ async function runCodex(command: string[], saying: string, cwd: string, timeoutM
   } finally {
     clearTimeout(timer);
   }
+}
+
+// The road a judging pass rides: one batch of real rows in, one answer out, and the thread carried
+// between them. It is the same spawn, the same command and the same reading as the asker below;
+// what differs is only that the prompt is a batch of rows to judge rather than a batch to invent.
+export function codexJudgeRoad(settings: Partial<CodexSettings> = {}): JudgeRoad {
+  const model = settings.model ?? codexModel;
+  const effort = settings.effort ?? codexEffort;
+  const timeoutMs = settings.timeoutMs ?? codexTimeoutMs;
+  const run = settings.run ?? spawnCodex(settings.cwd ?? emptyCwd(), timeoutMs);
+
+  return async (system, prompt, resumeSessionId) => {
+    const reading = await run(codexCommand(model, effort, resumeSessionId), batchSaying(system, prompt, resumeSessionId));
+
+    if (reading.failure !== null) {
+      throw new Error(`codex 가 판정 묶음을 쓰지 못했습니다 — ${reading.failure}`);
+    }
+
+    return { text: reading.text, sessionId: reading.threadId, tokens: reading.tokens };
+  };
 }
 
 // The asker `runSynthesis` drives: one batch in, one answer out, and the thread carried between
