@@ -421,6 +421,72 @@ describe("how far a run got, read off the folder", () => {
     expect(readRunStanding(root, [sanitizer])[0]!.threadHeld).toBe(true);
   });
 
+  // The road is in the progress from the first batch on, and a gate takes a day to freeze. A
+  // reading that waited for the meta would answer which road a gate is on a day after it was asked.
+  test("a gate still writing names the road, the model and the effort writing it", async () => {
+    const root = scratch();
+
+    await driveGates(driving(root, { gates: [sanitizer], rows: 6, model: "qwen3.8-27b", effort: "none", road: "j3090" }), async (spec, ask) => {
+      if (ask.seed.endsWith("-3")) {
+        throw new Error("세션이 끊겼습니다");
+      }
+
+      return { text: JSON.stringify(rowsFor(spec, ask, ask.count)), sessionId: null, tokens: noTokens };
+    });
+
+    expect(readRunStanding(root, [sanitizer])[0])
+      .toMatchObject({ state: "running", road: "j3090", roads: ["j3090"], model: "qwen3.8-27b", effort: "none" });
+  });
+
+  test("a gate carried onto a second road names both, in the order they drove it", async () => {
+    const root = scratch();
+
+    await driveGates(driving(root, { gates: [sanitizer], rows: 6 }), async (spec, ask) => {
+      if (ask.seed.endsWith("-2")) {
+        throw new Error("codex 가 묶음을 쓰지 못했습니다");
+      }
+
+      return { text: JSON.stringify(rowsFor(spec, ask, ask.count)), sessionId: "held", tokens: noTokens };
+    });
+
+    await driveGates(driving(root, { gates: [sanitizer], rows: 6, resume: true, model: "qwen3.8-27b", effort: "none", road: "j3090" }), async (spec, ask) => {
+      if (ask.seed.endsWith("-3")) {
+        throw new Error("세션이 끊겼습니다");
+      }
+
+      return { text: JSON.stringify(rowsFor(spec, ask, ask.count)), sessionId: null, tokens: noTokens };
+    });
+
+    expect(readRunStanding(root, [sanitizer])[0]).toMatchObject({ road: "j3090", roads: ["codex", "j3090"] });
+  });
+
+  // The thread id the codex stretch left behind stays in the progress. Read as a held thread it
+  // would say a gate sending its whole prefix afresh every batch was reading it from a cache.
+  test("a gate taken onto a road that holds no thread is not riding one", async () => {
+    const root = scratch();
+
+    await driveGates(driving(root, { gates: [sanitizer], rows: 6 }), async (spec, ask) => {
+      if (ask.seed.endsWith("-2")) {
+        throw new Error("codex 가 묶음을 쓰지 못했습니다");
+      }
+
+      return { text: JSON.stringify(rowsFor(spec, ask, ask.count)), sessionId: "held", tokens: noTokens };
+    });
+
+    expect(readRunStanding(root, [sanitizer])[0]!.threadHeld).toBe(true);
+
+    await driveGates(driving(root, { gates: [sanitizer], rows: 6, resume: true, model: "qwen3.8-27b", effort: "none", road: "j3090" }), async (spec, ask) => {
+      if (ask.seed.endsWith("-3")) {
+        throw new Error("세션이 끊겼습니다");
+      }
+
+      return { text: JSON.stringify(rowsFor(spec, ask, ask.count)), sessionId: null, tokens: noTokens };
+    });
+
+    expect(readProgress(gateFolder(root, sanitizer.gate))!.gates[sanitizer.gate]!.sessionId).toBe("held");
+    expect(readRunStanding(root, [sanitizer])[0]!.threadHeld).toBe(false);
+  });
+
   test("what it says matches what is in the folder", async () => {
     const root = scratch();
 

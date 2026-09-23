@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { frozenHere } from "./laya-frozen";
 import { gateFolder, gatesFolderName } from "./roots";
-import { gateOnDisk, guardFolder, plannedBatches, readProgress, runSynthesis } from "./laya-synth-run";
+import { gateOnDisk, guardFolder, plannedBatches, readProgress, roadHoldsSession, roadsOf, runSynthesis } from "./laya-synth-run";
 
 import type { SplitShares } from "./laya-dataset";
 import type { GateSynthesis } from "./laya-synth";
@@ -158,6 +158,14 @@ export interface GateStanding {
   // Whether the gate is riding a thread, which is what says the fixed prefix is being read from
   // the cache rather than sent again.
   threadHeld: boolean;
+  // What is writing this gate, read off its own progress: the road driving now, every road that
+  // has driven it, and that road's model and effort. They are the gate's and not the run's — one
+  // run builds sanitiser on J3090 while the other nine ride codex — so they are read here, where
+  // a gate's own folder is read, rather than taken from whichever gate was looked at last.
+  road: SynthRoad | null;
+  roads: SynthRoad[];
+  model: string;
+  effort: string;
 }
 
 // How far a run got, read out of the folders while it is still going. Nothing here attaches to a
@@ -183,6 +191,10 @@ export function readRunStanding(root: string, gates: readonly GateSynthesis[]): 
         refused: {},
         tokens: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
         threadHeld: false,
+        road: null,
+        roads: [],
+        model: "",
+        effort: "",
       };
     }
 
@@ -199,7 +211,15 @@ export function readRunStanding(root: string, gates: readonly GateSynthesis[]): 
       lostBatches: stands.lost,
       refused: held?.refused ?? {},
       tokens: held?.tokens ?? { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
-      threadHeld: held?.sessionId != null,
+      // The road driving now settles this, not the thread id lying in the progress. A gate taken
+      // off codex and onto J3090 keeps the id the codex stretch left behind, and a reading that
+      // went by the id alone would say a gate reading its whole prefix afresh every batch was
+      // riding a thread and paying nothing for it.
+      threadHeld: held?.sessionId != null && roadHoldsSession(progress.road),
+      road: progress.road,
+      roads: roadsOf(progress),
+      model: progress.model,
+      effort: progress.effort,
     };
   });
 }
@@ -222,6 +242,7 @@ export function standingLines(standing: readonly GateStanding[]): string[] {
       `날린 묶음 ${one.lostBatches}`,
       `버린 행 ${refused === "" ? "없음" : refused}`,
       `캐시읽기 ${one.tokens.cacheReadTokens} 새 입력 ${one.tokens.inputTokens}`,
+      `길 ${one.roads.join(" → ") || "?"}`,
       one.threadHeld ? "실 붙듦" : "실 없음",
     ].join(" · ");
   });

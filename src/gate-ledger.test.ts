@@ -112,7 +112,33 @@ describe("the ledger for a run", () => {
   test("it names the model, the effort and the road", async () => {
     const ledger = readLedger(await runOf([sanitizer]), [sanitizer]);
 
-    expect(ledger).toMatchObject({ model: "gpt-5.6-terra", effort: "high", road: "codex" });
+    expect(ledger).toMatchObject({ models: [{ model: "gpt-5.6-terra", effort: "high" }], roads: ["codex"] });
+  });
+
+  // A run whose gates did not share a road did not share a model either, and naming one of them as
+  // the run's would put the other gate's rows under a model that never wrote them.
+  test("it names every model its gates were written with, once each", async () => {
+    const root = await runOf([sanitizer, notes]);
+
+    await driveGates({
+      root,
+      gates: [sanitizer],
+      rows: 40,
+      batchSize: 5,
+      model: "qwen3.8-27b",
+      effort: "none",
+      road: "j3090",
+      shares: { calibration: 0.15, test: 0.15 },
+      atOnce: 1,
+      resume: true,
+      overwrite: true,
+    }, standIn);
+
+    const ledger = readLedger(root, [sanitizer, notes]);
+
+    expect(typeof ledger === "string" ? null : ledger.models)
+      .toEqual([{ model: "qwen3.8-27b", effort: "none" }, { model: "gpt-5.6-terra", effort: "high" }]);
+    expect(typeof ledger === "string" ? null : ledger.roads).toEqual(["codex", "j3090"]);
   });
 });
 
@@ -145,6 +171,38 @@ describe("what the ledger records of a gate", () => {
 
     expect(Object.keys(one!.refused)).toEqual(["no-questions"]);
     expect(one!.refused["no-questions"]).toBe(4);
+  });
+
+  // The meta is written at freezing, and a gate is a day's writing away from that. Until then its
+  // progress is the account of what is writing it, and the ledger is read off that.
+  test("a gate that has not frozen still names its road and its model", async () => {
+    const root = scratch();
+
+    await driveGates({
+      root,
+      gates: [sanitizer],
+      rows: 20,
+      batchSize: 5,
+      model: "qwen3.8-27b",
+      effort: "none",
+      road: "j3090",
+      shares: { calibration: 0.15, test: 0.15 },
+      atOnce: 1,
+      resume: false,
+      overwrite: false,
+    }, async (spec, ask, resume) => {
+      if (ask.seed.endsWith("-3")) {
+        throw new Error("세션이 끊겼습니다");
+      }
+
+      return standIn(spec, ask, resume);
+    });
+
+    const ledger = readLedger(root, [sanitizer]);
+
+    expect(typeof ledger === "string" ? null : ledger.gates[0])
+      .toMatchObject({ roads: ["j3090"], model: "qwen3.8-27b", effort: "none", threadHeld: false });
+    expect(typeof ledger === "string" ? null : ledger.models).toEqual([{ model: "qwen3.8-27b", effort: "none" }]);
   });
 
   test("a lost batch is counted", async () => {

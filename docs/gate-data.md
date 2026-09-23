@@ -284,7 +284,20 @@ carrying the rarer answer, at least 1,000 held out for evaluation.
 
 Per gate, for the run: rows written and rows kept; the three split counts; batches done and batches
 lost; refusals broken out by reason; the token tally with fresh input and cached reads kept apart;
-and the wall time.
+the road, the model and the effort that wrote it; and the wall time.
+
+- **The road, the model and the effort are the gate's, not the run's.** A run whose gates did not
+  all ride one road did not all ride one model either, so each gate's row names what wrote it and
+  the head of the ledger names every model and every road the run used rather than picking one of
+  them and calling it the run's. A gate carried across roads names both, in the order they drove it.
+- **The ledger is read while a run is still going.** A frozen gate reads off its meta; a gate still
+  writing reads off its progress, which has carried its model, its effort and its road since its
+  first batch landed. A run of gates is a day's work and the road one of them is on is the very
+  thing a reading taken in the middle of it is for, so leaving it unsaid until the gate freezes
+  answers the question a day after it was worth asking.
+- **Whether a thread is held is settled by the road driving now.** A gate taken off a thread-holding
+  road onto one that holds none is not riding a thread, and a thread id its earlier road left behind
+  in its progress does not make it one.
 
 - **Fresh input and cached reads are separate figures.** Codex reports an input count that already
   includes the cached part, so the fresh figure is that count less the cached one. Added together
@@ -307,8 +320,8 @@ and the wall time.
   many write at the same time is given, so one gate can be rebuilt on its own or all ten run
   together. It writes its own log beside the data.
 - `bun scripts/laya-status.ts` — how far a run got: batches done against planned, rows kept, lost
-  batches, refusals by reason and whether a gate is still riding its thread. It reads the folders
-  and attaches to nothing, so it answers while a run is still going.
+  batches, refusals by reason, the road each gate is riding and whether it is still riding a thread.
+  It reads the folders and attaches to nothing, so it answers while a run is still going.
 - `bun scripts/laya-merge.ts` — the per-gate folders into the one dataset folder.
 - `bun scripts/laya-audit.ts` — the figures per gate, and the verdict against the bars.
 - `bun scripts/laya-ledger.ts` — the ledger for a run.

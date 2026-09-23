@@ -36,16 +36,26 @@ export interface GateLedgerRow {
   tokens: TokenTally;
   seconds: number;
   threadHeld: boolean;
-  // The road or roads this gate was written on. More than one for a gate carried across roads.
+  // The road or roads this gate was written on, and the model and effort driving it. More than one
+  // road for a gate carried across roads. They are the gate's own: one run builds sanitiser on
+  // J3090 while the other nine ride codex, so no one of them is the run's.
   roads: SynthRoad[];
+  model: string;
+  effort: string;
+}
+
+// A model at an effort, as one of the run's gates was written with.
+export interface LedgerModel {
+  model: string;
+  effort: string;
 }
 
 export interface RunLedger {
   root: string;
-  model: string;
-  effort: string;
-  road: string;
-  // Every road any of the run's gates was written on.
+  // Every model and every road any of the run's gates was written with. A run of gates that all
+  // shared one names one; a run that did not names them all rather than passing off one gate's as
+  // the whole run's.
+  models: LedgerModel[];
   roads: SynthRoad[];
   gates: GateLedgerRow[];
   totals: {
@@ -75,15 +85,27 @@ function secondsBetween(from: string | undefined, to: string | undefined): numbe
   return Number.isFinite(took) && took > 0 ? Math.round(took / 1000) : 0;
 }
 
+// Every model-and-effort the run's gates were written with, each once and in the order the gates
+// stand. A gate that recorded neither has nothing to name and is passed over rather than entered
+// as a blank model somebody has to account for.
+function distinctModels(rows: readonly GateLedgerRow[]): LedgerModel[] {
+  const seen = new Map<string, LedgerModel>();
+
+  for (const one of rows) {
+    if (one.model !== "") {
+      seen.set(`${one.model}\u0000${one.effort}`, { model: one.model, effort: one.effort });
+    }
+  }
+
+  return [...seen.values()];
+}
+
 // The ledger for a run, read off the folders its gates wrote. A gate that never started is left
 // out rather than entered as a row of zeroes, because a row of zeroes reads as a gate that ran and
 // produced nothing.
 export function readLedger(root: string, gates: readonly GateSynthesis[]): RunLedger | string {
   const standing = readRunStanding(root, gates);
   const rows: GateLedgerRow[] = [];
-  let model = "";
-  let effort = "";
-  let road = "";
   let first = "";
   let last = "";
 
@@ -96,10 +118,6 @@ export function readLedger(root: string, gates: readonly GateSynthesis[]): RunLe
     const meta = metaIn(folder);
     const generation = generationOf(folder, one.gate);
     const figures = meta?.gates.find((each) => each.gate === one.gate);
-
-    model = meta?.model ?? model;
-    effort = meta?.effort ?? effort;
-    road = meta?.road ?? road;
 
     if (meta !== null) {
       first = first === "" || meta.started < first ? meta.started : first;
@@ -118,7 +136,13 @@ export function readLedger(root: string, gates: readonly GateSynthesis[]): RunLe
       tokens: one.tokens,
       seconds: secondsBetween(meta?.started, meta?.written),
       threadHeld: one.threadHeld,
-      roads: meta === null ? [] : roadsOf(meta),
+      // A frozen gate's meta is the account of what wrote it. A gate still writing has no meta
+      // yet — it is written at freezing — so its standing answers instead, off the progress it has
+      // been keeping since its first batch. A run of ten gates is a day's work, and a ledger that
+      // could name a road only once the gate had finished would answer a day after it was asked.
+      roads: meta === null ? one.roads : roadsOf(meta),
+      model: meta?.model ?? one.model,
+      effort: meta?.effort ?? one.effort,
     });
   }
 
@@ -128,9 +152,7 @@ export function readLedger(root: string, gates: readonly GateSynthesis[]): RunLe
 
   return {
     root,
-    model,
-    effort,
-    road,
+    models: distinctModels(rows),
     roads: [...new Set(rows.flatMap((one) => one.roads))].sort(),
     gates: rows,
     totals: {
@@ -155,6 +177,10 @@ function clock(seconds: number): string {
   return seconds < 3_600 ? `${Math.floor(seconds / 60)}분 ${seconds % 60}초` : `${Math.floor(seconds / 3_600)}시간 ${Math.floor((seconds % 3_600) / 60)}분`;
 }
 
+function modelWord(one: LedgerModel): string {
+  return one.model === "" ? "?" : `${one.model} (${one.effort})`;
+}
+
 export function ledgerLines(ledger: RunLedger): string[] {
   const lines = ledger.gates.flatMap((one) => {
     const refused = Object.entries(one.refused).sort(([a], [b]) => a.localeCompare(b))
@@ -165,13 +191,14 @@ export function ledgerLines(ledger: RunLedger): string[] {
       `  지은 행 ${one.written} · 산 행 ${one.kept} (학습 ${one.splits.train} · 보정 ${one.splits.calibration} · 시험 ${one.splits.test})`,
       `  묶음 ${one.batchesDone}/${one.batchesPlanned} · 날린 묶음 ${one.lostBatches} · 버린 행 ${refused === "" ? "없음" : refused}`,
       `  새 입력 ${one.tokens.inputTokens} · 캐시읽기 ${one.tokens.cacheReadTokens} · 캐시쓰기 ${one.tokens.cacheWriteTokens} · 출력 ${one.tokens.outputTokens}`,
-      `  길 ${one.roads.join(" → ") || "?"} · ${clock(one.seconds)} · ${one.threadHeld ? "실 하나를 붙들었습니다" : "실을 붙들지 않았습니다"}`,
+      `  길 ${one.roads.join(" → ") || "?"} · 모델 ${modelWord(one)} · ${clock(one.seconds)}`
+        + ` · ${one.threadHeld ? "실 하나를 붙들었습니다" : "실을 붙들지 않았습니다"}`,
     ];
   });
 
   return [
     `${ledger.root}`,
-    `모델 ${ledger.model} (${ledger.effort}), 길 ${ledger.roads.join(", ") || ledger.road}`,
+    `모델 ${ledger.models.map(modelWord).join(", ") || "?"}, 길 ${ledger.roads.join(", ") || "?"}`,
     "",
     ...lines,
     "",
