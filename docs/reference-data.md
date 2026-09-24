@@ -186,3 +186,18 @@ data root's `reference-data/` folder, never inside this checkout.
   spends on the codex road; a pass with nothing to judge spends no call and still assembles every row.
 - **The training holds a reference gate to its rarer answer as well as its rows:** a thousand rows and
   two hundred questions whose gold is yes, since a reference gate's yes answers are a few in a hundred.
+## Where run `ref-1` stands
+
+- **The timer is linked and not enabled.** A pass reads BMO's `scripts/reference-inputs.ts` in BMO's
+  live checkout, which lands there with BMO's own deployment; until it has, a pass started by hand
+  names a checkout that carries the script with `--checkout`.
+- **Its labels:** the first judging's 15,538 taken in, and 123 judged batches since, 30,955 labels
+  over 249 turns. Every frozen batch's labels are in `labels.jsonl`; a batch cut off before it froze
+  left nothing, and its turns are judged again by the next pass.
+- **Its rows** stand as the last whole pass put them, before the last 189 turns were judged:
+  `system-documents` 636, `room-rules` 274, `library-knowledge` 206, `people-search` 60 — every gate
+  still short of a thousand, so no training pass has taken a gate yet.
+- **Carrying it on** is one pass with a larger bound — `bun scripts/reference-data.ts ref-1 --judge
+  <n>` — which judges the newest turns still wanting a label, rebuilds every row and puts the gates in
+  place, followed by `bun scripts/laya-train.ts reference:ref-1`. The turns judged already are not
+  judged again.
