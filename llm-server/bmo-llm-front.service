@@ -1,12 +1,12 @@
 [Unit]
-Description=The house LLM service's MCP and OpenAI-compatible front (docs/llm-server.md in the bmo-gate repository)
-After=bmo-llm-vllm.service
-Wants=bmo-llm-vllm.service
+Description=The Laya service's MCP and OpenAI-compatible front (docs/llm-server.md in the bmo-gate repository)
+After=bmo-llm-laya.service
+Wants=bmo-llm-laya.service
 
 [Service]
 Type=simple
 WorkingDirectory=%h/bmo-llm
-# LLM_KEY and VLLM_API_KEY come from here.
+# LLM_KEY and LAYA_TOKEN come from here.
 EnvironmentFile=%h/.config/bmo-llm/env
 ExecStart=%h/bmo-llm/.venv/bin/python %h/bmo-llm/front.py
 Restart=always

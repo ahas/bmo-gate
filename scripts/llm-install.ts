@@ -2,14 +2,15 @@ import { asksUsage, readFlags } from "../src/flags";
 import { jakeConsole, spawnRunner } from "../src/jake";
 import { HEALTH_URL, installLlmService, LLM_NODE } from "../src/llm-install";
 
-// The house LLM service put on n6, or brought up to date there (docs/llm-server.md, 「Installing and
+// The Laya service put on n6, or brought up to date there (docs/llm-server.md, 「Installing and
 // updating」). It is the one way the service is installed, and it is run again to update.
 //
 // usage: bun scripts/llm-install.ts
 
 const usage = `usage: bun scripts/llm-install.ts
 
-${LLM_NODE} 에 집 LLM 서비스(vLLM, 앞단, 터널)를 세우거나 새로 맞춘다.
+${LLM_NODE} 에 Laya 서비스(엔진, MCP·OpenAI 앞단, 터널)를 세우거나 새로 맞춘다.
+어느 게이트를 어느 체크포인트가 맡는지는 건드리지 않는다 — 그건 bun scripts/laya-serve.ts 의 일이다.
 서비스 키는 main-host 에 한 번 만들고, ${LLM_NODE} 에는 환경 파일 안에만 둔다. 키는 어디에도 찍지 않는다.
 이미 서 있는 것은 그대로 두니 몇 번이든 다시 돌려도 된다.
 끝나면 ${HEALTH_URL} 가 답할 때까지 기다린다.`;
@@ -36,4 +37,4 @@ if (!outcome.ok) {
   process.exit(1);
 }
 
-console.log(`${LLM_NODE} 의 LLM 서비스가 ${HEALTH_URL} 에서 답해요.`);
+console.log(`${LLM_NODE} 의 Laya 서비스가 ${HEALTH_URL} 에서 답해요.`);

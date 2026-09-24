@@ -6,24 +6,21 @@ an installed provider: this repository holds the server, the data the checkpoint
 the training itself, and BMO holds only the client that asks it and the configuration of which gate
 asks (BMO's `docs/laya.md`).
 
-## The server on home-pc
+## The server
 
-- **Where it runs:** node `home-pc` (BMO's `docs/nodes.md`), in its WSL Ubuntu, as a systemd user unit
-  `bmo-laya.service`. Linger is on for the account, so the unit starts when WSL starts, with nobody
-  logged in.
-- **What it is:** the small HTTP server kept in this repository under `laya-server/`, installed into
-  its own Python 3.12 virtual environment by `uv` in user space. The install script in that folder,
-  run from main-host over the node's SSH, is the one way it is put there or updated, and it installs
-  no system package and asks for no sudo.
-- **What the machine carries underneath it:** a C toolchain and the Python headers —
-  `build-essential` and `python3-dev` in the WSL Ubuntu. torch's native Triton kernels are built
-  against the venv's Python the first time a decision meets an input shape, and without them every
-  decision ends in `Failed to find C compiler`. A kernel is built once for each of the few shapes the
-  input padding leaves, costs 40 to 120 milliseconds the once, and is kept in the account's triton
-  cache on disk, so it survives a restart and the shapes a gate asks are warm within a handful of
-  calls; a decision on a warm shape is not a millisecond slower than one with the kernels off. These
-  are system packages and the install script is not what puts them there: the account's sudo asks for
-  a password, and root on that machine is reached through WSL's own interop, `wsl.exe -u root`.
+- **Where it runs:** node `n6` (BMO's `docs/nodes.md`), as the engine of the Laya service there — the
+  systemd user unit `bmo-llm-laya.service`, behind the service's MCP and OpenAI-compatible front and
+  the tunnel that brings it to main-host (`docs/llm-server.md`). Linger is on for the account, so the
+  unit starts with the machine, with nobody logged in.
+- **What it is:** the small HTTP server kept in this repository under `laya-server/`, in `~/bmo-laya`
+  on its own Python 3.12 virtual environment, built by `uv` in user space on uv's own interpreter —
+  the same venv a training node's setup builds. The service's installer, `bun scripts/llm-install.ts`,
+  is the one way it is put there or updated, and it installs no system package and asks for no sudo.
+- **What it compiles:** torch's native Triton kernels are built against the venv's Python the first
+  time a decision meets an input shape, with the node's C compiler and the headers uv's interpreter
+  carries. A kernel is built once for each of the few shapes the input padding leaves, costs 40 to 120
+  milliseconds the once, and is kept in the account's triton cache on disk, so it survives a restart
+  and the shapes a gate asks are warm within a handful of calls.
 - **What it holds:** one checkpoint per gate, never one shared by all of them. On start it loads
   every checkpoint the unit's settings name (「Which checkpoint answers which gate」), one after the
   other, and each makes one decision of its own on the card before the next is loaded. Only then does
@@ -32,12 +29,10 @@ asks (BMO's `docs/laya.md`).
   model: a gate no checkpoint is named for is refused, not answered by another gate's checkpoint.
 - **Its environment:**
   - `USE_TF=0`, which the model card names as the cure for a load that hangs.
-  - torch comes as PyPI's default build (CUDA 13), which the 3080's Windows driver runs.
-- **While it loads** (about 20 seconds a checkpoint from the local disk, so a minute and a half for
-  four), the port does not answer at all: a call then ends by timing out rather than being turned
-  away.
-- **Port:** `7431` on all of home-pc's addresses, which mirrored networking puts on `192.0.2.8x`.
-  Every other service on home-pc keeps off this port.
+  - torch comes as PyPI's default build (CUDA 13), which n6's driver runs.
+- **While it loads** (about fifteen seconds a checkpoint from the local disk, 「Measured on n6」), the
+  port does not answer at all; the front answers a call meanwhile with 503.
+- **Port:** `7431` on n6's loopback alone. The front is the only way to it.
 - **One call carries at most 128 questions**; more is refused as a request it cannot read.
 - **Its two calls:**
   - `GET /health` — for each gate it serves, the checkpoint directory, whether it is on the card now,
@@ -51,23 +46,22 @@ asks (BMO's `docs/laya.md`).
     a gate no checkpoint serves is refused as not served here (404); one whose checkpoint cannot be put
     on the card because something else holds it is answered 503, and none of them is asked of a
     checkpoint.
-- **Token:** every call carries a bearer token. The same token is kept in two files, each `0600`:
-  `$BMO_DATA_DIR/env/laya.token` on main-host (without `BMO_DATA_DIR`,
-  `~/.local/share/bmo/data/env/laya.token`), and `~/.config/bmo-laya/token` on home-pc. The token never
-  goes into the archive, a log, an environment variable or the console.
-- **Installing and updating:** `bash laya-server/install.sh` from this checkout on main-host. It makes
-  the token once if there is none, copies the server and the unit across, builds or updates the venv,
-  enables and restarts the unit, and waits until `/health` answers. The unit's own settings file,
-  `~/.config/bmo-laya/env`, is made once naming no gate and is never overwritten.
-- **Restarting it:** over the node's SSH, `systemctl --user restart bmo-laya`; `journalctl --user -u
-  bmo-laya` holds its log, one line per call and no request body.
+- **Token:** every call carries a bearer token, the Laya service's one key (`docs/llm-server.md`,
+  「The key」), which the server reads as `LAYA_TOKEN` from the service's environment file on n6. The
+  token never goes into the archive, a log, a command line or the console.
+- **Installing and updating:** `bun scripts/llm-install.ts` from this checkout on main-host, which puts
+  up the whole service on n6 (`docs/llm-server.md`, 「Installing and updating」). The gates' settings
+  file, `~/.config/bmo-laya/env`, is made once naming no gate and is never overwritten.
+- **Restarting it:** through the jake console, `exec -a n6 'systemctl --user restart bmo-llm-laya'`;
+  `journalctl --user -u bmo-llm-laya` there holds its log, one line per call and no request body.
 - **Timing a call:** `laya-server/bench.py --gates <gate>[,<gate>…]` asks the server with 1, 10 and 50
-  questions on a Korean state, from home-pc or from main-host. Given two gates it asks them in turn,
-  which times the move between the card and host memory as well as the decision.
+  questions on a Korean state, from main-host through the service's front with `--url
+  http://127.0.0.1:18010`. Given two gates it asks them in turn, which times the move between the card
+  and host memory as well as the decision where one is made.
 
 ## Which checkpoint answers which gate
 
-- **One place says it:** `LAYA_CHECKPOINTS` in the unit's settings file on home-pc,
+- **One place says it:** `LAYA_CHECKPOINTS` in the gates' settings file on n6,
   `~/.config/bmo-laya/env` — `gate=directory` pairs separated by spaces, the whole value in double
   quotes. A directory that is not absolute is read from `~/bmo-laya`, where the checkpoints are kept
   in the layout the collection keeps them in on main-host: `checkpoints/<training gate>/<run>/step-<n>`.
@@ -94,22 +88,22 @@ asks (BMO's `docs/laya.md`).
   answers "open" to everything — a figure that looks like 0.8 agreement and is only the common
   answer. So `output-decide` sends the training shape with `folded` false, which is where the decide
   step stands.
-- **Changing a gate's checkpoint** is naming another directory there and restarting the unit; the
-  directory is carried across first (「The training loop and calibration」, step 7).
+- **Changing a gate's checkpoint** is `bun scripts/laya-serve.ts <training gate>/<run>/step-<n>
+  --gate <gate>`, which carries the checkpoint to n6, names it there and restarts the unit
+  (`docs/llm-server.md`, 「Putting a checkpoint in service」).
 
 ## Sharing the card
 
-The 3080's 10 GB is shared with the Windows desktop (about 2.2 GB), BMO's voice server (5.7 GB of
-torch memory once it has loaded, the card then reading 8.5 GB with the desktop's share; it lets go
-after five minutes without a line) and whatever 하스 runs on it.
+A card the server does not hold alone can keep only some of the checkpoints on it at once and let the
+rest wait in host memory. n6's card is the server's alone, so the service keeps all of them on it
+(`docs/llm-server.md`, 「The engine」); what follows is the mechanism, which a smaller number turns on.
 
 - **What a checkpoint costs on the card:** 1.2 to 1.4 GB each as `nvidia-smi` reads it — the weights
-  are kept in 32 bits there, as Laya builds them. Four at once read 7.75 GB with the desktop's share,
-  which leaves no room for the voice server's 6.3.
-- **So one checkpoint is on the card at a time** (`LAYA_CARD_MODELS`, 1 unless the settings file
-  says more), and the others wait in host memory. That is offload and nothing else: a checkpoint's
-  weights are the same numbers wherever they wait, and its answers are the same to the last digit
-  after any number of moves, measured on four checkpoints over three rounds each.
+  are kept in 32 bits there, as Laya builds them.
+- **How many are on the card at once** is `LAYA_CARD_MODELS` (1 where nothing sets it), and the others
+  wait in host memory. That is offload and nothing else: a checkpoint's weights are the same numbers
+  wherever they wait, and its answers are the same to the last digit after any number of moves,
+  measured on four checkpoints over three rounds each.
 - **How they wait:** in pinned host memory, each weight in the 16 bits it was saved in wherever that
   holds it exactly, and in 32 bits where it does not — so the move back reproduces the card's copy
   bit for bit. Four checkpoints hold about 2.6 GB of host memory that way.
@@ -125,27 +119,37 @@ after five minutes without a line) and whatever 하스 runs on it.
   the checkpoint is put back in host memory and the next call moves it to the card again, so no gate
   is left deciding on the CPU for the rest of the process's life.
 
-## Measured on the 3080
+## Measured on n6
 
-- **VRAM:** the card holds about 1.7 GiB with the server stopped (the Windows desktop). Loading the
-  model adds about 1.5 GiB, and a 50-question call raises that to about 2.0 GiB, which the process then
-  keeps. torch reports 1.3 to 1.6 GB of its own reserve inside that.
-- **Time per call**, 50 calls each, p50 / p95 in milliseconds:
+Five gates served (`output-decide`, `library-knowledge`, `room-rules`, `situation-rules`,
+`system-documents`), all five on the card.
 
-  | Questions | Inside the server | From home-pc | From main-host |
-  |---|---|---|---|
-  | 1 | 18.9 / 22.6 | 20.4 / 24.1 | 21.3 / 22.7 |
-  | 10 | 23.5 / 35.4 | 25.0 / 36.9 | 25.4 / 25.9 |
-  | 50 | 69.6 / 72.7 | 71.4 / 74.5 | 74.0 / 74.7 |
-  | 100 | 120.7 / 125.8 | — | 123.2 / 129.3 |
-  | 128 | 150.3 / 159.8 | — | 158.5 / 168.0 |
+- **Loading:** 15 to 17 seconds a checkpoint from the local disk, so about a minute and a half for
+  the five before the port opens.
+- **VRAM:** 7,117 MiB of the card's 12,282 after 128-question calls, all five checkpoints on it — the
+  engine's own reserve 6.7 GiB of that. About 5 GiB of the card stays free.
+- **Host memory:** the engine holds 6.7 GiB resident — the pinned host copies and torch — and the
+  front 80 MB; 47 GiB of n6's 62 stay available.
+- **Time per call**, one gate, 50 calls each, p50 / p95 in milliseconds:
 
-  The 100 and 128 rows are 30 calls each; after a 128-question call the card holds about 4.3 GiB in
-  all.
+  | Questions | Inside the server | From main-host, through the front and the tunnel |
+  |---|---|---|
+  | 1 | 22.7 / 54.0 | 40.1 / 75.1 |
+  | 10 | 22.7 / 48.7 | 40.5 / 69.3 |
+  | 50 | 62.1 / 72.2 | 75.4 / 85.7 |
+  | 100 | 142.8 / 159.8 | 158.0 / 178.4 |
+  | 128 | 188.5 / 198.2 | 203.3 / 214.2 |
 
-- **The network** adds about 3 to 5 milliseconds between main-host and home-pc.
-- **What it means for the gates:** one question is about 20 ms, fifty are about 75 ms and 128 — the
-  most one call carries — about 160 ms, all of it far under the client's two seconds.
+- **Asking the five gates in turn** costs nothing more, since none of them moves: one question 21.5 /
+  25.5 inside and 38.8 / 42.4 from main-host, fifty 65.0 / 80.8 and 79.2 / 98.0.
+- **The front and the tunnel** add about 15 to 17 milliseconds a call.
+- **What it means for the gates:** one question is about 40 ms from main-host, fifty about 75 ms and
+  128 — the most one call carries — about 200 ms, all of it far under the client's two seconds.
+- **The answers are the checkpoint's, to the precision it computes at.** Laya decides under bfloat16
+  autocast, so the same checkpoint on another card generation moves a probability in its second or
+  third decimal: asked BMO's own recorded inputs, 20 calls a gate, n6 and a 3080 chose the same
+  answer for all 580 questions, with the probabilities at most 0.021 apart. Each card answers the
+  same input identically every time.
 
 ## The training loop and calibration
 
@@ -165,9 +169,8 @@ run here trains one gate's model on a card of its own, so there is nothing for D
    learns from, calibration is what the temperatures are fitted on and is never trained on, and test
    is what the figures are measured on and is neither; a row's split is fixed by its input hash, so
    one input never sits in two and keeps its split as the data grows.
-2. **Carry it to a node** with `jake upload`, or to home-pc with `scp` — into `~/bmo-laya/data/<name>/`.
-   On home-pc the install script puts the training scripts beside the server; on a training node they
-   are uploaded with the data by the setup verb.
+2. **Carry it to a node** with `jake upload`, into `~/bmo-laya/data/<name>/`. The training scripts are
+   uploaded with the data by the setup verb.
 3. **Train** with `.venv/bin/python finetune.py --data data/<name> --out checkpoints/<name>`:
    - The loop is the notebook's — RLCD policy gradients over noised logits with a proper scoring
      reward, plus soft cross-entropy — with its settings: 4 epochs, an effective batch of 64, GRPO
@@ -188,9 +191,8 @@ run here trains one gate's model on a card of its own, so there is nothing for D
      `train_meta.json` with the sequences per gate, each epoch's time and loss, and the peak memory.
      It never writes over a directory that exists, and `--resume` is how a killed run carries on from
      what it saved rather than starting again (`docs/laya-train-run.md`, 「The resume contract」).
-   - **Memory:** training alone reserves about 6.8 GB. With the server loaded beside it the 3080 peaked
-     at 9.6 of its 10 GB, so stop `bmo-laya` for a long run; the gates meanwhile run on their LLMs.
-     A training node's 4070 has the card to itself and never comes near its 12 GB.
+   - **Memory:** training alone reserves about 6.8 GB. A training node's 4070 has the card to itself
+     and never comes near its 12 GB.
 4. **Calibrate** with `.venv/bin/python calibrate.py --model checkpoints/<name> --data data/<name>`:
    - It fits one temperature per question type and option count — the buckets Laya's runtime reads —
      by LBFGS on the calibration split, with one per type as the fallback for a bucket of fewer than
@@ -205,22 +207,20 @@ run here trains one gate's model on a card of its own, so there is nothing for D
 6. **Try it without putting it in service:** the server's loader can be pointed at the checkpoint in a
    process of its own (`LAYA_CHECKPOINTS=<gate>=<dir>` with `server.load_decider()`), which loads it
    and makes one decision while the unit goes on serving what it serves.
-7. **Put it in service** by carrying the collected checkpoint to home-pc with the same layout —
-   `rsync -a --relative <training gate>/<run> ahas@192.0.2.8x:bmo-laya/checkpoints/` from the
-   collection folder on main-host, over the node key — naming it for its gate in `LAYA_CHECKPOINTS`
-   (「Which checkpoint answers which gate」) and restarting the unit. `/health` then names it. Moving a
-   gate off `shadow` and its τ are BMO's settings, chosen by 하스.
+7. **Put it in service** with `bun scripts/laya-serve.ts <training gate>/<run>/step-<n> --gate <gate>`,
+   which carries the collected checkpoint to n6 in the same layout, names it for its gate in
+   `LAYA_CHECKPOINTS` (「Which checkpoint answers which gate」) and restarts the unit. `/health` then
+   names it. Moving a gate off `shadow` and its τ are BMO's settings, chosen by 하스.
 
-- **Any Linux host with a CUDA GPU and Python 3.10 or later** runs the same scripts in the same venv.
-  home-pc's 3080 has the server beside it and holds a run at micro-batch 4 with the unit stopped; the
-  training machines are n2 to n5.
+- **Any Linux host with a CUDA GPU and Python 3.10 or later** runs the same scripts in the same venv;
+  the training machines are n2 to n5.
 
 ## Training on the nodes
 
 - **The machines:** nodes `n2` to `n5` (BMO's `docs/nodes.md`), 192.0.2.17 to .20 — four of the same
   build, Ubuntu on the metal, an RTX 4070 with 12 GB, 62 GB of RAM, a C compiler and CUDA. `n6` is of
-  the same build and is not a training machine: it carries the house LLM service
-  (`docs/llm-server.md`), and a training run would take its card.
+  the same build and is not a training machine: it serves the checkpoints (`docs/llm-server.md`), and
+  a training run would take their card.
 - **The venv stands on uv's own Python, never on the system's.** torch's native Triton kernels are
   compiled on the node at the first step against the interpreter's development headers, and uv's
   interpreter carries its own while the system's are installed on one node and missing on the next.
@@ -245,7 +245,7 @@ run here trains one gate's model on a card of its own, so there is nothing for D
 - **What is put there:** `~/bmo-laya` in the node's own account — `finetune.py`, `calibrate.py`,
   `compare.py`, the resume bookkeeping they share and `pyproject.toml`, a uv venv built from it with
   `laya` pinned, and the dataset folders under `data/`. No server, no unit and no token: a node
-  trains, and the deciding stays on home-pc. `uv pip install -r pyproject.toml --extra savings` adds
+  trains, and the deciding stays on n6. `uv pip install -r pyproject.toml --extra savings` adds
   bitsandbytes, which only the 8-bit optimizer run needs.
 - **A run is detached with `setsid`.** The hub stops a command it is streaming after five minutes, and
   the stop reaches the whole process group, so a run started with `nohup` alone dies with it. What

@@ -18,7 +18,7 @@ import type { NodeRunner } from "./jake";
 
 // The four machines the ten gates are trained on. They are named rather than read from the node table
 // because the table holds every machine BMO reaches and only these four train. n6 is not among them:
-// it carries the house LLM service (docs/llm-server.md), and a training run would take its card.
+// it serves the checkpoints (docs/llm-server.md), and a training run would take their card.
 export const TRAINING_NODES: readonly string[] = ["n2", "n3", "n4", "n5"];
 
 /** Why these nodes may not be given Laya's work, or null where every one of them is a training node.
@@ -35,7 +35,8 @@ export function notTrainingNodes(nodes: readonly string[]): string | null {
 // The account's own folder on a node. No sudo, no system package, nothing outside it.
 export const NODE_DIR = "bmo-laya";
 
-// What a node needs to train. The server, its unit and its installer are home-pc's and stay here.
+// What a node needs to train. The server and its unit belong to the Laya service on n6 and are put
+// there by its own installer.
 export const NODE_FILES: readonly string[] = [
   "finetune.py", "calibrate.py", "compare.py", "resume.py", "metrics.py", "pyproject.toml", "node-probe.sh", "node-setup.sh", "node-train.sh", "node-collect.sh",
 ];

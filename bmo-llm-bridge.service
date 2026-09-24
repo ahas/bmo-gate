@@ -1,5 +1,5 @@
 [Unit]
-Description=The house LLM service's tunnel door on main-host (docs/llm-server.md in the bmo-gate repository)
+Description=The Laya service's tunnel door on main-host (docs/llm-server.md in the bmo-gate repository)
 After=network-online.target
 
 [Service]

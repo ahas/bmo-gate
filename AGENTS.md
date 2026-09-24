@@ -1,14 +1,15 @@
 # bmo-gate
 
-Two things BMO's gates ask stand here whole, and nothing here is a part of BMO:
+Laya, the decision filter BMO places in front of some of its gates, stands here whole, and nothing
+here is a part of BMO:
 
-- **Laya,** the decision filter BMO places in front of some of its gates: the server that answers,
-  the distilled training data the ten split gates are trained on, and the training run that makes
-  the checkpoints.
-- **The house LLM service on n6,** the small served model BMO's gates can be routed to: the MCP and
-  OpenAI-compatible front, its units, the node setup and the installer that puts it there.
+- **The service on n6 that answers,** one checkpoint per gate: the server, the MCP and
+  OpenAI-compatible front around it, their units, the tunnel that brings it to main-host, the node
+  setup, the installer and the command that puts a checkpoint in service.
+- **The distilled training data** the ten split gates are trained on.
+- **The training run** that makes the checkpoints.
 
-BMO holds only the clients that ask these two and the configuration of which gate asks which.
+BMO holds only the client that asks the service and the configuration of which gate asks.
 
 Most gates' rows ride the codex account; the sanitiser gate, whose attack rows codex refuses at the
 account level, rides the J3090 road instead.
@@ -22,33 +23,34 @@ account level, rides the J3090 road instead.
 - `docs/laya-train-run.md` — the run across the four training nodes: the rehearsal, the checkpoints
   and their collection, the resume contract, the ledger, the two tables a gate is judged on, and the
   passes that train the gates while their judging runs and keep the score curve.
-- `docs/laya-server.md` — the server on home-pc, what it was measured at, the training loop and its
-  fixed settings, the calibration, and what the savings cost.
+- `docs/laya-server.md` — the server, which checkpoint answers which gate, how the card is shared,
+  what it was measured at on n6, the training loop and its fixed settings, the calibration, and what
+  the savings cost.
 - `docs/reference-use.md` — whether BMO's answers used what the four reference gates attached: the
   judgement, its words, the figures read off it, its training shape, and what it measured.
-- `docs/llm-server.md` — the house LLM service on n6: the model and how the card is divided, the
-  engine, the front and its one tool, the units, the tunnel that is its door, the key, the install
-  and the checks.
+- `docs/llm-server.md` — the Laya service on n6: the machine, the engine, the front with its MCP
+  tools and OpenAI-compatible call, the units, the tunnel that is its door, the key, the install,
+  putting a checkpoint in service, and the checks.
 
 ## What it is made of
 
 - Bun and TypeScript, no runtime dependencies.
 - `src/` holds the generator, the freezing and resume machinery, the audit, the two roads (codex and
   J3090), the rehearsal, the training driver, the checkpoint collection, the verification tables, the
-  jake console plumbing both halves drive the nodes with, and the LLM service's install steps and
-  the tunnel's door on main-host.
+  jake console plumbing that drives the nodes, the service's install steps, carrying a checkpoint
+  into service, and the tunnel's door on main-host.
 - `scripts/` holds the commands. Each takes `--help`.
-- `laya-server/` holds the Python server, the training and calibration scripts it is installed
-  beside, and the unit file. It is a virtual environment of its own on the machine it runs on and
-  shares nothing with the Bun side.
-- `llm-server/` holds the house LLM service's front, the tunnel's dial client, its node setup, its
-  three user units and the nginx config of the tunnel's proxy host. It stands in a virtual
-  environment of its own on n6, the same way.
-- `scripts/llm-install.ts` puts that service on n6 through the jake console and is the one way it is
-  installed or updated.
+- `laya-server/` holds the Python server and the training and calibration scripts. It is a virtual
+  environment of its own on the machine it runs on and shares nothing with the Bun side.
+- `llm-server/` holds the service's front, the tunnel's dial client, its node setup, its three user
+  units and the nginx config of the tunnel's proxy host. It stands in a virtual environment of its
+  own on n6, the same way.
+- `scripts/llm-install.ts` puts the service on n6 through the jake console and is the one way it is
+  installed or updated; `scripts/laya-serve.ts` carries a collected checkpoint there and names it
+  for a gate.
 - `bmo-gate.service` is the unit a full run is carried by, symlinked into the user's own unit
   directory. A full run is a day's work and belongs to no session.
-- `bmo-llm-bridge.service` runs `scripts/llm-bridge.ts`, the LLM service's tunnel door on
+- `bmo-llm-bridge.service` runs `scripts/llm-bridge.ts`, the service's tunnel door on
   main-host, symlinked the same way by the install.
 - `bmo-gate-curve.service` and its `.timer` run a training pass every thirty minutes while the
   judging goes on, symlinked the same way.
@@ -61,7 +63,7 @@ account level, rides the J3090 road instead.
 - `bun test` — the whole suite. `bun test <file>` for one.
 - The Laya server's Python side, which `bun test` does not reach either, on the system Python:
   `python3 -m unittest laya-server/test_server.py laya-server/test_resume.py laya-server/test_metrics.py`.
-- The LLM service's Python side, which `bun test` does not reach:
+- The service front's Python side, which `bun test` does not reach:
   `uv run --no-project --with mcp --with httpx --with starlette --with uvicorn --with websockets python3 -m unittest llm-server/test_front.py llm-server/test_ws_dial.py`.
 
 ## What this repository does not touch

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# The house LLM service's environment on n6, stood up from what is already there (docs/llm-server.md).
-# It is run detached with its output in setup.log, because installing vLLM and downloading the model
-# take longer than the hub holds a streamed command open, and it says `LLM-SETUP-DONE ok` or
+# The Laya service's environment on n6, stood up from what is already there (docs/llm-server.md).
+# It is run detached with its output in setup.log, because installing torch for the engine takes longer
+# than the hub holds a streamed command open, and it says `LLM-SETUP-DONE ok` or
 # `LLM-SETUP-DONE failed:<step>` on its last line, which is what the caller waits for.
 #
 # It is idempotent: what is already right is left alone and said so. It installs into the account
@@ -9,20 +9,17 @@
 set -uo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# The engine's folder, where the installer puts the Laya server and its own setup.
+engine="$HOME/bmo-laya"
 export PATH="$PATH:$HOME/.local/bin"
 # uv's managed interpreter, rather than the system python, so the venv carries its own headers.
 VENV_PYTHON="3.12"
 UV_INSTALLER="https://astral.sh/uv/install.sh"
-export HF_HOME="$here/hf"
 
 step() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*"; }
 fail() { printf 'LLM-SETUP-DONE failed:%s\n' "$1"; exit 1; }
 
 cd "$here" || fail cd
-
-# The model is the one the vLLM unit serves, read out of that unit so the two cannot name different ones.
-model="$(sed -n 's/^ExecStart=.* serve \([^ ]*\) .*/\1/p' "$here/bmo-llm-vllm.service")"
-[ -n "$model" ] || fail model-name
 
 if command -v uv >/dev/null 2>&1; then
   step "uv already here: $(uv --version)"
@@ -55,22 +52,21 @@ fi
 step "installing what pyproject pins"
 VIRTUAL_ENV="$here/.venv" uv pip install -r "$here/pyproject.toml" || fail install
 
-step "downloading $model into $HF_HOME"
-"$here/.venv/bin/python" - "$model" <<'PY' || fail model-download
-import sys
-from huggingface_hub import snapshot_download
-
-print(snapshot_download(sys.argv[1]))
-PY
-
 step "what stands now"
 "$here/.venv/bin/python" - <<'PY' || true
 import importlib.metadata as meta
-for name in ("vllm", "torch", "mcp", "starlette", "uvicorn", "httpx", "websockets"):
+for name in ("mcp", "starlette", "uvicorn", "httpx", "websockets"):
     try:
         print(f"  {name} {meta.version(name)}")
     except Exception:
         print(f"  {name} none")
 PY
+
+# The engine's venv is the one a training node's setup builds, so it is that setup that builds it.
+[ -f "$engine/node-setup.sh" ] || fail engine-files
+step "setting up the engine in $engine"
+engine_said="$(bash "$engine/node-setup.sh" 2>&1)"
+printf '%s\n' "$engine_said" | sed 's/^/  engine: /'
+printf '%s\n' "$engine_said" | tail -n 1 | grep -qx 'LAYA-SETUP-DONE ok' || fail engine
 
 printf 'LLM-SETUP-DONE ok\n'

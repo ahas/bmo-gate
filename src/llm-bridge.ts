@@ -3,7 +3,7 @@ import { readFileSync, statSync } from "node:fs";
 
 import type { Server, ServerWebSocket, Socket } from "bun";
 
-// The house LLM service's tunnel door on main-host (docs/llm-server.md, 「The door」). n6's network
+// The Laya service's tunnel door on main-host (docs/llm-server.md, 「The door」). n6's network
 // lets only HTTPS out, so the tunnel's SSH reaches main-host inside a WebSocket that NPM hands here;
 // this takes one only when its bearer is the service key and pipes it to main-host's own SSH. The key
 // is read from its file for each connection and never kept, logged or answered with.

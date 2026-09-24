@@ -1,6 +1,6 @@
-"""Times the Laya server's /decide call from wherever it runs (docs/laya-server.md, 「Measured on the 3080」).
+"""Times the Laya server's /decide call from wherever it runs (docs/laya-server.md, 「Measured on n6」).
 
-python3 bench.py --url http://192.0.2.8x:7431 --token-file <file> --gates <gate>[,<gate>...] [--runs 50]
+python3 bench.py --url http://127.0.0.1:18010 --token-file <file> --gates <gate>[,<gate>...] [--runs 50]
 Given several gates it asks them in turn, which times each checkpoint's move onto the card as well.
 Standard library only, so it runs on main-host's own Python as well as in the server's venv.
 """

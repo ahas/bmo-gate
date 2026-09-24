@@ -2,7 +2,7 @@
 
 GET /health answers what is loaded for which gate and where; POST /decide takes {"gate", "state",
 "questions"} and answers with that gate's checkpoint's own answer for each question. Every call
-carries the bearer token kept in the token file. docs/laya-server.md is the whole account of it.
+carries the service key as its bearer. docs/laya-server.md is the whole account of it.
 """
 
 from __future__ import annotations
@@ -50,11 +50,11 @@ class NoRoom(Exception):
     """The card would not take the checkpoint asked for, even with every other one taken off it."""
 
 
-def read_token(path: str) -> str:
-    with open(path, encoding="utf-8") as handle:
-        token = handle.read().strip()
+def read_token(env: Optional[Dict[str, str]] = None) -> str:
+    """The service key, which the unit reads out of the service's environment file."""
+    token = (os.environ if env is None else env).get("LAYA_TOKEN", "").strip()
     if not token:
-        raise SystemExit(f"laya-server: the token file {path} is empty")
+        raise SystemExit("laya-server: LAYA_TOKEN is not set; the unit reads it from its environment file")
     return token
 
 
@@ -339,10 +339,9 @@ def load_decider() -> Decider:
 
 
 def main() -> None:
-    token_path = os.environ.get("LAYA_TOKEN_FILE") or os.path.expanduser("~/.config/bmo-laya/token")
-    host = os.environ.get("LAYA_HOST", "0.0.0.0")
+    host = os.environ.get("LAYA_HOST", "127.0.0.1")
     port = int(os.environ.get("LAYA_PORT", "7431"))
-    token = read_token(token_path)
+    token = read_token()
     decider = load_decider()
     sys.stderr.write(f"laya-server: serving {decider.model_line()}, {decider.card_models} on the card at a time\n")
     ThreadingHTTPServer((host, port), handler_for(decider, token)).serve_forever()

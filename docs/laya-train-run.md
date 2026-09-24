@@ -148,8 +148,8 @@ comparison and the verdict record. This document adds no mechanism to either.
 
 ## One gate to a node, in rounds
 
-- **Four nodes, n2 to n5.** n6 is not one of them: it carries the house LLM service
-  (`docs/llm-server.md`), and a training run would take its card. Every node command — setting up,
+- **Four nodes, n2 to n5.** n6 is not one of them: it serves the checkpoints
+  (`docs/llm-server.md`), and a training run would take their card. Every node command — setting up,
   reading, training, the curve's passes and collecting — refuses a node outside these four by name
   before anything reaches it.
 - **A node holds one gate at a time** and a run takes its card to itself. Each node takes the next

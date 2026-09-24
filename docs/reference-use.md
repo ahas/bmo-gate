@@ -191,7 +191,7 @@ root's `reference-use/` folder, never inside this checkout.
   room's pieces in the order its index stands, every call over the same state. Laya's verdict is the
   union of the calls' yes answers and its confidence the lowest across them. A room offering four
   hundred pieces is four calls, well under the client's two seconds at the measured 160 ms a full
-  call (`docs/laya-server.md`, 「Measured on the 3080」).
+  call (`docs/laya-server.md`, 「Measured on n6」).
 - **Each call's input is recorded as its own probe input**, which is what makes the offered set
   readable afterwards and the gate trainable at all. The asking and the recording are BMO's client;
   what stands here is the reading of several inputs as one turn and the cut of each into rows.

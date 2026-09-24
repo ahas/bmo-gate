@@ -1,7 +1,7 @@
 [project]
 name = "bmo-laya-server"
 version = "0.1.0"
-description = "The Laya decision server on home-pc (docs/laya-server.md)"
+description = "The Laya decision server, the engine of the Laya service on n6 (docs/laya-server.md)"
 requires-python = ">=3.10"
 dependencies = [
   # Pinned exactly: the fine-tuning scripts use laya's own internals, which carry no promise across versions.

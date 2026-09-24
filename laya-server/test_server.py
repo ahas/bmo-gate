@@ -13,7 +13,7 @@ from http.server import ThreadingHTTPServer
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from server import Decider, handler_for, read_checkpoints  # noqa: E402
+from server import Decider, handler_for, read_checkpoints, read_token  # noqa: E402
 
 TOKEN = "test-token"
 
@@ -181,6 +181,14 @@ class CheckpointsSettingTest(unittest.TestCase):
         for text in ["output-decide", "=dir", "Output=dir", "a=x a=y", "a="]:
             with self.assertRaises(SystemExit, msg=text):
                 read_checkpoints(text, "/srv")
+
+
+class TokenTest(unittest.TestCase):
+    def test_the_token_comes_from_the_environment_or_the_server_stops(self):
+        self.assertEqual(read_token({"LAYA_TOKEN": " k1 \n"}), "k1")
+        for env in ({}, {"LAYA_TOKEN": "  "}):
+            with self.assertRaises(SystemExit):
+                read_token(env)
 
 
 if __name__ == "__main__":

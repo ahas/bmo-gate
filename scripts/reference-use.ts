@@ -5,6 +5,7 @@ import { bmoIdFrom, messagesIn, openArchive, ownerIdFrom } from "../src/archive"
 import { codexEffort, codexJudgeRoad, codexModel } from "../src/codex-road";
 import { asksUsage, lastOf, readFlags } from "../src/flags";
 import { addTokens, freezeBatch, noTokens, readProgress, writeProgress } from "../src/laya-synth-run";
+import { serviceKeyPath, TUNNEL_LISTEN } from "../src/llm-install";
 import { pseudonyms } from "../src/pii";
 import {
   answerCounts, classifierTurn, clearingTau, contextSlug, gateFigures, labelTurns, layaAnswersOf, readUseAnswer, trainingRows,
@@ -30,7 +31,7 @@ Laya 점수를 새로 내고, 판정을 학습 행 모양으로 쓴다(docs/refe
 --limit 은 판정할 턴 수(연습용, 학습 묶음은 쓰지 않는다). --at-once 는 동시에 판정할 묶음 수(기본 4).
 --effort 는 codex 추론 수준(기본 ${codexEffort}). --bar 는 Laya가 맡는 판정이 넘어야 할 정확도(기본 0.98).
 --checkout 은 비모의 라이브 체크아웃(기본 ~/.local/share/bmo/deploy).
---laya 는 Laya 서버 주소(기본 BMO_LAYA_URL, 없으면 http://192.0.2.8x:7431).`;
+--laya 는 Laya 서버 주소(기본 BMO_LAYA_URL, 없으면 n6 서비스의 main-host 쪽 끝 http://${TUNNEL_LISTEN}).`;
 
 const argv = process.argv.slice(2);
 
@@ -62,8 +63,8 @@ if (refusal !== null) {
 const home = process.env.HOME ?? "";
 const checkout = lastOf(reading, "--checkout") ?? join(home, ".local", "share", "bmo", "deploy");
 const brain = dataPath("brain");
-const layaUrl = (lastOf(reading, "--laya") ?? process.env.BMO_LAYA_URL ?? "http://192.0.2.8x:7431").replace(/\/$/, "");
-const layaToken = readFileSync(dataPath("env", "laya.token"), "utf8").trim();
+const layaUrl = (lastOf(reading, "--laya") ?? process.env.BMO_LAYA_URL ?? `http://${TUNNEL_LISTEN}`).replace(/\/$/, "");
+const layaToken = readFileSync(serviceKeyPath(), "utf8").trim();
 const bar = Number(lastOf(reading, "--bar") ?? "0.98");
 const atOnce = Math.max(1, Number(lastOf(reading, "--at-once") ?? "4"));
 const effort = lastOf(reading, "--effort") ?? codexEffort;

@@ -8,8 +8,8 @@ import { dataPath, homeDir, sourceRoot } from "./roots";
 
 import type { NodeRunner } from "./jake";
 
-// Putting the house LLM service on n6 (docs/llm-server.md, 「Installing and updating」). The node is a
-// jake node, so everything that reaches it is a command or a transfer handed to the jake console; the
+// Putting the Laya service on n6 (docs/llm-server.md, 「Installing and updating」). The node is a jake
+// node, so everything that reaches it is a command or a transfer handed to the jake console; the
 // main-host end — the key, the tunnel's authorized entry, the tunnel's door — is written here on this
 // machine. Each step leaves alone what already stands, so the install is run again to update as often
 // as one likes.
@@ -20,16 +20,24 @@ import type { NodeRunner } from "./jake";
 /** The machine the service stands on. */
 export const LLM_NODE = "n6";
 
-/** The node's own folder for the service, and the one for its settings and secrets. */
+/** The node's own folder for the front and the tunnel, and the one for their settings and secrets. */
 export const SERVICE_DIR = "bmo-llm";
 export const CONFIG_DIR = ".config/bmo-llm";
 
+/** The engine's folder, the same one a training node keeps Laya in, and the gates' settings file,
+ * which is made once and never overwritten. */
+export const ENGINE_DIR = "bmo-laya";
+export const GATES_SETTINGS = ".config/bmo-laya/env";
+
 /** What goes across from `llm-server/`. The tests stay here. */
 export const SERVICE_FILES: readonly string[] = [
-  "front.py", "ws-dial.py", "pyproject.toml", "node-setup.sh", "bmo-llm-vllm.service", "bmo-llm-front.service", "bmo-llm-tunnel.service",
+  "front.py", "ws-dial.py", "pyproject.toml", "node-setup.sh", "bmo-llm-laya.service", "bmo-llm-front.service", "bmo-llm-tunnel.service",
 ];
 
-export const UNITS: readonly string[] = ["bmo-llm-vllm.service", "bmo-llm-front.service", "bmo-llm-tunnel.service"];
+/** What goes across from `laya-server/`: the engine and the setup that builds its venv. */
+export const ENGINE_FILES: readonly string[] = ["server.py", "bench.py", "pyproject.toml", "node-setup.sh"];
+
+export const UNITS: readonly string[] = ["bmo-llm-laya.service", "bmo-llm-front.service", "bmo-llm-tunnel.service"];
 
 /** What the setup says on its last line, being the one thing a poll waits for. */
 export const SETUP_DONE = "LLM-SETUP-DONE";
@@ -46,8 +54,9 @@ export const TUNNEL_KEY = `${CONFIG_DIR}/tunnel_ed25519`;
 /** Where the service answers on main-host once the tunnel stands. */
 export const HEALTH_URL = `http://${TUNNEL_LISTEN}/health`;
 
+/** The service's one key, which is the Laya token BMO asks with. */
 export function serviceKeyPath(): string {
-  return dataPath("env", "n6.key");
+  return dataPath("env", "laya.token");
 }
 
 export type InstallStep =
@@ -70,8 +79,9 @@ export interface InstallOptions {
   checkout?: string;
   console: string;
   node?: string;
-  /** The folder the service's files are uploaded from. */
+  /** The folders the front's files and the engine's are uploaded from. */
   folder?: string;
+  engineFolder?: string;
   keyPath?: string;
   authorizedKeysPath?: string;
   hostKeyPath?: string;
@@ -107,9 +117,9 @@ export function ensureKey(path: string): { key: string; made: boolean } | string
   return { key, made: true };
 }
 
-/** The node's environment file. The key is in it twice, for the front and for vLLM. */
-export function envFileText(key: string, home: string): string {
-  return `LLM_KEY=${key}\nVLLM_API_KEY=${key}\nHF_HOME=${home}/${SERVICE_DIR}/hf\n`;
+/** The node's environment file. The key is in it twice, for the front and for the engine. */
+export function envFileText(key: string): string {
+  return `LLM_KEY=${key}\nLAYA_TOKEN=${key}\n`;
 }
 
 /** The tunnel's entry in main-host's authorized keys: port forwarding and nothing else, one listen
@@ -158,8 +168,10 @@ export function bridgeCommand(checkout: string): string {
     + ` && systemctl --user daemon-reload && systemctl --user enable ${BRIDGE_UNIT} && systemctl --user restart ${BRIDGE_UNIT}`;
 }
 
+/** The folders, and the gates' settings file naming no gate where none stands yet. */
 export function makeDirsCommand(): string {
-  return `mkdir -p ~/${SERVICE_DIR} ~/${CONFIG_DIR} && chmod 700 ~/${CONFIG_DIR}`;
+  return `mkdir -p ~/${SERVICE_DIR} ~/${ENGINE_DIR} ~/${CONFIG_DIR} ~/${dirname(GATES_SETTINGS)} && chmod 700 ~/${CONFIG_DIR}`
+    + ` && { test -f ~/${GATES_SETTINGS} || printf 'LAYA_CHECKPOINTS=""\\n' > ~/${GATES_SETTINGS}; }`;
 }
 
 export function envModeCommand(): string {
@@ -223,6 +235,7 @@ async function answersHealth(): Promise<boolean> {
 export async function installLlmService(options: InstallOptions): Promise<InstallOutcome> {
   const node = options.node ?? LLM_NODE;
   const folder = options.folder ?? join(sourceRoot(), "llm-server");
+  const engineFolder = options.engineFolder ?? join(sourceRoot(), "laya-server");
   const say = options.say ?? (() => {});
   const wait = options.wait ?? ((ms: number) => new Promise<void>((keep) => setTimeout(keep, ms)));
   const done: InstallStep[] = [];
@@ -253,7 +266,7 @@ export async function installLlmService(options: InstallOptions): Promise<Instal
   const scratch = mkdtempSync(join(options.tmpRoot ?? tmpdir(), "bmo-llm-env-"));
   try {
     const envPath = join(scratch, "env");
-    writeFileSync(envPath, envFileText(keyed.key, home), { mode: 0o600 });
+    writeFileSync(envPath, envFileText(keyed.key), { mode: 0o600 });
     const carried = await upload(envPath, `${home}/${CONFIG_DIR}/env`);
     if (carried.code !== 0) {
       return stop("env", `환경 파일을 올리지 못했어요 — ${runFault(carried)}`);
@@ -267,18 +280,22 @@ export async function installLlmService(options: InstallOptions): Promise<Instal
   }
   done.push("env");
 
-  // 3. The service's files.
-  for (const name of SERVICE_FILES) {
-    const carried = await upload(join(folder, name), `${home}/${SERVICE_DIR}/${name}`);
+  // 3. The front's files and the engine's.
+  const carrying: Array<[string, string]> = [
+    ...SERVICE_FILES.map((name): [string, string] => [join(folder, name), `${home}/${SERVICE_DIR}/${name}`]),
+    ...ENGINE_FILES.map((name): [string, string] => [join(engineFolder, name), `${home}/${ENGINE_DIR}/${name}`]),
+  ];
+  for (const [local, remote] of carrying) {
+    const carried = await upload(local, remote);
     if (carried.code !== 0) {
-      return stop("upload", `${name} 를 올리지 못했어요 — ${runFault(carried)}`);
+      return stop("upload", `${local} 를 올리지 못했어요 — ${runFault(carried)}`);
     }
   }
-  say(`${node}: 서비스 파일 ${SERVICE_FILES.length}개를 올렸어요`);
+  say(`${node}: 서비스 파일 ${carrying.length}개를 올렸어요`);
   done.push("upload");
 
   // 4. The setup, detached and waited on.
-  say(`${node}: vLLM 과 모델을 세우는 중`);
+  say(`${node}: 앞단과 Laya 엔진의 환경을 세우는 중`);
   const launched = await exec(setupLaunchCommand());
   if (launched.code !== 0) {
     return stop("setup", `설치를 시작하지 못했어요 — ${runFault(launched)}`);
@@ -355,7 +372,7 @@ export async function installLlmService(options: InstallOptions): Promise<Instal
     up = await health();
   }
   if (!up) {
-    return stop("health", `${HEALTH_URL} 가 답하지 않아요 — ${node} 의 journalctl --user -u bmo-llm-vllm 을 보세요`);
+    return stop("health", `${HEALTH_URL} 가 답하지 않아요 — ${node} 의 journalctl --user -u bmo-llm-laya 를 보세요`);
   }
   done.push("health");
 

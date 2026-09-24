@@ -1,5 +1,5 @@
 [Unit]
-Description=The house LLM service's reverse tunnel to main-host (docs/llm-server.md in the bmo-gate repository)
+Description=The Laya service's reverse tunnel to main-host (docs/llm-server.md in the bmo-gate repository)
 After=network-online.target bmo-llm-front.service
 
 [Service]

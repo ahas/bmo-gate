@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   authorizedLine,
   bridgeCommand,
+  ENGINE_FILES,
   ensureAuthorized,
   installLlmService,
   keyMaterial,
@@ -81,7 +82,7 @@ function stage(): Stage {
 
   return {
     root,
-    keyPath: join(root, "data", "env", "n6.key"),
+    keyPath: join(root, "data", "env", "laya.token"),
     authorizedKeysPath: join(root, "home", ".ssh", "authorized_keys"),
     hostKeyPath,
     said: [],
@@ -95,6 +96,7 @@ function installing(runner: NodeRunner, at: Stage, changes: Partial<InstallOptio
     runner,
     console: CONSOLE,
     folder: "/checkout/llm-server",
+    engineFolder: "/checkout/laya-server",
     keyPath: at.keyPath,
     authorizedKeysPath: at.authorizedKeysPath,
     hostKeyPath: at.hostKeyPath,
@@ -161,15 +163,22 @@ describe("the whole install", () => {
     const commands = seen.map(commandOf);
     const at_ = (what: string) => commands.findIndex((command) => command.includes(what));
     expect(at_("echo HOME")).toBe(0);
-    expect(at_("mkdir -p ~/bmo-llm ~/.config/bmo-llm")).toBe(1);
+    expect(at_("mkdir -p ~/bmo-llm ~/bmo-laya ~/.config/bmo-llm ~/.config/bmo-laya")).toBe(1);
+    // The gates' settings file is made only where none stands, so a gate named there is never lost.
+    expect(commands[1]).toContain(`test -f ~/.config/bmo-laya/env || printf 'LAYA_CHECKPOINTS=""\\n' > ~/.config/bmo-laya/env`);
     expect(commands[2]).toBe("upload /home/labuser/.config/bmo-llm/env");
     expect(commands[3]).toBe("chmod 600 ~/.config/bmo-llm/env");
-    expect(commands.slice(4, 4 + SERVICE_FILES.length)).toEqual(SERVICE_FILES.map((name) => `upload /home/labuser/bmo-llm/${name}`));
+    const uploads = SERVICE_FILES.length + ENGINE_FILES.length;
+    expect(commands.slice(4, 4 + uploads)).toEqual([
+      ...SERVICE_FILES.map((name) => `upload /home/labuser/bmo-llm/${name}`),
+      ...ENGINE_FILES.map((name) => `upload /home/labuser/bmo-laya/${name}`),
+    ]);
+    expect(seen[4 + SERVICE_FILES.length]!.argv[3]).toBe("/checkout/laya-server/server.py");
     expect(at_("setsid nohup bash node-setup.sh")).toBeLessThan(at_("setup.log 2>/dev/null"));
     expect(at_("setup.log 2>/dev/null")).toBeLessThan(at_("ssh-keygen"));
     expect(at_("ssh-keygen")).toBeLessThan(at_("upload /home/labuser/.config/bmo-llm/known_hosts"));
     expect(at_("upload /home/labuser/.config/bmo-llm/known_hosts")).toBeLessThan(at_("systemctl --user daemon-reload"));
-    expect(commands.at(-1)).toContain("systemctl --user enable bmo-llm-vllm.service bmo-llm-front.service bmo-llm-tunnel.service");
+    expect(commands.at(-1)).toContain("systemctl --user enable bmo-llm-laya.service bmo-llm-front.service bmo-llm-tunnel.service");
 
     const key = readFileSync(at.keyPath, "utf8").trim();
     expect(key).toMatch(/^[0-9a-f]{64}$/);
@@ -184,7 +193,7 @@ describe("the whole install", () => {
     // The key travelled only inside the environment file, which was private and is gone again.
     const env = seen.find((one) => one.argv[4]?.endsWith("/.config/bmo-llm/env"))!.carried!;
     expect(env.mode).toBe(0o600);
-    expect(env.text).toBe(`LLM_KEY=${key}\nVLLM_API_KEY=${key}\nHF_HOME=/home/labuser/bmo-llm/hf\n`);
+    expect(env.text).toBe(`LLM_KEY=${key}\nLAYA_TOKEN=${key}\n`);
     expect(readdirSync(join(at.root, "tmp"))).toEqual([]);
 
     const pinned = seen.find((one) => one.argv[4]?.endsWith("/known_hosts"))!.carried!;
@@ -245,7 +254,7 @@ describe("the whole install", () => {
 
   test("a setup that never finishes is not waited on for ever", async () => {
     const at = stage();
-    const { runner } = fakeNode({ setup: "[10:05] downloading the model" });
+    const { runner } = fakeNode({ setup: "[10:05] setting up the engine" });
 
     const outcome = await installLlmService(installing(runner, at));
 
