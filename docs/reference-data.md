@@ -14,6 +14,9 @@ its verdicts are kept, how rows and figures are read off them, and how it grows 
 - **The input is BMO's, byte for byte.** What a gate is handed — the turn's messages as a state, and
   one question per candidate the narrowing kept, in the probe's own words — is built by BMO's code
   and read from it (「The input」). This repository never reads the fragment table or the brain.
+- **A pass reads one copy of BMO's archive** and never the live one (`docs/gate-data.md`, 「The
+  archive copy」): the turns are read from the copy the pass takes as it starts, and BMO's code builds
+  the inputs from that same copy, so a turn and its input are read from the same moment.
 - **What BMO is asked and what it answers** is BMO's `docs/reference-selection.md`: the narrowing, the
   probes, and the replay of a stored turn's inputs.
 
@@ -45,8 +48,8 @@ messages — the key BMO's own records name a turn by.
 
 ## The input
 
-- **BMO builds it.** `bun scripts/reference-inputs.ts` in BMO's live checkout is handed the turns —
-  their room and their messages — and answers, for each gate the narrowing leaves something to, the
+- **BMO builds it.** `bun scripts/reference-inputs.ts` in BMO's live checkout is handed the pass's
+  archive copy by `--db` and the turns — their room and their messages — and answers, for each gate the narrowing leaves something to, the
   Laya request the gate would be asked today: the state as the gates are handed it and one question
   per candidate kept, named by its slug. It answers the index line of each candidate beside it, and
   the body of any piece it is asked for by gate and slug. Nothing is asked of a model and nothing is
@@ -168,7 +171,8 @@ data root's `reference-data/` folder, never inside this checkout.
   pass's rows and never half of two.
 - `turns.jsonl` — one line per turn: its key, where it was read from, its messages' numbers, whether
   what attached is known, and why it was left out where it was.
-- `ticks.jsonl` — one line per pass: when, the BMO commit that built the inputs, how many turns stood,
+- `ticks.jsonl` — one line per pass: when, the BMO commit that built the inputs, when the archive copy
+  it read was taken and that copy's schema version, how many turns stood,
   how many were judged, the calls and the tokens they spent, and how many times Laya was asked and
   reused.
 - `report.json` — the figures, per gate and per τ.

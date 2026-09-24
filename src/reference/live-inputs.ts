@@ -72,16 +72,16 @@ export function readLiveTurn(line: string): LiveTurn {
   };
 }
 
-// The script in BMO's live checkout, handed the turns on its standard input. It is run with the
-// environment it is given, which is where BMO's own settings — the archive, the bot's number — come
-// from.
-export function bmoInputs(checkout: string, env: Record<string, string | undefined> = process.env): InputsReader {
+// The script in BMO's live checkout, pointed at the pass's archive copy and handed the turns on its
+// standard input. It is run with the environment it is given, which is where BMO's own settings —
+// the bot's number among them — come from.
+export function bmoInputs(checkout: string, archive: string, env: Record<string, string | undefined> = process.env): InputsReader {
   return (asks) => {
     if (asks.length === 0) {
       return [];
     }
 
-    const ran = spawnSync("bun", [inputsScript], {
+    const ran = spawnSync("bun", [inputsScript, "--db", archive], {
       cwd: checkout,
       env,
       input: asks.map((one) => `${JSON.stringify(one)}\n`).join(""),

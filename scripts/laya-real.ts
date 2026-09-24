@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { asksUsage, allOf, asked, lastOf, readFlags } from "../src/flags";
 import { bmoIdFrom, judgedCounts, messagesIn, openArchive, ownerIdFrom, recordedQuestions, roomsIn, sentMessages } from "../src/archive";
+import { releaseArchiveCopy, takeArchiveCopy } from "../src/archive-copy";
 import { gateSyntheses, synthesisFor } from "../src/laya-synth";
 import { pseudonyms } from "../src/pii";
 import { realMetaFile, realRows, realSourceGates, unjudgedFile } from "../src/real-rows";
@@ -23,7 +24,7 @@ const usage = `usage: bun scripts/laya-real.ts [<실행>] [--gate <게이트>]�
 방들의 실제 대화에서 게이트별 입력을 세운다. 판정은 붙이지 않는다 — 그건 laya-judge.ts 의 몫이다.
 <실행> 을 주면 그 실행 폴더의 게이트마다 unjudged.jsonl 을 쓰고, 주지 않으면 세기만 한다.
 --gate 는 게이트를 고른다(여러 번). 없으면 실제 대화로 설 수 있는 게이트 전부.
---limit 은 게이트당 최대 행 수(기본 6000). --db 는 읽을 아카이브, 없으면 런타임 데이터 뿌리의 것.
+--limit 은 게이트당 최대 행 수(기본 6000). --db 는 읽을 아카이브 파일, 없으면 비모 아카이브의 사본을 새로 떠서 읽는다.
 --owner 와 --bmo 는 하스와 비모의 번호. 없으면 BMO_OWNER_ID 와 BMO_BOT_ID(또는 BMO_BOT_TOKEN)에서 읽는다.
 --calibration 은 온도 보정 몫(기본 0.15), --test 는 수치를 재는 몫(기본 0.15).
 --seed 는 가명을 고르는 씨앗(기본 laya-real). 같은 씨앗이면 같은 방이 같은 사람들로 읽힌다.
@@ -57,8 +58,16 @@ for (const gate of gates) {
   }
 }
 
-const dbPath = lastOf(reading, "--db");
-const db = openArchive(dbPath === undefined ? undefined : dbPath);
+// A file named is read as it stands; otherwise a copy of BMO's archive is taken for this run and the
+// live one is never opened (docs/gate-data.md, 「The archive copy」).
+const named = lastOf(reading, "--db");
+const copy = named === undefined ? takeArchiveCopy() : null;
+
+if (copy !== null) {
+  process.on("exit", () => releaseArchiveCopy(copy));
+}
+
+const db = openArchive(named ?? copy!.path);
 const ownerId = Number(lastOf(reading, "--owner") ?? ownerIdFrom());
 const bmoId = Number(lastOf(reading, "--bmo") ?? bmoIdFrom());
 const seed = lastOf(reading, "--seed") ?? "laya-real";

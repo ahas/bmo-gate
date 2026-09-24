@@ -51,10 +51,17 @@ export interface TickOptions {
   leaveRequest: (request: LayaRequest) => LayaRequest;
   laya: LayaService | null;
   bmoCommit: string | null;
+  // The archive copy the pass read: when it was taken and the schema version it carries.
+  archive: ArchiveStamp | null;
   // The first judging's turn file, whose labels are taken in once.
   importFrom: string | null;
   now?: () => Date;
   say?: (line: string) => void;
+}
+
+export interface ArchiveStamp {
+  takenAt: string;
+  schemaVersion: number;
 }
 
 export interface GateData {
@@ -74,6 +81,7 @@ export interface GateData {
 export interface TickReport {
   at: string;
   bmo: string | null;
+  archive: ArchiveStamp | null;
   turns: number;
   skipped: TurnBuild["skipped"] & { missing: number };
   wanting: number;
@@ -314,6 +322,7 @@ export async function referenceTick(options: TickOptions): Promise<TickReport> {
   const report: TickReport = {
     at,
     bmo: options.bmoCommit,
+    archive: options.archive,
     turns: turns.length,
     skipped: { ...options.built.skipped, missing },
     wanting: wanting.filter((one) => one.wanted.length > 0).length,
@@ -341,7 +350,7 @@ export async function referenceTick(options: TickOptions): Promise<TickReport> {
   })}\n`).join(""));
   writeFileSync(join(options.root, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
   appendFileSync(join(options.root, "ticks.jsonl"), `${JSON.stringify({
-    at, bmo: report.bmo, turns: report.turns, wanting: report.wanting, judgedTurns: report.judgedTurns, calls, failedBatches, tokens,
+    at, bmo: report.bmo, archive: report.archive, turns: report.turns, wanting: report.wanting, judgedTurns: report.judgedTurns, calls, failedBatches, tokens,
     labels: report.labels, layaAsked, layaReused, layaFailed,
   })}\n`);
 

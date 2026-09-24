@@ -1,6 +1,7 @@
 import { join } from "node:path";
 
 import { bmoIdFrom, messagesIn, openArchive, ownerIdFrom, roomsIn } from "../src/archive";
+import { releaseArchiveCopy, takeArchiveCopy } from "../src/archive-copy";
 import { codexEffort, codexJudgeRoad, codexModel } from "../src/codex-road";
 import { asked, asksUsage, lastOf, readFlags } from "../src/flags";
 import { claimGate, releaseGate } from "../src/gate-claim";
@@ -28,7 +29,8 @@ const usage = `usage: bun scripts/reference-data.ts <실행> [--judge <n>] [--at
 조립해 gates/ 에 통째로 바꿔 넣는다.
 <실행> 은 런타임 데이터 뿌리의 reference-data/ 아래 이름이거나 절대 경로다.
 --judge 는 한 회차에 판정할 턴 수(기본 ${judgedPerPass}), --at-once 는 동시에 판정할 묶음 수(기본 4).
---effort 는 codex 추론 수준(기본 ${codexEffort}). --checkout 은 비모의 라이브 체크아웃(기본 ~/.local/share/bmo/deploy).
+--effort 는 codex 추론 수준(기본 ${codexEffort}). --checkout 은 입력을 조립할 비모 체크아웃(기본 ~/.local/share/bmo/deploy).
+회차마다 비모 아카이브의 사본을 떠서 턴과 입력을 모두 그 사본에서 읽는다.
 --import 는 처음 판정의 턴 파일로, 라벨이 하나도 없는 실행에 한 번 들여온다(기본 reference-use/use-1/turns.jsonl).
 --no-judge 는 판정 없이 행과 수치만, --no-laya 는 Laya 재질의 없이 돈다.`;
 
@@ -70,7 +72,13 @@ if (standing !== null) {
 process.on("exit", () => releaseGate(join(root, "claim")));
 
 const checkout = lastOf(reading, "--checkout") ?? join(process.env.HOME ?? "", ".local", "share", "bmo", "deploy");
-const db = openArchive();
+// The turns and BMO's inputs for them are read from one copy of the archive taken now, and the live
+// archive is never opened (docs/gate-data.md, 「The archive copy」).
+const copy = takeArchiveCopy();
+
+process.on("exit", () => releaseArchiveCopy(copy));
+
+const db = openArchive(copy.path);
 const ownerId = ownerIdFrom();
 const bmoId = bmoIdFrom();
 const rooms = roomsIn(db).map((room) => room.chatId);
@@ -106,7 +114,7 @@ if (!asked(reading, "--no-laya") && health === null) {
 const report = await referenceTick({
   root,
   built,
-  inputs: bmoInputs(checkout),
+  inputs: bmoInputs(checkout, copy.path),
   road: judge,
   judged: Number(lastOf(reading, "--judge") ?? judgedPerPass),
   atOnce: Math.max(1, Number(lastOf(reading, "--at-once") ?? "4")),
@@ -122,6 +130,7 @@ const report = await referenceTick({
     ask: async (gate, request) => layaAnswersOf(await layaDecide(gate, request)),
   },
   bmoCommit: bmoCommit(checkout),
+  archive: { takenAt: copy.takenAt, schemaVersion: copy.schemaVersion },
   importFrom: lastOf(reading, "--import") ?? dataPath("reference-use", "use-1", "turns.jsonl"),
   say: (line) => console.log(line),
 });

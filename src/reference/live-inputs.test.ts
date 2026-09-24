@@ -22,26 +22,33 @@ describe("readLiveTurn", () => {
 });
 
 describe("bmoInputs", () => {
-  // A checkout whose script answers each turn with a line of its own, as BMO's does.
+  // A checkout whose script answers each turn with a line of its own, as BMO's does, and only when
+  // it is pointed at the pass's archive copy.
   const checkout = scratchDir("bmo-reference-inputs-");
+  const copy = join(checkout, "copy", "bmo.db");
 
   mkdirSync(join(checkout, "scripts"), { recursive: true });
   writeFileSync(join(checkout, inputsScript), [
+    `if (process.argv[2] !== '--db' || process.argv[3] !== ${JSON.stringify(copy)}) { console.error('no archive named'); process.exit(4); }`,
     "const lines = (await Bun.stdin.text()).split('\\n').filter((line) => line.trim() !== '');",
     "if (lines.some((line) => JSON.parse(line).chatId === 0)) { console.error('no such room'); process.exit(3); }",
     "for (const line of lines) console.log(JSON.stringify({ ...JSON.parse(line), gates: [] }));",
   ].join("\n"));
 
   test("hands the turns to BMO's script and reads a line a turn back", () => {
-    expect(bmoInputs(checkout)([{ chatId: -7, messageIds: [3] }, { chatId: -7, messageIds: [4, 5] }]).map((one) => one.messageIds))
+    expect(bmoInputs(checkout, copy)([{ chatId: -7, messageIds: [3] }, { chatId: -7, messageIds: [4, 5] }]).map((one) => one.messageIds))
       .toEqual([[3], [4, 5]]);
   });
 
+  test("points the script at the archive it is given and no other", () => {
+    expect(() => bmoInputs(checkout, join(checkout, "live.db"))([{ chatId: -7, messageIds: [3] }])).toThrow("no archive named");
+  });
+
   test("says what the script said when it fails", () => {
-    expect(() => bmoInputs(checkout)([{ chatId: 0, messageIds: [1] }])).toThrow("no such room");
+    expect(() => bmoInputs(checkout, copy)([{ chatId: 0, messageIds: [1] }])).toThrow("no such room");
   });
 
   test("asks nothing of the script for no turns", () => {
-    expect(bmoInputs(join(checkout, "absent"))([])).toEqual([]);
+    expect(bmoInputs(join(checkout, "absent"), copy)([])).toEqual([]);
   });
 });

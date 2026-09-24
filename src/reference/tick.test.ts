@@ -79,6 +79,7 @@ function options(where: string, asked: InputsAsk[][], changes: Partial<TickOptio
     leaveRequest: (request) => request,
     laya: null,
     bmoCommit: "abc1234",
+    archive: { takenAt: "2026-09-25T00:00:00.000Z", schemaVersion: 7 },
     importFrom: null,
     now: () => new Date("2026-09-25T00:00:00Z"),
     ...changes,
@@ -99,6 +100,7 @@ describe("referenceTick", () => {
     expect(data.rows.train + data.rows.calibration + data.rows.test).toBe(2);
     expect([data.waiting, data.yes]).toEqual([1, 2]);
     expect(report.bmo).toBe("abc1234");
+    expect(JSON.parse(readFileSync(join(where, "ticks.jsonl"), "utf8")).archive).toEqual({ takenAt: "2026-09-25T00:00:00.000Z", schemaVersion: 7 });
   });
 
   test("the next pass judges only what is still missing, and puts the gates in place whole", async () => {

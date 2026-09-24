@@ -58,7 +58,7 @@ account level, rides the J3090 road instead.
   minutes, symlinked the same way.
 - `bmo-gate-reference-data.service` and its `.timer` make a pass of the reference gates' data and
   then a training pass over it every hour, symlinked the same way. The data pass reads BMO's
-  `scripts/reference-inputs.ts` in BMO's live checkout.
+  `scripts/reference-inputs.ts` in BMO's live checkout, pointed at the pass's archive copy.
 
 ## Checking a change
 
@@ -71,7 +71,8 @@ account level, rides the J3090 road instead.
 
 ## What this repository does not touch
 
-- BMO's archive is opened read-only for the real rows and is never written.
+- BMO's live archive is never opened. Each run reads a copy of it taken for itself, read-only
+  (`docs/gate-data.md`, 「The archive copy」).
 - A gate's mode and τ are BMO's configuration and 하스's decision; nothing here writes either.
 - Generated data never lands inside this checkout. It goes to the shared runtime data root, which is
   where the training driver here looks for it.

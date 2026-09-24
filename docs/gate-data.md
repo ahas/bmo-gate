@@ -25,13 +25,36 @@ train on.
   not a second source.
 - **No τ is chosen here, and no gate is moved off `shadow`.** Those are 하스's, and BMO is where a
   gate's mode and τ are configured (BMO's `docs/laya.md`).
-- **Nothing in BMO is written by anything in this repository.** Its archive is opened read-only for
-  the real rows and for nothing else. The data lands in the shared runtime data root, which is where
-  the training driver here looks for it.
+- **Nothing in BMO is written by anything in this repository, and its live archive is never
+  opened.** Every run reads a copy of the archive it takes for itself (「The archive copy」). The
+  data lands in the shared runtime data root, which is where the training driver here looks for it.
+
+## The archive copy
+
+BMO's archive is the running bot's, written every few seconds. What this repository reads of it is
+a copy of its own, so no read here ever holds a lock the bot waits on, and one run reads one moment
+of the archive from its first line to its last.
+
+- **Each run takes its own copy.** A pass of the reference data and a run of the real rows each copy
+  the archive as they start, in one consistent read of the whole file (SQLite's `VACUUM INTO`), into
+  the runtime data root's `archive-copies/` folder, one folder a copy.
+- **A copy says what it is.** Beside the file stand the archive it was taken from, when, its size and
+  its schema version — the number the archive stamps itself with, which BMO's own code checks before
+  it reads a file. A pass of the reference data records its copy's time and schema version with its
+  figures.
+- **The copy is the only archive anything reads.** This repository opens it read-only. BMO's own
+  script that builds the reference gates' inputs is pointed at it by name, so the narrowing and the
+  probes read the same moment the turns were read from. The copy is put in write-ahead mode once as it
+  is taken, so no reader after that writes anything to it.
+- **Old copies go.** The newest whole copy stays, for whoever wants to see what the last run read;
+  every older one is removed once no living run reads it. A run marks the copy it reads for as long as
+  it lives, and a copy whose run is gone is free. A copy cut off before it was whole goes the same way.
+- **A run can be handed a file instead.** `--db` names an archive file to read as it stands, which is
+  how a run reads a copy somebody kept; no copy is taken then.
 
 ## The real conversation source
 
-The rows come out of BMO's archive, which is opened read-only and never written. What is built is
+The rows come out of the archive copy, which is opened read-only and never written. What is built is
 one row per turn: the state that gate would have been given, and the questions it would have been
 asked, with no answer on either.
 
@@ -497,8 +520,8 @@ behind it has nothing else, and the shape it writes is the shape the training re
 
 ## Running it
 
-- `bun scripts/laya-real.ts` — count what the rooms hold for each gate, and, given a run name,
-  write each gate's unjudged rows into that run's folders. With no run name it counts and writes
+- `bun scripts/laya-real.ts` — count what the rooms hold for each gate in a fresh archive copy, and,
+  given a run name, write each gate's unjudged rows into that run's folders. With no run name it counts and writes
   nothing, which is how a build starts: the count is what says which gates can be trained now and
   which are still short. It needs 하스's and BMO's own numbers, from the environment or from
   `--owner` and `--bmo`.

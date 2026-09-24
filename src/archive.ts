@@ -3,9 +3,8 @@ import { join } from "node:path";
 
 import { dataRoot } from "./roots";
 
-// BMO's archive as this repository reads it (docs/gate-data.md, 「The real conversation source」).
-// It is opened read-only and never written: the archive is the bot's, and a generation that wrote
-// to it would be writing into the very record it is drawing its rows from.
+// BMO's archive as this repository reads it (docs/gate-data.md, 「The real conversation source」),
+// which is always a copy of it. It is opened read-only and never written.
 //
 // Only the reads the rows need are here. Nothing interprets a gate's judgement: the past verdicts
 // say which turns a gate was asked about and nothing more, because the gates' prompts and their
@@ -22,11 +21,13 @@ export interface ArchivedMessage {
   replyToMessageId: number | null;
 }
 
-export function archivePath(): string {
+// The bot's own archive, which nothing here opens except to take a copy of it (docs/gate-data.md,
+// 「The archive copy」).
+export function liveArchivePath(): string {
   return process.env.BMO_DB_PATH ?? join(dataRoot(), "bmo.db");
 }
 
-export function openArchive(path: string = archivePath()): Database {
+export function openArchive(path: string): Database {
   return new Database(path, { readonly: true });
 }
 
