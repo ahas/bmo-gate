@@ -106,7 +106,7 @@ function questionsOf(gate: string): Record<string, LayaQuestion> {
 // The turn one message stands at the end of: the run of messages before it that nobody has
 // answered yet, which is the batch BMO would have been given. A gap longer than the turn's own
 // stands for the conversation having moved on.
-function turnEndingAt(room: readonly ArchivedMessage[], at: number, bmoId: number, gapSeconds: number): ArchivedMessage[] {
+export function turnEndingAt(room: readonly ArchivedMessage[], at: number, bmoId: number, gapSeconds: number): ArchivedMessage[] {
   const turn = [room[at]!];
 
   for (let back = at - 1; back >= 0; back -= 1) {

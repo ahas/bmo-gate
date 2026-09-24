@@ -82,7 +82,7 @@ asks (BMO's `docs/laya.md`).
   | `library-knowledge` | `library-knowledge` | served |
   | `room-rules` | `room-rules` | served |
   | `situation-rules` | `situation-rules` | served |
-  | `system-documents` | `system-documents` | none trained yet, refused |
+  | `system-documents` | `system-documents` | served (`real-1-hand2`); below the bar on real turns (`docs/reference-use.md`) |
   | `people-search` | `people-search` | none trained yet, refused |
   | `content-judge` | `content-judge` | trained, not served: the gate's mode is `off` |
   | `reply-wanted` | none — no gate code in BMO | trained, not served |

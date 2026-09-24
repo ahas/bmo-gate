@@ -24,6 +24,8 @@ account level, rides the J3090 road instead.
   passes that train the gates while their judging runs and keep the score curve.
 - `docs/laya-server.md` — the server on home-pc, what it was measured at, the training loop and its
   fixed settings, the calibration, and what the savings cost.
+- `docs/reference-use.md` — whether BMO's answers used what the four reference gates attached: the
+  judgement, its words, the figures read off it, its training shape, and what it measured.
 - `docs/llm-server.md` — the house LLM service on n6: the model and how the card is divided, the
   engine, the front and its one tool, the units, the tunnel that is its door, the key, the install
   and the checks.
