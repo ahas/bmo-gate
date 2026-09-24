@@ -6,8 +6,7 @@ answers it may give, and whether it is asymmetric — and beside those, the lang
 balance its distilled training data is to be drawn to.
 
 - **This is a target specification, not a description of what runs.** Two of the ten have no gate
-  code at all, and one has a probe over only half of what is asked of it here. Each section says
-  which of those it is.
+  code at all. Each section says which gates run and how.
 - **What it is for:** the distilled data is generated against this document, the training and the
   verification are measured against it, and the structural split implements it. Where the built gate
   and this document differ, one of them is wrong and it is said so rather than quietly settled.
@@ -320,22 +319,30 @@ gate on each road, same bar, same audit.
 
 ## 5. 출력 서식
 
-- **Status:** the decide half runs today with a probe, declared by the dialect that folds. The verify
-  half has no probe. This gate is the two read as one judgement, which is what the split builds.
-- **Input:** the answer as its reader will see it, the markdown original it was converted from, and
-  whether the candidate is folded.
-- **Questions:** three yes/no.
-  - 「이 메시지는 채팅방에 접어서(펼치기 인용으로 감싸서) 보내야 하는가?」 — the decide half's own question,
-    unchanged.
-  - 「변환된 글이 원문의 내용을 잃거나 바꾸지 않았는가?」
-  - 「접은 모양이 규칙에 맞는가 — 대화체가 접히지 않았고 결론이 접히지 않았는가?」
-- **Answers:** fold or open; the original kept or lost; the fold's shape right or wrong.
-- **Asymmetry:** on the second and third questions only, and the answer Laya may settle is the one
-  that says something is wrong — 내용이 바뀌었다, 모양이 틀렸다 — because that answer hands the message to
-  the model, which is where a doubtful one belongs. The fold question is symmetric: a wrongly folded
-  message is a cosmetic error either way.
-- **Note:** tag validity, escaping and nesting are settled by reading the markup and are not asked of
-  any model, so they are not questions here.
+- **Status:** BMO's one formatting gate, on the key `output-format`, whose provider is Laya: the
+  fold is Laya's verdict alone, and the markup is the code's. It is declared by the dialect that
+  folds.
+- **Input:** the markdown as BMO wrote it, reduced so a message of any length fits one call — the
+  reduction is fixed to the character, since BMO builds the same state from the same markdown:
+  - the text is trimmed of the whitespace around it;
+  - `head` — where the whole costs no more than 520 tokens in the generous count, the whole text;
+    otherwise the longest opening costing at most 320, ended at the last line break where one falls
+    in its latter half;
+  - `tail` — empty where `head` holds the whole; otherwise the longest closing costing at most 200,
+    begun after the first line break where one falls in its former half;
+  - `chars`, the characters of the whole; `lines`, its lines that are not blank; `paragraphs`, its
+    runs of lines that are not blank; `items`, the lines opening with a list mark (`-`, `*`, `+`,
+    `•`, or a number of up to three digits and `.` or `)`); `headings`, the lines opening with one
+    to six `#`; `code`, the fence lines halved and rounded up; `table`, the lines opening with `|`;
+  - where escaping would carry the state past 768 tokens, both excerpt budgets are cut to three
+    quarters, a half and a quarter in turn, and the first that fits — or the quarter — is the state.
+- **What the judge reads:** the markdown whole, never the reduction (`docs/gate-data.md`, 「Judging
+  the real rows」).
+- **Question:** one yes/no — 「이 메시지는 채팅방에 접어서(펼치기 인용으로 감싸서) 보내야 하는가?」
+- **Answers:** fold or open.
+- **Asymmetry:** none. A wrongly folded message is a cosmetic error either way.
+- **Note:** whether the converted text keeps the original, and tag validity, escaping and nesting,
+  are the conversion code's and its tests', never a model's, so they are not questions here.
 
 ## 6. 답변 내용 게이트
 

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { foldState } from "./fold-state";
 import { layaFits } from "./laya";
 import { splitOf } from "./laya-dataset";
 import { jsonArrayIn, jsonObjectsIn } from "./laya-teach";
@@ -807,32 +808,26 @@ const noteScope: GateSynthesis = {
   },
 };
 
+// The gate is shown a message as its opening, its closing and its counts (`fold-state.ts`), which
+// is how a message of any length fits one call; the example is that reduction of a short one.
 const outputFormat: GateSynthesis = {
   gate: "output-format",
   title: "출력 서식",
-  judges: "나갈 메시지를 접을지, 그리고 변환된 글이 원문을 지켰고 접은 모양이 규칙에 맞는지",
-  textFields: ["original", "candidate"],
+  judges: "나갈 메시지를 채팅방에 접어서(펼치기 인용으로 감싸서) 보낼지",
+  textFields: ["head", "tail"],
   transcript: null,
   perCandidate: false,
   candidates: null,
   questions: [
     { id: "fold", type: "noul", instructions: "이 메시지는 채팅방에 접어서(펼치기 인용으로 감싸서) 보내야 하는가?" },
-    { id: "kept", type: "noul", instructions: "변환된 글이 원문의 내용을 잃거나 바꾸지 않았는가?", safe: false },
-    { id: "shape", type: "noul", instructions: "접은 모양이 규칙에 맞는가 — 대화체가 접히지 않았고 결론이 접히지 않았는가?", safe: false },
   ],
   language: { korean: 0.65, english: 0.05, mixed: 0.3 },
   example: {
-    state: {
-      original: "**결론: 유닛은 다시 섰어요.**\n\n로그에 `Failed to find C compiler` 가 반복되고 있었고, 헤더가 빠져 있었습니다.",
-      candidate: "<b>결론: 유닛은 다시 섰어요.</b>\n\n로그에 <code>Failed to find C compiler</code> 가 반복되고 있었고, 헤더가 빠져 있었습니다.",
-      folded: false,
-    },
+    state: foldState("**결론: 유닛은 다시 섰어요.**\n\n로그에 `Failed to find C compiler` 가 반복되고 있었고, 헤더가 빠져 있었습니다."),
     questions: {
       fold: ask("이 메시지는 채팅방에 접어서(펼치기 인용으로 감싸서) 보내야 하는가?"),
-      kept: ask("변환된 글이 원문의 내용을 잃거나 바꾸지 않았는가?"),
-      shape: ask("접은 모양이 규칙에 맞는가 — 대화체가 접히지 않았고 결론이 접히지 않았는가?"),
     },
-    gold: { fold: noul("false", 0.21), kept: noul("true", 0.97), shape: noul("true", 0.95) },
+    gold: { fold: noul("false", 0.21) },
   },
 };
 

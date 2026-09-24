@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { foldState } from "./fold-state";
 import { layaFits } from "./laya";
 import { splitOf } from "./laya-dataset";
 import { indexOf, plainShapeLine, roomShapeLine } from "./room-shape";
@@ -31,6 +32,10 @@ export interface UnjudgedRow {
   split: DatasetSplit;
   state: LayaState;
   questions: Record<string, LayaQuestion>;
+  // What the judge reads in place of the state, for a gate whose state is a reduction of something
+  // the judge can read whole. The judgement is made on the whole and taught against the reduction,
+  // which is what the gate will be handed when it runs.
+  teacher?: LayaState;
 }
 
 // Where a row's material came from. A row built out of a room's own talk and one written by a
@@ -199,14 +204,17 @@ export function contentJudgeRows(room: readonly ArchivedMessage[], settings: Rea
   return rows;
 }
 
-// 출력 서식 — the answer as its reader saw it, the markdown it was converted from, and whether it
-// went out folded. What people received is the record of that judgement, and it outlives every log.
+// 출력 서식 — the markdown BMO wrote, what the reader saw of it and whether it went out folded. What
+// people received is the record of that judgement, and it outlives every log.
 export interface SentRow {
   original: string;
   visible: string;
   folded: boolean;
 }
 
+// The gate is shown the message reduced to its opening, its closing and its counts, so a message of
+// any length is a row; the judge reads the markdown whole. A message with no line break and no more
+// than 120 characters never reaches the gate, and is not a row of it either.
 export function outputFormatRows(sent: readonly SentRow[], settings: RealSettings): UnjudgedRow[] {
   const gate = "output-format";
   const questions = questionsOf(gate);
@@ -217,13 +225,19 @@ export function outputFormatRows(sent: readonly SentRow[], settings: RealSetting
       break;
     }
 
-    const state = { original: scrubText(one.original), candidate: scrubText(one.visible), folded: one.folded };
+    const original = scrubText(one.original);
 
-    if (state.original.trim() === "" || !layaFits({ state, questions })) {
+    if (original.trim() === "" || (!original.includes("\n") && original.length <= 120)) {
       continue;
     }
 
-    rows.push(unjudgedRowOf(gate, state, questions, settings.shares));
+    const state = foldState(original);
+
+    if (!layaFits({ state, questions })) {
+      continue;
+    }
+
+    rows.push({ ...unjudgedRowOf(gate, state, questions, settings.shares), teacher: { message: original } });
   }
 
   return rows;

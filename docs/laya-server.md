@@ -72,7 +72,8 @@ asks (BMO's `docs/laya.md`).
 
   | Training gate (`docs/laya-gates.md`) | BMO gate asking | Checkpoint |
   |---|---|---|
-  | `output-format` | `output-decide` — the decide half, asking only the fold question | served |
+  | `output-format` | `output-format` — the gate whose provider is Laya, asked the reduced state | served (`real-2-fold`) |
+  | `output-format` | `output-decide` — a BMO build older than its one formatting gate, asking the original, the converted message and the fold | served (`real-1-hand`) until no running BMO asks it |
   | `library-knowledge` | `library-knowledge` | served |
   | `room-rules` | `room-rules` | served |
   | `situation-rules` | `situation-rules` | served |
@@ -83,11 +84,10 @@ asks (BMO's `docs/laya.md`).
   | `sanitizer` | `sanitizer` | not trained |
 
 - **A checkpoint answers only the shape it was trained on.** The state a gate's probe sends must be
-  the state its training rows carry. The `output-format` checkpoint, asked the fold question over the
-  converted message alone instead of the original, the converted message and whether it is folded,
-  answers "open" to everything — a figure that looks like 0.8 agreement and is only the common
-  answer. So `output-decide` sends the training shape with `folded` false, which is where the decide
-  step stands.
+  the state its training rows carry, to the character. A checkpoint asked in another shape still
+  answers, and answers the common answer to everything — a figure that looks like 0.8 agreement and
+  is only the base rate. So the `output-format` reduction is written out in `docs/laya-gates.md` and
+  BMO builds it from the same markdown with the same fixture under test.
 - **Changing a gate's checkpoint** is `bun scripts/laya-serve.ts <training gate>/<run>/step-<n>
   --gate <gate>`, which carries the checkpoint to n6, names it there and restarts the unit
   (`docs/llm-server.md`, 「Putting a checkpoint in service」).

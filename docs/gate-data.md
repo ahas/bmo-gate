@@ -59,8 +59,9 @@ asked, with no answer on either.
   candidate being asked about twice. A room offered fewer than the gate's minimum builds no row of
   that gate at all.
 - **The formatting gate's material is what went out.** One judgement decides the fold, so the
-  message people received — its markdown, the text the reader saw, and whether it was folded — is
-  that judgement's own record, and it outlives every log.
+  markdown of every message people received is that judgement's own material, and it outlives every
+  log. A message of any length is a row, reduced to what the gate is shown; a message with no line
+  break and no more than 120 characters never reaches the gate and is not a row.
 - **Nothing is read of the brain, and nothing is written to the archive.**
 
 ## What leaves the rooms
@@ -91,6 +92,10 @@ Every label is made afresh, on a road, against the gate exactly as it stands.
 
 - **The gate's own questions ride on the row**, so the judge is shown the question in the gate's own
   words and nothing restates them.
+- **The judge reads the whole where the gate is shown a reduction.** A gate whose state is a
+  reduction of a longer text — the 출력 서식 gate, shown a message's opening, closing and counts —
+  keeps the whole beside the row, and the judge is shown that instead of the state. The verdict is
+  made on the whole and taught against the reduction, which is what the gate is handed when it runs.
 - **The answers each question may take are named outright in the prompt.** A judge left to guess the
   answers of a yes/no writes "yes" and "no", and the batch cannot be read back at all.
 - **The gold is a distribution, not one answer** — the soft target the training loop already reads —

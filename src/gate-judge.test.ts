@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { gateFor, judgeBatches, judgePrompt, judgeSystem, judgedRows, readJudgements } from "./gate-judge";
+import { gateFor, judgeBatches, judgeItemOf, judgePrompt, judgeSystem, judgedRows, readJudgements } from "./gate-judge";
 import { unjudgedRowOf } from "./real-rows";
 
 import type { JudgeItem } from "./gate-judge";
@@ -24,6 +24,15 @@ function rowOf(message: string): UnjudgedRow {
 
 const row = rowOf("[2026-06-19T08:13:20.000Z] #5512 세영 (id 3391044): 아 맞다 고마워");
 const items: JudgeItem[] = [{ id: row.id, state: row.state, questions: row.questions }];
+
+describe("judgeItemOf", () => {
+  test("the judge reads the whole a row keeps beside the reduction its gate is shown", () => {
+    const row = { ...rowOf("비모야 알려 줘"), teacher: { message: "전체 원문" } };
+
+    expect(judgeItemOf(row).state).toEqual({ message: "전체 원문" });
+    expect(judgeItemOf(rowOf("비모야 알려 줘")).state).toEqual(rowOf("비모야 알려 줘").state);
+  });
+});
 
 describe("judgePrompt", () => {
   test("names the answers outright, since a judge left to guess writes yes and no", () => {

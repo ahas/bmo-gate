@@ -33,8 +33,9 @@ export interface JudgeItem {
   questions: Record<string, LayaQuestion>;
 }
 
+// The judge reads the whole where the row keeps one beside the reduction the gate is shown.
 export function judgeItemOf(row: UnjudgedRow): JudgeItem {
-  return { id: row.id, state: row.state, questions: row.questions };
+  return { id: row.id, state: row.teacher ?? row.state, questions: row.questions };
 }
 
 // How many answers one batch may ask for at once. A batch is counted in answers rather than in

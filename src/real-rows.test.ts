@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { foldState } from "./fold-state";
 import { inTranscriptShape, languageOf, stateText, synthesisFor, validateSynthRow } from "./laya-synth";
 import { pseudonyms } from "./pii";
 import {
@@ -105,15 +106,24 @@ describe("contentJudgeRows", () => {
 });
 
 describe("outputFormatRows", () => {
-  test("carries the markdown, what the reader saw and whether it went out folded", () => {
-    const rows = outputFormatRows([{ original: "**결론**: 됐어요", visible: "결론: 됐어요", folded: true }], settings());
-    const state = rows[0]!.state as { original: string; candidate: string; folded: boolean };
+  test("the gate is shown the message reduced, and the judge reads the markdown whole", () => {
+    const original = "**결론**: 됐어요\n\n나머지는 내일 볼게요.";
+    const rows = outputFormatRows([{ original, visible: "결론: 됐어요\n\n나머지는 내일 볼게요.", folded: true }], settings());
 
-    expect(state).toEqual({ original: "**결론**: 됐어요", candidate: "결론: 됐어요", folded: true });
+    expect(rows[0]!.state).toEqual(foldState(original));
+    expect(rows[0]!.teacher).toEqual({ message: original });
+    expect(Object.keys(rows[0]!.questions)).toEqual(["fold"]);
   });
 
-  test("leaves out a message that carried no markdown of its own", () => {
+  test("a message far past one call's reach is still a row", () => {
+    const original = "긴 답의 한 줄이에요.\n".repeat(400);
+
+    expect(outputFormatRows([{ original, visible: original, folded: true }], settings())).toHaveLength(1);
+  });
+
+  test("leaves out what never reaches the gate: no markdown, or one short line", () => {
     expect(outputFormatRows([{ original: "   ", visible: "x", folded: false }], settings())).toEqual([]);
+    expect(outputFormatRows([{ original: "네, 알겠어요.", visible: "네, 알겠어요.", folded: false }], settings())).toEqual([]);
   });
 });
 

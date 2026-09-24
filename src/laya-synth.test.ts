@@ -95,7 +95,7 @@ describe("the ten gates", () => {
       .filter((spec) => spec.questions.some((question) => question.safe !== undefined))
       .map((spec) => spec.gate);
 
-    expect(asymmetric).toEqual(["output-format", "content-judge", "sanitizer", "reply-wanted"]);
+    expect(asymmetric).toEqual(["content-judge", "sanitizer", "reply-wanted"]);
   });
 
   test("the reply-wanted gate settles only that the message was not for BMO", () => {
