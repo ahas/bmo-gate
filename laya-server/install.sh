@@ -31,15 +31,16 @@ command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
 cd ~/bmo-laya
 [[ -d .venv ]] || uv venv -q -p 3.12 .venv
 uv pip install -q -p .venv -r pyproject.toml
-# The unit's own settings file: an empty checkpoint means the hub model.
-[[ -f ~/.config/bmo-laya/env ]] || printf 'LAYA_CHECKPOINT=\n' > ~/.config/bmo-laya/env
+# The unit's own settings file, the one place a gate is given its checkpoint: made naming none.
+[[ -f ~/.config/bmo-laya/env ]] || printf 'LAYA_CHECKPOINTS=""\n' > ~/.config/bmo-laya/env
 systemctl --user daemon-reload
 systemctl --user enable bmo-laya.service
 systemctl --user restart bmo-laya.service
 REMOTE
 
-# The model is loaded before the port opens, so the first health answer is the proof it is up.
-for _ in $(seq 1 90); do
+# Every checkpoint is loaded before the port opens, about twenty seconds each, so the first health
+# answer is the proof all of them are up.
+for _ in $(seq 1 180); do
   if curl -fsS -m 3 -H "Authorization: Bearer $(cat "$token_file")" "http://${node#*@}:$port/health" >/dev/null 2>&1; then
     echo "bmo-laya is up on ${node#*@}:$port"
     exit 0

@@ -24,25 +24,33 @@ asks (BMO's `docs/laya.md`).
   calls; a decision on a warm shape is not a millisecond slower than one with the kernels off. These
   are system packages and the install script is not what puts them there: the account's sudo asks for
   a password, and root on that machine is reached through WSL's own interop, `wsl.exe -u root`.
-- **What it holds:** on start it loads `laya-multilingual` from `convaiinnovations/laya` onto CUDA and
-  keeps it there, so no request ever waits for a load. It then makes one decision of its own before it
-  opens the port, so a server that answers `/health` can also decide, and one that cannot decide stops
-  and is restarted by the unit.
+- **What it holds:** one checkpoint per gate, never one shared by all of them. On start it loads
+  every checkpoint the unit's settings name (「Which checkpoint answers which gate」), one after the
+  other, and each makes one decision of its own on the card before the next is loaded. Only then does
+  it open the port, so a server that answers `/health` can decide for every gate it names, and one
+  whose checkpoint cannot decide stops and is restarted by the unit. It never falls back to the hub
+  model: a gate no checkpoint is named for is refused, not answered by another gate's checkpoint.
 - **Its environment:**
   - `USE_TF=0`, which the model card names as the cure for a load that hangs.
   - torch comes as PyPI's default build (CUDA 13), which the 3080's Windows driver runs.
-- **While it loads** (about 20 seconds from the local model cache), the port does not answer at all:
-  a call then ends by timing out rather than being turned away.
-- **A fine-tuned checkpoint** is used in place of the hub model only when the unit's environment file
-  names a checkpoint directory (「The training loop and calibration」). Nothing switches it on its own.
+- **While it loads** (about 20 seconds a checkpoint from the local disk, so a minute and a half for
+  four), the port does not answer at all: a call then ends by timing out rather than being turned
+  away.
 - **Port:** `7431` on all of home-pc's addresses, which mirrored networking puts on `192.0.2.8x`.
   Every other service on home-pc keeps off this port.
 - **One call carries at most 128 questions**; more is refused as a request it cannot read.
 - **Its two calls:**
-  - `GET /health` — the model and where it came from, the device, the VRAM the process holds, how long
-    the load took, the Laya and torch versions, and the calibration temperatures in use, if any.
-  - `POST /decide` — a state and a set of named questions in, Laya's answer for each question out, as
-    Laya gives it: the probabilities, the chosen option and the confidence.
+  - `GET /health` — for each gate it serves, the checkpoint directory, whether it is on the card now,
+    how long it took to load and the calibration temperatures it carries; beside those the device,
+    the VRAM the process holds, how many checkpoints may be on the card at once, and the Laya and
+    torch versions. Its `model` line names every gate with its checkpoint, so a change of any one of
+    them is a change of the model a watcher sees.
+  - `POST /decide` — the gate asking, a state and a set of named questions in, Laya's answer for each
+    question out, as that gate's checkpoint gives it: the probabilities, the chosen option and the
+    confidence. A call that names no gate is refused as a request it cannot read (400); one that names
+    a gate no checkpoint serves is refused as not served here (404); one whose checkpoint cannot be put
+    on the card because something else holds it is answered 503, and none of them is asked of a
+    checkpoint.
 - **Token:** every call carries a bearer token. The same token is kept in two files, each `0600`:
   `$BMO_DATA_DIR/env/laya.token` on main-host (without `BMO_DATA_DIR`,
   `~/.local/share/bmo/data/env/laya.token`), and `~/.config/bmo-laya/token` on home-pc. The token never
@@ -50,11 +58,72 @@ asks (BMO's `docs/laya.md`).
 - **Installing and updating:** `bash laya-server/install.sh` from this checkout on main-host. It makes
   the token once if there is none, copies the server and the unit across, builds or updates the venv,
   enables and restarts the unit, and waits until `/health` answers. The unit's own settings file,
-  `~/.config/bmo-laya/env`, is made empty once and never overwritten.
+  `~/.config/bmo-laya/env`, is made once naming no gate and is never overwritten.
 - **Restarting it:** over the node's SSH, `systemctl --user restart bmo-laya`; `journalctl --user -u
   bmo-laya` holds its log, one line per call and no request body.
-- **Timing a call:** `laya-server/bench.py` asks the server with 1, 10 and 50 questions on a Korean
-  state, from home-pc or from main-host.
+- **Timing a call:** `laya-server/bench.py --gates <gate>[,<gate>…]` asks the server with 1, 10 and 50
+  questions on a Korean state, from home-pc or from main-host. Given two gates it asks them in turn,
+  which times the move between the card and host memory as well as the decision.
+
+## Which checkpoint answers which gate
+
+- **One place says it:** `LAYA_CHECKPOINTS` in the unit's settings file on home-pc,
+  `~/.config/bmo-laya/env` — `gate=directory` pairs separated by spaces, the whole value in double
+  quotes. A directory that is not absolute is read from `~/bmo-laya`, where the checkpoints are kept
+  in the layout the collection keeps them in on main-host: `checkpoints/<training gate>/<run>/step-<n>`.
+  The gate on the left is the name BMO asks with, which is the gate's own key in BMO.
+- **What decides the gate on the left is BMO's key, and the directory on the right is the training
+  side's name.** Most of the two agree. Where they do not, the settings file is the one place that
+  joins them:
+
+  | Training gate (`docs/laya-gates.md`) | BMO gate asking | Checkpoint |
+  |---|---|---|
+  | `output-format` | `output-decide` — the decide half, asking only the fold question | served |
+  | `library-knowledge` | `library-knowledge` | served |
+  | `room-rules` | `room-rules` | served |
+  | `situation-rules` | `situation-rules` | served |
+  | `system-documents` | `system-documents` | none trained yet, refused |
+  | `people-search` | `people-search` | none trained yet, refused |
+  | `content-judge` | `content-judge` | trained, not served: the gate's mode is `off` |
+  | `reply-wanted` | none — no gate code in BMO | trained, not served |
+  | `sanitizer` | `sanitizer` | not trained |
+
+- **A checkpoint answers only the shape it was trained on.** The state a gate's probe sends must be
+  the state its training rows carry. The `output-format` checkpoint, asked the fold question over the
+  converted message alone instead of the original, the converted message and whether it is folded,
+  answers "open" to everything — a figure that looks like 0.8 agreement and is only the common
+  answer. So `output-decide` sends the training shape with `folded` false, which is where the decide
+  step stands.
+- **Changing a gate's checkpoint** is naming another directory there and restarting the unit; the
+  directory is carried across first (「The training loop and calibration」, step 7).
+
+## Sharing the card
+
+The 3080's 10 GB is shared with the Windows desktop (about 2.2 GB), BMO's voice server (5.7 GB of
+torch memory once it has loaded, the card then reading 8.5 GB with the desktop's share; it lets go
+after five minutes without a line) and whatever 하스 runs on it.
+
+- **What a checkpoint costs on the card:** 1.2 to 1.4 GB each as `nvidia-smi` reads it — the weights
+  are kept in 32 bits there, as Laya builds them. Four at once read 7.75 GB with the desktop's share,
+  which leaves no room for the voice server's 6.3.
+- **So one checkpoint is on the card at a time** (`LAYA_CARD_MODELS`, 1 unless the settings file
+  says more), and the others wait in host memory. That is offload and nothing else: a checkpoint's
+  weights are the same numbers wherever they wait, and its answers are the same to the last digit
+  after any number of moves, measured on four checkpoints over three rounds each.
+- **How they wait:** in pinned host memory, each weight in the 16 bits it was saved in wherever that
+  holds it exactly, and in 32 bits where it does not — so the move back reproduces the card's copy
+  bit for bit. Four checkpoints hold about 2.6 GB of host memory that way.
+- **What a move costs:** putting a checkpoint on the card takes about half a second; taking one off
+  takes a hundredth, since only the card's copy is dropped. The card's cache is let go with it, so
+  what a large call reserved goes back to the others.
+- **Which one goes:** the one asked least recently. A turn that asks two served gates pays one move
+  each; a run of calls to one gate pays none.
+- **When the card has no room** for the checkpoint asked for, every checkpoint is taken off and the
+  move tried once more; a second failure answers 503, the gate's LLM decides, and the checkpoint
+  waits in host memory for the next call.
+- **Laya's own fallback to the CPU** on a card that ran out mid-decision is undone after the call:
+  the checkpoint is put back in host memory and the next call moves it to the card again, so no gate
+  is left deciding on the CPU for the rest of the process's life.
 
 ## Measured on the 3080
 
@@ -134,11 +203,13 @@ run here trains one gate's model on a card of its own, so there is nothing for D
    checkpoint without `--write` for the base. Temperature scaling never moves an argmax, so it is the
    calibration error the fit changes and not the agreement.
 6. **Try it without putting it in service:** the server's loader can be pointed at the checkpoint in a
-   process of its own (`LAYA_CHECKPOINT=<dir>` with `server.load_decider()`), which loads it and makes
-   one decision while the unit goes on serving the hub model.
-7. **Put it in service** by naming the checkpoint directory as `LAYA_CHECKPOINT` in
-   `~/.config/bmo-laya/env` and restarting the unit. That step, like τ, waits for 하스, and `/health`
-   then names the checkpoint.
+   process of its own (`LAYA_CHECKPOINTS=<gate>=<dir>` with `server.load_decider()`), which loads it
+   and makes one decision while the unit goes on serving what it serves.
+7. **Put it in service** by carrying the collected checkpoint to home-pc with the same layout —
+   `rsync -a --relative <training gate>/<run> ahas@192.0.2.8x:bmo-laya/checkpoints/` from the
+   collection folder on main-host, over the node key — naming it for its gate in `LAYA_CHECKPOINTS`
+   (「Which checkpoint answers which gate」) and restarting the unit. `/health` then names it. Moving a
+   gate off `shadow` and its τ are BMO's settings, chosen by 하스.
 
 - **Any Linux host with a CUDA GPU and Python 3.10 or later** runs the same scripts in the same venv.
   home-pc's 3080 has the server beside it and holds a run at micro-batch 4 with the unit stopped; the
