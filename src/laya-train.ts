@@ -3,13 +3,13 @@ import { join } from "node:path";
 
 import { collectCheckpoint, collectionRoot } from "./laya-collect";
 import { splitFiles } from "./laya-frozen";
-import { homeCommand, jakeConsole, jakeExecArgs, jakeUploadArgs, parseHome } from "./jake";
+import { homeCommand, jakeConsole, nodeCalls, parseHome, runFault } from "./jake";
 import { nodePath, notTrainingNodes, printedWidth } from "./laya-nodes";
 import { rehearsalFolder, runWord } from "./laya-rehearsal";
 import { synthesisFor } from "./laya-synth";
 
 import type { DatasetSplit } from "./laya-dataset";
-import type { NodeRunner, RunResult } from "./jake";
+import type { NodeRunner } from "./jake";
 
 // One gate to one node, each node taking the next gate as its own finishes (docs/laya-train-run.md,
 // 「One gate to a node, in rounds」). This is the driver: it cuts the dataset into one folder a gate,
@@ -427,20 +427,21 @@ export async function driveGate(gate: string, node: string, round: number, optio
   const ended = (fault: string | null, state: TrainLedgerRow["state"]): TrainLedgerRow =>
     ({ ...row, state, fault, endedAt: now().toISOString() });
 
-  const exec = async (command: string) => options.runner(jakeExecArgs(options.console, node, command));
-  const out = (result: RunResult) => (result.stderr || result.stdout).trim().slice(-300);
+  const calls = nodeCalls(options.runner, options.console, node);
+  const exec = calls.exec;
 
   const asked = await exec(homeCommand());
   const home = parseHome(asked.stdout);
 
   if (home === null) {
-    return ended(`노드가 답하지 않아요 — ${out(asked)}`, "unreachable");
+    return ended(`노드가 답하지 않아요 — ${runFault(asked)}`, "unreachable");
   }
 
-  let state = parseRunState((await exec(stateCommand(options.dataset, gate))).stdout);
+  const stated = await exec(stateCommand(options.dataset, gate));
+  let state = parseRunState(stated.stdout);
 
   if (state === null) {
-    return ended("학습 상태를 읽지 못했어요. 노드에 환경이 서 있는지 보세요.", "unreachable");
+    return ended(`학습 상태를 읽지 못했어요 — ${runFault(stated)}. 노드에 환경이 서 있는지 보세요.`, "unreachable");
   }
 
   // The data goes across once, before the first launch, and never again while the run lives: a
@@ -457,11 +458,10 @@ export async function driveGate(gate: string, node: string, round: number, optio
 
     await exec(`mkdir -p ${nodePath(dataOnNode(options.dataset, gate))} ${nodePath("logs")}`);
     for (const name of Object.values(splitFiles)) {
-      const carried = await options.runner(jakeUploadArgs(
-        options.console, node, join(folder, name), `${home}/bmo-laya/${dataOnNode(options.dataset, gate)}/${name}`));
+      const carried = await calls.upload(join(folder, name), `${home}/bmo-laya/${dataOnNode(options.dataset, gate)}/${name}`);
 
       if (carried.code !== 0) {
-        return ended(`${name} 를 올리지 못했어요 — ${out(carried)}`, "failed");
+        return ended(`${name} 를 올리지 못했어요 — ${runFault(carried)}`, "failed");
       }
     }
     uploaded = true;
@@ -508,7 +508,7 @@ export async function driveGate(gate: string, node: string, round: number, optio
         : resumeCommand(options.dataset, gate, args));
 
       if (started.code !== 0) {
-        return ended(`학습을 시작하지 못했어요 — ${out(started)}`, "failed");
+        return ended(`학습을 시작하지 못했어요 — ${runFault(started)}`, "failed");
       }
     }
     if (move === "calibrate") {
@@ -533,7 +533,7 @@ export async function driveGate(gate: string, node: string, round: number, optio
         const started = await exec(calibrateCommand(options.dataset, gate, asymmetricFlags(gate)));
 
         if (started.code !== 0) {
-          return ended(`보정을 시작하지 못했어요 — ${out(started)}`, "failed");
+          return ended(`보정을 시작하지 못했어요 — ${runFault(started)}`, "failed");
         }
         calibrating = true;
       } else {
@@ -553,10 +553,11 @@ export async function driveGate(gate: string, node: string, round: number, optio
     }
 
     await wait(everyMs);
-    const read = parseRunState((await exec(stateCommand(options.dataset, gate))).stdout);
+    const reread = await exec(stateCommand(options.dataset, gate));
+    const read = parseRunState(reread.stdout);
 
     if (read === null) {
-      return ended("학습 상태를 읽지 못했어요.", "unreachable");
+      return ended(`학습 상태를 읽지 못했어요 — ${runFault(reread)}`, "unreachable");
     }
     const moved = read.lines !== state.lines || read.step !== state.step || read.training !== state.training
       || read.calibrating !== state.calibrating || read.finished !== state.finished;

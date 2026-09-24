@@ -3,10 +3,10 @@ import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync, readFile
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { homeCommand, jakeExecArgs, jakeUploadArgs, parseHome, spawnRunner } from "./jake";
+import { homeCommand, nodeCalls, parseHome, runFault, spawnRunner } from "./jake";
 import { dataPath, homeDir, sourceRoot } from "./roots";
 
-import type { NodeRunner, RunResult } from "./jake";
+import type { NodeRunner } from "./jake";
 
 // Putting the house LLM service on n6 (docs/llm-server.md, 「Installing and updating」). The node is a
 // jake node, so everything that reaches it is a command or a transfer handed to the jake console; the
@@ -227,9 +227,7 @@ export async function installLlmService(options: InstallOptions): Promise<Instal
   const wait = options.wait ?? ((ms: number) => new Promise<void>((keep) => setTimeout(keep, ms)));
   const done: InstallStep[] = [];
   const stop = (step: InstallStep, fault: string): InstallOutcome => ({ ok: false, step, fault, done });
-  const exec = (command: string) => options.runner(jakeExecArgs(options.console, node, command));
-  const upload = (local: string, remote: string) => options.runner(jakeUploadArgs(options.console, node, local, remote));
-  const out = (result: RunResult) => (result.stderr || result.stdout).trim().slice(-300);
+  const { exec, upload } = nodeCalls(options.runner, options.console, node);
 
   // 1. The key, on main-host.
   const keyed = ensureKey(options.keyPath ?? serviceKeyPath());
@@ -239,13 +237,14 @@ export async function installLlmService(options: InstallOptions): Promise<Instal
   say(keyed.made ? "서비스 키를 새로 만들었어요" : "서비스 키는 이미 있어요");
   done.push("key");
 
-  const home = parseHome((await exec(homeCommand())).stdout);
+  const asked = await exec(homeCommand());
+  const home = parseHome(asked.stdout);
   if (home === null) {
-    return stop("home", `${node} 가 답하지 않아요`);
+    return stop("home", `${node} 가 답하지 않아요 — ${runFault(asked)}`);
   }
   const made = await exec(makeDirsCommand());
   if (made.code !== 0) {
-    return stop("home", `폴더를 만들지 못했어요 — ${out(made)}`);
+    return stop("home", `폴더를 만들지 못했어요 — ${runFault(made)}`);
   }
   done.push("home");
 
@@ -257,11 +256,11 @@ export async function installLlmService(options: InstallOptions): Promise<Instal
     writeFileSync(envPath, envFileText(keyed.key, home), { mode: 0o600 });
     const carried = await upload(envPath, `${home}/${CONFIG_DIR}/env`);
     if (carried.code !== 0) {
-      return stop("env", `환경 파일을 올리지 못했어요 — ${out(carried)}`);
+      return stop("env", `환경 파일을 올리지 못했어요 — ${runFault(carried)}`);
     }
     const moded = await exec(envModeCommand());
     if (moded.code !== 0) {
-      return stop("env", `환경 파일 권한을 맞추지 못했어요 — ${out(moded)}`);
+      return stop("env", `환경 파일 권한을 맞추지 못했어요 — ${runFault(moded)}`);
     }
   } finally {
     rmSync(scratch, { recursive: true, force: true });
@@ -272,7 +271,7 @@ export async function installLlmService(options: InstallOptions): Promise<Instal
   for (const name of SERVICE_FILES) {
     const carried = await upload(join(folder, name), `${home}/${SERVICE_DIR}/${name}`);
     if (carried.code !== 0) {
-      return stop("upload", `${name} 를 올리지 못했어요 — ${out(carried)}`);
+      return stop("upload", `${name} 를 올리지 못했어요 — ${runFault(carried)}`);
     }
   }
   say(`${node}: 서비스 파일 ${SERVICE_FILES.length}개를 올렸어요`);
@@ -282,7 +281,7 @@ export async function installLlmService(options: InstallOptions): Promise<Instal
   say(`${node}: vLLM 과 모델을 세우는 중`);
   const launched = await exec(setupLaunchCommand());
   if (launched.code !== 0) {
-    return stop("setup", `설치를 시작하지 못했어요 — ${out(launched)}`);
+    return stop("setup", `설치를 시작하지 못했어요 — ${runFault(launched)}`);
   }
   let end: SetupEnd = { done: false, ok: false, fault: null };
   for (let poll = 0; poll < (options.setupPolls ?? 160) && !end.done; poll += 1) {
@@ -301,7 +300,7 @@ export async function installLlmService(options: InstallOptions): Promise<Instal
   const keyAnswer = await exec(tunnelKeyCommand(node));
   const publicKey = keyAnswer.stdout.split("\n").map((line) => line.trim()).find((line) => keyMaterial(line) !== null);
   if (keyAnswer.code !== 0 || publicKey === undefined) {
-    return stop("tunnel-key", `터널 키를 만들지 못했어요 — ${out(keyAnswer)}`);
+    return stop("tunnel-key", `터널 키를 만들지 못했어요 — ${runFault(keyAnswer)}`);
   }
   done.push("tunnel-key");
 
@@ -316,7 +315,7 @@ export async function installLlmService(options: InstallOptions): Promise<Instal
   // 7. The tunnel's door on main-host.
   const bridged = await (options.local ?? spawnRunner)(["bash", "-c", bridgeCommand(options.checkout ?? sourceRoot())]);
   if (bridged.code !== 0) {
-    return stop("bridge", `${BRIDGE_UNIT} 를 세우지 못했어요 — ${out(bridged)}`);
+    return stop("bridge", `${BRIDGE_UNIT} 를 세우지 못했어요 — ${runFault(bridged)}`);
   }
   say(`main-host 에 ${BRIDGE_UNIT} 를 세웠어요`);
   done.push("bridge");
@@ -333,7 +332,7 @@ export async function installLlmService(options: InstallOptions): Promise<Instal
     writeFileSync(hostsPath, `${pinned}\n`, { mode: 0o600 });
     const carried = await upload(hostsPath, `${home}/${CONFIG_DIR}/known_hosts`);
     if (carried.code !== 0) {
-      return stop("known-hosts", `known_hosts 를 올리지 못했어요 — ${out(carried)}`);
+      return stop("known-hosts", `known_hosts 를 올리지 못했어요 — ${runFault(carried)}`);
     }
   } finally {
     rmSync(hostScratch, { recursive: true, force: true });
@@ -343,7 +342,7 @@ export async function installLlmService(options: InstallOptions): Promise<Instal
   // 9. The units.
   const started = await exec(unitsCommand());
   if (started.code !== 0) {
-    return stop("units", `유닛을 올리지 못했어요 — ${out(started)}`);
+    return stop("units", `유닛을 올리지 못했어요 — ${runFault(started)}`);
   }
   done.push("units");
 

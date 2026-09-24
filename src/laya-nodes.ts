@@ -2,10 +2,10 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { homeCommand, jakeExecArgs, jakeUploadArgs, parseHome } from "./jake";
+import { homeCommand, nodeCalls, parseHome, runFault } from "./jake";
 import { sourceRoot } from "./roots";
 
-import type { NodeRunner, RunResult } from "./jake";
+import type { NodeRunner } from "./jake";
 
 // The training environment on the nodes that train the split gates (docs/laya-train-run.md, 「One gate
 // to a node, in rounds」): what each node carries, what has to be put there, and whether it is ready
@@ -290,8 +290,8 @@ export async function standNode(node: string, options: StandOptions): Promise<No
   const done = (outcome: Omit<NodeOutcome, "seconds">): NodeOutcome =>
     ({ ...outcome, seconds: Math.round((now() - started) / 100) / 10 });
 
-  const exec = async (command: string) => options.runner(jakeExecArgs(options.console, node, command));
-  const out = (result: RunResult) => (result.stderr || result.stdout).trim().slice(-400);
+  const calls = nodeCalls(options.runner, options.console, node);
+  const exec = calls.exec;
   const silent = (fault: string) => done({ node, probe: null, uploaded: [], setup: "unreachable", ready: false,
     fault, missing: ["살펴보기에 답하지 않아요"] });
 
@@ -300,26 +300,28 @@ export async function standNode(node: string, options: StandOptions): Promise<No
   const asked = await exec(homeCommand());
   const home = parseHome(asked.stdout);
   if (home === null) {
-    return silent(`노드가 답하지 않아요 — ${out(asked)}`);
+    return silent(`노드가 답하지 않아요 — ${runFault(asked)}`);
   }
-  const upload = async (name: string) =>
-    options.runner(jakeUploadArgs(options.console, node, join(options.folder, name), nodeFilePath(home, name)));
+  const upload = async (name: string) => calls.upload(join(options.folder, name), nodeFilePath(home, name));
 
   await exec(makeDirCommand());
   const carriedEarly: string[] = [];
-  let probe = parseProbe((await exec(probeCommand())).stdout);
+  let probed = await exec(probeCommand());
+  let probe = parseProbe(probed.stdout);
   if (probe === null) {
     // A node that will not answer a probe it does not have yet is a node we have not stood up, so the
     // probe goes across first and is asked again. Only a second silence is the node being out of reach.
     // This one file goes across even where the caller only wanted to read, since it is how a node is
     // read at all; nothing is installed and nothing else is written.
     const carried = await upload("node-probe.sh");
-    if (carried.code === 0) {
-      carriedEarly.push("node-probe.sh");
-      probe = parseProbe((await exec(probeCommand())).stdout);
+    if (carried.code !== 0) {
+      return silent(`노드가 답하지 않아요 — node-probe.sh 를 올리지 못했어요: ${runFault(carried)}`);
     }
+    carriedEarly.push("node-probe.sh");
+    probed = await exec(probeCommand());
+    probe = parseProbe(probed.stdout);
     if (probe === null) {
-      return silent("노드가 답하지 않아요");
+      return silent(`노드가 답하지 않아요 — ${runFault(probed)}`);
     }
   }
 
@@ -346,7 +348,7 @@ export async function standNode(node: string, options: StandOptions): Promise<No
     const carried = await upload(name);
     if (carried.code !== 0) {
       return done({ node, probe, uploaded, setup: "failed", ready: false, missing: before.missing,
-        fault: `${name}를 올리지 못했어요 — ${out(carried)}` });
+        fault: `${name}를 올리지 못했어요 — ${runFault(carried)}` });
     }
   }
 
@@ -357,7 +359,7 @@ export async function standNode(node: string, options: StandOptions): Promise<No
     const launched = await exec(setupLaunchCommand());
     if (launched.code !== 0) {
       return done({ node, probe, uploaded, setup: "failed", ready: false, missing: before.missing,
-        fault: `설치를 시작하지 못했어요 — ${out(launched)}` });
+        fault: `설치를 시작하지 못했어요 — ${runFault(launched)}` });
     }
   }
 

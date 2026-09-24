@@ -189,6 +189,9 @@ comparison and the verdict record. This document adds no mechanism to either.
 - **The data goes across once and is not touched again while the run lives.** A resume is bound to
   the very file its training started on, so a file put across a second time would be refused as
   another run's.
+- **A gate whose data could not be put across fails on its own.** Every transfer is bounded and made
+  twice at most (`docs/laya-server.md`), so a stalled upload costs its gate minutes and never holds
+  the pass; the gate keeps its line with the fault, and the other gates go on under the rule above.
 - **A run is detached** with `setsid` and its output redirected to a log, because the hub stops a
   command it is streaming and the stop reaches the whole process group.
 - **What to do next is read off the node**, never remembered here: a run going is left alone, a run

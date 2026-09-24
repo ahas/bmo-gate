@@ -615,6 +615,45 @@ describe("driving a whole run", () => {
     expect(ledger.rehearsal).toBe(true);
   });
 
+  test("an upload that outlived its limit is made once more and then fails its own gate alone", async () => {
+    const limits: Array<[string, number | undefined]> = [];
+    const runner: NodeRunner = async (argv, limit) => {
+      const upload = argv[2] === "upload";
+      const node = upload ? argv[6] : argv[4];
+      const command = argv[5] ?? "";
+
+      limits.push([`${node} ${argv[2]}`, limit?.ms]);
+      if (upload) {
+        return { code: 143, stdout: "", stderr: "", timedOut: { seconds: 115, bytes: 55_000_000 } };
+      }
+      if (command.startsWith("echo HOME")) {
+        return answer("HOME=/home/labuser\n");
+      }
+      if (command.includes(" state ")) {
+        return answer(node === "n3" ? stateText() : stateText({ finished: "yes", exists: "yes", step: "step-000008" }));
+      }
+      if (command.includes("-calibrate.log")) {
+        return answer(REPORT);
+      }
+      if (command.includes("-train.log")) {
+        return answer(TRAIN_META);
+      }
+
+      return answer("");
+    };
+
+    const ledger = await driveRun(["a", "b", "c"], ["n2", "n3"], driving(runner, {
+      gateFolders: { a: "/x/a", b: "/x/b", c: "/x/c" },
+    }));
+
+    expect(ledger.rows.map((row) => [row.gate, row.node, row.state])).toEqual([
+      ["a", "n2", "done"], ["b", "n3", "failed"], ["c", "n2", "done"],
+    ]);
+    expect(ledger.rows[1]!.fault).toBe("train.jsonl 를 올리지 못했어요 — 2번 해 봤어요, 마지막은 시간 초과(115초, 55,000,000바이트), 출력 없음");
+    expect(limits.filter(([call]) => call === "n3 upload")).toEqual([["n3 upload", 60_000], ["n3 upload", 60_000]]);
+    expect(limits.filter(([call]) => call.endsWith(" exec")).every(([, ms]) => ms === 360_000)).toBe(true);
+  });
+
   test("a node whose gate finished takes the next one waiting rather than standing idle", async () => {
     const polled = new Map<string, number>();
     const runner: NodeRunner = async (argv) => {

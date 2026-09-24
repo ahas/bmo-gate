@@ -2,11 +2,11 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { homeCommand, jakeDownloadArgs, jakeExecArgs, parseHome } from "./jake";
+import { homeCommand, nodeCalls, parseHome, runFault } from "./jake";
 import { nodePath, notTrainingNodes } from "./laya-nodes";
 import { workbenchPath } from "./roots";
 
-import type { NodeRunner, RunResult } from "./jake";
+import type { NodeRunner } from "./jake";
 
 // A checkpoint carried off the node that made it (docs/laya-train-run.md, 「Checkpoint naming and
 // collection」). A node that dies must not be the only copy of a step, and a checkpoint is a folder
@@ -184,8 +184,6 @@ export interface Collected {
   manifest: CheckpointManifest;
 }
 
-const out = (result: RunResult) => (result.stderr || result.stdout).trim().slice(-300);
-
 /** One checkpoint carried back whole. It is packed on the node, brought over as one file, checked
  * against the hash the node gave, unpacked under a partial name and only then given its own, so a
  * transfer cut short leaves nothing that reads as a collected checkpoint. */
@@ -206,31 +204,33 @@ export async function collectCheckpoint(ask: CollectAsk): Promise<Collected | st
       + "같은 게이트의 같은 스텝은 덮어쓰지 않아요 — 다른 이름으로 가져오거나 직접 지우고 다시 부르세요.";
   }
 
-  const exec = async (command: string) => ask.runner(jakeExecArgs(ask.console, ask.node, command));
+  const calls = nodeCalls(ask.runner, ask.console, ask.node);
+  const exec = calls.exec;
   const asked = await exec(homeCommand());
   const home = parseHome(asked.stdout);
 
   if (home === null) {
-    return `노드가 답하지 않아요 — ${out(asked)}`;
+    return `노드가 답하지 않아요 — ${runFault(asked)}`;
   }
 
   const tarball = tarballOnNode(ask.run, ask.gate, ask.step);
 
   say(`${ask.node}: ${ask.gate} ${stepName(ask.step)} 를 묶는 중`);
-  const packed = parsePacked((await exec(packCommand(ask.source, tarball, ask.checkpoint))).stdout);
+  const packing = await exec(packCommand(ask.source, tarball, ask.checkpoint));
+  const packed = parsePacked(packing.stdout);
 
   if (typeof packed === "string") {
-    return packed;
+    return packing.code === 0 ? packed : `${packed} — ${runFault(packing)}`;
   }
 
   mkdirSync(join(root, ".incoming"), { recursive: true });
   const carried = join(root, ".incoming", `${ask.run}-${ask.gate}-${stepName(ask.step)}.tar`);
 
   say(`${ask.node}: ${ask.gate} ${stepName(ask.step)} 를 가져오는 중 (${(packed.bytes / 1e6).toFixed(0)}MB)`);
-  const brought = await ask.runner(jakeDownloadArgs(ask.console, ask.node, `${home}/bmo-laya/${tarball}`, carried));
+  const brought = await calls.download(`${home}/bmo-laya/${tarball}`, carried, packed.bytes);
 
   if (brought.code !== 0) {
-    return `가져오지 못했어요 — ${out(brought)}`;
+    return `가져오지 못했어요 — ${runFault(brought)}`;
   }
   if (!existsSync(carried)) {
     return "가져왔다는데 파일이 없어요.";

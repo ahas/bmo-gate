@@ -157,6 +157,17 @@ run here trains one gate's model on a card of its own, so there is nothing for D
 - All four are jake nodes, so each is reached through its hub rather than by SSH. The console is
   the owner's jake checkout, run as `bun ~/repos/ahas/jake/src/console/main.ts`: its `exec -a <node>
   '<command>'` runs a command and `upload` / `download` carry a file across.
+- **Every call to a node is bounded by a clock, and one that outlives it is killed.** A transfer is
+  given a minute plus a second for every megabyte it carries — twenty times slower than the tunnel
+  has ever carried a file — and a command six minutes, one more than the hub itself streams one for.
+  A call that stood silent past that would otherwise hold whatever waits on it for as long as nobody
+  noticed. The fault it leaves says the limit and the bytes: the file's size for a transfer, what the
+  command had answered for a command.
+- **A failed call says why.** Its fault carries the exit code and the tail of what the console wrote
+  to stderr, or to stdout where stderr was empty, and says so where it wrote nothing at all.
+- **A transfer that failed is made once more** before its caller hears of it, since most of what
+  breaks one is the tunnel of the moment. A second failure is the caller's to handle, and says that
+  it was the second.
 - **What a node carries is read off the node, not from here.** The GPU, the free VRAM, the CUDA and
   python versions and the installed package versions move with the machine, so the setup verb reports
   the nodes side by side rather than this document stating them (`docs/laya-train-run.md`).
