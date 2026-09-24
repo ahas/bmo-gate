@@ -69,6 +69,9 @@ export interface GateSynthesis {
   questions: readonly SynthQuestion[];
   // How many candidates one row offers, for a gate that asks per candidate.
   candidates: { min: number; max: number } | null;
+  // The word a reference gate's probe calls its candidates by — 「문서 structure: …」 — for a gate
+  // whose one question is asked of each candidate beside that candidate's index line.
+  candidateWord?: string;
   // The share of this gate's rows written in each language, and why, from the specification.
   language: Readonly<Record<LanguageBucket, number>>;
   // A worked row, which stands in the prompt's fixed prefix and is checked by this module's own
@@ -652,6 +655,7 @@ const systemDocuments: GateSynthesis = {
   transcript: { shape: "plain", fields: [] },
   perCandidate: true,
   candidates: { min: 2, max: 80 },
+  candidateWord: "문서",
   questions: [{ id: "needed", type: "noul", instructions: "이 대화에 답하려면 이 참고 문서가 필요한가?" }],
   language: { korean: 0.7, english: 0.1, mixed: 0.2 },
   example: {
@@ -683,6 +687,7 @@ const roomRules: GateSynthesis = {
   transcript: { shape: "plain", fields: [] },
   perCandidate: true,
   candidates: { min: 1, max: 20 },
+  candidateWord: "규칙",
   questions: [{ id: "needed", type: "noul", instructions: "이 대화에 답하려면 이 방 규칙이 필요한가?" }],
   language: { korean: 0.8, english: 0.05, mixed: 0.15 },
   example: {
@@ -704,6 +709,7 @@ const libraryKnowledge: GateSynthesis = {
   transcript: { shape: "plain", fields: [] },
   perCandidate: true,
   candidates: { min: 1, max: 30 },
+  candidateWord: "문서",
   questions: [{ id: "needed", type: "noul", instructions: "이 대화에 답하려면 이 지식 문서가 필요한가?" }],
   language: { korean: 0.75, english: 0.08, mixed: 0.17 },
   example: {
@@ -895,6 +901,7 @@ const personBook: GateSynthesis = {
   transcript: { shape: "plain", fields: [] },
   perCandidate: true,
   candidates: { min: 2, max: 20 },
+  candidateWord: "기록",
   questions: [{ id: "needed", type: "noul", instructions: "이 대화에 답하려면 이 인물 기록이 필요한가?" }],
   language: { korean: 0.8, english: 0.05, mixed: 0.15 },
   example: {

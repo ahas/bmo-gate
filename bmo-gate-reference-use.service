@@ -1,0 +1,19 @@
+[Unit]
+Description=bmo-gate-reference-use — 참조 게이트의 새 턴을 답이 실제로 쓴 문서로 판정하고, 쌓인 만큼 학습하는 한 회차
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/repos/ahas/bmo-gate
+Environment=PATH=%h/.bun/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+# Building a turn needs 하스's and 비모's own numbers, and asking Laya needs the address BMO asks it
+# at; both are the bot's own settings and are read from where the bot reads them.
+EnvironmentFile=%h/.local/share/bmo/data/env/bot.env
+# First the turns no frozen batch carries are judged and the gate batches frozen; a batch that failed
+# is taken up by the next hour's run, so it does not stop the training pass after it. Then one curve
+# pass over the run, holding each gate to its rows and to the questions of its rarer answer
+# (docs/reference-use.md 「Keeping it growing」).
+ExecStart=-%h/.bun/bin/bun scripts/reference-use.ts use-1
+ExecStart=%h/.bun/bin/bun scripts/laya-curve.ts %h/.local/share/bmo/data/reference-use/use-1 --rarer 200
+TimeoutStartSec=infinity

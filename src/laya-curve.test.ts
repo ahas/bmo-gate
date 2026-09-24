@@ -16,8 +16,8 @@ import type { TrainLedger, TrainLedgerRow } from "./laya-train";
 const rule: CurveRule = { floor: 100, growth: 1.25 };
 const started = "2026-09-23T13:23:29.866Z";
 
-function count(gate: string, train: number, calibration: number, test: number, since = started): MergedPart {
-  return { gate, rows: { train, calibration, test }, finished: false, started: since };
+function count(gate: string, train: number, calibration: number, test: number, since = started, rarer = 20): MergedPart {
+  return { gate, rows: { train, calibration, test }, finished: false, started: since, rarer };
 }
 
 function point(gate: string, rows: number, state: CurvePoint["state"] = "done", pass = 1): CurvePoint {
@@ -41,6 +41,13 @@ describe("which gates a pass trains", () => {
 
     expect(choice.train).toEqual([]);
     expect(choice.waiting[0]!.reason).toBe("test 분할이 비어 있음");
+  });
+
+  test("a gate over the row floor waits while its rarer answer is short of its own floor", () => {
+    const held = { ...rule, rarer: 30 };
+
+    expect(choosePass([count("a", 200, 10, 10, started, 29)], [], held).waiting[0]!.reason).toBe("드문 답 29개, 최소 30개 미달");
+    expect(choosePass([count("a", 200, 10, 10, started, 30)], [], held).train.map((one) => one.gate)).toEqual(["a"]);
   });
 
   test("a gate with no point yet is trained as soon as it clears the floor", () => {

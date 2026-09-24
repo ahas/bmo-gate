@@ -3,13 +3,14 @@ import { createHash } from "node:crypto";
 import { candidateOf, datasetRowOf, languageOf, stateText, synthesisFor, validateSynthRow } from "./laya-synth";
 import { jsonArrayIn, jsonObjectsIn } from "./laya-teach";
 import { scrubText } from "./pii";
-import { turnEndingAt } from "./real-rows";
+import { offeredSets, turnEndingAt } from "./real-rows";
 import { plainShapeLine } from "./room-shape";
 
 import type { ArchivedMessage } from "./archive";
 import type { DatasetRow, Gold, SplitShares } from "./laya-dataset";
 import type { LayaQuestion, LayaRequest } from "./laya";
 import type { GateSynthesis, SynthRefusal } from "./laya-synth";
+import type { FrozenRow } from "./laya-synth-run";
 import type { ShapeWho } from "./room-shape";
 
 // Whether the answer BMO sent used the pieces a reference gate attached (docs/reference-use.md).
@@ -49,8 +50,13 @@ export const charsPerBatch = 60_000;
 export const replyBoundSeconds = 1_800;
 export const turnGapSeconds = 600;
 
+// Where a turn was read from: BMO's per-candidate reference record, or the agent log's runs of the
+// classifier the four gates replaced.
+export type TurnSource = "record" | "log";
+
 // One row of BMO's per-candidate reference record, as this measure reads it.
 export interface RecordedCandidate {
+  source: TurnSource;
   stage: string;
   chatId: number;
   messageId: number;
@@ -86,13 +92,16 @@ export interface UseCandidate {
 
 export interface UseTurn {
   id: string;
+  source: TurnSource;
   chatId: number;
   messageId: number;
   // The turn's own messages as the judge reads them, and as a training row's state is built.
   lines: string[];
   reply: string;
   candidates: UseCandidate[];
-  probes: Partial<Record<UseGate, LayaRequest>>;
+  // Every probe input the turn kept for a gate: one, or one for each call a gate too large for a
+  // single call was split into.
+  probes: Partial<Record<UseGate, LayaRequest[]>>;
 }
 
 export interface UseReads {
@@ -187,7 +196,7 @@ export function useTurns(reads: UseReads, who: ShapeWho & { bmoId: number }): Tu
     byTurn.set(key, [...(byTurn.get(key) ?? []), one]);
   }
 
-  const probes = new Map<string, Partial<Record<UseGate, LayaRequest>>>();
+  const probes = new Map<string, Partial<Record<UseGate, LayaRequest[]>>>();
 
   for (const one of reads.probes()) {
     if (!isUseGate(one.stage)) {
@@ -195,8 +204,14 @@ export function useTurns(reads: UseReads, who: ShapeWho & { bmoId: number }): Tu
     }
 
     const key = turnKey(one.chatId, one.messageId);
+    const held = probes.get(key) ?? {};
+    const asked = held[one.stage] ?? [];
+    const questions = JSON.stringify(Object.keys(one.request.questions));
 
-    probes.set(key, { ...probes.get(key), [one.stage]: one.request });
+    // The same input recorded twice is one call, not two.
+    if (!asked.some((request) => JSON.stringify(Object.keys(request.questions)) === questions)) {
+      probes.set(key, { ...held, [one.stage]: [...asked, one.request] });
+    }
   }
 
   const rooms = new Map<number, ArchivedMessage[]>();
@@ -260,15 +275,16 @@ export function useTurns(reads: UseReads, who: ShapeWho & { bmoId: number }): Tu
     }
 
     for (const gate of useGates) {
-      const request = turnProbes[gate];
-
-      for (const slug of request === undefined ? [] : probeSlugs(specOf(gate), request)) {
-        add(gate, slug, false, false);
+      for (const request of turnProbes[gate] ?? []) {
+        for (const slug of probeSlugs(specOf(gate), request)) {
+          add(gate, slug, false, false);
+        }
       }
     }
 
     turns.push({
       id: key,
+      source: recorded[0]!.source,
       chatId,
       messageId,
       lines: turnEndingAt(room, at, who.bmoId, turnGapSeconds).map((one) => plainShapeLine(one, who)),
@@ -279,6 +295,108 @@ export function useTurns(reads: UseReads, who: ShapeWho & { bmoId: number }): Tu
   }
 
   return { turns, skipped };
+}
+
+// The piece one context line of BMO's turn run names: a path whose last part is the piece's slug, or
+// a root document's file name, which is its slug in upper case.
+export function contextSlug(text: string): string {
+  return (text.split("/").at(-1) ?? text).replace(/\.md$/i, "").toLowerCase();
+}
+
+// The headings the classifier's prompt put each library under, and the gate that library is now.
+// They are words the log wrote rather than a choice made here, so they are matched as written.
+const classifierHeadings: readonly (readonly [string, UseGate])[] = [
+  ["# System reference index", "system-documents"],
+  ["# Room rules", "room-rules"],
+  ["# Knowledge index", "library-knowledge"],
+];
+
+// An index line in the shape every library writes one, and a slug as an answer names it.
+const indexLine = /^- ([a-z0-9-]+)(?:\s+(\[[^\]]*\]))?\s+—\s+(.+)$/;
+const slugWord = /^[a-z0-9][a-z0-9-]*$/;
+
+// One run of the classifier the four gates replaced, as the agent log kept it.
+export interface LoggedClassifierRun {
+  chatId: number;
+  messageId: number;
+  prompt: string;
+  // Whether the log kept the prompt whole rather than cutting it short.
+  whole: boolean;
+  answer: string;
+}
+
+// Why a logged run is no turn: its prompt was cut, its answer was a failure rather than a choice, or
+// no turn run of BMO says what reached the prompt.
+export type LogSkip = "cut" | "failed" | "noContext";
+
+export interface LoggedTurn {
+  candidates: RecordedCandidate[];
+  probes: RecordedProbe[];
+}
+
+// A probe's question about one candidate, in the words BMO's reference probe puts it in: the gate's
+// own question, the word the gate calls a candidate by, the slug and what its index line says.
+export function probeQuestion(gate: UseGate, slug: string, about: string): LayaQuestion {
+  const spec = specOf(gate);
+
+  return { type: "noul", instructions: `${spec.questions[0]!.instructions} ${spec.candidateWord ?? ""} ${slug}: ${about}` };
+}
+
+// A classifier run as the record would have kept it: every candidate under the gate its heading
+// names, the classifier's pick as the LLM's yes, what the turn run's context lines name as attached,
+// and a probe rebuilt for each gate that was offered something.
+export function classifierTurn(run: LoggedClassifierRun, attached: ReadonlySet<string> | null): LoggedTurn | LogSkip {
+  const parts = run.whole ? /^INDEX:\n([\s\S]*)\n\nMESSAGES:\n([\s\S]*)$/.exec(run.prompt) : null;
+
+  if (parts === null) {
+    return "cut";
+  }
+
+  const offered = new Map<UseGate, { slug: string; about: string }[]>();
+  let gate: UseGate | null = null;
+
+  for (const line of parts[1]!.split("\n")) {
+    if (line.startsWith("# ")) {
+      gate = classifierHeadings.find(([heading]) => line.startsWith(heading))?.[1] ?? null;
+      continue;
+    }
+
+    const entry = indexLine.exec(line.trim());
+    const held = gate === null ? [] : offered.get(gate) ?? [];
+
+    if (gate !== null && entry !== null && !held.some((one) => one.slug === entry[1])) {
+      offered.set(gate, [...held, { slug: entry[1]!, about: entry[3]! }]);
+    }
+  }
+
+  const said = run.answer.trim();
+  const picked = said === "none" ? [] : said.split(/[\n,]/).map((one) => one.trim()).filter((one) => one !== "");
+  const slugs = new Set([...offered.values()].flat().map((one) => one.slug));
+
+  if (said === "" || !picked.every((slug) => slugWord.test(slug) && slugs.has(slug))) {
+    return "failed";
+  }
+
+  if (attached === null) {
+    return "noContext";
+  }
+
+  const chosen = new Set(picked);
+  const where = { chatId: run.chatId, messageId: run.messageId };
+
+  return {
+    candidates: [...offered].flatMap(([stage, entries]) => entries.map((one) => ({
+      source: "log" as const, stage, ...where, slug: one.slug, llm: chosen.has(one.slug), attached: attached.has(one.slug),
+    }))),
+    probes: [...offered].map(([stage, entries]) => ({
+      stage,
+      ...where,
+      request: {
+        state: parts[2]!,
+        questions: Object.fromEntries(entries.map((one) => [one.slug, probeQuestion(stage, one.slug, one.about)])),
+      },
+    })),
+  };
 }
 
 // What one turn is shown as. Which side picked what is never in it.
@@ -576,24 +694,24 @@ export function clearingTau(figures: GateFigures, bar: number): TauFigures | nul
 }
 
 export interface TrainingOutcome {
-  rows: DatasetRow[];
+  rows: FrozenRow[];
   refusals: Partial<Record<SynthRefusal | "no-probe" | "unlabelled", number>>;
 }
 
-// The use verdicts as training rows: the turn rebuilt in the plain shape, the turn's own questions,
-// and a gold out of each question's label.
+// The use verdicts as training rows: the turn rebuilt in the plain shape, the turn's own questions
+// cut into sets its gate's specification offers, and a gold out of each question's label.
 export function trainingRows(gate: UseGate, turns: readonly UseTurn[], shares: SplitShares): TrainingOutcome {
   const spec = specOf(gate);
-  const rows: DatasetRow[] = [];
+  const rows: FrozenRow[] = [];
   const refusals: TrainingOutcome["refusals"] = {};
   const count = (why: keyof TrainingOutcome["refusals"]): void => {
     refusals[why] = (refusals[why] ?? 0) + 1;
   };
 
   for (const turn of turns) {
-    const request = turn.probes[gate];
+    const requests = turn.probes[gate] ?? [];
 
-    if (request === undefined) {
+    if (requests.length === 0) {
       if (turn.candidates.some((one) => one.gate === gate)) {
         count("no-probe");
       }
@@ -602,38 +720,76 @@ export function trainingRows(gate: UseGate, turns: readonly UseTurn[], shares: S
     }
 
     const labels = new Map(turn.candidates.filter((one) => one.gate === gate).map((one) => [one.slug, one.label]));
-    const gold: Record<string, Gold> = {};
-    let whole = true;
+    const state = turn.lines.join("\n");
+    const language = languageOf(stateText(spec, state));
 
-    for (const id of Object.keys(request.questions)) {
-      const label = labels.get(candidateOf(spec, id)?.slug ?? "") ?? null;
+    for (const request of requests) {
+      const sets = offeredSets(spec, request.questions);
 
-      if (label === null) {
-        whole = false;
-        break;
+      if (sets.length === 0) {
+        count("candidate-count");
       }
 
-      const yes = goldShare(label);
+      for (const questions of sets) {
+        const gold: Record<string, Gold> = {};
+        let whole = true;
 
-      gold[id] = { type: "noul", label: yes >= 0.5 ? "true" : "false", noul: yes, probabilities: { true: yes, false: Math.round((1 - yes) * 100) / 100 } };
+        for (const id of Object.keys(questions)) {
+          const label = labels.get(candidateOf(spec, id)?.slug ?? "") ?? null;
+
+          if (label === null) {
+            whole = false;
+            break;
+          }
+
+          const yes = goldShare(label);
+
+          gold[id] = { type: "noul", label: yes >= 0.5 ? "true" : "false", noul: yes, probabilities: { true: yes, false: Math.round((1 - yes) * 100) / 100 } };
+        }
+
+        if (!whole) {
+          count("unlabelled");
+          continue;
+        }
+
+        const row = { state, questions, gold };
+        const verdict = validateSynthRow(spec, row, language);
+
+        if (!verdict.ok) {
+          count(verdict.refusal);
+          continue;
+        }
+
+        rows.push({ row: datasetRowOf(spec, row, shares), language });
+      }
     }
-
-    if (!whole) {
-      count("unlabelled");
-      continue;
-    }
-
-    const state = turn.lines.join("\n");
-    const row = { state, questions: request.questions as Record<string, LayaQuestion>, gold };
-    const verdict = validateSynthRow(spec, row, languageOf(stateText(spec, state)));
-
-    if (!verdict.ok) {
-      count(verdict.refusal);
-      continue;
-    }
-
-    rows.push(datasetRowOf(spec, row, shares));
   }
 
   return { rows, refusals };
+}
+
+// How a gate's rows answer: questions whose gold leans yes, no, or neither, and the rows holding at
+// least one yes. The yes answers are the rarer ones for every reference gate, and their count is what
+// says whether the gate has anything to learn from yet.
+export interface AnswerCounts {
+  rows: number;
+  rowsWithYes: number;
+  yes: number;
+  no: number;
+  contested: number;
+}
+
+export function answerCounts(rows: readonly DatasetRow[]): AnswerCounts {
+  const counts: AnswerCounts = { rows: rows.length, rowsWithYes: 0, yes: 0, no: 0, contested: 0 };
+
+  for (const row of rows) {
+    const golds = Object.values(JSON.parse(row.gold) as Record<string, { noul?: number }>).map((one) => one.noul ?? 0.5);
+
+    counts.yes += golds.filter((yes) => yes > 0.5).length;
+    counts.no += golds.filter((yes) => yes < 0.5).length;
+    counts.contested += golds.filter((yes) => yes === 0.5).length;
+    counts.rowsWithYes += golds.some((yes) => yes > 0.5) ? 1 : 0;
+  }
+
+  return counts;
 }

@@ -52,6 +52,9 @@ export interface MergedPart {
   // When the gate's writing began. A gate started over is a new series of rows, and this is what
   // tells two cuts of the same gate apart as belonging to one series or not.
   started: string;
+  // How many questions carry the gate's rarer answer, across every split. A question counts toward
+  // the answer its gold gives at three to one or more, so a contested gold counts toward neither.
+  rarer: number;
 }
 
 // What a gate's frozen folder holds, as the merge reads it.
@@ -240,12 +243,32 @@ function readParts(root: string, gates: readonly string[] | null, growing: boole
   return refuseDisagreement(parts) ?? parts;
 }
 
+const leaning = 0.75;
+
+function rarerOf(rows: readonly DatasetRow[]): number {
+  const answered = new Map<string, number>();
+
+  for (const row of rows) {
+    for (const gold of Object.values(JSON.parse(row.gold) as Record<string, { probabilities?: Record<string, number> }>)) {
+      const [answer, share] = Object.entries(gold.probabilities ?? {}).reduce<[string, number]>(
+        (best, one) => one[1] > best[1] ? one : best, ["", 0]);
+
+      if (share >= leaning) {
+        answered.set(answer, (answered.get(answer) ?? 0) + 1);
+      }
+    }
+  }
+
+  return answered.size < 2 ? 0 : Math.min(...answered.values());
+}
+
 function countsOf(part: GatePart): MergedPart {
   return {
     gate: part.gate,
     rows: { train: part.rows.train.length, calibration: part.rows.calibration.length, test: part.rows.test.length },
     finished: part.finished,
     started: part.meta.started,
+    rarer: rarerOf([...part.rows.train, ...part.rows.calibration, ...part.rows.test]),
   };
 }
 

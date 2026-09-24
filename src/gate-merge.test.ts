@@ -5,7 +5,7 @@ import { describe, expect, test } from "bun:test";
 
 import { auditFrozen } from "./laya-audit";
 import { driveGates } from "./gate-run";
-import { frozenGatesUnder, gatesTrainingWouldRefuse, mergeGates, readsAsRehearsal } from "./gate-merge";
+import { frozenGatesUnder, gatesTrainingWouldRefuse, growingCounts, mergeGates, readsAsRehearsal } from "./gate-merge";
 import { rehearsalMetaFile } from "./laya-rehearsal";
 import { batchName, freezeBatch, languageFile, metaFile, writeProgress } from "./laya-synth-run";
 import { splitFiles } from "./laya-frozen";
@@ -469,6 +469,25 @@ describe("a cut taken while the judging goes on", () => {
     return folder;
   }
 
+  test("counts the questions of the rarer answer, a contested gold toward neither", () => {
+    const root = scratch();
+    const folder = judgingGate(root, []);
+    const gold = (yes: number) => ({ type: "noul", noul: yes, probabilities: { true: yes, false: 1 - yes } });
+
+    freezeBatch(folder, "sanitizer", 0, [
+      { a: gold(0.95), b: gold(0.05), c: gold(0.5) },
+      { a: gold(0.05), b: gold(0.2) },
+      { a: gold(0.9) },
+    ].map((golds, at) => ({
+      row: { id: `sanitizer:r${at}`, gate: "sanitizer", split: "train", state: "s", questions: "{}", gold: JSON.stringify(golds) },
+      language: "korean" as const,
+    })));
+
+    const counts = growingCounts(root);
+
+    expect(typeof counts === "string" ? counts : counts.map((one) => one.rarer)).toEqual([2]);
+  });
+
   test("a gate still being judged is refused without the word, and the refusal names it", () => {
     const root = scratch();
 
@@ -488,6 +507,7 @@ describe("a cut taken while the judging goes on", () => {
 
     expect(typeof report === "string" ? report : report.parts).toEqual([{
       gate: "sanitizer", rows: { train: 2, calibration: 0, test: 2 }, finished: false, started: "2026-09-23T13:23:29.866Z",
+      rarer: 0,
     }]);
     expect(rowsIn(datasetFolder(root), "test").map((row) => row.id)).toEqual(["sanitizer:0-1", "sanitizer:1-1"]);
     expect(existsSync(join(folder, splitFiles.train))).toBe(false);

@@ -15,12 +15,13 @@ import { dataPath, runFolder, sourceRoot } from "../src/roots";
 // their last point, and writes a point a gate into the curve. The timer `bmo-gate-curve` runs it,
 // so the curve grows with the judging and nobody has to start it.
 
-const usage = `usage: bun scripts/laya-curve.ts <실행> [--node <노드>]… [--floor <행>] [--growth <배수>] [--dry-run] [--show]
+const usage = `usage: bun scripts/laya-curve.ts <실행> [--node <노드>]… [--floor <행>] [--rarer <개>] [--growth <배수>] [--dry-run] [--show]
 
 판정 중인 게이트를 지금까지 굳은 묶음까지로 잘라, 지난 회차보다 충분히 자란 게이트만 학습시키고
 회차마다 게이트별 행 수·일치도·균형 정확도·보정 오차를 곡선 원장에 남긴다.
 --node 없이는 ${TRAINING_NODES.join(", ")} 가운데 비어 있고 준비된 노드를 쓴다.
 --floor 는 세우는 최소 행 수(기본 ${curveFloor}), --growth 는 다시 학습하기까지 늘어야 하는 배수(기본 ${curveGrowth}).
+--rarer 는 게이트의 드문 답이 적어도 몇 문항이어야 세우는지(기본 0, 행 수만 본다).
 --dry-run 은 이번 회차에 무엇을 학습시킬지만 보이고 아무것도 건드리지 않는다.
 --show 는 지금까지의 곡선만 보인다.`;
 
@@ -31,7 +32,9 @@ if (asksUsage(argv)) {
   process.exit(0);
 }
 
-const reading = readFlags(argv, { "--node": true, "--floor": true, "--growth": true, "--dry-run": false, "--show": false });
+const reading = readFlags(argv, {
+  "--node": true, "--floor": true, "--rarer": true, "--growth": true, "--dry-run": false, "--show": false,
+});
 
 if (!reading.ok || reading.loose.length !== 1) {
   console.error(`laya-curve: ${reading.trouble ?? "실행 하나를 주세요."}`);
@@ -44,9 +47,10 @@ const run = basename(root);
 const curve = dataPath("laya-curve", run);
 const floor = Number(lastOf(reading, "--floor") ?? curveFloor);
 const growth = Number(lastOf(reading, "--growth") ?? curveGrowth);
+const rarer = Number(lastOf(reading, "--rarer") ?? "0");
 
-if (!Number.isInteger(floor) || floor < 1 || !Number.isFinite(growth) || growth <= 1) {
-  console.error("laya-curve: --floor 는 1 이상의 정수, --growth 는 1 보다 큰 수여야 해요.");
+if (!Number.isInteger(floor) || floor < 1 || !Number.isInteger(rarer) || rarer < 0 || !Number.isFinite(growth) || growth <= 1) {
+  console.error("laya-curve: --floor 는 1 이상의 정수, --rarer 는 0 이상의 정수, --growth 는 1 보다 큰 수여야 해요.");
   process.exit(2);
 }
 
@@ -67,7 +71,7 @@ if (argv.includes("--dry-run")) {
     process.exit(1);
   }
 
-  const choice = choosePass(counts, readCurve(curve), { floor, growth });
+  const choice = choosePass(counts, readCurve(curve), { floor, growth, rarer });
 
   for (const one of choice.waiting) {
     say(`${one.gate}: ${one.rows}행 — ${one.reason}`);
@@ -103,7 +107,7 @@ const report = await runPass({
   run,
   curve,
   trainingRoot: (training) => dataPath("laya-runs", training),
-  rule: { floor, growth },
+  rule: { floor, growth, rarer },
   // A node is stood up before it is given a gate — the files that differ from this checkout go
   // across — and a node whose card is busy is left out of this pass rather than shared.
   nodes: async () => {

@@ -52,6 +52,8 @@ account level, rides the J3090 road instead.
   main-host, symlinked the same way by the install.
 - `bmo-gate-curve.service` and its `.timer` run a training pass every thirty minutes while the
   judging goes on, symlinked the same way.
+- `bmo-gate-reference-use.service` and its `.timer` judge the reference gates' new turns by what
+  BMO's answer used and run a training pass over them every hour, symlinked the same way.
 
 ## Checking a change
 

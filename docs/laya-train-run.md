@@ -241,6 +241,11 @@ they grow, and every training leaves a point on a curve of what more data buys.
   hundred and fifty test rows; with the rarer answer a fifth of them, one standard error of the
   balanced accuracy is about four points there and widens past five under a hundred rows. Below the
   floor two passes would differ by chance more than by what the data taught.
+- **A pass may also hold a gate to its rarer answer**, with `--rarer <개>`: the gate waits until that
+  many of its questions carry the answer its rows give least, a question counting toward the answer
+  its gold gives at three to one or more. The row floor reckons with the rarer answer a fifth of the
+  rows; a gate whose rarer answer is a few in a hundred clears the rows with too little of it to learn
+  from or to be measured on. Without the flag a gate is held to its rows alone.
 - **A gate is trained again once it has grown by a quarter** since its last point. A learning curve
   moves with the logarithm of the data, so points a constant ratio apart are evenly spaced along it,
   and the cost of every pass a gate ever gets is bounded by a few times the cost of its last one

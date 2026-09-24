@@ -100,6 +100,10 @@ function total(rows: Record<DatasetSplit, number>): number {
 export interface CurveRule {
   floor: number;
   growth: number;
+  // The fewest questions of its rarer answer a gate is trained on, or zero to hold it to its rows
+  // alone. The row floor reckons with the rarer answer a fifth of the rows; a gate whose rarer answer
+  // is a few in a hundred clears it with too little of that answer to learn or to be measured on.
+  rarer?: number;
 }
 
 export interface PassChoice {
@@ -131,6 +135,11 @@ export function choosePass(counts: readonly MergedPart[], points: readonly Curve
       choice.waiting.push({ gate: count.gate, rows, reason: empty.length > 0 && rows >= rule.floor
         ? `${empty.join(", ")} 분할이 비어 있음`
         : `최소 ${rule.floor}행 미달` });
+      continue;
+    }
+
+    if (count.rarer < (rule.rarer ?? 0)) {
+      choice.waiting.push({ gate: count.gate, rows, reason: `드문 답 ${count.rarer}개, 최소 ${rule.rarer}개 미달` });
       continue;
     }
 

@@ -4,12 +4,13 @@ import { join } from "node:path";
 
 import { pseudonyms } from "./pii";
 import {
-  attachedLabels, clearingTau, gateFigures, goldShare, layaAnswersOf, offeredLabels, readUseAnswer, replyAfter,
-  trainingRows, useBatches, useItem, usePrompt, useSystem, useTurns,
+  answerCounts, attachedLabels, classifierTurn, clearingTau, contextSlug, gateFigures, goldShare, layaAnswersOf, offeredLabels,
+  probeQuestion, readUseAnswer, replyAfter, trainingRows, useBatches, useItem, usePrompt, useSystem, useTurns,
 } from "./reference-use";
 import { sourceRoot } from "./roots";
 
 import type { ArchivedMessage } from "./archive";
+import type { LayaRequest } from "./laya";
 import type { LayaAnswers, RecordedCandidate, RecordedProbe, UseReads, UseTurn } from "./reference-use";
 
 const ownerId = 90000001;
@@ -45,7 +46,7 @@ function reads(room: ArchivedMessage[], candidates: RecordedCandidate[], probes:
 }
 
 function recorded(messageId: number, slug: string, llm: boolean, attached: boolean | null): RecordedCandidate {
-  return { stage: "library-knowledge", chatId, messageId, slug, llm, attached };
+  return { source: "record", stage: "library-knowledge", chatId, messageId, slug, llm, attached };
 }
 
 describe("the judge's words", () => {
@@ -116,6 +117,7 @@ describe("the turns", () => {
 function turnOf(id: string, candidates: [string, boolean, boolean, string | null][], probed = true): UseTurn {
   return {
     id,
+    source: "record",
     chatId,
     messageId: 10,
     lines: ["사람1 (id 1): 노드 GPU 몇 장이야?"],
@@ -123,7 +125,7 @@ function turnOf(id: string, candidates: [string, boolean, boolean, string | null
     candidates: candidates.map(([slug, llm, attached, label]) => ({
       gate: "library-knowledge" as const, slug, line: slug, llm, attached, body: null, bodyHash: null, label: label as never,
     })),
-    probes: probed ? { "library-knowledge": probe(10, candidates.map(([slug]) => slug)).request } : {},
+    probes: probed ? { "library-knowledge": [probe(10, candidates.map(([slug]) => slug)).request] } : {},
   };
 }
 
@@ -181,11 +183,93 @@ describe("the training rows", () => {
     expect(outcome.refusals).toEqual({ unlabelled: 1, "no-probe": 1 });
     expect(outcome.rows).toHaveLength(1);
 
-    const gold = JSON.parse(outcome.rows[0]!.gold) as Record<string, { label: string; noul: number }>;
+    const gold = JSON.parse(outcome.rows[0]!.row.gold) as Record<string, { label: string; noul: number }>;
 
     expect([gold.a1!.label, gold.b1!.label, gold.c1!.noul]).toEqual(["true", "false", 0.95]);
-    expect(outcome.rows[0]!.id.startsWith("library-knowledge:")).toBe(true);
+    expect(outcome.rows[0]!.row.id.startsWith("library-knowledge:")).toBe(true);
+    expect(outcome.rows[0]!.language).toBe("korean");
     expect(goldShare("related")).toBe(0.5);
+  });
+
+  test("cut a person-book turn's probe inputs into rows of at most the gate's twenty, read together", () => {
+    const slugs = Array.from({ length: 45 }, (_, at) => `p${at}`);
+    const ask = (taken: readonly string[]): LayaRequest => ({
+      state: "사람1 (id 1): 걔 생일 언제였지?",
+      questions: Object.fromEntries(taken.map((slug) => [slug, probeQuestion("people-search", slug, `${slug} 기록`)])),
+    });
+    const turn: UseTurn = {
+      ...turnOf("t1", []),
+      candidates: slugs.map((slug, at) => ({
+        gate: "people-search" as const, slug, line: slug, llm: at === 0, attached: at === 0, body: null, bodyHash: null,
+        label: at === 0 ? "used" as const : "not-needed" as const,
+      })),
+      probes: { "people-search": [ask(slugs.slice(0, 30)), ask(slugs.slice(30))] },
+    };
+    const outcome = trainingRows("people-search", [turn], shares);
+
+    expect(outcome.rows.map((one) => Object.keys(JSON.parse(one.row.questions) as object).length)).toEqual([20, 10, 15]);
+    expect(answerCounts(outcome.rows.map((one) => one.row))).toEqual({ rows: 3, rowsWithYes: 1, yes: 1, no: 44, contested: 0 });
+  });
+});
+
+describe("turns read out of the agent log", () => {
+  const prompt = [
+    "INDEX:",
+    "# System reference index",
+    "",
+    "- This is the index of the system's own reference documents.",
+    "",
+    "## The system",
+    "",
+    "- structure — what a chat provider and a gate are",
+    "- wording — how Korean text spells loanwords",
+    "",
+    "# Room rules — 90000001",
+    "",
+    "- infra-work-procedure — infra, server, docs · 2026-09",
+    "",
+    "# Knowledge index",
+    "",
+    "- compute-nodes-gpu [chat:90000001] — compute nodes, GPU · 2026-09",
+    "",
+    "MESSAGES:",
+    "ahas (id 90000001): 노드 GPU 몇 장이야?",
+  ].join("\n");
+  const run = { chatId, messageId: 10, prompt, whole: true, answer: "compute-nodes-gpu,infra-work-procedure" };
+
+  test("a whole run is every heading's candidates, the pick as the LLM's yes and the context line as attached", () => {
+    const turn = classifierTurn(run, new Set(["compute-nodes-gpu", "sheet"]));
+
+    if (typeof turn === "string") {
+      throw new Error(turn);
+    }
+
+    expect(turn.candidates.map((one) => [one.source, one.stage, one.slug, one.llm, one.attached])).toEqual([
+      ["log", "system-documents", "structure", false, false],
+      ["log", "system-documents", "wording", false, false],
+      ["log", "room-rules", "infra-work-procedure", true, false],
+      ["log", "library-knowledge", "compute-nodes-gpu", true, true],
+    ]);
+    expect(turn.probes.map((one) => one.stage)).toEqual(["system-documents", "room-rules", "library-knowledge"]);
+    expect(turn.probes[2]!.request).toEqual({
+      state: "ahas (id 90000001): 노드 GPU 몇 장이야?",
+      questions: {
+        "compute-nodes-gpu": { type: "noul", instructions: "이 대화에 답하려면 이 지식 문서가 필요한가? 문서 compute-nodes-gpu: compute nodes, GPU · 2026-09" },
+      },
+    });
+  });
+
+  test("a cut prompt, a failed answer and a turn no run says the attachments of are no turn", () => {
+    expect(classifierTurn({ ...run, whole: false }, new Set())).toBe("cut");
+    expect(classifierTurn({ ...run, answer: "no answer (timeout)" }, new Set())).toBe("failed");
+    expect(classifierTurn({ ...run, answer: "pizza" }, new Set())).toBe("failed");
+    expect(classifierTurn(run, null)).toBe("noContext");
+    expect(classifierTurn({ ...run, answer: "none" }, new Set())).not.toBeTypeOf("string");
+  });
+
+  test("a context line names its piece by the last part of its path", () => {
+    expect(contextSlug("STRUCTURE.md")).toBe("structure");
+    expect(contextSlug("/home/x/brain/rooms/-1/rules/parts-quote.md")).toBe("parts-quote");
   });
 });
 
