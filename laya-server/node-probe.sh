@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# What one training node carries, read and never changed (docs/laya-train-run.md, 「One gate to a node,
-# in rounds」). One `key=value` a line, every value present — what is missing says `none` rather than
+# What one training node carries, read and never changed (docs/training.md, 「The nodes」).
+# One `key=value` a line, every value present — what is missing says `none` rather than
 # leaving its line out, so the reader never has to tell an absent value from an absent line.
 set -uo pipefail
 

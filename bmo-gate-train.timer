@@ -1,5 +1,5 @@
 [Unit]
-Description=bmo-gate-curve — 30분마다 학습 회차가 필요한지 본다
+Description=bmo-gate-train — 30분마다 학습 회차가 필요한지 본다
 
 [Timer]
 # Every thirty minutes after the last pass ended, so a long pass is never stacked on by the next.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# A checkpoint made ready to be carried off the node it was made on (docs/laya-train-run.md,
+# A checkpoint made ready to be carried off the node it was made on (docs/training.md,
 # 「Checkpoint naming and collection」):
 #
 #   node-collect.sh pack  <체크포인트> <꾸러미> [final|step]   한 꾸러미로 묶고 크기와 해시를 말한다

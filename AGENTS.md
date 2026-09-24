@@ -16,18 +16,20 @@ account level, rides the J3090 road instead.
 
 ## The documents, which come before the code
 
-- `docs/gate-data.md` — the rows: where they come from, what leaves the rooms with them, how they are
-  judged, the roads, a run and its folders, the bars a gate must clear, and the commands.
+- `docs/gate-data.md` — the rows of every gate but the four reference gates: where they come from,
+  what leaves the rooms with them, how they are judged, the roads, a run and its folders, the bars a
+  gate must clear, and the commands.
+- `docs/reference-data.md` — the four reference gates' data: the turns, the input BMO's own code
+  builds for them, whether the answer used or needed each piece, the labels that are all it keeps,
+  the rows made afresh every pass, the figures, and the hourly pass.
 - `docs/laya-gates.md` — the specification the rows answer to: what each of the ten gates receives,
   asks, and may answer, and the language mix and answer balance its data is drawn to.
-- `docs/laya-train-run.md` — the run across the four training nodes: the rehearsal, the checkpoints
-  and their collection, the resume contract, the ledger, the two tables a gate is judged on, and the
-  passes that train the gates while their judging runs and keep the score curve.
+- `docs/training.md` — how a gate's data becomes a calibrated checkpoint and a table: the sources, when
+  a gate is trained, a pass over the four training nodes, one gate's run on a node, the settings, the
+  resume contract, the collection, the ledger and the curve, the tables, and the rehearsal.
 - `docs/laya-server.md` — the server, which checkpoint answers which gate, how the card is shared,
   what it was measured at on n6, the training loop and its fixed settings, the calibration, and what
   the savings cost.
-- `docs/reference-use.md` — whether BMO's answers used what the four reference gates attached: the
-  judgement, its words, the figures read off it, its training shape, and what it measured.
 - `docs/llm-server.md` — the Laya service on n6: the machine, the engine, the front with its MCP
   tools and OpenAI-compatible call, the units, the tunnel that is its door, the key, the install,
   putting a checkpoint in service, and the checks.
@@ -36,9 +38,9 @@ account level, rides the J3090 road instead.
 
 - Bun and TypeScript, no runtime dependencies.
 - `src/` holds the generator, the freezing and resume machinery, the audit, the two roads (codex and
-  J3090), the rehearsal, the training driver, the checkpoint collection, the verification tables, the
-  jake console plumbing that drives the nodes, the service's install steps, carrying a checkpoint
-  into service, and the tunnel's door on main-host.
+  J3090), the rehearsal, the checkpoint collection, the jake console plumbing that drives the nodes,
+  the service's install steps, carrying a checkpoint into service, and the tunnel's door on
+  main-host. `src/reference/` is the reference gates' data and `src/train/` the training driver.
 - `scripts/` holds the commands. Each takes `--help`.
 - `laya-server/` holds the Python server and the training and calibration scripts. It is a virtual
   environment of its own on the machine it runs on and shares nothing with the Bun side.
@@ -52,10 +54,11 @@ account level, rides the J3090 road instead.
   directory. A full run is a day's work and belongs to no session.
 - `bmo-llm-bridge.service` runs `scripts/llm-bridge.ts`, the service's tunnel door on
   main-host, symlinked the same way by the install.
-- `bmo-gate-curve.service` and its `.timer` run a training pass every thirty minutes while the
-  judging goes on, symlinked the same way.
-- `bmo-gate-reference-use.service` and its `.timer` judge the reference gates' new turns by what
-  BMO's answer used and run a training pass over them every hour, symlinked the same way.
+- `bmo-gate-train.service` and its `.timer` run a training pass over the judging run every thirty
+  minutes, symlinked the same way.
+- `bmo-gate-reference-data.service` and its `.timer` make a pass of the reference gates' data and
+  then a training pass over it every hour, symlinked the same way. The data pass reads BMO's
+  `scripts/reference-inputs.ts` in BMO's live checkout.
 
 ## Checking a change
 

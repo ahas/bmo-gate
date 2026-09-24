@@ -1,0 +1,18 @@
+[Unit]
+Description=bmo-gate-reference-data — 참조 게이트 데이터를 BMO 입력으로 다시 조립하고 빠진 라벨을 판정한 뒤, 자란 만큼 학습하는 한 회차
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/repos/ahas/bmo-gate
+Environment=PATH=%h/.bun/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+# Reading a turn needs 하스's and 비모's own numbers, and BMO's input script reads the bot's own
+# settings; both come from where the bot reads them.
+EnvironmentFile=%h/.local/share/bmo/data/env/bot.env
+# First the pass of the data: every turn, BMO's inputs for it today, at most sixty turns' missing
+# labels judged, and every gate's rows put in place whole. A batch that failed is asked again next
+# hour, so it does not stop the training pass after it (docs/reference-data.md 「Keeping it growing」).
+ExecStart=-%h/.bun/bin/bun scripts/reference-data.ts ref-1
+ExecStart=%h/.bun/bin/bun scripts/laya-train.ts reference:ref-1
+TimeoutStartSec=infinity

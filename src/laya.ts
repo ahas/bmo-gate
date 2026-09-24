@@ -1,6 +1,6 @@
 // What the Laya checkpoint reads of one call, and whether a row fits inside it. Only the reach is
 // here: this repository writes rows for the filter to be trained on and asks it only to measure a
-// checkpoint (docs/reference-use.md), so the client, the modes, the τ comparison and the verdict
+// checkpoint (docs/reference-data.md, 「The figures」), so the client, the modes, the τ comparison and the verdict
 // record are BMO's and stay there.
 
 export type LayaState = string | Record<string, unknown> | readonly unknown[];

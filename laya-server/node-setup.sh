@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# The training environment on one node, stood up from what is already there (docs/laya-train-run.md,
-# 「One gate to a node, in rounds」). It is run detached with its output in setup.log, because
+# The training environment on one node, stood up from what is already there (docs/training.md,
+# 「The nodes」). It is run detached with its output in setup.log, because
 # installing torch takes longer than the hub holds a streamed command open, and it says
 # `LAYA-SETUP-DONE ok` or `LAYA-SETUP-DONE failed:<step>` on its last line, which is what the caller
 # waits for.

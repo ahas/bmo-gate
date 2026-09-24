@@ -141,7 +141,7 @@ units this repository runs on main-host:
   `claude mcp add --transport http laya http://127.0.0.1:18010/mcp --header "Authorization: Bearer …"`.
 - **The public name is the tunnel's door, never the service's.** What answers on it is the bridge, and
   what the bridge reaches is SSH, which still asks for n6's tunnel key under the restricted entry.
-- **Why the door is inside the house:** every caller — BMO, this repository's own reference-use unit,
+- **Why the door is inside the house:** every caller — BMO, this repository's own reference-data unit,
   and a Claude Code session — runs on main-host, where the tunnel lands. A public name, a proxy host
   and a certificate in front of the service would stand in front of no caller.
 - **Why the key is still checked:** both ends of the tunnel are shared. n6 carries a second login
@@ -203,8 +203,8 @@ installer leaves them alone:
 ## Putting a checkpoint in service
 
 `bun scripts/laya-serve.ts <training gate>/<run>/step-<n> [--gate <gate>]` carries one collected
-checkpoint from the collection on main-host (`docs/laya-train-run.md`, 「Where the checkpoints are
-collected」) to n6.
+checkpoint from the collection on main-host (`docs/training.md`, 「Checkpoint naming and
+collection」) to n6.
 
 - **The carrying:** the checkpoint is packed here as one tar and hashed, and crosses with
   `jake upload` in parts of 96 MB, since the hub turns away a request body past 128 MB. On n6 the parts
@@ -221,7 +221,7 @@ collected」) to n6.
 ## n6 carries no training
 
 - **n6 is the service's machine.** Laya's training and measurement run on n2 to n5 only
-  (`docs/laya-train-run.md`). The Laya node commands refuse n6 by name, because the served
+  (`docs/training.md`). The Laya node commands refuse n6 by name, because the served
   checkpoints hold its card and a training run there would take it from them.
 - **Putting training back on n6** takes, in order:
   1. Point BMO's `BMO_LAYA_URL` at another Laya server, since its calls would otherwise go

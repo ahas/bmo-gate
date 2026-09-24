@@ -7,8 +7,8 @@ import { sourceRoot } from "./roots";
 
 import type { NodeRunner } from "./jake";
 
-// The training environment on the nodes that train the split gates (docs/laya-train-run.md, 「One gate
-// to a node, in rounds」): what each node carries, what has to be put there, and whether it is ready
+// The training environment on the nodes that train the split gates (docs/training.md, 「The
+// nodes」): what each node carries, what has to be put there, and whether it is ready
 // to take a gate. A node is reached through its jake hub rather than by SSH, so everything here is a
 // command handed to the jake console and an answer read back from it.
 //

@@ -11,7 +11,7 @@ checkpoint's own temperatures and under the fitted ones; `--write` puts the fitt
 checkpoint's rl_agent_config.json.
 
 It also writes the machine-readable report the verification table is assembled from
-(docs/laya-train-run.md, 「The two tables」): per gate the agreement plain and balanced, the
+(docs/training.md, 「The tables」): per gate the agreement plain and balanced, the
 calibration error and the counts behind them, the same figures for the base model measured on the
 very same rows so the difference is computed rather than left to a reader, and — for a gate that
 declares one answer settleable — how many calls that answer would have missed at each threshold.

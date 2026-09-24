@@ -263,39 +263,42 @@ gate on each road, same bar, same audit.
 ## 1. 시스템 문서 분류기
 
 - **Status:** a gate of its own, on the key `system-documents`, with a probe of its own.
-- **Input:** the turn's messages in the plain shape, and every system reference the room offers as a
-  candidate — the root documents named in the system reference index, and the lore pieces in a room
-  that reads the lore. Each candidate carries its slug and the one line its index says about it.
+- **Input:** the turn's messages in the plain shape, and the system references the room offers that
+  BMO's narrowing keeps for the turn — the root documents named in the system reference index, and
+  the lore pieces in a room that reads the lore. Each candidate carries its slug and the one line its
+  index says about it. The input is BMO's own, byte for byte (`docs/reference-data.md`, 「The input」).
 - **Question:** one yes/no per candidate — 「이 대화에 답하려면 이 참고 문서가 필요한가?」 — named by the
   candidate's own slug.
 - **Answers:** the set of slugs answered yes, or none. Two verdicts agree when the two sets are equal.
 - **Asymmetry:** none. Neither answer is the safe one: a document wrongly left out costs an answer
   written without it, and one wrongly carried costs prompt room, and neither is the kind of harm that
   makes a verdict settleable on its own.
-- **Candidates per row:** 2 to 80. A room that does not read the lore offers only the system
-  reference index's own slugs, which are few; a room that reads it offers the lore's chunks beside
-  them, which are many. Both ends are real and the data carries both.
+- **Candidates per row:** 1 to 128 — whatever the narrowing keeps, capped at one Laya call. A room
+  that does not read the lore offers only the system reference index's own slugs, which are few; a
+  room that reads it offers the lore's chunks beside them, which are many. Both ends are real and the
+  data carries both.
 
 ## 2. 방 규칙 분류기
 
 - **Status:** a gate of its own, on the key `room-rules`, with a probe of its own.
-- **Input:** the turn's messages in the plain shape, and the room's own rule pieces as candidates,
-  each with its slug and its index line. A room with no rulebook offers none and is not asked.
+- **Input:** the turn's messages in the plain shape, and the room's own rule pieces BMO's narrowing
+  keeps for the turn as candidates, each with its slug and its index line. A room with no rulebook
+  offers none and is not asked.
 - **Question:** one yes/no per candidate — 「이 대화에 답하려면 이 방 규칙이 필요한가?」
 - **Answers:** the set of slugs answered yes, or none.
 - **Asymmetry:** none.
-- **Candidates per row:** 1 to 20.
+- **Candidates per row:** 1 to 128 — whatever the narrowing keeps.
 
 ## 3. 서고 지식 분류기
 
 - **Status:** a gate of its own, on the key `library-knowledge`, with a probe of its own.
 - **Input:** the turn's messages in the plain shape, and the knowledge library's pieces that this room
-  may see — the ones its index marks for this room or as shared — each with its slug and its index
-  line.
+  may see — the ones its index marks for this room or as shared — that BMO's narrowing keeps for the
+  turn, each with its slug and its index line.
 - **Question:** one yes/no per candidate — 「이 대화에 답하려면 이 지식 문서가 필요한가?」
 - **Answers:** the set of slugs answered yes, or none.
 - **Asymmetry:** none.
-- **Candidates per row:** 1 to 30.
+- **Candidates per row:** 1 to 128 — whatever the narrowing keeps.
 
 ## 4. 상황 규칙 매칭기
 
@@ -374,14 +377,14 @@ gate on each road, same bar, same audit.
 
 - **Status:** a gate of its own, on the key `people-search`, with a probe shaped like the reference
   splits'.
-- **Input:** the turn's messages in the plain shape, and the person-book pieces the room offers as
-  candidates: the room's own pieces about the people in it, and the common pieces of each person who
-  has spoken in that room. Each candidate carries its slug, whose person it is about, and its index
-  line.
+- **Input:** the turn's messages in the plain shape, and the person-book pieces the room offers that
+  BMO's narrowing keeps for the turn: the room's own pieces about the people in it, and the common
+  pieces of each person who has spoken in that room. Each candidate carries its slug, whose person it
+  is about, and its index line.
 - **Question:** one yes/no per candidate — 「이 대화에 답하려면 이 인물 기록이 필요한가?」
 - **Answers:** the set of slugs answered yes, or none.
 - **Asymmetry:** none.
-- **Candidates per row:** 2 to 20.
+- **Candidates per row:** 1 to 128 — whatever the narrowing keeps, which for a large book is the cap.
 
 ## 9. 응답 여부 판정기
 

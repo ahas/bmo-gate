@@ -1,0 +1,80 @@
+import { describe, expect, test } from "bun:test";
+
+import { contextSlug, readTurns, replyAfter } from "./turns";
+
+import type { ArchivedMessage } from "../archive";
+import type { RecordedPick, TurnReads, TurnScope } from "./turns";
+
+const bmo = 900;
+const chat = -7;
+
+function said(messageId: number, senderId: number, sentAt: number, text = `말 ${messageId}`): ArchivedMessage {
+  return { chatId: chat, messageId, senderId, senderName: senderId === bmo ? "BMO" : `사람${senderId}`, sentAt, text, imagePath: null, replyToMessageId: null };
+}
+
+function reads(room: ArchivedMessage[], scopes: TurnScope[] = [], contexts = new Map<string, Set<string>>(), recorded = new Map<string, RecordedPick[]>()): TurnReads {
+  return { rooms: () => [chat], room: () => room, scopes: () => scopes, contexts: () => contexts, recorded: () => recorded };
+}
+
+describe("replyAfter", () => {
+  test("takes BMO's first run after the message, up to somebody else's next word", () => {
+    const room = [said(1, 5, 0), said(2, bmo, 10, "하나"), said(3, bmo, 12, "둘"), said(4, 5, 20)];
+
+    expect(replyAfter(room, 0, bmo)).toBe("하나\n\n둘");
+  });
+
+  test("finds none past the bound", () => {
+    expect(replyAfter([said(1, 5, 0), said(2, bmo, 4_000)], 0, bmo)).toBeNull();
+  });
+});
+
+describe("readTurns", () => {
+  test("a turn run's scope names its messages exactly, and its context lines say what attached", () => {
+    const room = [said(1, 5, 0), said(2, 6, 5), said(3, bmo, 20), said(4, 5, 100)];
+    const built = readTurns(reads(room, [{ run: "r1", chatId: chat, messageIds: [2, 1] }], new Map([["r1", new Set(["structure"])]])), bmo);
+
+    expect(built.turns).toHaveLength(1);
+    expect(built.turns[0]).toMatchObject({ key: `${chat}:2`, messageIds: [1, 2], source: "run", reply: "말 3" });
+    expect([...built.turns[0]!.attached!]).toEqual(["structure"]);
+  });
+
+  test("an answered run before the room's first scope is rebuilt, its attachments unknown", () => {
+    const room = [said(1, 5, 0), said(2, 6, 5), said(3, bmo, 20), said(4, 5, 1_000), said(5, bmo, 1_010)];
+    const built = readTurns(reads(room, [{ run: "r1", chatId: chat, messageIds: [4] }]), bmo);
+    const answered = built.turns.find((turn) => turn.source === "answered")!;
+
+    expect(answered).toMatchObject({ key: `${chat}:2`, messageIds: [1, 2], attached: null });
+    expect(built.turns.map((turn) => turn.key)).toEqual([`${chat}:4`, `${chat}:2`]);
+  });
+
+  test("after a room's first scope, BMO speaking unasked is no turn", () => {
+    const room = [said(1, 5, 0), said(2, bmo, 5), said(3, 5, 100), said(4, bmo, 110)];
+    const built = readTurns(reads(room, [{ run: "r1", chatId: chat, messageIds: [1] }]), bmo);
+
+    expect(built.turns.map((turn) => turn.key)).toEqual([`${chat}:1`]);
+  });
+
+  test("a message the gates were asked about whose run left no scope is a turn on the record's word", () => {
+    const room = [said(1, 5, 0), said(2, 5, 30), said(3, bmo, 40)];
+    const picks: RecordedPick[] = [{ gate: "room-rules", slug: "quiet", llm: true, attached: true }];
+    const built = readTurns(reads(room, [{ run: "r1", chatId: chat, messageIds: [1, 2] }], new Map(), new Map([[`${chat}:1`, picks]])), bmo);
+    const record = built.turns.find((turn) => turn.source === "record")!;
+
+    expect(record).toMatchObject({ key: `${chat}:1`, messageIds: [1], recorded: picks });
+    expect([...record.attached!]).toEqual(["quiet"]);
+  });
+
+  test("a turn with no reply inside the bound is left out and counted", () => {
+    const built = readTurns(reads([said(1, 5, 0), said(2, bmo, 5_000)], [{ run: "r", chatId: chat, messageIds: [1] }]), bmo);
+
+    expect(built.turns).toEqual([]);
+    expect(built.skipped.noReply).toBe(1);
+  });
+});
+
+describe("contextSlug", () => {
+  test("reads a piece's slug off a path, and a root document's off its file name", () => {
+    expect(contextSlug("/brain/rooms/-7/rules/quiet.md")).toBe("quiet");
+    expect(contextSlug("STRUCTURE.md")).toBe("structure");
+  });
+});

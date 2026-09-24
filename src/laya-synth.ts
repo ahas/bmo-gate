@@ -123,8 +123,9 @@ export function answersOf(question: SynthQuestion): string[] {
 }
 
 // A per-candidate gate names its questions after the candidate: one question a candidate is the
-// slug alone, several are the slug and the question's own name.
-const slugShape = /^[a-z0-9][a-z0-9-]{1,48}$/;
+// slug alone, several are the slug and the question's own name. A slug is as long as BMO's writers
+// made it; what bounds a question is what one Laya call reads, and that is checked on its own.
+const slugShape = /^[a-z0-9][a-z0-9-]+$/;
 
 export function candidateOf(gate: GateSynthesis, questionId: string): { slug: string; id: string } | null {
   if (!gate.perCandidate) {
@@ -655,7 +656,7 @@ const systemDocuments: GateSynthesis = {
   textFields: [],
   transcript: { shape: "plain", fields: [] },
   perCandidate: true,
-  candidates: { min: 2, max: 80 },
+  candidates: { min: 1, max: 128 },
   candidateWord: "문서",
   questions: [{ id: "needed", type: "noul", instructions: "이 대화에 답하려면 이 참고 문서가 필요한가?" }],
   language: { korean: 0.7, english: 0.1, mixed: 0.2 },
@@ -687,7 +688,7 @@ const roomRules: GateSynthesis = {
   textFields: [],
   transcript: { shape: "plain", fields: [] },
   perCandidate: true,
-  candidates: { min: 1, max: 20 },
+  candidates: { min: 1, max: 128 },
   candidateWord: "규칙",
   questions: [{ id: "needed", type: "noul", instructions: "이 대화에 답하려면 이 방 규칙이 필요한가?" }],
   language: { korean: 0.8, english: 0.05, mixed: 0.15 },
@@ -709,7 +710,7 @@ const libraryKnowledge: GateSynthesis = {
   textFields: [],
   transcript: { shape: "plain", fields: [] },
   perCandidate: true,
-  candidates: { min: 1, max: 30 },
+  candidates: { min: 1, max: 128 },
   candidateWord: "문서",
   questions: [{ id: "needed", type: "noul", instructions: "이 대화에 답하려면 이 지식 문서가 필요한가?" }],
   language: { korean: 0.75, english: 0.08, mixed: 0.17 },
@@ -895,7 +896,7 @@ const personBook: GateSynthesis = {
   textFields: [],
   transcript: { shape: "plain", fields: [] },
   perCandidate: true,
-  candidates: { min: 2, max: 20 },
+  candidates: { min: 1, max: 128 },
   candidateWord: "기록",
   questions: [{ id: "needed", type: "noul", instructions: "이 대화에 답하려면 이 인물 기록이 필요한가?" }],
   language: { korean: 0.8, english: 0.05, mixed: 0.15 },

@@ -8,10 +8,11 @@ import {
 } from "../src/laya-collect";
 import { jakeConsole, spawnRunner } from "../src/jake";
 import { notTrainingNodes } from "../src/laya-nodes";
-import { checkpointOnNode, readTrainLedger } from "../src/laya-train";
 import { dataPath } from "../src/roots";
+import { checkpointOnNode, stepFolder } from "../src/train/gate-run";
+import { readLedger } from "../src/train/ledger";
 
-// A checkpoint carried off the node that made it (docs/laya-train-run.md, 「Checkpoint naming and
+// A checkpoint carried off the node that made it (docs/training.md, 「Checkpoint naming and
 // collection」). Node-local is not enough: a node that dies must not be the only copy of a step.
 //
 // usage: bun scripts/laya-collect.ts --node <노드> --gate <게이트> --run <이름> --step <n> [--kind final|step] [--overwrite]
@@ -81,10 +82,10 @@ if (kind !== "final" && kind !== "step") {
 }
 
 // The ledger of the run says whether it was a rehearsal; without one the caller says so itself.
-const ledger = readTrainLedger(dataPath("laya-runs", run));
+const ledger = readLedger(dataPath("laya-runs", run));
 const row = ledger?.rows.find((one) => one.gate === gate);
 const source = value("--source")
-  ?? (kind === "final" ? checkpointOnNode(run, gate) : `${checkpointOnNode(run, gate)}/steps/step-${String(step).padStart(6, "0")}`);
+  ?? (kind === "final" ? checkpointOnNode(run, gate) : `${checkpointOnNode(run, gate)}/steps/${stepFolder(step)}`);
 
 const collected = await collectCheckpoint({
   runner: spawnRunner,
@@ -95,7 +96,7 @@ const collected = await collectCheckpoint({
   step,
   checkpoint: kind,
   source,
-  dataset: value("--dataset") ?? row?.dataset ?? run,
+  dataset: value("--dataset") ?? row?.pass ?? run,
   rehearsal: row?.rehearsal ?? ledger?.rehearsal ?? false,
   overwrite: argv.includes("--overwrite"),
   root,

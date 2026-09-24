@@ -5,7 +5,7 @@ import { gateSyntheses } from "../src/laya-synth";
 import { dataPath, refuseInsideCheckout } from "../src/roots";
 
 // The rehearsal dataset the training machinery is put through its paces on
-// (docs/laya-train-run.md, 「The data it trains on」): the ten gates' three splits, written here with
+// (docs/training.md, 「Rehearsal」): the ten gates' three splits, written here with
 // no model asked and no archive read, every row marked as a rehearsal.
 //
 // It is not training data and no figure measured on it is a gate's. What it is for is the resume,

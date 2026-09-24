@@ -5,7 +5,7 @@ import { inTranscriptShape, languageOf, stateText, synthesisFor, validateSynthRo
 import { pseudonyms } from "./pii";
 import {
   candidateSetsByRoom, contentJudgeRows, newestFitting, offeredSets, outputFormatRows, realRows,
-  realSourceGates, referenceRows, replyWantedRows, situationRows, unjudgedRowOf,
+  realSourceGates, replyWantedRows, situationRows, unjudgedRowOf,
 } from "./real-rows";
 
 import type { ArchivedMessage } from "./archive";
@@ -127,91 +127,39 @@ describe("outputFormatRows", () => {
   });
 });
 
-const candidates: Record<string, LayaQuestion> = {
-  "bmo-speech-patterns": { type: "noul", instructions: "이 대화에 답하려면 이 참고 문서가 필요한가? 문서 bmo-speech-patterns: 비모가 말하는 방식" },
-  "ooo-geography": { type: "noul", instructions: "이 대화에 답하려면 이 참고 문서가 필요한가? 문서 ooo-geography: 우 대륙의 지리" },
-};
-
-describe("referenceRows", () => {
-  test("reads the turn in the plain shape and offers what that room was really offered", () => {
-    const rows = referenceRows("system-documents", room, [candidates], settings());
-
-    expect(rows.length).toBeGreaterThan(0);
-    expect(inTranscriptShape("plain", rows[0]!.state as string)).toBe(true);
-    expect(Object.keys(rows[0]!.questions)).toEqual(Object.keys(candidates));
-  });
-
-  test("offers nothing where the room was never recorded offering anything", () => {
-    expect(referenceRows("system-documents", room, [], settings())).toEqual([]);
-  });
-
-  test("leaves BMO's own words out of the lines, since the gate is picking documents about the people who spoke", () => {
-    const rows = referenceRows("system-documents", room, [candidates], settings());
-
-    expect(rows.every((row) => !(row.state as string).includes("일곱 시로 잡아 둘까요?"))).toBe(true);
-  });
-});
+// A room's standing rules as the situation-rule matcher is offered them: two questions of each.
+function rulesOf(many: number): Record<string, LayaQuestion> {
+  return Object.fromEntries(Array.from({ length: many }, (_, at) => [
+    [`rule-${at}:applies`, { type: "noul" as const, instructions: `이 규칙의 조건이 지금 상황에 맞는가? 규칙 rule-${at}: 저녁 약속이 잡히면 알려 준다` }],
+    [`rule-${at}:spent`, { type: "noul" as const, instructions: `이 규칙은 이제 안 써도 되는가? 규칙 rule-${at}: 저녁 약속이 잡히면 알려 준다` }],
+  ]).flat());
+}
 
 describe("offeredSets", () => {
-  const people = synthesisFor("people-search")!;
   const situation = synthesisFor("situation-rules")!;
 
-  function bookOf(many: number): Record<string, LayaQuestion> {
-    return Object.fromEntries(Array.from({ length: many }, (_, at) => [
-      `p51078230-piece-${at}`,
-      { type: "noul" as const, instructions: "이 대화에 답하려면 이 인물 기록이 필요한가? 기록" },
-    ]));
-  }
+  test("cuts a set past what the gate offers into sets the gate accepts, counting candidates rather than questions", () => {
+    const sets = offeredSets(situation, rulesOf(24));
 
-  test("cuts a set past what the gate offers into sets the gate accepts", () => {
-    const sets = offeredSets(people, bookOf(80));
-
-    expect(sets.length).toBe(4);
-    expect(sets.every((set) => Object.keys(set).length === people.candidates!.max)).toBe(true);
+    expect(sets.length).toBe(3);
+    expect(sets.every((set) => Object.keys(set).length === situation.candidates!.max * 2)).toBe(true);
   });
 
   test("offers nothing where the room was recorded offering fewer than the gate's least", () => {
-    expect(offeredSets(people, bookOf(1))).toEqual([]);
+    expect(offeredSets(situation, rulesOf(1))).toEqual([]);
   });
 
   test("reaches back over the group before it rather than dropping a short remainder", () => {
-    const sets = offeredSets(people, bookOf(21));
+    const sets = offeredSets(situation, rulesOf(17));
 
-    expect(sets.map((set) => Object.keys(set).length)).toEqual([20, 2]);
-    expect(Object.keys(sets[1]!)).toEqual(["p51078230-piece-19", "p51078230-piece-20"]);
-  });
-
-  test("counts candidates rather than questions where a gate asks several of each", () => {
-    const rules = Object.fromEntries(Array.from({ length: 10 }, (_, at) => [
-      [`rule-${at}:applies`, { type: "noul" as const, instructions: "이 규칙의 조건이 지금 상황에 맞는가?" }],
-      [`rule-${at}:spent`, { type: "noul" as const, instructions: "이 규칙은 이제 안 써도 되는가?" }],
-    ]).flat());
-    const sets = offeredSets(situation, rules);
-
-    expect(sets.map((set) => Object.keys(set).length)).toEqual([16, 4]);
-  });
-
-  test("every set it cuts stands as its own gate's row", () => {
-    for (const set of offeredSets(people, bookOf(80))) {
-      const gold = Object.fromEntries(Object.keys(set).map((id) => [
-        id,
-        { type: "noul" as const, label: "true" as const, noul: 0.9, probabilities: { true: 0.9, false: 0.1 } },
-      ]));
-      const verdict = validateSynthRow(people, { state: "세영 (id 3391044): 비모야 유진이 번호 뭐였지", questions: set, gold }, "korean");
-
-      expect(verdict.ok ? "ok" : `${verdict.refusal} — ${verdict.detail}`).toBe("ok");
-    }
+    expect(sets.map((set) => Object.keys(set).length)).toEqual([16, 16, 4]);
+    expect(Object.keys(sets[2]!)).toEqual(["rule-15:applies", "rule-15:spent", "rule-16:applies", "rule-16:spent"]);
   });
 });
 
 describe("candidateSetsByRoom", () => {
   test("keeps a room's sets under the room that was offered them, cut to what the gate offers", () => {
-    const people = synthesisFor("people-search")!;
-    const book = Object.fromEntries(Array.from({ length: 40 }, (_, at) => [
-      `p51078230-piece-${at}`,
-      { type: "noul" as const, instructions: "이 대화에 답하려면 이 인물 기록이 필요한가? 기록" },
-    ]));
-    const byRoom = candidateSetsByRoom(people, [{ chatId: -1_000, questions: book }]);
+    const byRoom = candidateSetsByRoom(synthesisFor("situation-rules")!, [{ chatId: -1_000, questions: rulesOf(16) }]);
 
     expect(byRoom.get(-1_000)!.length).toBe(2);
   });
@@ -256,7 +204,7 @@ describe("realRows", () => {
   const reads: ArchiveReads = {
     rooms: () => [-1_000],
     messages: () => room,
-    recorded: () => [{ chatId: -1_000, questions: candidates }],
+    recorded: () => [{ chatId: -1_000, questions: rulesOf(3) }],
     sent: () => [{ original: "**결론**: 됐어요", visible: "결론: 됐어요", folded: false }],
   };
 
@@ -266,22 +214,22 @@ describe("realRows", () => {
     expect([...built.keys()].sort()).toEqual([...realSourceGates].sort());
   });
 
+  test("builds no reference gate, whose rows are made from BMO's own inputs", () => {
+    expect(realSourceGates.some((gate) => ["system-documents", "room-rules", "library-knowledge", "people-search"].includes(gate))).toBe(false);
+  });
+
   test("offers a gate no more candidates than that gate says it offers", () => {
-    const book = Object.fromEntries(Array.from({ length: 80 }, (_, at) => [
-      `p51078230-piece-${at}`,
-      { type: "noul" as const, instructions: "이 대화에 답하려면 이 인물 기록이 필요한가? 기록" },
-    ]));
-    const many: ArchiveReads = { ...reads, recorded: () => [{ chatId: -1_000, questions: book }] };
-    const rows = realRows(many, settings(), ["people-search"]).get("people-search")!;
-    const range = synthesisFor("people-search")!.candidates!;
+    const many: ArchiveReads = { ...reads, recorded: () => [{ chatId: -1_000, questions: rulesOf(30) }] };
+    const rows = realRows(many, settings(), ["situation-rules"]).get("situation-rules")!;
+    const range = synthesisFor("situation-rules")!.candidates!;
 
     expect(rows.length).toBeGreaterThan(0);
-    expect(rows.every((row) => Object.keys(row.questions).length <= range.max)).toBe(true);
-    expect(rows.every((row) => Object.keys(row.questions).length >= range.min)).toBe(true);
+    expect(rows.every((row) => Object.keys(row.questions).length <= range.max * 2)).toBe(true);
+    expect(rows.every((row) => Object.keys(row.questions).length >= range.min * 2)).toBe(true);
   });
 
   test("every row it builds answers its own gate once a gold is on it", () => {
-    const built = realRows(reads, settings(), ["reply-wanted", "content-judge", "system-documents"]);
+    const built = realRows(reads, settings(), ["reply-wanted", "content-judge", "situation-rules"]);
 
     for (const [gate, rows] of built) {
       const spec = synthesisFor(gate)!;

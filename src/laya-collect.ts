@@ -8,7 +8,7 @@ import { workbenchPath } from "./roots";
 
 import type { NodeRunner } from "./jake";
 
-// A checkpoint carried off the node that made it (docs/laya-train-run.md, 「Checkpoint naming and
+// A checkpoint carried off the node that made it (docs/training.md, 「Checkpoint naming and
 // collection」). A node that dies must not be the only copy of a step, and a checkpoint is a folder
 // while the transfer carries a file, so it travels as one tar and is unpacked here.
 //

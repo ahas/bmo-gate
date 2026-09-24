@@ -77,7 +77,7 @@ asks (BMO's `docs/laya.md`).
   | `library-knowledge` | `library-knowledge` | served |
   | `room-rules` | `room-rules` | served |
   | `situation-rules` | `situation-rules` | served |
-  | `system-documents` | `system-documents` | served (`real-1-hand2`); below the bar on real turns (`docs/reference-use.md`) |
+  | `system-documents` | `system-documents` | served (`real-1-hand2`); below the bar on real turns (`docs/reference-data.md`) |
   | `people-search` | `people-search` | none trained yet, refused |
   | `content-judge` | `content-judge` | trained, not served: the gate's mode is `off` |
   | `reply-wanted` | none — no gate code in BMO | trained, not served |
@@ -190,7 +190,7 @@ run here trains one gate's model on a card of its own, so there is nothing for D
    - It writes a new directory, a rolling checkpoint the run can be resumed from, and
      `train_meta.json` with the sequences per gate, each epoch's time and loss, and the peak memory.
      It never writes over a directory that exists, and `--resume` is how a killed run carries on from
-     what it saved rather than starting again (`docs/laya-train-run.md`, 「The resume contract」).
+     what it saved rather than starting again (`docs/training.md`, 「The resume contract」).
    - **Memory:** training alone reserves about 6.8 GB. A training node's 4070 has the card to itself
      and never comes near its 12 GB.
 4. **Calibrate** with `.venv/bin/python calibrate.py --model checkpoints/<name> --data data/<name>`:
@@ -241,7 +241,7 @@ run here trains one gate's model on a card of its own, so there is nothing for D
   it was the second.
 - **What a node carries is read off the node, not from here.** The GPU, the free VRAM, the CUDA and
   python versions and the installed package versions move with the machine, so the setup verb reports
-  the nodes side by side rather than this document stating them (`docs/laya-train-run.md`).
+  the nodes side by side rather than this document stating them (`docs/training.md`).
 - **What is put there:** `~/bmo-laya` in the node's own account — `finetune.py`, `calibrate.py`,
   `compare.py`, the resume bookkeeping they share and `pyproject.toml`, a uv venv built from it with
   `laya` pinned, and the dataset folders under `data/`. No server, no unit and no token: a node
@@ -297,6 +297,6 @@ pass, it is settled, and it is not run again per gate.**
 - **Each gate is its own training run**, and a run takes a card to itself. All four nodes stand as
   jake nodes, so one gate goes to one node and four run at once, and each node takes the next gate
   of `docs/laya-gates.md` as its own finishes.
-- **The run across the four has a document of its own** — `docs/laya-train-run.md`: what a checkpoint
+- **The run across the four has a document of its own** — `docs/training.md`: what a checkpoint
   carries and how a killed run is resumed from it, how the gates are assigned and what the run ledger
   records, where the checkpoints are collected, and the two tables the run is judged on.

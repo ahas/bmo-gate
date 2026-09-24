@@ -35,25 +35,26 @@ The rows come out of BMO's archive, which is opened read-only and never written.
 one row per turn: the state that gate would have been given, and the questions it would have been
 asked, with no answer on either.
 
+- **The four reference gates are not built here.** Their rows are made by the reference data, out of
+  the input BMO's own code hands each gate today and the answer BMO actually sent
+  (`docs/reference-data.md`). What follows is the other gates'.
 - **Each gate is built in the shape it really receives.** The room shape for the gates that judge a
-  room's situation, the plain shape for the four that pick documents out of a library, and the
-  message-and-markup pair for the formatting gate. The shapes are built from the archive's own rows
-  rather than described, because a row whose lines are nearly the shape teaches a shape no gate
-  ever sends.
+  room's situation, and the message-and-markup pair for the formatting gate. The shapes are built
+  from the archive's own rows rather than described, because a row whose lines are nearly the shape
+  teaches a shape no gate ever sends.
 - **A turn with nothing in front of it is no row.** Every gate that reads a room's recent messages
   is given them; a state whose transcript is empty is refused by the gate's own specification, and
   leaving it out is what stops a judgement being bought for it.
 - **The window is what fits one Laya call**, newest first to go in and oldest first to stay out,
   which is how the gates themselves cut it.
-- **A gate's candidates are what that room was really offered**, read back out of the probe inputs
-  the verdict record kept. The brain moves; a row written against today's library would be a row no
-  turn of that room ever saw, and reading the brain directly would put this repository inside BMO's
-  own structure, which it is not.
+- **The situation-rule matcher's candidates are what that room was really offered**, read back out
+  of the probe inputs the verdict record kept. Reading the brain directly would put this repository
+  inside BMO's own structure, which it is not.
 - **A row is offered as many candidates as its gate says it offers**, never as many as the record
-  holds. What the record keeps for a room is every candidate that room was ever offered, which for
-  the person book runs to dozens against a gate that is handed twenty; a row carrying the lot is a
-  row no turn of that gate ever saw, the gate's own specification refuses it, and the judgement
-  bought for it was bought for nothing. The recorded set is cut into sets of the gate's own maximum,
+  holds. What the record keeps for a room is every rule that room was ever offered, which can run
+  past what the matcher is handed at once; a row carrying the lot is a row no turn of that gate ever
+  saw, the gate's own specification refuses it, and the judgement bought for it was bought for
+  nothing. The recorded set is cut into sets of the gate's own maximum,
   and a remainder short of the gate's minimum reaches back over the set before it rather than being
   dropped — so every candidate the room was offered stands in some row, and the overlap costs only a
   candidate being asked about twice. A room offered fewer than the gate's minimum builds no row of
@@ -110,7 +111,7 @@ Every label is made afresh, on a road, against the gate exactly as it stands.
   another, and the audit reports the balance as it stands.
 - **A batch is counted in the answers it asks for, not in the rows it carries.** What the judge has
   to write is one answer a question, so a gate asking eighty questions of a row asks eighty times
-  what a gate asking one does off the same twenty rows. Twenty rows of the person book is sixteen
+  what a gate asking one does off the same twenty rows. Twenty rows of eighty questions is sixteen
   hundred answers in one reply, and the model hands back every row's gold empty rather than writing
   them — which reads from outside as a gate judging nothing at all. A batch takes rows while it
   stays under both the row bound and the answer bound, and always takes one row however many answers
@@ -515,8 +516,8 @@ behind it has nothing else, and the shape it writes is the shape the training re
   It reads the folders and attaches to nothing, so it answers while a run is still going.
 - `bun scripts/laya-merge.ts` — the per-gate folders into the one dataset folder. `--growing` takes
   the gates still being judged as well, each cut at the whole batches it has frozen so far, and
-  writes nothing into any gate's folder (`docs/laya-train-run.md`, 「Training while the judging
-  runs」).
+  writes nothing into any gate's folder; it is the same cut a training pass reads a judging run by
+  (`docs/training.md`, 「Where the data comes from」).
 - `bun scripts/laya-audit.ts` — the figures per gate, and the verdict against the bars.
 - `bun scripts/laya-ledger.ts` — the ledger for a run.
 
@@ -534,8 +535,8 @@ When it has finished, the three readings that close a run are the merge, the ver
 ledger, in that order. A gate the verdict names is built again on its own and the three are run
 once more.
 
-What happens to the merged dataset afterwards — the rehearsal it is tried against, the four nodes
-it is trained on, how a killed run is taken up again, where the checkpoints are collected, the two
-tables the run is judged on, and the passes that train the gates while their judging still runs —
-is `docs/laya-train-run.md`. The server the trained checkpoint is
+What happens to the rows afterwards — the passes that train the gates while their judging still
+runs, the four nodes they are trained on, how a killed run is taken up again, where the checkpoints
+are collected, the tables a pass is judged on, and the rehearsal the machinery is tried against —
+is `docs/training.md`. The server the trained checkpoint is
 served from, and the loop and the settings it is trained with, are `docs/laya-server.md`.

@@ -4,7 +4,8 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { join } from "node:path";
 
 import { MANIFEST_KIND } from "./laya-collect";
-import { namedSettings, serveCheckpoint, servingCheckpoint, type ServeAsk } from "./laya-serve";
+import { namedSettings, serveCheckpoint, type ServeAsk } from "./laya-serve";
+import { servingCheckpoint } from "./laya-service";
 import { scratchDir } from "./scratch";
 
 import type { NodeRunner, RunResult } from "./jake";

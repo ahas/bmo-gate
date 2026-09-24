@@ -11,7 +11,7 @@ import type { DatasetRow, DatasetSplit, Gold, SplitShares } from "./laya-dataset
 import type { GateSynthesis, SynthRow } from "./laya-synth";
 
 // A rehearsal dataset: the ten gates' three splits, written by this machine alone with no model
-// asked and no archive read (docs/laya-train-run.md, 「The data it trains on」). It exists so the
+// asked and no archive read (docs/training.md, 「Rehearsal」). It exists so the
 // resume, the driver, the collection and the tables can be put through their paces whole before the
 // distilled data is paid for, and it is marked at every level so a figure measured on it can never be
 // read as a gate's.

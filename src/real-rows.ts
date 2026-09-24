@@ -243,16 +243,6 @@ export function outputFormatRows(sent: readonly SentRow[], settings: RealSetting
   return rows;
 }
 
-// The gates that ask one question per candidate, and the shape their state takes. What they are
-// offered is the room's own library as that room was really offered it.
-const referenceGates = ["system-documents", "room-rules", "library-knowledge", "people-search"] as const;
-
-export type ReferenceGate = (typeof referenceGates)[number];
-
-export function isReferenceGate(gate: string): gate is ReferenceGate {
-  return (referenceGates as readonly string[]).includes(gate);
-}
-
 // One recorded set's candidates, in the order the record names them, each with the question ids it
 // was asked under. A slug the record asked something other than this gate's own questions of is not
 // a candidate of this gate and is left out.
@@ -339,53 +329,6 @@ export function candidateSetsByRoom(gate: GateSynthesis, recorded: readonly Reco
   return byRoom;
 }
 
-// A reference gate's rows: the turn's messages in the plain shape, and one of the candidate sets
-// that room was really offered. Which set a turn takes is fixed by the turn itself, so the same
-// archive read twice builds the same rows.
-export function referenceRows(
-  gate: ReferenceGate,
-  room: readonly ArchivedMessage[],
-  sets: readonly Record<string, LayaQuestion>[],
-  settings: RealSettings,
-): UnjudgedRow[] {
-  const rows: UnjudgedRow[] = [];
-  const gap = settings.turnGapSeconds ?? defaultTurnGapSeconds;
-
-  if (sets.length === 0) {
-    return rows;
-  }
-
-  for (const [at, one] of room.entries()) {
-    if (rows.length >= settings.limit) {
-      break;
-    }
-
-    // A turn is judged when its last message is in, and BMO's own words are taken out of the lines
-    // these gates read: they are picking documents about the people who spoke.
-    if (one.senderId === settings.who.bmoId || !hasText(one)) {
-      continue;
-    }
-
-    const next = room[at + 1];
-
-    if (next !== undefined && next.senderId !== settings.who.bmoId && next.sentAt - one.sentAt <= gap) {
-      continue;
-    }
-
-    const turn = turnEndingAt(room, at, settings.who.bmoId, gap);
-    const state = turn.map((message) => plainShapeLine(message, settings.who)).join("\n");
-    const questions = sets[Number(BigInt(`0x${createHash("sha256").update(state).digest("hex").slice(0, 8)}`) % BigInt(sets.length))]!;
-
-    if (!layaFits({ state, questions })) {
-      continue;
-    }
-
-    rows.push(unjudgedRowOf(gate, state, questions, settings.shares));
-  }
-
-  return rows;
-}
-
 // 상황 규칙 매칭기 — the room's recent messages in the room shape as the situation, and the room's
 // standing rules as candidates, both halves of each rule named by its own slug.
 export function situationRows(
@@ -454,10 +397,9 @@ export interface ArchiveReads {
 }
 
 // The gates this source builds rows for. A gate not named here has no material in the rooms and is
-// written on a road instead; which those are is the count's to say, not this list's.
-export const realSourceGates = [
-  "reply-wanted", "content-judge", "output-format", "situation-rules", ...referenceGates,
-] as const;
+// written on a road instead, or — the four reference gates — is made from BMO's own inputs and the
+// answers BMO sent (docs/reference-data.md).
+export const realSourceGates = ["reply-wanted", "content-judge", "output-format", "situation-rules"] as const;
 
 // Every gate's rows, built room by room. A gate the rooms hold nothing for comes back with none
 // rather than being left out, so a count says the same thing about every gate.
@@ -472,7 +414,7 @@ export function realRows(reads: ArchiveReads, settings: RealSettings, gates: rea
       continue;
     }
 
-    const sets = isReferenceGate(gate) || gate === "situation-rules"
+    const sets = gate === "situation-rules"
       ? candidateSetsByRoom(specOf(gate), reads.recorded(gate))
       : new Map<number, Record<string, LayaQuestion>[]>();
 
@@ -490,8 +432,6 @@ export function realRows(reads: ArchiveReads, settings: RealSettings, gates: rea
         rows.push(...contentJudgeRows(room, left));
       } else if (gate === "situation-rules") {
         rows.push(...situationRows(room, sets.get(chatId) ?? [], left));
-      } else if (isReferenceGate(gate)) {
-        rows.push(...referenceRows(gate, room, sets.get(chatId) ?? [], left));
       }
     }
   }

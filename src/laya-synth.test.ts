@@ -368,15 +368,17 @@ describe("the validator refuses", () => {
   });
 
   test("fewer candidates than the gate offers — candidate-count", () => {
-    const row = copyOf(classifier.example);
+    const rules = gate("situation-rules");
+    const row = copyOf(rules.example);
+    const first = candidateOf(rules, Object.keys(row.questions)[0]!)!.slug;
 
-    for (const id of Object.keys(row.questions).slice(1)) {
+    for (const id of Object.keys(row.questions).filter((one) => candidateOf(rules, one)!.slug !== first)) {
       delete row.questions[id];
       delete row.gold[id];
     }
 
-    expect(Object.keys(row.questions).length).toBeLessThan(classifier.candidates!.min);
-    expect(validateSynthRow(classifier, row, "korean")).toMatchObject({ ok: false, refusal: "candidate-count" });
+    expect(1).toBeLessThan(rules.candidates!.min);
+    expect(validateSynthRow(rules, row, "korean")).toMatchObject({ ok: false, refusal: "candidate-count" });
   });
 
   test("a gold naming answers the question does not have — bad-answers", () => {

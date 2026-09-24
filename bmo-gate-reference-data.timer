@@ -1,5 +1,5 @@
 [Unit]
-Description=bmo-gate-reference-use — 한 시간마다 참조 게이트의 새 턴을 판정한다
+Description=bmo-gate-reference-data — 한 시간마다 참조 게이트 데이터를 다시 만든다
 
 [Timer]
 # An hour after the last run ended, so a long run is never stacked on by the next.

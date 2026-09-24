@@ -13,8 +13,8 @@ import {
 } from "../src/laya-nodes";
 import { sourceRoot } from "../src/roots";
 
-// The training environment on the nodes the split gates are trained on (docs/laya-train-run.md,
-// 「One gate to a node, in rounds」): it reads each node, puts across what differs from this
+// The training environment on the nodes the split gates are trained on (docs/training.md,
+// 「The nodes」): it reads each node, puts across what differs from this
 // checkout, installs what the pinned project file names, and prints the nodes side by side.
 //
 // It changes nothing on a node whose card is busy, and it is run again as often as one likes: a node

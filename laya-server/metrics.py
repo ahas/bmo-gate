@@ -1,4 +1,4 @@
-"""What a trained gate came to, counted (docs/laya-train-run.md, 「The two tables」): agreement with
+"""What a trained gate came to, counted (docs/training.md, 「The tables」): agreement with
 the LLM's verdicts plain and balanced over the answers, the counts behind both, the difference from
 the base model measured the same way, and — for a gate that may settle one answer on its own — how
 many calls that answer would have missed at each threshold.

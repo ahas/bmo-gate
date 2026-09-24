@@ -14,7 +14,7 @@ Two memory savings can be asked for, `--freeze-embeddings` and `--optimizer adam
 by default, and neither is used for a checkpoint meant for service unless a run beside the unsaved one
 shows it costs nothing in agreement or calibration.
 
-A run that is killed is carried on rather than started again (docs/laya-train-run.md, 「The resume
+A run that is killed is carried on rather than started again (docs/training.md, 「The resume
 contract」): every so many optimizer steps, and at each epoch's end, the weights, the optimizer, the
 scheduler, the step count and the place reached in the data order are written into a step checkpoint
 of the run's own `steps/` folder, and `--resume <dir>` reads the newest whole one and continues from

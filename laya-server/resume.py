@@ -1,4 +1,4 @@
-"""The bookkeeping a killed training run is carried on from (docs/laya-train-run.md, 「The resume
+"""The bookkeeping a killed training run is carried on from (docs/training.md, 「The resume
 contract」): where a run's step checkpoints stand, which of them can be resumed from, what a resume has
 to match, how the data order is reproduced, which old checkpoints are dropped, and how a finished run
 says that it is finished.
