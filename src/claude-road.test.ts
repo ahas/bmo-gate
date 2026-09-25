@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  claudeAsker,
   claudeCommand,
   claudeEffort,
   claudeEnvironment,
@@ -9,7 +10,8 @@ import {
   loginVariables,
   readClaudeResult,
 } from "./claude-road";
-import { noTokens } from "./laya-synth-run";
+import { synthesisFor } from "./laya-synth";
+import { batchPrompts, noTokens, plannedBatches } from "./laya-synth-run";
 
 import type { ClaudeReading, ClaudeRun } from "./claude-road";
 
@@ -144,5 +146,36 @@ describe("the judging road", () => {
     const { judge } = road({ text: "ANSWER", models: ["claude-opus-5-5"] });
 
     await expect(judge("SYSTEM", "PROMPT", null)).rejects.toThrow("claude-opus-5-5");
+  });
+});
+
+describe("the writing road", () => {
+  const spec = synthesisFor("content-judge")!;
+  const ask = plannedBatches(spec, 20, 20, "false")[0]!;
+
+  function writer(reading: Partial<ClaudeReading>, account = "pinned@example.com") {
+    const calls: { command: string[]; saying: string }[] = [];
+    const run: ClaudeRun = (command, saying) => {
+      calls.push({ command, saying });
+
+      return Promise.resolve({ text: "", tokens: noTokens, models: [claudeModel], failure: null, ...reading });
+    };
+
+    return { calls, write: claudeAsker({ run, configDir: "/pinned", account: "pinned@example.com", readAccount: () => account }) };
+  }
+
+  test("the gate's fixed prefix is the system prompt and the batch's own ask goes on stdin", async () => {
+    const { calls, write } = writer({ text: "[]" });
+    const answer = await write(spec, ask, null);
+    const { system, prompt } = batchPrompts(spec, ask);
+
+    expect(answer.sessionId).toBeNull();
+    expect(calls[0]!.command.at(-1)).toBe(system);
+    expect(calls[0]!.saying).toBe(prompt);
+  });
+
+  test("keeps the judging road's pin: another login or another model stops the gate at its batch", async () => {
+    await expect(writer({ text: "[]" }, "other@example.com").write(spec, ask, null)).rejects.toThrow("other@example.com");
+    await expect(writer({ text: "[]", models: ["claude-opus-5-5"] }).write(spec, ask, null)).rejects.toThrow(`content-judge ${ask.seed}`);
   });
 });

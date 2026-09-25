@@ -34,6 +34,8 @@ export interface DriveOptions {
   // otherwise, which is what sanitizer's own run does when it moves off codex onto J3090.
   road?: SynthRoad;
   shares: SplitShares;
+  // The one answer every batch leans on, for a top-up run (docs/gate-data.md 「Invented data」).
+  topUp?: string | null;
   // How many gates write at the same time. All of them, unless a reason is given to hold back.
   atOnce: number;
   resume: boolean;
@@ -140,6 +142,7 @@ export async function driveGates(options: DriveOptions, ask: SynthAsker): Promis
         effort: options.effort,
         road: options.road ?? "codex",
         shares: options.shares,
+        topUp: options.topUp ?? null,
         resume: options.resume,
         say,
       }, ask);
@@ -192,7 +195,7 @@ function plannedCount(folder: string, spec: GateSynthesis, progress: SynthProgre
     return judgeBatches(readUnjudged(folder), progress.batchSize, progress.answerCap).length;
   }
 
-  return plannedBatches(spec, progress.rows, progress.batchSize).length;
+  return plannedBatches(spec, progress.rows, progress.batchSize, progress.topUp ?? null).length;
 }
 
 // How far a run got, read out of the folders while it is still going. Nothing here attaches to a

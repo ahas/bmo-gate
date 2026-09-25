@@ -245,7 +245,9 @@ function readParts(root: string, gates: readonly string[] | null, growing: boole
 
 const leaning = 0.75;
 
-function rarerOf(rows: readonly DatasetRow[]): number {
+// How many questions carry the rarer answer among these rows, a question counting toward the answer
+// its gold gives at three to one or more.
+export function rarerOf(rows: readonly DatasetRow[]): number {
   const answered = new Map<string, number>();
 
   for (const row of rows) {

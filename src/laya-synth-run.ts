@@ -84,12 +84,13 @@ function languageAt(spec: GateSynthesis, place: number, howMany: number): Langua
   return "korean";
 }
 
-// Every batch one gate's run asks for, in order. It is a pure function of the gate, the rows wanted
-// and the batch size, so a resumed run takes up the plan exactly where the dead one left it.
-export function plannedBatches(spec: GateSynthesis, rows: number, batchSize: number): SynthAsk[] {
+// Every batch one gate's run asks for, in order. It is a pure function of the gate, the rows wanted,
+// the batch size and the one answer a top-up run leans every batch on, so a resumed run takes up the
+// plan exactly where the dead one left it. Without a top-up the batches take the answers in turn.
+export function plannedBatches(spec: GateSynthesis, rows: number, batchSize: number, topUp: string | null = null): SynthAsk[] {
   const size = Math.max(1, batchSize);
   const batches = Math.max(1, Math.ceil(Math.max(1, rows) / size));
-  const answers = answersOf(spec.questions[0]!);
+  const answers = topUp === null ? answersOf(spec.questions[0]!) : [topUp];
   const asks: SynthAsk[] = [];
 
   for (let index = 0; index < batches; index += 1) {
@@ -166,6 +167,9 @@ export interface SynthProgress {
   // were never cut from — so a resume counting batches against them takes up at a batch holding
   // other rows than the one it counted. Absent on a generation run, which writes its own rows.
   builtAt?: string;
+  // The one answer a top-up run leans every batch on (docs/gate-data.md 「Invented data」). Absent on
+  // a run that takes the answers in turn, and on a judging pass.
+  topUp?: string;
   shares: SplitShares;
   gates: Record<string, GateProgress>;
 }
@@ -525,6 +529,9 @@ export interface SynthOptions {
   effort: string;
   road: SynthRoad;
   shares: SplitShares;
+  // The one answer every batch leans on, for a top-up run. A resumed run keeps the one it started
+  // with, since its plan was cut by it.
+  topUp?: string | null;
   resume: boolean;
   say?: (line: string) => void;
 }
@@ -549,6 +556,7 @@ export async function runSynthesis(options: SynthOptions, ask: SynthAsker): Prom
     roads: [options.road],
     rows: options.rows,
     batchSize: options.batchSize,
+    ...(options.topUp === undefined || options.topUp === null ? {} : { topUp: options.topUp }),
     shares: options.shares,
     gates: {},
   };
@@ -559,6 +567,10 @@ export async function runSynthesis(options: SynthOptions, ask: SynthAsker): Prom
   // that wrote them; nothing here rewrites a frozen batch.
   if (held !== null) {
     const roads = roadsOf(held);
+
+    if (options.topUp !== undefined && (options.topUp ?? undefined) !== held.topUp) {
+      throw new Error(`이 실행은 ${held.topUp ?? "답을 번갈아"} 로 짰는데 ${options.topUp ?? "답을 번갈아"} 로 이어 가라고 했습니다. 계획이 달라 이어 갈 수 없습니다.`);
+    }
 
     if (!roads.includes(options.road)) {
       roads.push(options.road);
@@ -578,7 +590,7 @@ export async function runSynthesis(options: SynthOptions, ask: SynthAsker): Prom
   let asked = 0;
 
   for (const spec of options.gates) {
-    const plan = plannedBatches(spec, progress.rows, progress.batchSize);
+    const plan = plannedBatches(spec, progress.rows, progress.batchSize, progress.topUp ?? null);
     const state = progress.gates[spec.gate] ?? { done: 0, sessionId: null, kept: 0, refused: {}, unreadable: 0, lostBatches: 0, tokens: noTokens };
 
     state.lostBatches ??= 0;

@@ -3,16 +3,16 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { emptyCwd } from "./codex-road";
-import { noTokens } from "./laya-synth-run";
+import { batchPrompts, noTokens } from "./laya-synth-run";
 
 import type { JudgeRoad } from "./gate-judge";
-import type { TokenTally } from "./laya-synth-run";
+import type { SynthAnswer, SynthAsker, TokenTally } from "./laya-synth-run";
 
-// The road a judging pass rides while the codex account is shut: Claude Code's print mode, pinned to
-// one login (docs/gate-data.md 「The claude road」). It judges and writes no rows.
+// The road a judging pass or a top-up run rides while the codex account is shut: Claude Code's print
+// mode, pinned to one login (docs/gate-data.md 「The claude road」).
 //
-// One call is one batch and keeps no session: the judge's own lines stand in for the system prompt,
-// the batch goes in on stdin, and one JSON result comes back.
+// One call is one batch and keeps no session: the batch's fixed part stands in for the system
+// prompt, the rest goes in on stdin, and one JSON result comes back.
 
 export const claudeModel = "claude-sonnet-5";
 export const claudeEffort = "high";
@@ -210,10 +210,11 @@ function withDefaults(settings: Partial<ClaudeSettings>): ClaudeSettings {
   };
 }
 
-// The road a judging pass rides here. The login is checked once, before the first batch, and a batch
-// that failed or was answered by another model throws rather than coming back as an answer, so the
-// gate stops at it and its frozen batches stand — the same contract the other two roads keep.
-export function claudeJudgeRoad(settings: Partial<ClaudeSettings> = {}): JudgeRoad {
+// One batch on this road, whatever the batch is. The login is checked once, before the first batch,
+// and a batch that failed or was answered by another model throws rather than coming back as an
+// answer, so the gate stops at it and its frozen batches stand — the same contract the other two
+// roads keep.
+function claudeBatches(settings: Partial<ClaudeSettings>, what: string): (system: string, prompt: string) => Promise<SynthAnswer> {
   const full = withDefaults(settings);
   let confirmed = false;
 
@@ -235,15 +236,36 @@ export function claudeJudgeRoad(settings: Partial<ClaudeSettings> = {}): JudgeRo
     );
 
     if (reading.failure !== null) {
-      throw new Error(`claude 가 판정 묶음을 쓰지 못했습니다 — ${reading.failure}`);
+      throw new Error(`claude 가 ${what} 묶음을 쓰지 못했습니다 — ${reading.failure}`);
     }
 
     const strangers = reading.models.filter((model) => model !== full.model);
 
     if (strangers.length > 0 || !reading.models.includes(full.model)) {
-      throw new Error(`판정 묶음에 ${full.model} 아닌 모델이 답했습니다 — ${reading.models.join(", ") || "없음"}`);
+      throw new Error(`${what} 묶음에 ${full.model} 아닌 모델이 답했습니다 — ${reading.models.join(", ") || "없음"}`);
     }
 
     return { text: reading.text, sessionId: null, tokens: reading.tokens };
+  };
+}
+
+// The road a judging pass rides here.
+export function claudeJudgeRoad(settings: Partial<ClaudeSettings> = {}): JudgeRoad {
+  return claudeBatches(settings, "판정");
+}
+
+// The road a top-up run writes its rows on here (docs/gate-data.md 「Invented data」). No session is
+// held, so the gate's fixed prefix is the system prompt of every call.
+export function claudeAsker(settings: Partial<ClaudeSettings> = {}): SynthAsker {
+  const batch = claudeBatches(settings, "짓기");
+
+  return async (spec, ask) => {
+    const { system, prompt } = batchPrompts(spec, ask);
+
+    try {
+      return await batch(system, prompt);
+    } catch (trouble) {
+      throw new Error(`${spec.gate} ${ask.seed}: ${trouble instanceof Error ? trouble.message : String(trouble)}`);
+    }
   };
 }

@@ -12,19 +12,21 @@ import { dataPath, sourceRoot } from "../src/roots";
 import { curveLines, readCurve } from "../src/train/curve";
 import { BESIDE_DIR, runGate } from "../src/train/gate-run";
 import { runPass } from "../src/train/pass";
-import { sourceOf } from "../src/train/sources";
+import { sourceOf, toppedUp } from "../src/train/sources";
 
 // One training pass over a source (docs/training.md): which gates are trained and why the rest wait,
 // each chosen gate on a node of its own, calibrated beside the checkpoint serving it, its checkpoint
 // carried back, and the ledger, the curve and the tables written.
 
-const usage = `usage: bun scripts/laya-train.ts <원천> [--gate <게이트>]… [--node <노드>]… [--rarer <개>] [--epochs <n>] [--seed <n>] [--save-every <n>] [--dry-run] [--show]
+const usage = `usage: bun scripts/laya-train.ts <원천> [--gate <게이트>]… [--node <노드>]… [--rarer <개>] [--top-up <실행>] [--epochs <n>] [--seed <n>] [--save-every <n>] [--dry-run] [--show]
 
 원천의 게이트 가운데 학습할 만큼 자란 것을 노드마다 하나씩 맡겨 학습시키고, 끝난 체크포인트를 지금
 서비스 중인 체크포인트 옆에서 같은 시험 행으로 재고, 원장·곡선·표를 남긴다(docs/training.md).
 <원천> 은 reference:<실행>(참조 데이터), judging:<실행>(판정 회차), folder:<경로>(데이터 폴더, 리허설 포함).
 --gate 는 이 게이트들만 본다. --node 없이는 ${TRAINING_NODES.join(", ")} 를 쓴다.
 --rarer 는 판정 회차의 게이트를 드문 답 몇 개까지 기다리게 할지(참조 데이터는 스스로 200개를 요구한다).
+--top-up 은 드문 답을 지어 보탠 실행(laya-synth --top-up)의 행을 게이트마다 학습·보정 쪽에 더한다.
+  시험 쪽은 원천의 행만 두고, 곡선은 <원천>.<실행> 이름으로 따로 선다.
 --dry-run 은 어느 게이트를 왜 학습하고 나머지는 왜 기다리는지만 말하고 아무것도 건드리지 않는다.
 --show 는 원천의 곡선을 보인다.`;
 
@@ -36,7 +38,7 @@ if (asksUsage(argv)) {
 }
 
 const reading = readFlags(argv, {
-  "--gate": true, "--node": true, "--rarer": true, "--epochs": true, "--seed": true, "--save-every": true, "--dry-run": false, "--show": false,
+  "--gate": true, "--node": true, "--rarer": true, "--top-up": true, "--epochs": true, "--seed": true, "--save-every": true, "--dry-run": false, "--show": false,
 });
 
 if (!reading.ok || reading.loose.length !== 1) {
@@ -45,12 +47,15 @@ if (!reading.ok || reading.loose.length !== 1) {
   process.exit(2);
 }
 
-const source = sourceOf(reading.loose[0]!, { rarer: Number(lastOf(reading, "--rarer") ?? "0") });
+const named = sourceOf(reading.loose[0]!, { rarer: Number(lastOf(reading, "--rarer") ?? "0") });
 
-if (typeof source === "string") {
-  console.error(`laya-train: ${source}`);
+if (typeof named === "string") {
+  console.error(`laya-train: ${named}`);
   process.exit(2);
 }
+
+const topUp = lastOf(reading, "--top-up");
+const source = topUp === undefined ? named : toppedUp(named, topUp);
 
 const curve = dataPath("laya-curve", source.name);
 const say = (line: string) => console.error(line);

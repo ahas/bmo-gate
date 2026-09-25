@@ -546,6 +546,16 @@ describe("the prompt", () => {
     expect(prefix).toContain("`group`");
   });
 
+  test("a gate that says what its fields hold puts each of them in the prefix", () => {
+    const prefix = synthPrefix(gate("content-judge"));
+
+    expect(prefix).toContain("state 의 자리마다 담는 것");
+    expect(prefix).toContain("답변 자체는 여기 들어가지 않는다");
+    expect(prefix).toContain("1200자에서 1700자 사이");
+    expect(synthPrefix(gate("sanitizer"))).not.toContain("state 의 자리마다 담는 것");
+    expect(synthPrefix(gate("sanitizer"))).toContain("700자");
+  });
+
   test("an asymmetric gate's prefix says which answer Laya may settle", () => {
     expect(synthPrefix(gate("reply-wanted"))).toContain("비대칭");
   });

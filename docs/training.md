@@ -29,6 +29,13 @@ The driver asks those four and never which kind of source it is talking to.
   judging could catch one half-written. Its gates are held to a thousand rows.
 - **A dataset folder** — three split files holding the rows of any gates, such as a rehearsal
   (「Rehearsal」). Its gates are held to nothing but having rows in every split.
+- **Any of these topped up** with a top-up run (`docs/gate-data.md`, 「Invented data」), given as
+  `--top-up <run>` beside the source. Each gate's copy takes the source's own rows and then the
+  top-up run's rows of that gate in training and calibration; a top-up row that landed in the test is
+  dropped, so the test is the source's own. The counts and the rarer answer are read off the two
+  together, the bars are the source's own, and the source is named after both, `<source>.<top-up>`,
+  so its curve is a series of its own and never mixed with the points the source earned alone. The
+  top-up is read at its whole batches, the way a judging run is.
 - **A row's split is fixed where the row is made** — by its input's hash for a judging run and by its
   turn for the reference data — so a row held out for the test in one pass is held out in every pass
   after it, and two points of one gate are measured on one test set that only grows.

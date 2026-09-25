@@ -65,6 +65,14 @@ export interface GateSynthesis {
   // left to infer them from a worked example invents its own words for them — `dm` where the gate
   // says `owner` — and the field is then unusable to everything downstream.
   choices?: Readonly<Record<string, readonly string[]>>;
+  // What each field of an object state holds, where the worked example alone leaves a reading open
+  // that the gate never receives — a transcript that already carries the answer being judged, a
+  // speaker marked as somebody they are not.
+  fields?: Readonly<Record<string, string>>;
+  // How long a state runs, in characters, for a gate whose real inputs run longer than a written row
+  // is otherwise held to. A written row far shorter than the real ones teaches its length, so the
+  // least is said as plainly as the most.
+  stateChars?: { least: number; most: number };
   // The kinds of room an invented batch of this gate is set in, for a gate that stands in only some
   // of them. Every kind where it is not named.
   rooms?: readonly RoomKind[];
@@ -120,6 +128,9 @@ export const languageTolerance = 0.05;
 
 // What one gate's finished data owes, from the specification.
 export const synthFloors = { train: 4_000, minority: 1_000, evaluation: 1_000 } as const;
+
+// How long a written state runs, where its gate says nothing of its own.
+export const defaultStateChars = 700;
 
 export function answersOf(question: SynthQuestion): string[] {
   return question.type === "noul" ? ["true", "false"] : Object.keys(question.options ?? {});
@@ -483,6 +494,16 @@ export function synthPrefix(gate: GateSynthesis): string {
     said.push("", "대화 줄의 모양 — 이 모양을 벗어난 행은 버려진다:", ...transcriptHelp(gate.transcript.shape));
   }
 
+  const fields = Object.entries(gate.fields ?? {});
+
+  if (fields.length > 0) {
+    said.push("", "state 의 자리마다 담는 것 — 게이트가 실제로 받는 그대로:");
+
+    for (const [field, holds] of fields) {
+      said.push(`- \`${field}\`: ${holds}`);
+    }
+  }
+
   const choices = Object.entries(gate.choices ?? {});
 
   if (choices.length > 0) {
@@ -498,7 +519,9 @@ export function synthPrefix(gate: GateSynthesis): string {
     "지켜야 할 것:",
     "- 가상 인물로 짓는다. 이름, 말투, 나이대, 호칭이 행마다 달라야 하고 같은 인물을 돌려 쓰지 않는다.",
     "- 실제 기록을 옮겨 적지 않는다. 전부 새로 짓는다.",
-    "- 한 행은 판정 모델 한 번의 호출에 들어가야 한다. state는 넉넉잡아 700자를 넘기지 않는다.",
+    gate.stateChars === undefined
+      ? `- 한 행은 판정 모델 한 번의 호출에 들어가야 한다. state는 넉넉잡아 ${defaultStateChars}자를 넘기지 않는다.`
+      : `- 한 행은 판정 모델 한 번의 호출에 들어가야 한다. state는 ${gate.stateChars.least}자에서 ${gate.stateChars.most}자 사이로 짓는다. 이 게이트가 실제로 받는 입력이 그 길이라, 이보다 짧은 행은 길이로 들킨다.`,
     "",
     "보기 한 행:",
     JSON.stringify(gate.example),
@@ -527,7 +550,7 @@ function transcriptHelp(shape: TranscriptShape): string[] {
         "```",
         "[<시각>] #<메시지 번호> <보낸 사람 이름> (id <보낸 사람 번호>, OWNER): <본문> <노트>",
         "```",
-        "- 시각은 UTC의 ISO 8601 순간이다.",
+        "- 시각은 UTC의 ISO 8601 순간이다. 행마다 해와 달과 시간대를 흩어 쓰고, 한 달에 몰지 않는다.",
         "- `, OWNER`는 하스가 보낸 줄에만 붙는다.",
         "- 노트는 본문 뒤에 붙는 대괄호 한 문장이고, 없으면 아무것도 붙지 않는다. 답장이면 `[replies to message 812, sent by 지우, shown elsewhere in this prompt]`처럼 적는다.",
         ...attachments,
@@ -844,6 +867,13 @@ const answerContent: GateSynthesis = {
   textFields: ["recent", "answer"],
   transcript: { shape: "room", fields: ["recent"] },
   choices: { room: ["group"] },
+  fields: {
+    room: "방의 종류, 늘 `group`.",
+    recent: "답이 나가기 직전까지 그 방의 최근 말들, 열다섯 줄에서 스무 줄. 답과 상관없는 잡담과 다른 사람들끼리 주고받은 말이 대부분이고, 답을 부른 말은 그 끝에 있다. 마지막 줄은 사람의 말이고, 답변 자체는 여기 들어가지 않는다. 비모가 앞서 한 말도 섞일 수 있는데 보낸 사람은 `BMO (id 4261144)`이고 OWNER는 붙지 않는다.",
+    answer: "비모가 방금 지어 그 방에 내보내려는 답변 한 편. 판정은 이것만 두고 한다.",
+  },
+  // The real rows run about fifteen lines of the room, some fifteen hundred characters.
+  stateChars: { least: 1_200, most: 1_700 },
   rooms: ["group", "ai"],
   perCandidate: false,
   candidates: null,

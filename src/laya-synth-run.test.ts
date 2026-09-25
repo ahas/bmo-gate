@@ -126,6 +126,14 @@ describe("the batch plan", () => {
     expect(plannedBatches(sanitizer, 100, 20)).toEqual(plannedBatches(sanitizer, 100, 20));
   });
 
+  test("a top-up leans every batch on its one answer and still draws the rooms and the hard cases", () => {
+    const plan = plannedBatches(sanitizer, 200, 20, "false");
+
+    expect(plan.every((ask) => ask.lean === false)).toBe(true);
+    expect(plan.filter((ask) => ask.edge)).toHaveLength(3);
+    expect(plannedBatches(sanitizer, 200, 20).some((ask) => ask.lean === true)).toBe(true);
+  });
+
   test("asks for exactly the rows wanted", () => {
     const plan = plannedBatches(sanitizer, 47, 20);
 
@@ -463,6 +471,26 @@ describe("a run that dies", () => {
     expect(seeds).toEqual(["sanitizer-3"]);
     expect(report.asked).toBe(1);
     expect(report.meta.gates[0]!.rows).toBe(6);
+  });
+
+  test("a top-up run is resumed only as the same top-up, since its plan was cut by that answer", async () => {
+    const folder = scratch();
+
+    await expect(runSynthesis(options(folder, { topUp: "false" }), async (spec, ask) => {
+      if (ask.seed.endsWith("-2")) {
+        throw new Error("끊김");
+      }
+
+      return { text: JSON.stringify(rowsFor(ask, ask.count)), sessionId: null, tokens: noTokens };
+    })).rejects.toThrow("끊김");
+
+    await expect(runSynthesis(options(folder, { resume: true, topUp: null }), standIn())).rejects.toThrow("이어 갈 수 없습니다");
+
+    const leans: (boolean | string | null)[] = [];
+
+    await runSynthesis(options(folder, { resume: true, topUp: "false" }), standIn((ask) => leans.push(ask.lean)));
+    expect(leans.length).toBeGreaterThan(0);
+    expect(leans.every((lean) => lean === false)).toBe(true);
   });
 
   test("resuming carries the session the dead run was riding", async () => {

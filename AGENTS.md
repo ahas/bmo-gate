@@ -12,8 +12,8 @@ here is a part of BMO:
 BMO holds only the client that asks the service and the configuration of which gate asks.
 
 Most gates' rows ride the codex account; the sanitiser gate, whose attack rows codex refuses at the
-account level, rides the J3090 road instead. While the codex account is shut, a judging pass can
-ride the claude road, pinned to one Claude login.
+account level, rides the J3090 road instead. While the codex account is shut, a judging pass or a
+top-up run can ride the claude road, pinned to one Claude login.
 
 ## The documents, which come before the code
 
@@ -39,7 +39,7 @@ ride the claude road, pinned to one Claude login.
 
 - Bun and TypeScript, no runtime dependencies.
 - `src/` holds the generator, the freezing and resume machinery, the audit, the three roads (codex,
-  J3090 and the claude judging road), the rehearsal, the checkpoint collection, the jake console plumbing that drives the nodes,
+  J3090 and the claude road), the rehearsal, the checkpoint collection, the jake console plumbing that drives the nodes,
   the service's install steps, carrying a checkpoint into service, and the tunnel's door on
   main-host. `src/reference/` is the reference gates' data and `src/train/` the training driver.
 - `scripts/` holds the commands. Each takes `--help`.

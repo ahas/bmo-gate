@@ -6,13 +6,16 @@ train on.
 
 - **The inputs are real.** Every row's state is a turn that really happened, rebuilt in the shape
   that gate really receives, and every candidate a gate is offered is one that room was really
-  offered. Nothing is invented.
+  offered. The one exception is a gate's rarer answer where the rooms hold too little of it, which
+  is topped up with invented rows in training and calibration alone (「Invented data」); the test
+  holds real rows only.
 - **The labels are made afresh.** The verdicts the archive holds were given by gates whose prompts
   and structure have since moved, so they are not what today's gate would answer and are not gold.
   They say which turns a gate was asked about, and that is the whole of what they are used for.
 - **A gate the rooms cannot fill is left short.** It is not filled with written rows. It keeps
   J3090 as its gate until the rooms have said enough, and the gates that are full are trained and
-  moved to Laya first. Which gates those are is counted, not guessed at.
+  moved to Laya first. Which gates those are is counted, not guessed at. A gate the rooms fill with
+  its common answer but starve of its rarer one is not short: its rarer answer is topped up.
 
 ## What it answers to
 
@@ -301,9 +304,9 @@ one HTTPS request per batch against a small MCP service.
 
 ## The claude road
 
-A judging pass can ride Claude Code instead of codex, for the stretch the codex account is shut. It
-judges and writes nothing: the writing driver does not offer it, since writing rows is what the
-choice of a writing road keeps off claude.
+A judging pass, or a writing run that tops up a gate's rarer answer (「Invented data」), can ride
+Claude Code instead of codex, for the stretch the codex account is shut. Both ride it the same way,
+and everything below holds for a writing batch as for a judging one.
 
 - **One login, pinned.** The road rides the second Claude account — the one whose credentials stand
   in `~/.claude` — and no other. It names that directory outright as the CLI's configuration
@@ -317,14 +320,16 @@ choice of a writing road keeps off claude.
   to one.
 - **The tier**: model `claude-sonnet-5`, effort `high`, named on every call, with no fallback model.
   The model that answered is read back off the result, and a batch answered by any other model is a
-  failed batch rather than a label written under a name that did not make it.
+  failed batch rather than a label or a row written under a name that did not make it.
 - **The CLI runs bare of this machine's own setup.** Safe mode, so no `CLAUDE.md`, hook, plugin,
-  skill or MCP server of the machine's rides along; no tools at all; the judge's own few lines
-  replace the default system prompt; nothing is kept of the session. It starts in a directory
+  skill or MCP server of the machine's rides along; no tools at all; the batch's fixed part — the
+  judge's own few lines, or the gate's rules, row format and worked example for a writing batch —
+  replaces the default system prompt; nothing is kept of the session. It starts in a directory
   holding nothing, the same as codex.
 - **One call, one batch, no session.** The batch goes in on stdin and one JSON result comes back:
   the answer is its result text, a result marked as an error is a failed batch carrying its words,
-  and the usage gives fresh input, cache reads, cache writes and output apart.
+  and the usage gives fresh input, cache reads, cache writes and output apart. With no session held,
+  a writing batch's fixed part is sent on every call, and the run says so.
 - **Its unit does not restart on failure.** A spent limit lasts hours or days, and a unit that
   restarted on it would only meet it again. The run ends failed where it stopped, and it is taken
   up with `--resume` once the limit has reset.
@@ -569,27 +574,62 @@ the road, the model and the effort that wrote it; and the wall time.
 
 ## Invented data
 
-A gate that does not run yet has decided nothing, so the rooms may hold too little of it to build on.
-Its data can be invented instead: a model is given what the gate asks and writes the inputs and the
-answers together, against `docs/laya-gates.md` — the split gates, each with its input, its question,
-its answers and its asymmetry, and the language mix and answer balance its rows are drawn to. **No
-gate's data is built this way today**: the rooms are the source, and a gate they cannot fill waits
-for them rather than being filled with written rows. The road is kept because a gate with no rooms
-behind it has nothing else, and the shape it writes is the shape the training reads.
+A model is given what a gate asks and writes the inputs and the answers together, against
+`docs/laya-gates.md` — the split gates, each with its input, its question, its answers and its
+asymmetry, and the language mix and answer balance its rows are drawn to. The shape it writes is the
+shape the training reads.
 
-- **One gate rides one session.** The gate's rules, the row format and its worked example are the
-  system prompt and never move while that gate is being written, so every batch after the first
-  reads them out of the prompt cache. The J3090 road keeps no session and reads the whole prefix
-  afresh on every call, and a run on it says so rather than leaving a cache-read of zero to be
-  explained later.
-- **A run that dies is resumed, not restarted.** The batch plan is fixed by the gate, the rows wanted
-  and the batch size, so a resumed run asks for exactly what the dead one would have asked next.
+**The one use of it today is topping up a rarer answer.** A gate the rooms fill with its common
+answer can still hold its rarer one a few times in a hundred — the leaks content-judge exists to
+catch are rare in a group room precisely because BMO seldom leaks — and a checkpoint trained on that
+learns to give the common answer to everything. The rooms cannot be made to leak more, so the rarer
+answer is written instead, beside the real rows:
+
+```mermaid
+flowchart TB
+  real["judging run<br/>real rows, three splits"]
+  inv["top-up run<br/>rarer answer only<br/>training and calibration"]
+  src["training source<br/>judging:run + top-up"]
+  tr["training + calibration<br/>real and invented"]
+  te["test<br/>real rows only"]
+  real --> src
+  inv --> src
+  src --> tr
+  src --> te
+```
+
+- **A top-up run writes only the rarer answer and holds nothing out for the test.** Every batch leans
+  on that one answer, and its rows split between training and calibration alone. The gate is
+  measured on its real test rows and on nothing written, so a figure it earns is a figure about the
+  rooms.
+- **A top-up row looks like the real rows beside it** — their length, what their transcript holds and
+  where it ends, how the speakers are marked — so the only thing setting it apart is its answer.
+  A written row shorter or tidier than the real ones teaches its own look instead, and the gate
+  learns to spot an invented row rather than a leak. So a gate says what each field of its state
+  holds and how long its real states run, and the prompt carries both.
+- **It is a run of its own**, apart from the judging run it tops up, and the training reads the two
+  together as one source (`docs/training.md`, 「Where the data comes from」). The judging run is left
+  exactly as it was judged.
+- **It rides any writing road**, and the claude road while codex is shut (「The claude road」).
+- **A gate that does not run yet** has decided nothing, so the rooms hold nothing of it at all; the
+  same road can write the whole of its data, drawn to its answer balance. No gate's data is built
+  that way today: a gate the rooms cannot fill waits for them.
+
+- **One gate rides one session** on codex. The gate's rules, the row format and its worked example
+  are the system prompt and never move while that gate is being written, so every batch after the
+  first reads them out of the prompt cache. The J3090 and claude roads keep no session and send the
+  whole prefix afresh on every call, and a run on either says so rather than leaving a cache-read of
+  zero to be explained later.
+- **A run that dies is resumed, not restarted.** The batch plan is fixed by the gate, the rows
+  wanted, the batch size and the answer a top-up leans on, so a resumed run asks for exactly what the
+  dead one would have asked next.
 - **Every row is refused unless it answers its own gate**: the gold naming exactly the answers the
   question declares, the row fitting one Laya call, the transcript in the shape that gate really
   receives, and the language the batch asked for. What was refused and why is counted in the meta.
-- **Nothing invented is measured on a gate that already runs.** For the gates with no code there is
-  nothing else to measure on, and what stands in for a verification there is a sample audit against
-  the specification rather than agreement with a record that does not exist.
+- **Nothing invented is measured on.** A topped-up gate is measured on its real test rows. For the
+  gates with no code there is nothing else to measure on, and what stands in for a verification
+  there is a sample audit against the specification rather than agreement with a record that does
+  not exist.
 - **What audits it** is `bun scripts/laya-audit.ts`, which reports two shares and they are not the
   same one. The first is read off the run's own meta and says what share of everything the model
   wrote survived the generator, which is what says whether the model was any good. The second is
@@ -612,7 +652,9 @@ behind it has nothing else, and the shape it writes is the shape the training re
   is hours and is carried by the unit `bmo-gate-judge`, never by a session.
 - `bun scripts/laya-synth.ts` — write the gates' rows, one codex thread and one folder each. How
   many write at the same time is given, so one gate can be rebuilt on its own or all ten run
-  together. It writes its own log beside the data.
+  together. It writes its own log beside the data. `--top-up <answer>` makes it a top-up run of
+  that one answer with nothing held out for the test, and `--road claude` puts it on the claude
+  road.
 - `bun scripts/laya-status.ts` — how far a run got: batches done against planned, rows kept, lost
   batches, refusals by reason, the road each gate is riding and whether it is still riding a thread.
   It reads the folders and attaches to nothing, so it answers while a run is still going.

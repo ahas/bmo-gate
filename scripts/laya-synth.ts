@@ -1,11 +1,12 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 
+import { claudeAccount, claudeAsker, claudeConfigDir, claudeEffort, claudeModel, claudeTimeoutMs } from "../src/claude-road";
 import { codexAsker, codexEffort, codexModel, codexTimeoutMs, emptyCwd } from "../src/codex-road";
 import { j3090Asker, j3090Effort, j3090Model, j3090TimeoutMs } from "../src/j3090-road";
 import { driveGates } from "../src/gate-run";
 import { asksUsage, allOf, asked, lastOf, readFlags } from "../src/flags";
-import { gatesChosen } from "../src/laya-synth";
+import { answersOf, gatesChosen } from "../src/laya-synth";
 import { refuseInsideCheckout, runFolder } from "../src/roots";
 
 import type { SynthAsker, SynthRoad } from "../src/laya-synth-run";
@@ -23,8 +24,8 @@ const defaultBatch = 20;
 
 const usage = `usage: bun scripts/laya-synth.ts --run <이름> [--gate <게이트>]… [--except <게이트>]…
                                  [--rows <n>] [--batch <n>]
-                                 [--road codex|j3090] [--at-once <n>] [--model <모델>] [--effort <노력>]
-                                 [--timeout <초>] [--resume] [--overwrite]
+                                 [--road codex|j3090|claude] [--top-up <답>] [--at-once <n>]
+                                 [--model <모델>] [--effort <노력>] [--timeout <초>] [--resume] [--overwrite]
 
 게이트마다 실 하나를 붙들고 증류 데이터를 지어 <이름> 실행 폴더 아래에 굳힌다.
 --run 은 런타임 데이터 뿌리 아래의 이름이거나 절대 경로다. 체크아웃 안에는 쓰지 않는다.
@@ -33,6 +34,9 @@ const usage = `usage: bun scripts/laya-synth.ts --run <이름> [--gate <게이�
 --rows 는 게이트당 지을 행 수(기본 ${defaultRows}), --batch 는 한 번에 받을 행 수(기본 ${defaultBatch}).
 --road 는 codex(기본, 실을 붙들어 캐시를 쓴다) 또는 j3090(집의 qwen, 세션도 캐시도 없다).
   codex 가 계정 차원에서 거부하는 게이트를 codex 아닌 길로 이어 지을 때 j3090 을 쓴다.
+  claude 는 2번 Claude 계정(~/.claude)에 못박힌 길로, codex 가 막힌 동안 쓴다. 세션도 캐시도 없다.
+--top-up 은 모든 묶음을 이 답 하나로만 짓고 시험 쪽에는 한 행도 두지 않는다. 실제 판정 회차에
+  모자란 드문 답을 학습·보정 쪽에 보태는 실행이다(docs/gate-data.md 「Invented data」).
 --at-once 는 동시에 쓸 게이트 수(기본: 고른 게이트 전부).
 --resume 은 쓰다 만 실행을 그다음 묶음부터 이어 간다. 이미 굳은 게이트는 그대로 둔다.
   다른 길로 이어 지어도 굳은 묶음은 그대로 두고 그다음부터 새 길로 짓는다.
@@ -50,7 +54,7 @@ if (asksUsage(argv)) {
 }
 
 const reading = readFlags(argv, {
-  "--run": true, "--gate": true, "--except": true, "--rows": true, "--batch": true, "--road": true, "--at-once": true,
+  "--run": true, "--gate": true, "--except": true, "--rows": true, "--batch": true, "--road": true, "--top-up": true, "--at-once": true,
   "--model": true, "--effort": true, "--timeout": true, "--resume": false, "--overwrite": false,
 });
 
@@ -86,15 +90,25 @@ const gates = chosen;
 
 const road = (lastOf(reading, "--road") ?? "codex") as SynthRoad;
 
-if (road !== "codex" && road !== "j3090") {
-  console.error("laya-synth: --road 는 codex 또는 j3090 입니다.");
+if (road !== "codex" && road !== "j3090" && road !== "claude") {
+  console.error("laya-synth: --road 는 codex, j3090, claude 가운데 하나입니다.");
+  process.exit(2);
+}
+
+const topUp = lastOf(reading, "--top-up") ?? null;
+const unanswerable = topUp === null ? [] : gates.filter((gate) => !answersOf(gate.questions[0]!).includes(topUp));
+
+if (unanswerable.length > 0) {
+  console.error(`laya-synth: ${unanswerable.map((gate) => gate.gate).join(", ")} 에는 ${topUp} 라는 답이 없습니다.`);
   process.exit(2);
 }
 
 // Each road brings its own model, its own effort and its own wait, and the asker that speaks it.
 const roadDefaults = road === "j3090"
   ? { model: j3090Model, effort: j3090Effort, timeoutSeconds: j3090TimeoutMs / 1000 }
-  : { model: codexModel, effort: codexEffort, timeoutSeconds: codexTimeoutMs / 1000 };
+  : road === "claude"
+    ? { model: claudeModel, effort: claudeEffort, timeoutSeconds: claudeTimeoutMs / 1000 }
+    : { model: codexModel, effort: codexEffort, timeoutSeconds: codexTimeoutMs / 1000 };
 
 const rows = Number(lastOf(reading, "--rows") ?? String(defaultRows));
 const batchSize = Number(lastOf(reading, "--batch") ?? String(defaultBatch));
@@ -123,16 +137,25 @@ function say(line: string): void {
 
 const started = Date.now();
 
-// The asker for the chosen road. Codex works in a directory holding nothing so no checkout's
-// AGENTS.md is carried into a batch; J3090 is one request over HTTPS and has no such directory.
+// The asker for the chosen road. Codex and claude work in a directory holding nothing so no
+// checkout's AGENTS.md is carried into a batch; J3090 is one request over HTTPS and has no such
+// directory.
 const asker: SynthAsker = road === "j3090"
   ? j3090Asker({ model, timeoutMs })
-  : codexAsker({ model, effort, timeoutMs });
+  : road === "claude"
+    ? claudeAsker({ model, effort, timeoutMs })
+    : codexAsker({ model, effort, timeoutMs });
 
 say(`${root}: ${gates.length}게이트, 게이트당 ${rows}행, 한 묶음 ${batchSize}행, 동시에 ${Math.min(atOnce, gates.length)}개.`);
 say(road === "j3090"
   ? `모델 ${model} (${effort}), 길 j3090.`
-  : `모델 ${model} (${effort}), 길 codex. 작업 폴더 ${emptyCwd()}.`);
+  : road === "claude"
+    ? `모델 ${model} (${effort}), 길 claude — ${claudeConfigDir()} 의 ${claudeAccount} 에 못박힘. 작업 폴더 ${emptyCwd()}.`
+    : `모델 ${model} (${effort}), 길 codex. 작업 폴더 ${emptyCwd()}.`);
+
+if (topUp !== null) {
+  say(`드문 답 보태기: 모든 묶음을 ${topUp} 로 짓고, 시험 쪽에는 두지 않습니다.`);
+}
 
 const outcomes = await driveGates({
   root,
@@ -142,7 +165,9 @@ const outcomes = await driveGates({
   model,
   effort,
   road,
-  shares: { calibration: 0.15, test: 0.15 },
+  // A top-up's rows are held out of the test, which is the real rows' alone.
+  shares: { calibration: 0.15, test: topUp === null ? 0.15 : 0 },
+  topUp,
   atOnce,
   resume: asked(reading, "--resume"),
   overwrite: asked(reading, "--overwrite"),

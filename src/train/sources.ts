@@ -1,8 +1,9 @@
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 
-import { growingCounts, mergeGates, readsAsRehearsal } from "../gate-merge";
+import { growingCounts, mergeGates, rarerOf, readsAsRehearsal } from "../gate-merge";
+import { datasetSplits } from "../laya-dataset";
 import { splitFiles } from "../laya-frozen";
 import { gateDataFile, gatesFolder } from "../reference/tick";
 import { dataPath, runFolder } from "../roots";
@@ -99,6 +100,110 @@ export function folderSource(folder: string): GateSource {
     },
     bars: (): GateBars => ({ floor: 0, rarer: 0 }),
     copy: (gate, to) => copyGateRows(folder, gate, to),
+  };
+}
+
+// The rows a top-up run holds for one gate, read at its whole batches the way a judging run is, and
+// only its training and calibration: the test stays the topped-up source's own.
+function topUpRows(root: string, gate: string): string[] | string {
+  const parts = growingCounts(root);
+
+  if (typeof parts === "string") {
+    return parts;
+  }
+
+  if (!parts.some((part) => part.gate === gate)) {
+    return [];
+  }
+
+  const scratch = mkdtempSync(join(tmpdir(), "bmo-gate-topup-"));
+
+  try {
+    const merged = mergeGates({ root, into: scratch, gates: [gate], overwrite: true, growing: true });
+
+    if (typeof merged === "string") {
+      return merged;
+    }
+
+    return (["train", "calibration"] as const).flatMap((split) => readLines(join(merged.folder, splitFiles[split])))
+      .filter((line) => (JSON.parse(line) as DatasetRow).gate === gate);
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+}
+
+function readLines(path: string): string[] {
+  return existsSync(path) ? readFileSync(path, "utf8").split("\n").filter((line) => line.trim() !== "") : [];
+}
+
+// The source's own copy of a gate with a top-up run's rows added to its training and calibration,
+// each in the split it was made in.
+function copyToppedUp(base: GateSource, root: string, gate: string, to: string): GateCopy | string {
+  const own = base.copy(gate, to);
+
+  if (typeof own === "string") {
+    return own;
+  }
+
+  const added = topUpRows(root, gate);
+
+  if (typeof added === "string") {
+    return added;
+  }
+
+  const standing = new Set(own.ids);
+
+  for (const line of added) {
+    const row = JSON.parse(line) as DatasetRow;
+
+    if (!standing.has(row.id)) {
+      appendFileSync(join(to, splitFiles[row.split]), `${line}\n`);
+    }
+  }
+
+  return copyGateRows(to, gate, to);
+}
+
+// A source topped up with a top-up run's rows for the rarer answer the rooms hold too little of
+// (docs/training.md, 「Where the data comes from」). Its bars are the source's own, and it is named
+// after both so its curve is a series of its own.
+export function toppedUp(base: GateSource, run: string, root: string = runFolder(run)): GateSource {
+  return {
+    // Joined by a dot, which a checkpoint's run name takes where a plus is refused.
+    name: `${base.name}.${basename(root)}`,
+    rehearsal: base.rehearsal,
+    counts: () => {
+      const counted = base.counts();
+
+      if (typeof counted === "string") {
+        return counted;
+      }
+
+      const scratch = mkdtempSync(join(tmpdir(), "bmo-gate-topup-count-"));
+
+      try {
+        const out: GateCount[] = [];
+
+        for (const count of counted) {
+          const copy = copyToppedUp(base, root, count.gate, join(scratch, count.gate));
+
+          if (typeof copy === "string") {
+            return copy;
+          }
+
+          const rows = datasetSplits.flatMap((split) => readLines(join(copy.folder, splitFiles[split])))
+            .map((line) => JSON.parse(line) as DatasetRow);
+
+          out.push({ ...count, rows: copy.rows, rarer: rarerOf(rows) });
+        }
+
+        return out;
+      } finally {
+        rmSync(scratch, { recursive: true, force: true });
+      }
+    },
+    bars: (gate) => base.bars(gate),
+    copy: (gate, to) => copyToppedUp(base, root, gate, to),
   };
 }
 
