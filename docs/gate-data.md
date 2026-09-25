@@ -86,6 +86,10 @@ asked, with no answer on either.
   markdown of every message people received is that judgement's own material, and it outlives every
   log. A message of any length is a row, reduced to what the gate is shown; a message with no line
   break and no more than 120 characters never reaches the gate and is not a row.
+- **The content gate's material is BMO's answers to a group room's words.** That gate never reads
+  하스's private chat nor a round that carries no room word, so an answer there is no row of it; the
+  archive marks neither, and the rows keep the answers that stand right after a person's message
+  within one turn's gap (`docs/laya-gates.md`, 「6. 답변 내용 게이트」).
 - **Nothing is read of the brain, and nothing is written to the archive.**
 
 ## What leaves the rooms
@@ -415,6 +419,39 @@ Everything a run makes stands under one folder named for the run.
   believes them.
 - **A folder holding a half-written run is refused too**, and the refusal names both ways out:
   continue it, or start it over.
+
+## A gate whose question moved
+
+A gold answers the question its row carried when it was judged. A gate whose question, its answers,
+the rooms it stands in or the shape of its input have moved keeps none of its rows: an old gold says
+nothing about the new question, and since a row's id is the hash of its state and its questions, no
+old row is ever one of the new ones.
+
+- **The gate is rebuilt whole, never topped up.** Mixing the old rows in would teach the old question
+  under the new one's words.
+- **It is rebuilt in a run folder of its own**, never in the folder the other gates share. Building
+  rows writes the build moment onto the run, and every gate's frozen batches in that folder are bound
+  to it: rebuilding one gate there would refuse every other gate's resume.
+- **The rows are counted before any judgement is bought.** The count says whether the rooms hold
+  enough of the gate's material under its new question to clear the floors at all.
+- **The gate's rows in the shared folder stay where they are** and answer the old question. A
+  checkpoint trained on them is not put in service for the gate; the one trained from the new folder
+  is.
+
+In order, with the rebuilt gate's own run name:
+
+1. `bun scripts/laya-real.ts --gate <gate>` — the count, writing nothing.
+2. `bun scripts/laya-real.ts <run> --gate <gate>` — the unjudged rows, in the run's own folder.
+3. The judging, which is hours and is carried by a unit rather than a session: from this checkout,
+   `systemd-run --user --unit bmo-gate-judge-<run> --same-dir -E PATH="$PATH" -p Restart=on-failure
+   bun scripts/laya-judge.ts <run> --gate <gate> --road codex --batch 20 --resume`. It always
+   resumes, so a restart takes up at the batch after the last one frozen, as the standing unit does.
+4. The readings that close a run on that run: `bun scripts/laya-audit.ts` for the verdict and
+   `bun scripts/laya-ledger.ts` for the ledger.
+5. The training: `bun scripts/laya-train.ts judging:<run> --gate <gate>`, a source whose curve is
+   its own (`docs/training.md`, 「A pass」).
+6. The checkpoint into service with `bun scripts/laya-serve.ts <gate>/<run>/step-<n> --gate <gate>`
+   (`docs/laya-server.md`).
 
 ## The bars a gate must clear
 

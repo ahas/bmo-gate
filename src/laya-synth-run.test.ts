@@ -193,6 +193,12 @@ describe("the batch plan", () => {
     expect(new Set(plan.map((ask) => ask.room))).toEqual(new Set(["owner", "group", "ai"]));
     expect(plan.filter((ask) => ask.edge).length).toBeGreaterThan(plan.length / 4);
   });
+
+  test("sets a gate's batches only in the rooms it stands in", () => {
+    const plan = plannedBatches(gate("content-judge"), 300, 10);
+
+    expect(new Set(plan.map((ask) => ask.room))).toEqual(new Set(["group", "ai"]));
+  });
 });
 
 describe("the folder guard", () => {

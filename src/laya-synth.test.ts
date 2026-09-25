@@ -432,6 +432,15 @@ describe("the validator refuses", () => {
     expect(validateSynthRow(replies, row, "korean")).toMatchObject({ ok: false, refusal: "bad-state-field" });
   });
 
+  test("a content-judge row set in 하스's private chat, where the gate never stands — bad-state-field", () => {
+    const content = gate("content-judge");
+    const row = copyOf(content.example);
+
+    (row.state as { room: string }).room = "owner";
+
+    expect(validateSynthRow(content, row, "korean")).toMatchObject({ ok: false, refusal: "bad-state-field" });
+  });
+
   test("a state field missing altogether — bad-state-field", () => {
     const replies = gate("reply-wanted");
     const row = copyOf(replies.example);

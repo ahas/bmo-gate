@@ -103,6 +103,25 @@ describe("contentJudgeRows", () => {
     expect(state.answer).toBe("일곱 시로 잡아 둘까요?");
     expect(state.recent.length).toBeGreaterThan(0);
   });
+
+  test("builds no row in 하스's private chat, where the gate never stands", () => {
+    const own = room.map((one) => ({ ...one, chatId: ownerId }));
+
+    expect(contentJudgeRows(own, settings())).toEqual([]);
+  });
+
+  test("leaves out what answered no person's words: a line after BMO's own, or one past the turn's gap", () => {
+    const answered = said(51_078_230, "Creeper", "비모야 내일 일정 알려 줘");
+    const reply = said(bmoId, "BMO", "내일은 열 시에 모여요.", { sentAt: answered.sentAt + 5 });
+    const report = said(bmoId, "BMO", "빌드 끝났어요.", { sentAt: reply.sentAt + 5 });
+    const notice = said(bmoId, "BMO", "점검 알림이에요.", { sentAt: report.sentAt + 3_600 });
+    const late = said(29_071_912, "정수 배", "고마워", { sentAt: notice.sentAt + 5 });
+    const stale = said(bmoId, "BMO", "하루 지난 알림이에요.", { sentAt: late.sentAt + 86_400 });
+    const answers = contentJudgeRows([...room, answered, reply, report, notice, late, stale], settings())
+      .map((row) => (row.state as { answer: string }).answer);
+
+    expect(answers).toEqual(["일곱 시로 잡아 둘까요?", "내일은 열 시에 모여요."]);
+  });
 });
 
 describe("outputFormatRows", () => {

@@ -170,11 +170,19 @@ export function replyWantedRows(room: readonly ArchivedMessage[], settings: Real
 
 // 답변 내용 게이트 — the kind of room, as many of the room's latest messages as fit beside the
 // answer, and the candidate answer whole. The answer is one BMO really gave, which is the only
-// candidate answer the archive holds.
+// candidate answer the archive holds. The gate checks only a group room's answers to the room's
+// words, and the archive marks neither which answers those were nor which were a report or a
+// notice: an answer standing right after a person's message within one turn's gap is taken for one.
 export function contentJudgeRows(room: readonly ArchivedMessage[], settings: RealSettings): UnjudgedRow[] {
   const gate = "content-judge";
-  const questions = questionsOf(gate);
   const kind = roomKindOf(room[0]?.chatId ?? 0, settings.who.ownerId);
+
+  if (kind === "owner") {
+    return [];
+  }
+
+  const questions = questionsOf(gate);
+  const gapSeconds = settings.turnGapSeconds ?? defaultTurnGapSeconds;
   const rows: UnjudgedRow[] = [];
   const index = indexOf(room);
   const lines = room.map((one) => roomShapeLine(one, index, settings.who));
@@ -185,6 +193,12 @@ export function contentJudgeRows(room: readonly ArchivedMessage[], settings: Rea
     }
 
     if (one.senderId !== settings.who.bmoId || !hasText(one)) {
+      continue;
+    }
+
+    const asked = room[at - 1];
+
+    if (asked === undefined || asked.senderId === settings.who.bmoId || one.sentAt - asked.sentAt > gapSeconds) {
       continue;
     }
 

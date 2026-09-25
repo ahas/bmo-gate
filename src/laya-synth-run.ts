@@ -85,13 +85,14 @@ export function plannedBatches(spec: GateSynthesis, rows: number, batchSize: num
     // answer taking one language — and then anything that costs a language its batches costs that
     // answer every row it had.
     const among = Math.max(1, Math.ceil((batches - (index % answers.length)) / answers.length));
+    const rooms = spec.rooms ?? roomKinds;
 
     asks.push({
       gate: spec.gate,
       count: Math.min(size, Math.max(1, rows) - index * size),
       language: languageAt(spec, Math.floor(index / answers.length), among),
       lean: spec.questions[0]!.type === "noul" ? answer === "true" : answer,
-      room: roomKinds[index % roomKinds.length]!,
+      room: rooms[index % rooms.length]!,
       // A third of the batches are the hard cases, which is where an asymmetric gate is decided.
       edge: index % 3 === 2,
       seed: `${spec.gate}-${index + 1}`,

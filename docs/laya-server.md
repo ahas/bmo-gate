@@ -79,7 +79,7 @@ asks (BMO's `docs/laya.md`).
   | `situation-rules` | `situation-rules` | served |
   | `system-documents` | `system-documents` | served (`real-1-hand2`); below the bar on real turns (`docs/reference-data.md`) |
   | `people-search` | `people-search` | none trained yet, refused |
-  | `content-judge` | `content-judge` | trained, not served: the gate's mode is `off` |
+  | `content-judge` | `content-judge` | not served: the gate's mode is `off`, and its trained checkpoint answers a question the gate no longer asks (`docs/gate-data.md`, 「A gate whose question moved」) |
   | `reply-wanted` | none — no gate code in BMO | trained, not served |
   | `sanitizer` | `sanitizer` | not trained |
 

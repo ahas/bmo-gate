@@ -126,7 +126,7 @@ in the proportion that gate really meets.
   | 서고 지식 분류기 | 75% | 8% | 17% | the knowledge library holds working knowledge, so the turns that reach for it lean technical more often than an ordinary room's |
   | 상황 규칙 매칭기 | 80% | 5% | 15% | a situation is the room's own talk and a rule is written in the room's language |
   | 출력 서식 | 65% | 5% | 30% | BMO's answers are Korean by the answer-language rule and carry code blocks, paths and logs inside them more often than any other gate's input |
-  | 답변 내용 게이트 | 75% | 5% | 20% | the candidate answer and the room's recent messages together: BMO's Korean prose with technical fragments embedded |
+  | 답변 내용 게이트 | 75% | 5% | 20% | the candidate answer and a group room's recent messages together: BMO's Korean prose with technical fragments embedded |
   | 무해화 게이트 | 40% | 35% | 25% | what it reads is carried material — job prompts, fetched pages, documents, logs — whose English share is far larger than any room's |
   | 인물북 서칭 | 80% | 5% | 15% | the turn's own messages in a room where people are being talked about |
   | 응답 여부 판정기 | 80% | 5% | 15% | a room's recent talk, which is the room's own language |
@@ -349,17 +349,31 @@ gate on each road, same bar, same audit.
 
 ## 6. 답변 내용 게이트
 
-- **Status:** runs today with its own probe. The split leaves it as it stands.
-- **Input:** the kind of room, `owner` or `group`; as many of the room's latest messages as fit beside
-  the answer, in the room shape, newest first to go in and oldest first to stay out; and the
+- **Status:** runs today with its own probe, as the leak check on a group room's answers. The split
+  leaves it as it stands.
+- **Where it stands:** only in a group room, and only on a round that read the room's words. 하스's
+  private chat is never checked, and neither is a round carrying no room word — a job's report, a
+  notice (BMO's `docs/content-gate.md`, 「Where it stands」).
+- **Input:** the kind of room, which is always `group`; as many of the room's latest messages as fit
+  beside the answer, in the room shape, newest first to go in and oldest first to stay out; and the
   candidate answer whole. An answer that does not fit on its own is past the gate's reach and is not
   a row.
-- **Question:** one yes/no — 「이 답변은 채팅방의 대화 흐름에 맞고 답변 내용 규칙(반복 없음, 받을 사람
-  빠짐없음, 끼어들 차례가 맞음)을 지키는가?」
-- **Answers:** PASS or FAIL.
-- **Asymmetry:** yes, and PASS is the safe answer. A PASS Laya settles stands in as the judge's own
-  pass, deferring no message. A FAIL, the reason behind it, the rewrite and any appended passage are
-  always the model's, because only the model can name them.
+- **Which answers are rows:** an answer BMO gave in a group room right after a person's message, no
+  further from it than one turn's gap. The archive does not mark which of BMO's messages answered
+  the room's words, so an answer whose line in front is BMO's own, or stands further back than that
+  gap, is taken for a report or a notice and is not a row.
+- **Question:** one yes/no — 「이 답변은 단체방이 들으면 안 되는 것 — 구성원의 사생활, 다른 방의 이야기,
+  비모 자신의 시스템 — 을 드러내지 않는가?」
+- **What it never asks:** whether this is BMO's moment to speak, whether the answer repeats itself,
+  whom it answers and whom it leaves out, how long it is, whether its facts are true. Those are BMO's
+  own rulebooks' and its code's.
+- **Answers:** PASS, nothing the room must not hear stands in the answer; or FAIL.
+- **Asymmetry:** yes, and PASS is the only answer Laya may settle. A PASS Laya settles stands in as
+  the judge's own pass. A FAIL and the reason naming what leaks are always the model's, because only
+  the model can name them, and the rewrite belongs to the session that wrote the answer. Nothing is
+  appended to an answer that passes.
+  - **A wrong PASS is the expensive mistake**, since it lets a leak into the room. PASS is settleable
+    because it is the only answer that saves anything, and what makes it safe is τ, which is 하스's.
 
 ## 7. 무해화 게이트
 
@@ -398,11 +412,11 @@ gate on each road, same bar, same audit.
 - **Answers:** 비모에게 한 말이다, or 확실히 비모에게 한 말이 아니다.
 - **Asymmetry:** yes, and the only answer Laya may settle is 확실히 비모에게 한 말이 아니다. Anything
   else, however confident, wakes BMO.
-  - **This asymmetry is the opposite of the other two's in its reasoning.** The content gate and the
-    sanitiser let Laya settle the answer that is cheap to be wrong about. Here the settleable answer
-    is the expensive one — a message wrongly judged not to be BMO's is an answer never given — and it
-    is settleable because it is the only answer that saves anything: settling 「비모에게 한 말이다」
-    runs BMO, which is what would have happened anyway.
+  - **This asymmetry is the opposite of the sanitiser's in its reasoning, and the content gate's
+    twin.** The sanitiser lets Laya settle the answer that is cheap to be wrong about. Here, as in the
+    content gate, the settleable answer is the expensive one — a message wrongly judged not to be
+    BMO's is an answer never given — and it is settleable because it is the only answer that saves
+    anything: settling 「비모에게 한 말이다」 runs BMO, which is what would have happened anyway.
   - **What makes it safe is τ, set high**, and that number is 하스's. Verification of this gate counts
     the missed calls — the messages that wanted an answer and were judged not to — as a figure of its
     own, apart from accuracy.
