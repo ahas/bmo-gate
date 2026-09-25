@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import sys
 import threading
+import time
 import unittest
 import urllib.error
 import urllib.request
@@ -13,7 +15,7 @@ from http.server import ThreadingHTTPServer
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from server import Decider, handler_for, read_checkpoints, read_token  # noqa: E402
+from server import CardFull, Decider, ForwardFailed, guard_forward, handler_for, read_checkpoints, read_token  # noqa: E402
 
 TOKEN = "test-token"
 
@@ -23,6 +25,10 @@ class StandIn:
 
     def __init__(self, gate, moves, full=0):
         self.gate = gate
+        # Decisions that run out of card before one fits, and a hold a decision waits on.
+        self.tight = 0
+        self.hold = None
+        self.holding = threading.Event()
         self.source = f"checkpoints/{gate}/run/step-000001"
         self.load_ms = 1000
         self.on_card = False
@@ -46,6 +52,12 @@ class StandIn:
         pass
 
     def predict(self, state, questions):
+        if self.hold is not None:
+            self.holding.set()
+            self.hold.wait(5)
+        if self.tight > 0:
+            self.tight -= 1
+            raise CardFull("OutOfMemoryError: CUDA out of memory. Tried to allocate 520 MiB")
         self.asked.append((state, questions))
         if "overflow" in questions:
             raise ValueError("question 'overflow' options exceed head_max_len=192")
@@ -142,6 +154,48 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(self.gates["output-decide"].asked, [])
         self.assertEqual(self.call("/decide", noul("output-decide"))[0], 200)
 
+    def test_a_decision_that_runs_out_of_card_makes_room_and_keeps_it(self):
+        self.serve(["output-decide", "library-knowledge", "room-rules"], card_models=3)
+        for gate in ["output-decide", "library-knowledge", "room-rules"]:
+            self.assertEqual(self.call("/decide", noul(gate))[0], 200)
+        self.gates["room-rules"].tight = 2
+        self.assertEqual(self.call("/decide", noul("room-rules"))[0], 200)
+        self.assertEqual(self.moves[3:], [("off", "output-decide"), ("off", "library-knowledge")])
+        self.assertEqual(len(self.gates["room-rules"].asked), 2)
+        health = self.call("/health")[1]
+        self.assertEqual((health["cardModels"], health["roomMade"]), (1, 1))
+
+        self.assertEqual(self.call("/decide", noul("output-decide"))[0], 200)
+        self.assertEqual(self.moves[5:], [("off", "room-rules"), ("on", "output-decide")])
+
+    def test_a_decision_that_does_not_fit_alone_is_no_room(self):
+        self.gates["output-decide"].tight = 1
+        status, body = self.call("/decide", noul("output-decide"))
+        self.assertEqual(status, 503)
+        self.assertIn("no room", body["error"])
+        self.assertEqual(self.gates["output-decide"].asked, [])
+        self.assertEqual(self.call("/decide", noul("output-decide"))[0], 200)
+
+    def test_a_call_whose_caller_left_before_its_turn_is_dropped_unasked(self):
+        first = self.gates["output-decide"]
+        first.hold = threading.Event()
+        ahead = threading.Thread(target=self.call, args=("/decide", noul("output-decide")))
+        ahead.start()
+        self.assertTrue(first.holding.wait(5))
+        body = json.dumps(noul("library-knowledge")).encode()
+        with socket.create_connection(self.server.server_address) as gone:
+            gone.sendall(b"POST /decide HTTP/1.1\r\nHost: laya\r\nAuthorization: Bearer " + TOKEN.encode()
+                         + b"\r\nContent-Type: application/json\r\nContent-Length: " + str(len(body)).encode()
+                         + b"\r\n\r\n" + body)
+        first.hold.set()
+        ahead.join(5)
+        deadline = time.monotonic() + 5
+        while self.call("/health")[1]["droppedCalls"] < 1:
+            self.assertLess(time.monotonic(), deadline, "the call whose caller left was never dropped")
+            time.sleep(0.01)
+        self.assertEqual(len(first.asked), 1)
+        self.assertEqual(self.gates["library-knowledge"].asked, [])
+
     def test_malformed_requests_are_refused_without_asking(self):
         question = {"a": {"type": "noul", "instructions": "x"}}
         cases = [
@@ -168,6 +222,44 @@ class ServerTest(unittest.TestCase):
     def test_unknown_paths(self):
         self.assertEqual(self.call("/nothing")[0], 404)
         self.assertEqual(self.call("/health", {"state": "x"})[0], 404)
+
+
+class GuardedForwardTest(unittest.TestCase):
+    """The forward pass a checkpoint runs, as Laya's own fallback to the CPU sees it."""
+
+    class Model:
+        def __init__(self, failure=None):
+            self.failure = failure
+
+        def forward(self, x):
+            if self.failure is not None:
+                raise self.failure
+            return x * 2
+
+    def decide_as_laya(self, model):
+        # Laya catches a RuntimeError out of the forward pass and decides on the CPU instead.
+        try:
+            return model.forward(3)
+        except RuntimeError:
+            return "cpu"
+
+    def test_a_pass_that_works_is_untouched(self):
+        model = self.Model()
+        guard_forward(model)
+        self.assertEqual(self.decide_as_laya(model), 6)
+
+    def test_a_card_that_runs_out_never_reaches_the_cpu(self):
+        model = self.Model(RuntimeError("CUDA out of memory. Tried to allocate 520.00 MiB"))
+        guard_forward(model)
+        with self.assertRaises(CardFull) as raised:
+            self.decide_as_laya(model)
+        self.assertIsNone(raised.exception.__context__)
+
+    def test_any_other_failure_of_the_pass_never_reaches_the_cpu(self):
+        model = self.Model(RuntimeError("CUDA error: an illegal memory access was encountered"))
+        guard_forward(model)
+        with self.assertRaises(ForwardFailed):
+            self.decide_as_laya(model)
 
 
 class CheckpointsSettingTest(unittest.TestCase):

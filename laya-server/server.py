@@ -11,6 +11,7 @@ import hmac
 import json
 import os
 import re
+import socket
 import sys
 import threading
 import time
@@ -47,7 +48,21 @@ class Unserved(Refused):
 
 
 class NoRoom(Exception):
-    """The card would not take the checkpoint asked for, even with every other one taken off it."""
+    """The card would not take the checkpoint asked for, or its decision, even with every other one
+    taken off it."""
+
+
+class CardFull(Exception):
+    """A forward pass that ran out of card. Not a RuntimeError, so Laya's own fallback to the CPU,
+    which catches those, never sees it."""
+
+
+class ForwardFailed(Exception):
+    """A forward pass that failed any other way, kept from Laya's fallback to the CPU the same way."""
+
+
+class CallerLeft(Exception):
+    """The caller hung up before its turn at the card came."""
 
 
 def read_token(env: Optional[Dict[str, str]] = None) -> str:
@@ -120,6 +135,7 @@ class Checkpoint:
         self.device = agent.device
         self.dtype = agent.dtype
         self.on_card = True
+        guard_forward(agent.model)
         self.slots = []
         for module in agent.model.modules():
             for table in (module._parameters, module._buffers):
@@ -172,11 +188,30 @@ def is_out_of_memory(error: BaseException) -> bool:
     return "out of memory" in str(error).lower()
 
 
+def guard_forward(model: Any) -> None:
+    """Make the model's forward pass fail as CardFull or ForwardFailed rather than a RuntimeError, so
+    Laya's own fallback to the CPU never runs and a decision that ran out of card is the Decider's to
+    make room for. The error is let go before its stand-in is raised, so the activations its frames
+    held are free by the time the room is made."""
+    forward = model.forward
+
+    def guarded(*args: Any, **kwargs: Any) -> Any:
+        try:
+            return forward(*args, **kwargs)
+        except RuntimeError as error:
+            failed = CardFull if is_out_of_memory(error) else ForwardFailed
+            reason = f"{type(error).__name__}: {str(error)[:300]}"
+        raise failed(reason)
+
+    model.forward = guarded
+
+
 class Decider:
     """The gates' checkpoints and the card they take turns on. One decision at a time.
 
     At most card_models checkpoints are on the card; asking a gate whose checkpoint waits in host
-    memory takes the least recently asked one off first.
+    memory takes the least recently asked one off first. A decision that runs out of card lowers
+    card_models to the number that left it room.
     """
 
     def __init__(self, checkpoints: Dict[str, Any], card_models: int, device: str, versions: Dict[str, str],
@@ -187,6 +222,8 @@ class Decider:
         self.versions = versions
         self.vram = vram
         self.lock = threading.Lock()
+        self.room_made = 0
+        self.dropped_calls = 0
         # Least recently asked first: the order checkpoints leave the card in.
         self.card: "OrderedDict[str, Any]" = OrderedDict(
             (gate, checkpoint) for gate, checkpoint in checkpoints.items() if checkpoint.on_card)
@@ -214,15 +251,39 @@ class Decider:
                 raise
         self.card[checkpoint.gate] = checkpoint
 
-    def decide(self, gate: str, state: Any, questions: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+    def predict_on_card(self, checkpoint: Any, state: Any, questions: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        """The checkpoint's decision, made on the card. One that runs out of card is asked again with the
+        least recently asked other checkpoint taken off, until the asking one is alone there."""
+        made_room = False
+        while True:
+            try:
+                result = checkpoint.predict(state, questions)
+                break
+            except CardFull:
+                pass
+            others = [gate for gate in self.card if gate != checkpoint.gate]
+            if not others:
+                raise NoRoom(f"the card has no room for this {checkpoint.gate} decision even with its checkpoint alone on it")
+            self.card.pop(others[0]).take_off_card()
+            made_room = True
+        if made_room:
+            self.room_made += 1
+            self.card_models = len(self.card)
+        return result
+
+    def decide(self, gate: str, state: Any, questions: Dict[str, Dict[str, Any]],
+               caller_waiting: Callable[[], bool] = lambda: True) -> Dict[str, Any]:
         checkpoint = self.checkpoints.get(gate)
         if checkpoint is None:
             raise Unserved(f"no checkpoint here serves the gate {gate}")
         started = time.perf_counter()
         with self.lock:
+            if not caller_waiting():
+                self.dropped_calls += 1
+                raise CallerLeft(f"the caller of a {gate} decision left before its turn")
             self.bring(checkpoint)
             try:
-                result = checkpoint.predict(state, questions)
+                result = self.predict_on_card(checkpoint, state, questions)
             except ValueError as error:
                 # Laya's own refusal of a question it cannot lay out (options past its head budget).
                 raise Refused(str(error)) from error
@@ -243,6 +304,8 @@ class Decider:
             "vramBytes": self.vram(),
             "loadMs": sum(checkpoint.load_ms for checkpoint in self.checkpoints.values()),
             "cardModels": self.card_models,
+            "roomMade": self.room_made,
+            "droppedCalls": self.dropped_calls,
             "versions": self.versions,
             "gates": {gate: checkpoint.described() for gate, checkpoint in self.checkpoints.items()},
         }
@@ -260,11 +323,25 @@ def handler_for(decider: Decider, token: str):
 
         def answer(self, status: int, payload: Dict[str, Any]) -> None:
             data = json.dumps(payload, ensure_ascii=False).encode()
-            self.send_response(status)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.send_header("Content-Length", str(len(data)))
-            self.end_headers()
-            self.wfile.write(data)
+            try:
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+            except (BrokenPipeError, ConnectionResetError):
+                self.close_connection = True
+                decider.dropped_calls += 1
+                sys.stderr.write(f"{self.address_string()} left before its answer\n")
+
+        def caller_waiting(self) -> bool:
+            """Whether the caller still holds its end of the connection: one it closed reads as ended."""
+            try:
+                return self.connection.recv(1, socket.MSG_PEEK | socket.MSG_DONTWAIT) != b""
+            except (BlockingIOError, InterruptedError):
+                return True
+            except OSError:
+                return False
 
         def authorised(self) -> bool:
             given = (self.headers.get("Authorization") or "").encode()
@@ -296,7 +373,10 @@ def handler_for(decider: Decider, token: str):
                 except json.JSONDecodeError as error:
                     raise Refused("the body is not JSON") from error
                 gate, state, questions = check_request(body)
-                self.answer(HTTPStatus.OK, decider.decide(gate, state, questions))
+                self.answer(HTTPStatus.OK, decider.decide(gate, state, questions, self.caller_waiting))
+            except CallerLeft as error:
+                self.close_connection = True
+                sys.stderr.write(f"{self.address_string()} {error}\n")
             except Refused as error:
                 self.answer(error.status, {"error": str(error)})
             except NoRoom as error:

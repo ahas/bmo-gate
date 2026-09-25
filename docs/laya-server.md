@@ -37,15 +37,22 @@ asks (BMO's `docs/laya.md`).
 - **Its two calls:**
   - `GET /health` — for each gate it serves, the checkpoint directory, whether it is on the card now,
     how long it took to load and the calibration temperatures it carries; beside those the device,
-    the VRAM the process holds, how many checkpoints may be on the card at once, and the Laya and
-    torch versions. Its `model` line names every gate with its checkpoint, so a change of any one of
-    them is a change of the model a watcher sees.
+    the VRAM the process holds, how many checkpoints may be on the card at once, how many decisions
+    ran out of card and were asked again with room made (`roomMade`), how many calls were dropped
+    because their caller had left (`droppedCalls`), and the Laya and torch versions. Its `model` line
+    names every gate with its checkpoint, so a change of any one of them is a change of the model a
+    watcher sees.
   - `POST /decide` — the gate asking, a state and a set of named questions in, Laya's answer for each
     question out, as that gate's checkpoint gives it: the probabilities, the chosen option and the
     confidence. A call that names no gate is refused as a request it cannot read (400); one that names
     a gate no checkpoint serves is refused as not served here (404); one whose checkpoint cannot be put
     on the card because something else holds it is answered 503, and none of them is asked of a
-    checkpoint.
+    checkpoint. A decision that does not fit on the card even with its checkpoint alone there is
+    answered 503 too (「Sharing the card」).
+- **One decision at a time.** Calls wait in line for the card. A call whose caller has hung up by the
+  time its turn comes — the front gave up on it — is dropped unasked, with one log line and no answer,
+  so calls nobody waits for any more never hold up the ones behind them. An answer whose caller left
+  while it was being made is dropped the same way.
 - **Token:** every call carries a bearer token, the Laya service's one key (`docs/llm-server.md`,
   「The key」), which the server reads as `LAYA_TOKEN` from the service's environment file on n6. The
   token never goes into the archive, a log, a command line or the console.
@@ -95,13 +102,17 @@ asks (BMO's `docs/laya.md`).
 ## Sharing the card
 
 A card the server does not hold alone can keep only some of the checkpoints on it at once and let the
-rest wait in host memory. n6's card is the server's alone, so the service keeps all of them on it
-(`docs/llm-server.md`, 「The engine」); what follows is the mechanism, which a smaller number turns on.
+rest wait in host memory. n6's card is the server's alone, so the service lets every checkpoint onto
+it for as long as the decisions leave them room (`docs/llm-server.md`, 「The engine」); what follows
+is the mechanism.
 
 - **What a checkpoint costs on the card:** 1.2 to 1.4 GB each as `nvidia-smi` reads it — the weights
-  are kept in 32 bits there, as Laya builds them.
-- **How many are on the card at once** is `LAYA_CARD_MODELS` (1 where nothing sets it), and the others
-  wait in host memory. That is offload and nothing else: a checkpoint's weights are the same numbers
+  are kept in 32 bits there, as Laya builds them. A decision needs working memory of its own beside
+  them, which grows with the tokens it lays out, so the card that holds every checkpoint of eight
+  gates has no room left for a large part.
+- **How many are on the card at once** is `LAYA_CARD_MODELS` (1 where nothing sets it) at most, fewer
+  once a decision has needed the room (below), and the others wait in host memory. That is offload
+  and nothing else: a checkpoint's weights are the same numbers
   wherever they wait, and its answers are the same to the last digit after any number of moves,
   measured on four checkpoints over three rounds each.
 - **How they wait:** in pinned host memory, each weight in the 16 bits it was saved in wherever that
@@ -115,9 +126,20 @@ rest wait in host memory. n6's card is the server's alone, so the service keeps 
 - **When the card has no room** for the checkpoint asked for, every checkpoint is taken off and the
   move tried once more; a second failure answers 503, the gate's LLM decides, and the checkpoint
   waits in host memory for the next call.
-- **Laya's own fallback to the CPU** on a card that ran out mid-decision is undone after the call:
-  the checkpoint is put back in host memory and the next call moves it to the card again, so no gate
-  is left deciding on the CPU for the rest of the process's life.
+- **A decision is never finished on the CPU.** Laya's own answer to a card that runs out
+  mid-decision is to move the checkpoint to the processor and decide there, which at a full part takes
+  over a minute while every call behind it waits in line. So the server wraps each checkpoint's forward
+  pass: a card that runs out there fails the pass before Laya can move, the least recently asked other
+  checkpoint is taken off the card, and the same decision is asked again on the card — one checkpoint
+  fewer each time, until the asking one is alone there. A decision that still does not fit is answered
+  503. Any other failure of the forward pass is answered 500 and is not retried anywhere.
+- **The card keeps the room it has had to make.** Once a decision has fitted only after checkpoints
+  were taken off, the number the card holds at once is lowered to what stood on it when it fitted, for
+  the rest of the process's life, so the next decision of that size finds its room without failing
+  first. `/health` says the number it stands at; a restart starts again from `LAYA_CARD_MODELS`.
+- **Laya's own fallback to the CPU** anywhere outside the forward pass is undone after the call: the
+  checkpoint is put back in host memory and the next call moves it to the card again, so no gate is
+  left deciding on the CPU for the rest of the process's life.
 
 ## Measured on n6
 
@@ -150,6 +172,11 @@ Five gates served (`output-decide`, `library-knowledge`, `room-rules`, `situatio
   third decimal: asked BMO's own recorded inputs, 20 calls a gate, n6 and a 3080 chose the same
   answer for all 580 questions, with the probabilities at most 0.021 apart. Each card answers the
   same input identically every time.
+- **Eight gates, all eight on the card, BMO's own recorded inputs at a full state,** from main-host:
+  a part of 32 questions takes 0.5 to 0.8 seconds and fits beside the eight checkpoints, the card then
+  reading 11,751 MiB of its 12,282. A part of 128 questions at the same state does not fit: it has the
+  three least recently asked checkpoints taken off and is answered on the card in 2.8 to 3.0 seconds,
+  where Laya's own fallback takes over a minute on the CPU.
 
 ## The training loop and calibration
 

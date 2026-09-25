@@ -28,9 +28,12 @@ that asks it and the configuration of which gate asks (BMO's `docs/laya.md`).
 - **Which checkpoint answers which gate** is `LAYA_CHECKPOINTS` in `~/.config/bmo-laya/env` on n6
   (`docs/laya-server.md`, 「Which checkpoint answers which gate」). The checkpoints stand under
   `~/bmo-laya/checkpoints/<training gate>/<run>/step-<n>`, the layout of the collection on main-host.
-- **How many checkpoints are on the card at once:** all of them. The unit sets `LAYA_CARD_MODELS` to
-  8, above the number of gates served, so each checkpoint goes onto the card the first time its gate
-  asks and stays, and no later call pays a move between the card and host memory.
+- **How many checkpoints are on the card at once:** as many as leave room for the decisions. The
+  unit sets `LAYA_CARD_MODELS` to 8, the most it lets on, so each checkpoint goes onto the card the
+  first time its gate asks and stays there until a decision needs its room. The first decision that
+  runs out of card has the least recently asked checkpoints taken off until it fits, and from then on
+  the card holds that many and the rest pay a move of about half a second when their gate asks
+  (`docs/laya-server.md`, 「Sharing the card」).
 
 ## The front
 
@@ -53,9 +56,13 @@ service key and to nothing else.
 - **Nothing of a request is logged:** no header and no body reaches a log line, in the front or the
   engine.
 - **The engine not answering** — stopped, restarting, or still loading its checkpoints — is a 503
-  on every path that needs it: at once where its port refuses, and after thirty seconds where it
-  holds a call without answering. A 128-question decision takes a fraction of a second, so the
-  bound is never what a real decision meets.
+  on every path that needs it, at once, since its port refuses or does not take the connection
+  within five seconds.
+- **The engine holding a call** past thirty seconds without answering is a 504 on every path that
+  needs it, saying that Laya did not answer in time, and the front hangs up on the engine, which then
+  drops the call unasked if it has not reached it yet (`docs/laya-server.md`, 「The server」). A
+  decision takes under a second, so only a line stuck behind something wrong meets the
+  bound, and the 504 lets a caller tell a wait that ran out from an answer that went wrong.
 
 ### The model a caller names is the gate
 
@@ -74,8 +81,8 @@ refused by the engine as not served (404), whichever path asked.
   answer as JSON — `answers`, the tokens it read and `ms` — and a usage of zero tokens.
 - **Streaming is not offered:** a decision is one answer made at once, so `stream: true` is refused
   (400) rather than dressed as a stream.
-- **A refusal** keeps the engine's status (400, 404 or 503) and carries the engine's reason in the
-  OpenAI error shape, `{"error": {"message", "type", "code"}}`.
+- **A refusal** keeps the engine's status (400, 404, 500 or 503), or the front's own 503 or 504, and
+  carries the engine's reason in the OpenAI error shape, `{"error": {"message", "type", "code"}}`.
 
 ### The two tools
 

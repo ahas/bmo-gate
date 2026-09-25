@@ -31,7 +31,8 @@ UPSTREAM = os.environ.get("LAYA_UPSTREAM", "http://127.0.0.1:7431")
 OPEN_PATHS = frozenset({"/health"})
 
 # A decision of the most questions one call carries takes a fraction of a second. This only keeps a
-# call the engine holds without answering from being held for ever.
+# call the engine holds without answering from being held for ever: past it the front hangs up on the
+# engine, which then drops the call if it has not reached it, and answers 504.
 DECIDE_TIMEOUT_S = 30.0
 HEALTH_TIMEOUT_S = 5.0
 MAX_BODY_BYTES = 1 << 20
@@ -68,24 +69,27 @@ class EngineRefused(Exception):
         self.reason = reason
 
 
-def build_app(key: str, upstream: str = UPSTREAM, upstream_key: str | None = None) -> ASGIApp:
+def build_app(key: str, upstream: str = UPSTREAM, upstream_key: str | None = None,
+              decide_timeout_s: float = DECIDE_TIMEOUT_S) -> ASGIApp:
     """The whole front as one ASGI app, so a test serves exactly what the unit serves."""
     upstream_auth = {"authorization": f"Bearer {upstream_key or key}"}
     expected = f"Bearer {key}".encode()
-    client = httpx.AsyncClient(base_url=upstream, timeout=httpx.Timeout(DECIDE_TIMEOUT_S, connect=HEALTH_TIMEOUT_S))
+    client = httpx.AsyncClient(base_url=upstream, timeout=httpx.Timeout(decide_timeout_s, connect=HEALTH_TIMEOUT_S))
 
-    async def engine(method: str, path: str, body: bytes | None = None) -> httpx.Response | None:
-        """The engine's answer, or None where it did not give one: stopped, restarting or still loading."""
+    async def engine(method: str, path: str, body: bytes | None = None) -> httpx.Response:
+        """The engine's answer. Where it gives none, a 503 when it is stopped, restarting or still
+        loading, and a 504 when it took the call and held it past the wait."""
+        wait = HEALTH_TIMEOUT_S if path == "/health" else decide_timeout_s
         try:
             return await client.request(method, path, content=body, headers={**upstream_auth, "content-type": "application/json"},
-                                        timeout=HEALTH_TIMEOUT_S if path == "/health" else DECIDE_TIMEOUT_S)
-        except httpx.HTTPError:
-            return None
+                                        timeout=httpx.Timeout(wait, connect=HEALTH_TIMEOUT_S))
+        except (httpx.ReadTimeout, httpx.WriteTimeout) as held:
+            raise EngineRefused(504, f"laya did not answer within {wait:g} seconds") from held
+        except httpx.HTTPError as silent:
+            raise EngineRefused(503, "laya is not answering") from silent
 
     async def decide(gate: str, state: Any, questions: Any) -> dict[str, Any]:
         answered = await engine("POST", "/decide", json.dumps({"gate": gate, "state": state, "questions": questions}).encode())
-        if answered is None:
-            raise EngineRefused(503, "laya is not answering")
         try:
             said = answered.json()
         except ValueError:
@@ -100,7 +104,7 @@ def build_app(key: str, upstream: str = UPSTREAM, upstream_key: str | None = Non
     async def gates() -> dict[str, str]:
         """The gates the engine serves, each with the checkpoint that answers it."""
         answered = await engine("GET", "/health")
-        if answered is None or answered.status_code != 200:
+        if answered.status_code != 200:
             raise EngineRefused(503, "laya is not answering")
         served = answered.json().get("gates") or {}
         return {gate: described.get("model", "") for gate, described in served.items()}
@@ -128,8 +132,11 @@ def build_app(key: str, upstream: str = UPSTREAM, upstream_key: str | None = Non
 
     @server.custom_route("/health", methods=["GET"])
     async def health(request: Request) -> Response:
-        answered = await engine("GET", "/health")
-        if answered is None or answered.status_code != 200:
+        try:
+            answered = await engine("GET", "/health")
+        except EngineRefused:
+            return JSONResponse({"status": "down"}, status_code=503)
+        if answered.status_code != 200:
             return JSONResponse({"status": "down"}, status_code=503)
         # The key holder is given the engine's own health; anybody else only whether it stands.
         if hmac.compare_digest(bearer(request.scope["headers"]), expected):
@@ -141,9 +148,10 @@ def build_app(key: str, upstream: str = UPSTREAM, upstream_key: str | None = Non
         body = await request.body()
         if len(body) > MAX_BODY_BYTES:
             return JSONResponse({"error": f"the body must be 1 to {MAX_BODY_BYTES} bytes"}, status_code=400)
-        answered = await engine("POST", "/decide", body)
-        if answered is None:
-            return JSONResponse({"error": "laya is not answering"}, status_code=503)
+        try:
+            answered = await engine("POST", "/decide", body)
+        except EngineRefused as refusal:
+            return JSONResponse({"error": refusal.reason}, status_code=refusal.status)
         return Response(answered.content, status_code=answered.status_code, media_type="application/json")
 
     @server.custom_route("/v1/models", methods=["GET"])

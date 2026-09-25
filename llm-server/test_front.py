@@ -42,6 +42,9 @@ class StandInEngine:
         self.refusal: tuple[int, str] | None = None
         self.asked: list[dict] = []
         self.auth: list[str] = []
+        # A decision held until the test lets it go, and whether the front had hung up by then.
+        self.hold: threading.Event | None = None
+        self.hung_up: list[bool] = []
         stand_in = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -69,6 +72,13 @@ class StandInEngine:
                 stand_in.auth.append(self.headers.get("authorization", ""))
                 body = json.loads(self.rfile.read(int(self.headers.get("content-length", "0"))))
                 stand_in.asked.append(body)
+                if stand_in.hold is not None:
+                    stand_in.hold.wait(5)
+                    try:
+                        stand_in.hung_up.append(self.connection.recv(1, socket.MSG_PEEK | socket.MSG_DONTWAIT) == b"")
+                    except BlockingIOError:
+                        stand_in.hung_up.append(False)
+                    return
                 if stand_in.refusal is not None:
                     self.reply(stand_in.refusal[0], {"error": stand_in.refusal[1]})
                 else:
@@ -89,11 +99,15 @@ def free_port() -> int:
         return probe.getsockname()[1]
 
 
+# Short enough that a held decision costs the suite nothing.
+DECIDE_TIMEOUT_S = 0.3
+
+
 class FrontTest(unittest.TestCase):
     def setUp(self):
         self.engine = StandInEngine()
         port = free_port()
-        config = uvicorn.Config(build_app(KEY, self.engine.url, UPSTREAM_KEY), host="127.0.0.1", port=port,
+        config = uvicorn.Config(build_app(KEY, self.engine.url, UPSTREAM_KEY, DECIDE_TIMEOUT_S), host="127.0.0.1", port=port,
                                 log_level="warning", access_log=False)
         self.front = uvicorn.Server(config)
         self.thread = threading.Thread(target=self.front.run, daemon=True)
@@ -172,6 +186,22 @@ class FrontTest(unittest.TestCase):
         self.engine.refusal = (404, "no checkpoint here serves the gate sanitizer")
         self.assertEqual(self.call("/decide", {**asked, "gate": "sanitizer"}),
                          (404, {"error": "no checkpoint here serves the gate sanitizer"}))
+
+    def test_a_decision_the_engine_holds_is_a_504_and_the_front_hangs_up(self):
+        self.engine.hold = threading.Event()
+        asked = {"gate": "room-rules", "state": "x", "questions": QUESTIONS}
+        status, said = self.call("/decide", asked)
+        self.assertEqual(status, 504)
+        self.assertIn("did not answer within", said["error"])
+        status, said = self.chat()
+        self.assertEqual(status, 504)
+        self.assertEqual(said["error"]["code"], 504)
+        self.engine.hold.set()
+        deadline = time.monotonic() + 5
+        while len(self.engine.hung_up) < 2:
+            self.assertLess(time.monotonic(), deadline, "the held decisions never ended")
+            time.sleep(0.01)
+        self.assertEqual(self.engine.hung_up, [True, True])
 
     def test_the_models_are_the_gates_served(self):
         status, said = self.call("/v1/models")
