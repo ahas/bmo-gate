@@ -14,7 +14,7 @@ import type { JudgeRoad } from "../gate-judge";
 import type { LayaRequest } from "../laya";
 import type { TokenTally } from "../laya-synth-run";
 import type { GateFigures, LayaAnswers } from "./figures";
-import type { JudgeItem } from "./judge";
+import type { JudgeItem, Wanting } from "./judge";
 import type { Label, ReferenceGate } from "./labels";
 import type { InputsAsk, InputsReader, LiveTurn } from "./live-inputs";
 import type { GateRows } from "./rows";
@@ -43,6 +43,8 @@ export interface TickOptions {
   inputs: InputsReader;
   // The road the judge is asked on, or null for a pass that judges nothing.
   road: JudgeRoad | null;
+  // Which pieces the pass asks about; an ordinary pass asks about what has no label.
+  wanting?: Wanting;
   judged: number;
   atOnce: number;
   // The turn's messages as the judge reads them, and a text or an input as it leaves the room.
@@ -209,8 +211,14 @@ async function judgeTurns(
     }
   };
 
-  for (let next = 0; next < plan.length; next += options.atOnce) {
+  // A failed batch ends the judging: the ones under way land, and no further batch is started, so a
+  // spent limit is met once rather than once for every batch left.
+  for (let next = 0; next < plan.length && spent.failedBatches === 0; next += options.atOnce) {
     await Promise.all(plan.slice(next, next + options.atOnce).map((batch, offset) => judge(batch, next + offset)));
+  }
+
+  if (spent.failedBatches > 0 && spent.calls + spent.failedBatches < plan.length) {
+    say(`판정 묶음이 실패해 ${plan.length - spent.calls - spent.failedBatches}묶음은 시작하지 않았어요.`);
   }
 
   return spent;
@@ -301,7 +309,7 @@ export async function referenceTick(options: TickOptions): Promise<TickReport> {
   const turns = options.built.turns;
   const live = options.inputs(turns.map((turn): InputsAsk => ({ chatId: turn.chatId, messageIds: turn.messageIds })));
   const missing = live.filter((one) => one.missing).length;
-  const wanting = turns.map((turn, index) => ({ turn, live: live[index]!, wanted: unjudged(turn, live[index]!, labels) }));
+  const wanting = turns.map((turn, index) => ({ turn, live: live[index]!, wanted: unjudged(turn, live[index]!, labels, options.wanting) }));
   const chosen = options.road === null ? [] : turnsToJudge(wanting.filter((one) => !one.live.missing), options.judged);
 
   say(`턴 ${turns.length}개 · 라벨을 기다리는 턴 ${wanting.filter((one) => one.wanted.length > 0).length}개 · 이번에 판정할 턴 ${chosen.length}개`);

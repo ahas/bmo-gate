@@ -118,6 +118,21 @@ describe("referenceTick", () => {
     expect(report.gates.find((one) => one.gate === "room-rules")!.waiting).toBe(0);
   });
 
+  test("a failed batch ends the judging, and the batches after it are never sent", async () => {
+    let sent = 0;
+    const spent: JudgeRoad = async () => {
+      sent += 1;
+      throw new Error("You've hit your limit");
+    };
+    // Twenty turns are three batches of at most eight.
+    const many: ReferenceTurn[] = Array.from({ length: 20 }, (_, index) => ({ ...turns[0]!, key: `-7:${index + 10}`, messageIds: [index + 10] }));
+    const report = await referenceTick(options(folder(), [], {
+      road: spent, judged: 20, built: { turns: many, skipped: { noReply: 0, noMessage: 0, noText: 0 } },
+    }));
+
+    expect([sent, report.calls, report.failedBatches]).toEqual([1, 0, 1]);
+  });
+
   test("takes the first judging's labels in once, where the run has none", async () => {
     const where = folder();
     const first = join(where, "use-turns.jsonl");

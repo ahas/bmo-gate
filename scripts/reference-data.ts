@@ -2,13 +2,15 @@ import { join } from "node:path";
 
 import { bmoIdFrom, messagesIn, openArchive, ownerIdFrom, roomsIn } from "../src/archive";
 import { releaseArchiveCopy, takeArchiveCopy } from "../src/archive-copy";
+import { claudeAccount, claudeEffort, claudeJudgeRoad, claudeModel } from "../src/claude-road";
 import { codexEffort, codexJudgeRoad, codexModel } from "../src/codex-road";
-import { asked, asksUsage, lastOf, readFlags } from "../src/flags";
+import { allOf, asked, asksUsage, lastOf, readFlags } from "../src/flags";
 import { claimGate, releaseGate } from "../src/gate-claim";
 import { layaDecide, layaHealth, servedCheckpoints } from "../src/laya-service";
 import { pseudonyms, scrubText } from "../src/pii";
 import { layaAnswersOf } from "../src/reference/figures";
-import { isReferenceGate } from "../src/reference/labels";
+import { heldTo, judgedAgain, unlabelled } from "../src/reference/judge";
+import { isReferenceGate, isWordFor } from "../src/reference/labels";
 import { bmoCommit, bmoInputs } from "../src/reference/live-inputs";
 import { leaveRequest, leaveRoom } from "../src/reference/rows";
 import { judgedPerPass, referenceTick } from "../src/reference/tick";
@@ -17,19 +19,23 @@ import { plainShapeLine } from "../src/room-shape";
 import { dataPath, refuseInsideCheckout } from "../src/roots";
 
 import type { ArchivedMessage } from "../src/archive";
+import type { UseWord } from "../src/reference/labels";
 
 // One pass of the reference gates' data (docs/reference-data.md): the turns out of BMO's archive,
 // the inputs BMO's own code builds for them today, the labels still wanting judged within the pass's
 // bound, every row assembled afresh, Laya asked again, and the figures.
 
-const usage = `usage: bun scripts/reference-data.ts <실행> [--judge <n>] [--at-once <n>] [--effort <수준>] [--checkout <경로>] [--import <turns.jsonl>] [--no-judge] [--no-laya]
+const usage = `usage: bun scripts/reference-data.ts <실행> [--judge <n>] [--at-once <n>] [--road codex|claude] [--effort <수준>] [--rejudge <낱말> --before <시각>] [--gate <게이트>]… [--checkout <경로>] [--import <turns.jsonl>] [--no-judge] [--no-laya]
 
 참조 게이트 네 개의 학습 데이터를 한 회차 만든다(docs/reference-data.md). 비모가 답한 턴을 아카이브에서 읽고,
 게이트마다 비모 코드가 지금 조립하는 입력을 받아, 라벨이 없는 후보를 최신 턴부터 판정하고, 행을 모두 새로
 조립해 gates/ 에 통째로 바꿔 넣는다.
 <실행> 은 런타임 데이터 뿌리의 reference-data/ 아래 이름이거나 절대 경로다.
 --judge 는 한 회차에 판정할 턴 수(기본 ${judgedPerPass}), --at-once 는 동시에 판정할 묶음 수(기본 4).
+--road 는 판정을 맡을 길(기본 codex). claude 는 2번 Claude 계정(${claudeAccount})에 못박힌 ${claudeModel} ${claudeEffort} 이다.
 --effort 는 codex 추론 수준(기본 ${codexEffort}). --checkout 은 입력을 조립할 비모 체크아웃(기본 ~/.local/share/bmo/deploy).
+--rejudge 는 라벨이 없는 후보 대신, <시각> 전에 그 낱말로 판정된 라벨을 지금의 낱말로 다시 판정한다.
+--gate 는 이번 회차가 판정할 게이트를 그것들로만 묶는다(여러 번 줄 수 있다).
 회차마다 비모 아카이브의 사본을 떠서 턴과 입력을 모두 그 사본에서 읽는다.
 --import 는 처음 판정의 턴 파일로, 라벨이 하나도 없는 실행에 한 번 들여온다(기본 reference-use/use-1/turns.jsonl).
 --no-judge 는 판정 없이 행과 수치만, --no-laya 는 Laya 재질의 없이 돈다.`;
@@ -42,7 +48,8 @@ if (asksUsage(argv)) {
 }
 
 const reading = readFlags(argv, {
-  "--judge": true, "--at-once": true, "--effort": true, "--checkout": true, "--import": true, "--no-judge": false, "--no-laya": false,
+  "--judge": true, "--at-once": true, "--road": true, "--effort": true, "--rejudge": true, "--before": true, "--gate": true,
+  "--checkout": true, "--import": true, "--no-judge": false, "--no-laya": false,
 });
 
 if (!reading.ok || reading.loose.length !== 1) {
@@ -59,6 +66,49 @@ if (refusal !== null) {
   console.error(refusal);
   process.exit(2);
 }
+
+// The road the judge rides, and which pieces this pass asks it about.
+const roads = {
+  codex: () => codexJudgeRoad({ model: codexModel, effort: lastOf(reading, "--effort") ?? codexEffort }),
+  claude: () => claudeJudgeRoad(),
+};
+const roadName = lastOf(reading, "--road") ?? "codex";
+
+if (!Object.hasOwn(roads, roadName)) {
+  console.error(`reference-data: --road 는 ${Object.keys(roads).join(", ")} 중 하나입니다.`);
+  process.exit(2);
+}
+
+const gates = allOf(reading, "--gate");
+const strangeGate = gates.find((gate) => !isReferenceGate(gate));
+
+if (strangeGate !== undefined) {
+  console.error(`reference-data: ${strangeGate} 는 참조 게이트가 아닙니다.`);
+  process.exit(2);
+}
+
+const again = lastOf(reading, "--rejudge");
+const before = lastOf(reading, "--before");
+
+if ((again === undefined) !== (before === undefined)) {
+  console.error("reference-data: --rejudge 와 --before 는 함께 줍니다.");
+  process.exit(2);
+}
+
+if (again !== undefined && !isWordFor(true, again) && !isWordFor(false, again)) {
+  console.error(`reference-data: ${again} 는 판정의 낱말이 아닙니다.`);
+  process.exit(2);
+}
+
+if (before !== undefined && Number.isNaN(Date.parse(before))) {
+  console.error(`reference-data: --before 의 ${before} 를 시각으로 읽을 수 없습니다.`);
+  process.exit(2);
+}
+
+const wanting = heldTo(
+  gates.filter(isReferenceGate),
+  again === undefined || before === undefined ? unlabelled : judgedAgain(again as UseWord, new Date(before).toISOString()),
+);
 
 // One pass at a time over a run: two would judge the same turns twice and swap the gates in under
 // each other. A pass already going is doing this one's work, so standing down is not a failure.
@@ -104,7 +154,7 @@ for (const [id, said] of people) {
 
 const who = { ownerId, names };
 const built = readTurns(archiveTurnReads(db, () => rooms, room), bmoId);
-const judge = asked(reading, "--no-judge") ? null : codexJudgeRoad({ model: codexModel, effort: lastOf(reading, "--effort") ?? codexEffort });
+const judge = asked(reading, "--no-judge") ? null : roads[roadName as keyof typeof roads]();
 const health = asked(reading, "--no-laya") ? null : await layaHealth();
 
 if (!asked(reading, "--no-laya") && health === null) {
@@ -116,6 +166,7 @@ const report = await referenceTick({
   built,
   inputs: bmoInputs(checkout, copy.path),
   road: judge,
+  wanting,
   judged: Number(lastOf(reading, "--judge") ?? judgedPerPass),
   atOnce: Math.max(1, Number(lastOf(reading, "--at-once") ?? "4")),
   messages: (turn) => {

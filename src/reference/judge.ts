@@ -36,14 +36,37 @@ function clip(text: string, limit: number): string {
   return text.length <= limit ? text : `${text.slice(0, limit)}\n…(잘림)`;
 }
 
-// What still wants a label on a turn: every candidate its rows would carry that has none, and every
-// piece the record says a gate attached that has none, whether the narrowing offers it today or not.
-export function unjudged(turn: ReferenceTurn, live: LiveTurn, labels: ReadonlyMap<string, Label>): { gate: ReferenceGate; slug: string; attached: boolean }[] {
+// Which pieces a pass asks the judge about, read off the piece's gate and the label standing on it.
+export type Wanting = (gate: ReferenceGate, standing: Label | undefined) => boolean;
+
+// An ordinary pass asks about what has no label.
+export const unlabelled: Wanting = (_gate, standing) => standing === undefined;
+
+// A pass judging a word again asks about every label of that word judged before the moment, and
+// about nothing else (docs/reference-data.md, 「Judging a word again」). The moment is an ISO time,
+// the shape every label's own is written in, so the two compare as text.
+export function judgedAgain(word: UseWord, before: string): Wanting {
+  return (_gate, standing) => standing !== undefined && standing.word === word && standing.at < before;
+}
+
+// A pass held to some gates asks about nothing outside them; held to none, it is not held.
+export function heldTo(gates: readonly ReferenceGate[], wanting: Wanting): Wanting {
+  return gates.length === 0 ? wanting : (gate, standing) => gates.includes(gate) && wanting(gate, standing);
+}
+
+// What a pass wants judged on a turn: every candidate its rows would carry, and every piece the
+// record says a gate attached whether the narrowing offers it today or not, where the pass wants it.
+export function unjudged(
+  turn: ReferenceTurn,
+  live: LiveTurn,
+  labels: ReadonlyMap<string, Label>,
+  wanting: Wanting = unlabelled,
+): { gate: ReferenceGate; slug: string; attached: boolean }[] {
   const wanted = new Map<string, { gate: ReferenceGate; slug: string; attached: boolean }>();
   const want = (gate: ReferenceGate, slug: string, attached: boolean): void => {
     const key = labelKey(turn.key, gate, slug);
 
-    if (!labels.has(key) && !wanted.has(key)) {
+    if (wanting(gate, labels.get(key)) && !wanted.has(key)) {
       wanted.set(key, { gate, slug, attached });
     }
   };

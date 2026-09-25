@@ -78,8 +78,9 @@ repository is (`docs/gate-data.md`, 「What leaves the rooms」) before it is wr
 
 ## The judgement
 
-One item per turn, several turns to a batch, on the codex road (`docs/gate-data.md`, 「The codex
-road」), holding no thread.
+One item per turn, several turns to a batch, holding no thread, on the codex road
+(`docs/gate-data.md`, 「The codex road」) — or, while the codex account is shut, on the claude road
+with its one login and tier (`docs/gate-data.md`, 「The claude road」).
 
 - **What is judged** is every candidate a turn's rows would carry that has no label yet, and every
   piece the reference record says a gate attached on that turn, whether or not the narrowing offers it
@@ -101,6 +102,27 @@ road」), holding no thread.
   it is.
 - **An answer is read per candidate and a gap is not a no.** A candidate left unanswered, or answered
   with a word not offered for its kind, has no label and is asked again on the next pass.
+- **A failed batch ends the pass's judging.** Batches go a few at a time; once one of them fails — a
+  spent limit, a refusal, an answer from another model — no further batch is started, the ones
+  already under way land, and every turn not reached waits for the next pass. A spent limit is met
+  once, not once for every batch left.
+
+## Judging a word again
+
+A label judged by wider words than the prompt carries now still stands and still makes gold. A pass
+can be told to judge one word again instead of judging what has no label.
+
+- **What is judged again** is every standing label of the named word judged before a named moment,
+  on a piece the turn's rows carry or the record says attached — the same pieces an ordinary pass
+  would ask about. A label on a piece the narrowing no longer offers keeps its word, since no row
+  reads it.
+- **Only those pieces are in the items**, judged with the words the prompt carries now. Pieces with
+  no label wait for an ordinary pass.
+- **The pass can be held to some gates**, so the gates a comparison rests on are judged first and the
+  others after.
+- **The new label is appended and wins**, as every label does. Its moment is after the named one, so a
+  re-judging pass that stopped — at a spent limit or a failed batch — is taken up by running it again
+  with the same moment, and judges only what it had not reached.
 
 ## The labels
 
@@ -200,3 +222,7 @@ data root's `reference-data/` folder, never inside this checkout.
   `bun scripts/reference-data.ts ref-1 --judge <n>` — followed by
   `bun scripts/laya-train.ts reference:ref-1`. A frozen batch is never judged again, so a pass cut off
   loses only the batches it had not frozen, and the next pass takes their turns up.
+- **A word is judged again by a pass of its own** (「Judging a word again」) —
+  `bun scripts/reference-data.ts ref-1 --rejudge needed --before <moment> --judge <n>`, with
+  `--gate <gate>` for each gate it is held to and `--road claude` while codex is shut — followed by
+  the same training pass.

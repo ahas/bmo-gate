@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { labelKey } from "./labels";
-import { charsPerBatch, judgeBatches, judgeItem, judgePrompt, judgeSystem, readJudgement, turnsToJudge, unjudged } from "./judge";
+import { charsPerBatch, heldTo, judgeBatches, judgedAgain, judgeItem, judgePrompt, judgeSystem, readJudgement, turnsToJudge, unjudged, unlabelled } from "./judge";
 
 import type { Label } from "./labels";
 import type { LiveTurn } from "./live-inputs";
@@ -42,6 +42,25 @@ describe("unjudged", () => {
 
   test("judges every piece of a turn whose attachments are unknown as offered", () => {
     expect(unjudged(turn(null), live, new Map()).every((one) => !one.attached)).toBe(true);
+  });
+});
+
+describe("judging a word again", () => {
+  const worded = (slug: string, word: Label["word"], at: string): [string, Label] =>
+    [labelKey("-7:3", "room-rules", slug), { turn: "-7:3", gate: "room-rules", slug, word, attached: false, batch: 0, at }];
+
+  test("asks only about the word's labels judged before the moment, and not about pieces with none", () => {
+    const labels = new Map([worded("quiet", "needed", "2026-09-24T00:00:00.000Z"), worded("photos", "needed", "2026-09-26T00:00:00.000Z")]);
+
+    expect(unjudged(turn(null), live, labels, judgedAgain("needed", "2026-09-25T19:00:00.000Z")))
+      .toEqual([{ gate: "room-rules", slug: "quiet", attached: false }]);
+    expect(unjudged(turn(null), live, new Map([worded("quiet", "not-needed", "2026-09-24T00:00:00.000Z")]), judgedAgain("needed", "2026-09-25T19:00:00.000Z")))
+      .toEqual([]);
+  });
+
+  test("a pass held to some gates asks about nothing outside them", () => {
+    expect(unjudged(turn(null), live, new Map(), heldTo(["people-search"], unlabelled))).toEqual([]);
+    expect(unjudged(turn(null), live, new Map(), heldTo([], unlabelled))).toHaveLength(2);
   });
 });
 
