@@ -607,6 +607,10 @@ flowchart TB
   A written row shorter or tidier than the real ones teaches its own look instead, and the gate
   learns to spot an invented row rather than a leak. So a gate says what each field of its state
   holds and how long its real states run, and the prompt carries both.
+- **Its audit reads what the writing did, not what the gate owes.** The yield, the format breaks, the
+  repeats, the sample's conformance and the languages are the top-up's own; the answer balance and
+  the three floors are the finished gate's, which a run of one answer and no test misses by what it
+  is, and they are read on the source it tops up.
 - **It is a run of its own**, apart from the judging run it tops up, and the training reads the two
   together as one source (`docs/training.md`, 「Where the data comes from」). The judging run is left
   exactly as it was judged.
