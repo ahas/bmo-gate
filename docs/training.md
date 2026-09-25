@@ -86,8 +86,11 @@ The driver asks those four and never which kind of source it is talking to.
 - **A node's card is read again right before every gate it is handed**, because the card is shared
   with work that is not a pass's: BMO's voice training puts each of its stages on whichever of n3, n4
   and n5 has a free card, and a gate on a card already carrying one runs one of the two out of memory.
-  A card carrying a process takes no gate. Its node reads it again every minute while gates are still
-  waiting, for half an hour at most, and then drops out of the pass; the gates it did not take go to
+  A card without room for a gate — less free than the seven gigabytes one training reserves — takes
+  no gate; a process holding less, such as BMO's resident voice server once it has let its model go,
+  leaves the card free, since it stands on every node and counting it would keep every card from
+  ever training. Where the free memory cannot be read, a process on the card is what takes it. Its
+  node reads it again every minute while gates are still waiting, for half an hour at most, and then drops out of the pass; the gates it did not take go to
   the nodes still working, or stay for the next pass. A node that does not answer the reading drops
   out at once.
 - **A node whose gate did not finish takes no other gate in that pass** — out of reach, or a training
@@ -132,7 +135,7 @@ picked up rather than begun again.
    a command it is streaming and the stop reaches the whole process group.
 3. **Nothing is started on a card somebody else holds.** Right before a launch, a resume and a
    calibration the card is read again, since the card stands free between the gate's own processes
-   and another training can take it in that gap. A card carrying a process is waited on, and the wait
+   and another training can take it in that gap. A card without room for a gate is waited on, and the wait
    is a run that does not move, so the hour below bounds it; a node that does not answer the reading
    is out of reach.
 4. **A run is waited on while it moves.** The largest gates train for hours, so no clock bounds the

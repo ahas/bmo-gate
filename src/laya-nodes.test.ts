@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { jakeExecArgs, jakeUploadArgs, parseHome } from "./jake";
 import {
   NODE_FILES,
+  cardTaken,
   nodeBusy,
   nodeFilePath,
   nodePath,
@@ -236,9 +237,19 @@ describe("whether a node can take a gate", () => {
     expect(readiness(null, "0.3.5", digests).ready).toBe(false);
   });
 
-  test("a card with a process on it is busy", () => {
-    expect(nodeBusy(parseProbe(probeText({ gpu_procs: "1" }))!)).toBe(true);
+  test("a card without room for a gate is busy", () => {
+    expect(nodeBusy(parseProbe(probeText({ gpu_procs: "1", vram_free_mb: "5480" }))!)).toBe(true);
+    expect(cardTaken(parseProbe(probeText({ gpu_procs: "1", vram_free_mb: "5480" }))!)).toContain("5480MB");
     expect(nodeBusy(parseProbe(probeText())!)).toBe(false);
+  });
+
+  test("a resident process that holds little leaves the card free", () => {
+    expect(nodeBusy(parseProbe(probeText({ gpu_procs: "1", vram_free_mb: "12055" }))!)).toBe(false);
+  });
+
+  test("a card whose free memory cannot be read is taken by any process on it", () => {
+    expect(nodeBusy(parseProbe(probeText({ gpu_procs: "1", vram_free_mb: "none" }))!)).toBe(true);
+    expect(nodeBusy(parseProbe(probeText({ gpu_procs: "0", vram_free_mb: "none" }))!)).toBe(false);
   });
 
   test("a node with nothing on it needs every file", () => {
@@ -295,13 +306,13 @@ describe("standing a node up", () => {
   });
 
   test("a busy card is not touched", async () => {
-    const { runner, seen } = fakeRunner({ probe: () => answer(probeText({ gpu_procs: "2", "pkg.torch": "none" })) });
+    const { runner, seen } = fakeRunner({ probe: () => answer(probeText({ gpu_procs: "2", vram_free_mb: "4210", "pkg.torch": "none" })) });
 
     const outcome = await standNode("n5", standing(runner));
 
     expect(outcome.setup).toBe("busy");
     expect(outcome.ready).toBe(false);
-    expect(outcome.fault).toContain("2");
+    expect(outcome.fault).toContain("4210MB");
     expect(uploads(seen)).toEqual([]);
     expect(launched(seen)).toBe(false);
   });
@@ -414,7 +425,7 @@ describe("the five side by side", () => {
     const outcomes: NodeOutcome[] = [
       { node: "n2", probe: parseProbe(probeText({ host: "node2.labuser.local" })), uploaded: [], setup: "already right",
         ready: true, missing: [], fault: null, seconds: 2.1 },
-      { node: "n3", probe: parseProbe(probeText({ gpu_procs: "1" })), uploaded: [], setup: "busy", ready: false,
+      { node: "n3", probe: parseProbe(probeText({ gpu_procs: "1", vram_free_mb: "5480" })), uploaded: [], setup: "busy", ready: false,
         missing: ["카드에 프로세스가 1개 올라가 있어요"], fault: "카드에 이미 프로세스가 1개 있어 그대로 두었어요", seconds: 1.4 },
     ];
 

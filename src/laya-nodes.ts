@@ -178,10 +178,27 @@ export function parseProbe(text: string): NodeProbe | null {
   };
 }
 
-/** A node with a process on its card is somebody else's for now: another gate's run, or a job nobody
- * here started. It is left alone rather than installed into underneath. */
+// What one gate's training reserves on the card, with room to spare (docs/laya-server.md, 「The
+// training loop and calibration」: about 6.8 GB).
+export const GATE_VRAM_MB = 7_000;
+
+/** Why a node's card cannot take a gate now, or null where it can. The card is somebody else's for
+ * now where it has less free than a gate reserves: another gate's run, or work nobody here started. A
+ * process holding less — a resident server that has let its model go — leaves room, and counting it
+ * as a taken card would keep every card it stands on from ever training. Where the free memory could
+ * not be read, a process on the card is what takes it. */
+export function cardTaken(probe: NodeProbe): string | null {
+  if (probe.vramFreeMb !== null) {
+    return probe.vramFreeMb < GATE_VRAM_MB
+      ? `카드 여유가 ${probe.vramFreeMb}MB라 게이트 하나(${GATE_VRAM_MB}MB)가 들어갈 자리가 없어요`
+      : null;
+  }
+  return (probe.gpuProcs ?? 0) > 0 ? `카드에 프로세스가 ${probe.gpuProcs}개 올라가 있어요` : null;
+}
+
+/** A node whose card cannot take a gate is left alone rather than installed into underneath. */
 export function nodeBusy(probe: NodeProbe): boolean {
-  return (probe.gpuProcs ?? 0) > 0;
+  return cardTaken(probe) !== null;
 }
 
 /** A card as it stands right now: free, carrying a process, or not to be read at all. */
@@ -195,7 +212,8 @@ export async function readCard(node: string, runner: NodeRunner, console: string
   if (probe === null) {
     return { state: "silent", why: `노드가 답하지 않아요 — ${runFault(probed)}` };
   }
-  return nodeBusy(probe) ? { state: "taken", why: `카드에 프로세스가 ${probe.gpuProcs}개 올라가 있어요` } : { state: "free" };
+  const taken = cardTaken(probe);
+  return taken === null ? { state: "free" } : { state: "taken", why: taken };
 }
 
 /** The version `pyproject.toml` pins `laya` at, read from the file rather than kept beside it, so the
@@ -241,8 +259,9 @@ export function readiness(probe: NodeProbe | null, pinned: string | null, digest
   if (probe.diskFreeGb !== null && probe.diskFreeGb < NEEDED_DISK_GB) {
     missing.push(`남은 디스크가 ${probe.diskFreeGb}GB로 한 판에 필요한 ${NEEDED_DISK_GB}GB보다 적어요`);
   }
-  if (nodeBusy(probe)) {
-    missing.push(`카드에 프로세스가 ${probe.gpuProcs}개 올라가 있어요`);
+  const taken = cardTaken(probe);
+  if (taken !== null) {
+    missing.push(taken);
   }
   return { ready: missing.length === 0, missing };
 }
@@ -343,7 +362,7 @@ export async function standNode(node: string, options: StandOptions): Promise<No
   if (nodeBusy(probe)) {
     const verdict = readiness(probe, options.pinned, options.digests);
     return done({ node, probe, uploaded: carriedEarly, setup: "busy", ready: false, missing: verdict.missing,
-      fault: `카드에 이미 프로세스가 ${probe.gpuProcs}개 있어 그대로 두었어요` });
+      fault: `${cardTaken(probe)} — 그대로 두었어요` });
   }
 
   const before = readiness(probe, options.pinned, options.digests);
