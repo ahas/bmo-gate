@@ -22,8 +22,8 @@ export const attachedWords = {
 } as const;
 
 export const offeredWords = {
-  needed: "답이 이 문서가 다룰 내용을 담고 있거나, 이 문서가 없어서 틀리거나 모자랐다.",
-  "not-needed": "답에 이 문서가 필요하지 않았다.",
+  needed: "답이 이 문서에만 있을 내용(사실, 수치, 이름, 절차, 규칙)을 써야 했는데, 그게 없어서 틀리거나 모자랐다. 답이 이 문서의 주제나 낱말을 건드린 것만으로는 여기에 들지 않는다.",
+  "not-needed": "답에 이 문서가 필요하지 않았다. 주제가 맞닿아 있어도 이 문서 없이 답이 맞고 모자람이 없었다면 여기에 든다.",
 } as const;
 
 export type AttachedWord = keyof typeof attachedWords;

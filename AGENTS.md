@@ -66,7 +66,7 @@ top-up run can ride the claude road, pinned to one Claude login.
 - `bunx tsc --noEmit` — the static check.
 - `bun test` — the whole suite. `bun test <file>` for one.
 - The Laya server's Python side, which `bun test` does not reach either, on the system Python:
-  `python3 -m unittest laya-server/test_server.py laya-server/test_resume.py laya-server/test_metrics.py`.
+  `python3 -m unittest laya-server/test_server.py laya-server/test_resume.py laya-server/test_metrics.py laya-server/test_balance.py`.
 - The service front's Python side, which `bun test` does not reach:
   `uv run --no-project --with mcp --with httpx --with starlette --with uvicorn --with websockets python3 -m unittest llm-server/test_front.py llm-server/test_ws_dial.py`.
 

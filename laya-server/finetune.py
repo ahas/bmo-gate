@@ -32,7 +32,7 @@ import shutil
 import sys
 import time
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 os.environ.setdefault("USE_TF", "0")
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
@@ -42,6 +42,7 @@ from safetensors.torch import load_file, save_file  # noqa: E402
 from transformers import AutoTokenizer  # noqa: E402
 
 import resume as resume_state  # noqa: E402
+from balance import balanced_items  # noqa: E402
 
 from laya.agent import _fix_tokenizer_config  # noqa: E402
 from laya.common import QTYPES, build_model, build_sequence, proper_reward, render_options  # noqa: E402
@@ -62,9 +63,10 @@ def base_dir(base: Optional[str]) -> str:
     return os.path.join(root, HUB_SUBFOLDER)
 
 
-def training_item(tok, cfg: Dict[str, Any], state: Any, question: Dict[str, Any], gold: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """One question as a training sequence with its target distribution, as the notebook builds it;
-    None where the options do not fit the head, which the notebook leaves out too."""
+def training_item(tok, cfg: Dict[str, Any], state: Any, qid: str, question: Dict[str, Any], gold: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """One question as a training sequence with its target distribution, as the notebook builds it,
+    named by the question it asks so the balance can be counted per question; None where the options
+    do not fit the head, which the notebook leaves out too."""
     kind = question["type"]
     criteria = question.get("criteria", {})
     if kind == "choice":
@@ -84,33 +86,12 @@ def training_item(tok, cfg: Dict[str, Any], state: Any, question: Dict[str, Any]
     sequence, markers = build_sequence(tok, state, internal, cfg["max_len"], cfg["head_max_len"])
     if len(markers) != len(render_options(internal)):
         return None
-    return {"ids": sequence, "markers": markers, "qtype": QTYPES[kind], "target": target, "label": target.index(max(target))}
-
-
-def balanced_items(items: List[Dict[str, Any]], ratio: Optional[float], rng: random.Random) -> List[Dict[str, Any]]:
-    """One gate's sequences with no answer more than `ratio` times as common as its rarest. A gate whose
-    verdicts are nearly all one answer — the reference classifier says no to almost every candidate —
-    otherwise teaches Laya to give that answer always, which agrees with it just as often and decides
-    nothing."""
-    if ratio is None:
-        return items
-    by_answer: Dict[Tuple[int, int], List[Dict[str, Any]]] = defaultdict(list)
-    for item in items:
-        by_answer[(item["qtype"], item["label"])].append(item)
-    if len(by_answer) < 2:
-        return items
-    most = int(min(len(group) for group in by_answer.values()) * ratio)
-    kept: List[Dict[str, Any]] = []
-    for group in by_answer.values():
-        rng.shuffle(group)
-        kept.extend(group[:most])
-    rng.shuffle(kept)
-    return kept
+    return {"ids": sequence, "markers": markers, "qtype": QTYPES[kind], "target": target, "label": target.index(max(target)), "question": qid}
 
 
 def read_items(path: str, tok, cfg: Dict[str, Any], per_gate: Optional[int], ratio: Optional[float], seed: int) -> Dict[str, List[Dict[str, Any]]]:
     """Every question of every row, grouped by the gate it came from; each group balanced over its
-    answers and then cut to `per_gate` sequences drawn at random, so neither one answer nor one gate
+    answers question by question and then cut to `per_gate` sequences drawn at random, so neither one answer nor one gate
     that asks many questions per row can drown the rest."""
     by_gate: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     with open(path, encoding="utf-8") as handle:
@@ -121,7 +102,7 @@ def read_items(path: str, tok, cfg: Dict[str, Any], per_gate: Optional[int], rat
             state, questions, gold = json.loads(row["state"]), json.loads(row["questions"]), json.loads(row["gold"])
             for qid, question in questions.items():
                 if qid in gold:
-                    item = training_item(tok, cfg, state, question, gold[qid])
+                    item = training_item(tok, cfg, state, qid, question, gold[qid])
                     if item is not None:
                         by_gate[row["gate"]].append(item)
     rng = random.Random(seed)

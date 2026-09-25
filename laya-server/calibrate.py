@@ -80,7 +80,7 @@ def split_logits(agent, path: str) -> List[Dict[str, Any]]:
                 state, questions, gold = json.loads(row["state"]), json.loads(row["questions"]), json.loads(row["gold"])
                 for qid, question in questions.items():
                     if qid in gold:
-                        item = training_item(agent.tok, agent.cfg, state, question, gold[qid])
+                        item = training_item(agent.tok, agent.cfg, state, qid, question, gold[qid])
                         if item is not None:
                             rows.append((item, row["gate"], qid, metrics.answer_names(question)))
     out = []

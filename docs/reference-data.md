@@ -91,8 +91,8 @@ road」), holding no thread.
   - `related` — 답의 주제와는 맞닿아 있지만, 이 문서가 없었어도 답이 그대로였다.
   - `unused` — 답이 이 문서와 상관이 없다.
 - **Any other piece is answered with one of two**, read off its index line alone:
-  - `needed` — 답이 이 문서가 다룰 내용을 담고 있거나, 이 문서가 없어서 틀리거나 모자랐다.
-  - `not-needed` — 답에 이 문서가 필요하지 않았다.
+  - `needed` — 답이 이 문서에만 있을 내용(사실, 수치, 이름, 절차, 규칙)을 써야 했는데, 그게 없어서 틀리거나 모자랐다. 답이 이 문서의 주제나 낱말을 건드린 것만으로는 여기에 들지 않는다.
+  - `not-needed` — 답에 이 문서가 필요하지 않았다. 주제가 맞닿아 있어도 이 문서 없이 답이 맞고 모자람이 없었다면 여기에 든다.
 - **A turn whose attachments are unknown** has every piece judged with the two words. A piece that
   was in fact attached and used is `needed` by that reading, so the gold it makes is the same.
 - **Nothing in the item says which side picked what.** The judge is not told the LLM's yes or Laya's.

@@ -64,7 +64,7 @@ else
   for name in laya torch transformers safetensors bitsandbytes numpy; do say "pkg.$name" none; done
 fi
 
-for file in finetune.py calibrate.py compare.py resume.py metrics.py pyproject.toml node-probe.sh node-setup.sh node-train.sh node-collect.sh; do
+for file in finetune.py balance.py calibrate.py compare.py resume.py metrics.py pyproject.toml node-probe.sh node-setup.sh node-train.sh node-collect.sh; do
   if [ -f "$here/$file" ]; then
     say "sha.$file" "$(sha256sum "$here/$file" | awk '{print $1}')"
   else

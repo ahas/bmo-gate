@@ -210,10 +210,20 @@ run here trains one gate's model on a card of its own, so there is nothing for D
      token embeddings untrained and `--optimizer adamw8bit` keeps the optimizer state in 8 bits. Both
      cost accuracy at these settings, so neither is turned on (「What the savings cost」).
    - It starts from the hub's multilingual checkpoint unless `--base` names another.
-   - **Balance:** within each gate, no answer is kept more than three times as often as the gate's
-     rarest (`--balance-ratio`). A reference gate answers no to almost every candidate, and
-     unbalanced data teaches Laya to answer no always, which agrees with it as often as a real
-     judgement and decides nothing. `--per-gate` also caps how many sequences one gate gives.
+   - **Balance:** within each question a gate asks, no answer is kept more than three times as often
+     as that question's rarest (`--balance-ratio`). A reference gate answers no to almost every
+     candidate, and unbalanced data teaches Laya to answer no always, which agrees with it as often
+     as a real judgement and decides nothing.
+   - **The balance is counted per question, never over the whole gate.** A reference gate's questions
+     are its candidates, each with a rate of its own. Counted over the gate, the few candidates that
+     carry most of its yes answers keep every yes and lose nearly every no, and are taught to say yes
+     to every turn — the system reference `structure`, at a fifth of its turns needed, becomes
+     nine-tenths yes. Counted per question, each candidate is held to its own ratio and no more. A
+     gate that asks one question is balanced the same either way.
+   - **The questions only ever given one answer** — the lore piece no turn needed — have nothing to
+     balance against. Together they keep at most three times the gate's rarest answer, shared evenly
+     among them, so a library of pieces nobody needs does not bury the few that are.
+   - `--per-gate` also caps how many sequences one gate gives.
    - It writes a new directory, a rolling checkpoint the run can be resumed from, and
      `train_meta.json` with the sequences per gate, each epoch's time and loss, and the peak memory.
      It never writes over a directory that exists, and `--resume` is how a killed run carries on from
