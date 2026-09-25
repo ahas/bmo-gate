@@ -2,7 +2,7 @@ import { join } from "node:path";
 
 import { homeCommand, nodeCalls, parseHome, runFault } from "../jake";
 import { splitFiles } from "../laya-frozen";
-import { nodePath } from "../laya-nodes";
+import { nodePath, readCard } from "../laya-nodes";
 import { synthesisFor } from "../laya-synth";
 
 import type { NodeRunner } from "../jake";
@@ -370,6 +370,8 @@ export async function runGate(gate: string, node: string, round: number, options
 
   let calibrating = false;
   let launched = false;
+  // Why the card could not be started on at the last reading, or null where it could.
+  let held: string | null = null;
 
   // A run is waited on while it moves, however long that is, and given up on once nothing about it
   // has moved for the whole bound.
@@ -382,7 +384,23 @@ export async function runGate(gate: string, node: string, round: number, options
         : "올린 데이터도 이어 갈 체크포인트도 없어요.", "failed");
     }
 
-    if (move === "launch" || move === "resume") {
+    // The card stands free between this gate's own processes, and another training can take it in that
+    // gap, so it is read again right before anything is started on it. A taken card is a run that does
+    // not move, and the bound below is what gives up on it.
+    const starts = move === "launch" || move === "resume" || (move === "calibrate" && !calibrating && !state.calibrated);
+    const card = starts ? await readCard(node, options.runner, options.console) : null;
+
+    if (card?.state === "silent") {
+      return ended(card.why, "unreachable");
+    }
+
+    if (card?.state === "taken" && held === null) {
+      say(`${node}: ${gate} 를 올릴 카드가 차 있어 비기를 기다려요 — ${card.why}`);
+    }
+
+    held = card?.state === "taken" ? card.why : null;
+
+    if (held === null && (move === "launch" || move === "resume")) {
       if (move === "resume") {
         if (row.resumes >= maxResumes) {
           return ended(`${maxResumes}번을 이어 봤는데도 학습이 서지 않아요 — 마지막 줄: ${state.last}`, "failed");
@@ -409,7 +427,7 @@ export async function runGate(gate: string, node: string, round: number, options
       }
     }
 
-    if (move === "calibrate") {
+    if (held === null && move === "calibrate") {
       if (!calibrating && !state.calibrated) {
         say(`${node}: ${gate} 온도 보정을 시작해요`);
 
@@ -450,5 +468,7 @@ export async function runGate(gate: string, node: string, round: number, options
     state = read;
   }
 
-  return ended(`${Math.round(polls * everyMs / 1000)}초 동안 아무것도 움직이지 않았어요 — 마지막 줄: ${state.last}`, "failed");
+  return ended(held !== null
+    ? `${Math.round(polls * everyMs / 1000)}초 동안 카드가 비지 않았어요 — ${held}`
+    : `${Math.round(polls * everyMs / 1000)}초 동안 아무것도 움직이지 않았어요 — 마지막 줄: ${state.last}`, "failed");
 }

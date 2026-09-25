@@ -18,10 +18,12 @@ const TRAIN_META = '{"epochs": [{"epoch": 1}], "seconds": 141.2, "steps": 8, "re
   + '"precision": "bf16", "device": "RTX 4070", "peak_allocated_bytes": 5100000000, "peak_reserved_bytes": 6790000000}';
 const REPORT = '{"after": {"agreement": 0.93, "balanced": 0.84, "ece": 0.047}, "report": {"kind": "laya-calibration", "gates": {}}}';
 
-/** A node that answers the way a real one does, told what its run looks like at each poll. */
-function fakeNode(states: readonly string[]): { runner: NodeRunner; commands: string[] } {
+/** A node that answers the way a real one does, told what its run looks like at each poll and how many
+ * processes its card carries at each reading of it — `silent` for a reading it does not answer. */
+function fakeNode(states: readonly string[], cards: readonly string[] = ["0"]): { runner: NodeRunner; commands: string[] } {
   const commands: string[] = [];
   let polled = 0;
+  let read = 0;
   const runner: NodeRunner = async (argv) => {
     const command = argv[2] === "upload" ? `upload ${argv[4]}` : argv[5] ?? "";
 
@@ -29,6 +31,14 @@ function fakeNode(states: readonly string[]): { runner: NodeRunner; commands: st
 
     if (command.startsWith("echo HOME")) {
       return answer("HOME=/home/labuser\n");
+    }
+
+    if (command.includes("node-probe.sh")) {
+      read += 1;
+
+      const procs = cards[Math.min(read - 1, cards.length - 1)]!;
+
+      return procs === "silent" ? answer("", 1) : answer(`host=n2\ngpu_procs=${procs}\n`);
     }
 
     if (command.includes(" state ")) {
@@ -143,6 +153,55 @@ describe("runGate", () => {
 
     expect(row.state).toBe("failed");
     expect(row.fault).toContain("마지막 줄: epoch 1");
+  });
+
+  test("starts nothing on a card another training holds, and launches once it stands free", async () => {
+    const { runner, commands } = fakeNode([
+      stateText(),
+      stateText(),
+      stateText(),
+      stateText({ training: "yes", exists: "yes", lines: "3" }),
+      stateText({ finished: "yes", exists: "yes", lines: "9" }),
+      stateText({ finished: "yes", exists: "yes", calibrated: "yes", lines: "9" }),
+    ], ["1", "1", "0"]);
+    const said: string[] = [];
+    const row = await runGate("room-rules", "n3", 1, running(runner, { say: (line) => said.push(line) }));
+    const launch = commands.findIndex((one) => one.includes(" launch "));
+
+    expect(row.state).toBe("done");
+    expect(commands.slice(0, launch).filter((one) => one.includes("node-probe.sh"))).toHaveLength(3);
+    expect(said.filter((line) => line.includes("비기를 기다려요"))).toEqual(["n3: room-rules 를 올릴 카드가 차 있어 비기를 기다려요 — 카드에 프로세스가 1개 올라가 있어요"]);
+  });
+
+  test("calibrates a finished run only on a card that stands free", async () => {
+    const { runner, commands } = fakeNode([
+      stateText({ finished: "yes", exists: "yes" }),
+      stateText({ finished: "yes", exists: "yes" }),
+      stateText({ finished: "yes", exists: "yes", calibrated: "yes" }),
+    ], ["1", "0"]);
+    const row = await runGate("room-rules", "n3", 1, running(runner));
+    const calibrate = commands.findIndex((one) => one.includes(" calibrate "));
+
+    expect(row.state).toBe("done");
+    expect(commands.slice(0, calibrate).filter((one) => one.includes("node-probe.sh"))).toHaveLength(2);
+  });
+
+  test("gives a gate up once its card has stayed taken for the whole bound, and says what holds it", async () => {
+    const { runner, commands } = fakeNode([stateText()], ["2"]);
+    const row = await runGate("room-rules", "n3", 1, running(runner));
+
+    expect(row.state).toBe("failed");
+    expect(row.fault).toBe("0초 동안 카드가 비지 않았어요 — 카드에 프로세스가 2개 올라가 있어요");
+    expect(commands.some((one) => one.includes(" launch "))).toBe(false);
+  });
+
+  test("a card that cannot be read is a node out of reach, and nothing is started on it", async () => {
+    const { runner, commands } = fakeNode([stateText()], ["silent"]);
+    const row = await runGate("room-rules", "n3", 1, running(runner));
+
+    expect(row.state).toBe("unreachable");
+    expect(row.fault).toContain("노드가 답하지 않아요");
+    expect(commands.some((one) => one.includes(" launch "))).toBe(false);
   });
 
   test("names a directory with nothing to carry on from rather than writing over it", async () => {

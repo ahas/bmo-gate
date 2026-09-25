@@ -5,7 +5,7 @@ import { claimGate, releaseGate } from "../src/gate-claim";
 import { allOf, asked, asksUsage, lastOf, readFlags } from "../src/flags";
 import { jakeConsole, spawnRunner } from "../src/jake";
 import { collectCheckpoint, collectionRoot, readManifest } from "../src/laya-collect";
-import { localDigests, notTrainingNodes, pinnedLaya, standNodes, TRAINING_NODES } from "../src/laya-nodes";
+import { localDigests, notTrainingNodes, pinnedLaya, readCard, standNodes, TRAINING_NODES } from "../src/laya-nodes";
 import { carryCheckpoint } from "../src/laya-serve";
 import { layaHealth, servingCheckpoint } from "../src/laya-service";
 import { dataPath, sourceRoot } from "../src/roots";
@@ -117,6 +117,7 @@ const report = await runPass({
 
       return outcomes.filter((one) => one.ready).map((one) => one.node);
     },
+    card: (node) => readCard(node, spawnRunner, jakeConsole()),
     // The checkpoint serving the gate today, where the collection holds it.
     beside: async (gate) => {
       const served = servingCheckpoint(health, gate)?.replace(/^checkpoints\//, "") ?? null;

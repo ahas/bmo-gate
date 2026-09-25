@@ -9,6 +9,7 @@ import { writeLedger } from "./ledger";
 import { floorReason, retrainReason, seriesOf } from "./readiness";
 import { totalRows } from "./source";
 
+import type { CardRead } from "../laya-nodes";
 import type { CurvePoint } from "./curve";
 import type { Ledger, LedgerRow } from "./ledger";
 import type { Waiting } from "./readiness";
@@ -22,6 +23,8 @@ import type { GateCopy, GateSource } from "./source";
 export interface PassHands {
   // The nodes ready to take a gate now.
   nodes: () => Promise<string[]>;
+  // A node's card as it stands right before the node is handed a gate.
+  card: (node: string) => Promise<CardRead>;
   // The collected checkpoint a gate is measured beside, or null for the one it is trained from.
   beside: (gate: string) => Promise<string | null>;
   runGate: (gate: string, node: string, round: number, run: { pass: string; folder: string; beside: string | null }) => Promise<LedgerRow>;
@@ -38,6 +41,10 @@ export interface PassOptions {
   hands: PassHands;
   now?: () => Date;
   say?: (line: string) => void;
+  // How a node whose card is taken waits for it: read again every so often, so many times at most.
+  wait?: (ms: number) => Promise<void>;
+  cardEveryMs?: number;
+  cardPolls?: number;
 }
 
 export interface PassReport {
@@ -49,25 +56,67 @@ export interface PassReport {
   fault: string | null;
 }
 
+// How a node's card is read before each gate, and how long a taken one is waited on.
+export interface CardWait {
+  card: (node: string) => Promise<CardRead>;
+  wait: (ms: number) => Promise<void>;
+  everyMs: number;
+  polls: number;
+  say: (line: string) => void;
+}
+
 // The gates queued over the nodes: each node takes the next gate waiting the moment its own is done,
 // and a node whose gate did not finish takes no other, since a node failing in seconds would
-// otherwise take every gate still waiting and fail each of them the same way.
+// otherwise take every gate still waiting and fail each of them the same way. A node's card is read
+// again before every gate, since other work takes the cards too: a taken card is waited on while
+// gates are still waiting and for the bound at most, and a node that does not answer drops out.
 export async function queueGates(
   gates: readonly string[],
   nodes: readonly string[],
   run: (gate: string, node: string, round: number) => Promise<LedgerRow>,
   unclaimed: (gate: string) => LedgerRow,
+  cards: CardWait,
 ): Promise<LedgerRow[]> {
   const waiting = [...gates];
   const driven = new Map<string, LedgerRow>();
 
   await Promise.all(nodes.map(async (node) => {
-    for (let round = 1; ; round += 1) {
+    let round = 0;
+
+    for (let held = 0; waiting.length > 0;) {
+      const card = await cards.card(node);
+
+      if (card.state === "silent") {
+        cards.say(`${node}: 이번 회차에서 뺐어요 — ${card.why}`);
+
+        return;
+      }
+
+      if (card.state === "taken") {
+        if (held === cards.polls) {
+          cards.say(`${node}: 카드가 비지 않아 이번 회차에서 뺐어요 — ${card.why}`);
+
+          return;
+        }
+
+        if (held === 0) {
+          cards.say(`${node}: 카드가 빌 때까지 기다려요 — ${card.why}`);
+        }
+
+        held += 1;
+        await cards.wait(cards.everyMs);
+        continue;
+      }
+
+      held = 0;
+
       const gate = waiting.shift();
 
       if (gate === undefined) {
         return;
       }
+
+      round += 1;
 
       const row = await run(gate, node, round);
 
@@ -169,6 +218,13 @@ export async function runPass(options: PassOptions): Promise<PassReport> {
       pass: training, folder: chosen.find((one) => one.gate === gate)!.copy.folder, beside: besides.get(gate) ?? null,
     }),
     (gate) => ({ ...unfinishedRow(gate, "—", 0, { pass: training, rehearsal: options.source.rehearsal, beside: besides.get(gate) ?? null }, null), fault: "맡을 노드가 남지 않았어요." }),
+    {
+      card: options.hands.card,
+      wait: options.wait ?? ((ms) => new Promise<void>((keep) => setTimeout(keep, ms))),
+      everyMs: options.cardEveryMs ?? 60_000,
+      polls: options.cardPolls ?? 30,
+      say,
+    },
   );
   const ledger: Ledger = {
     pass: training, source: options.source.name, rehearsal: options.source.rehearsal, started, ended: now().toISOString(), nodes, rows,

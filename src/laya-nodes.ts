@@ -184,6 +184,20 @@ export function nodeBusy(probe: NodeProbe): boolean {
   return (probe.gpuProcs ?? 0) > 0;
 }
 
+/** A card as it stands right now: free, carrying a process, or not to be read at all. */
+export type CardRead = { state: "free" } | { state: "taken" | "silent"; why: string };
+
+/** The card read again right before anything is put on it. The card is shared with work that is not a
+ * pass's, so what it carried when the node was stood up says nothing about it a gate later. */
+export async function readCard(node: string, runner: NodeRunner, console: string): Promise<CardRead> {
+  const probed = await nodeCalls(runner, console, node).exec(probeCommand());
+  const probe = parseProbe(probed.stdout);
+  if (probe === null) {
+    return { state: "silent", why: `노드가 답하지 않아요 — ${runFault(probed)}` };
+  }
+  return nodeBusy(probe) ? { state: "taken", why: `카드에 프로세스가 ${probe.gpuProcs}개 올라가 있어요` } : { state: "free" };
+}
+
 /** The version `pyproject.toml` pins `laya` at, read from the file rather than kept beside it, so the
  * pin has one place to be wrong. */
 export function pinnedLaya(pyproject: string): string | null {

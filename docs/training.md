@@ -76,6 +76,13 @@ The driver asks those four and never which kind of source it is talking to.
 - **A node takes the next gate waiting the moment its own is done**, so a node that drew a small gate
   is not left idle beside one that drew a large one; a gate's round is how many gates its node had
   taken by then.
+- **A node's card is read again right before every gate it is handed**, because the card is shared
+  with work that is not a pass's: BMO's voice training puts each of its stages on whichever of n3, n4
+  and n5 has a free card, and a gate on a card already carrying one runs one of the two out of memory.
+  A card carrying a process takes no gate. Its node reads it again every minute while gates are still
+  waiting, for half an hour at most, and then drops out of the pass; the gates it did not take go to
+  the nodes still working, or stay for the next pass. A node that does not answer the reading drops
+  out at once.
 - **A node whose gate did not finish takes no other gate in that pass** — out of reach, or a training
   that fell over. A node failing in seconds would otherwise take every gate still waiting and fail
   each the same way while the nodes that work sat idle. A gate no node was left to take keeps its line
@@ -116,21 +123,26 @@ picked up rather than begun again.
    on. A gate whose data could not be put across fails on its own and costs its node nothing else.
 2. **The training is started detached** with `setsid` and its output in a log, because the hub stops
    a command it is streaming and the stop reaches the whole process group.
-3. **A run is waited on while it moves.** The largest gates train for hours, so no clock bounds the
+3. **Nothing is started on a card somebody else holds.** Right before a launch, a resume and a
+   calibration the card is read again, since the card stands free between the gate's own processes
+   and another training can take it in that gap. A card carrying a process is waited on, and the wait
+   is a run that does not move, so the hour below bounds it; a node that does not answer the reading
+   is out of reach.
+4. **A run is waited on while it moves.** The largest gates train for hours, so no clock bounds the
    wait; a run whose log has grown by no line, whose step has not moved and which has not passed from
    training to calibrating for an hour is given up on with the log's last line.
-4. **A run that died is carried on from its newest step checkpoint**, which is carried off the node
+5. **A run that died is carried on from its newest step checkpoint**, which is carried off the node
    first. It is carried on at most five times; a gate that keeps dying is given up on with the count
    and the log's last line. A run that died leaving nothing to carry on from is named rather than
    written over — removing somebody's checkpoint is nobody's to do quietly.
-5. **A finished run is calibrated**, with the gate's own declaration of which answer Laya may settle
+6. **A finished run is calibrated**, with the gate's own declaration of which answer Laya may settle
    handed over as a flag. A calibration counts as this training's only where its log is newer than
    the training that finished.
-6. **The checkpoint measured beside it** is the one serving the gate on n6 today, where the service
+7. **The checkpoint measured beside it** is the one serving the gate on n6 today, where the service
    serves the gate and the collection holds that checkpoint: it is put on the node and measured on the
    same test rows, so the table's before and after are one computation on one set. A gate nobody
    serves is measured beside the checkpoint it was trained from.
-7. **The finished checkpoint is carried back**, and the gate's line written into the ledger.
+8. **The finished checkpoint is carried back**, and the gate's line written into the ledger.
 
 ## The training script and its settings
 
