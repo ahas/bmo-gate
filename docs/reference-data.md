@@ -120,14 +120,16 @@ road」), holding no thread.
 The rows take the shape every row of this repository takes, the one the training reads
 (`docs/gate-data.md`, 「A run folder」).
 
-- **One row a turn a gate**, carrying every candidate the narrowing kept — one to 128 — exactly as one
-  Laya call on the live road does.
+- **One row a turn a gate a Laya call.** A turn's candidates are cut the way BMO's Laya client cuts
+  its request: every candidate the narrowing kept, in BMO's order, 128 to a row, each row with the
+  turn's same state. A turn of up to 128 candidates is one row; one of 300 is three, of 128, 128
+  and 44. No candidate is dropped for being past one call.
 - **The state is BMO's state**, rewritten as above. A state longer than one Laya call reads is cut to
   its newest lines that fit, and the cut is counted.
 - **The questions are BMO's questions**, rewritten as above, under their slugs.
 - **The gold of a question** is a yes/no distribution: yes at 0.95 for `used` and `needed`, no at
   0.95 for `unused` and `not-needed`, and an even half for `related`.
-- **A row waits until every one of its candidates has a label.** A row with a hole in its gold is a
+- **A row waits until every one of its own candidates has a label.** A row with a hole in its gold is a
   row the training cannot read; it is counted as waiting and made on the pass its last label lands.
 - **A row's id is its input's hash; its split is its turn's.** The split is drawn from the turn's key
   at fifteen per cent calibration and fifteen per cent test, so a turn stays in its split however its
@@ -147,11 +149,15 @@ The rows take the shape every row of this repository takes, the one the training
   `needed`, and the number of such pieces, beside the turns it was asked on.
 - **The LLM gate's own set against the use gold** is read on the turns the reference record holds.
 - **Laya is asked again, not read back.** Each turn's input as BMO builds it today is put to the Laya
-  service as it serves now, so a score belongs to the checkpoint serving the gate today. An answer is
-  kept beside the checkpoint that gave it and the input it was given, and reused while both stand.
-- **Laya's verdict on a turn** is the set of candidates it gives a yes at or above even odds, and its
-  confidence the lowest of its per-candidate confidences. **At each τ** the figures are the share of
-  turns Laya would settle and, of those, how many matched the use gold on the uncontested candidates.
+  service as it serves now, so a score belongs to the checkpoint serving the gate today. A turn of
+  more than 128 candidates is asked in the calls BMO's client cuts it into, and a call that fails
+  leaves the turn unanswered. An answer is kept beside the checkpoint that gave it and the input it
+  was given, and reused while both stand.
+- **Laya's verdict on a candidate** is yes at or above even odds, and its confidence the larger of
+  its two probabilities. **At each τ**, as the filter settles these gates candidate by candidate
+  (`docs/laya-gates.md`, 「Question types」), the figures count candidates: how many reach τ and
+  their share of those Laya answered, how many of those matched the use gold among the uncontested
+  ones, and the turns where every candidate reached τ — the turns the LLM is not asked at all.
 - **The rarer answer is counted before anything is trained.** For each gate: its rows, the rows
   waiting on a label, the questions whose gold is yes, the ones whose gold is no, the contested ones,
   and how many rows hold at least one yes.

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { splitOf } from "../laya-dataset";
-import { layaFits } from "../laya";
+import { layaFits, layaRequestParts } from "../laya";
 import { languageOf, synthesisFor, validateSynthRow } from "../laya-synth";
 import { scrubText } from "../pii";
 import { goldShare, labelKey, referenceGates } from "./labels";
@@ -126,9 +126,10 @@ function specOf(gate: ReferenceGate): GateSynthesis {
   return spec;
 }
 
-// One turn's row for one gate, or why it is none. The gold is read from the labels under the turn's
-// key and the candidate's slug as BMO named it, before anything is rewritten.
-export function referenceRow(
+// One turn's rows for one gate, one for each call BMO's client asks the turn in, or why a row is
+// none. The gold is read from the labels under the turn's key and the candidate's slug as BMO named
+// it, before anything is rewritten; the candidates stand in the order of the request's questions.
+export function referenceTurnRows(
   turn: string,
   live: LiveGate,
   labels: ReadonlyMap<string, Label>,
@@ -136,6 +137,25 @@ export function referenceRow(
   into: GateRows,
 ): void {
   const words = live.candidates.map((one) => labels.get(labelKey(turn, live.gate, one.slug))?.word ?? null);
+  let from = 0;
+
+  for (const part of layaRequestParts(live.request)) {
+    const count = Object.keys(part.questions).length;
+
+    partRow(turn, live.gate, part, words.slice(from, from + count), leave, into);
+    from += count;
+  }
+}
+
+// The row of one call's part of a turn, its words standing by place beside its questions.
+function partRow(
+  turn: string,
+  gate: ReferenceGate,
+  part: LayaRequest,
+  words: readonly (Label["word"] | null)[],
+  leave: (request: LayaRequest) => LayaRequest,
+  into: GateRows,
+): void {
   const missing = words.filter((word) => word === null).length;
 
   if (missing > 0) {
@@ -144,7 +164,7 @@ export function referenceRow(
     return;
   }
 
-  const left = leave(live.request);
+  const left = leave(part);
   const request = fittingState(left);
 
   if (request === null) {
@@ -160,7 +180,7 @@ export function referenceRow(
   // the rewriting renamed the question.
   const ids = Object.keys(request.questions);
   const gold = Object.fromEntries(ids.map((id, at) => [id, noul(goldShare(words[at]!))]));
-  const spec = specOf(live.gate);
+  const spec = specOf(gate);
   const state = String(request.state);
   const verdict = validateSynthRow(spec, { state, questions: { ...request.questions }, gold }, languageOf(state));
 
@@ -172,8 +192,8 @@ export function referenceRow(
   const hash = createHash("sha256").update(JSON.stringify({ state, questions: request.questions })).digest("hex");
 
   into.rows.push({
-    id: `${live.gate}:${hash.slice(0, 16)}`,
-    gate: live.gate,
+    id: `${gate}:${hash.slice(0, 16)}`,
+    gate,
     split: splitOf(turn, referenceShares),
     state: JSON.stringify(state),
     questions: JSON.stringify(request.questions),
@@ -220,7 +240,7 @@ export function referenceRows(
 
   for (const turn of turns) {
     for (const live of turn.gates) {
-      referenceRow(turn.key, live, labels, leave, built[live.gate]);
+      referenceTurnRows(turn.key, live, labels, leave, built[live.gate]);
     }
   }
 

@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { splitOf } from "../laya-dataset";
 import { pseudonyms } from "../pii";
 import { labelKey } from "./labels";
-import { answerCounts, emptyGateRows, fittingState, leaveRequest, leaveRoom, referenceRow, referenceRows, referenceShares } from "./rows";
+import { answerCounts, emptyGateRows, fittingState, leaveRequest, leaveRoom, referenceRows, referenceShares, referenceTurnRows } from "./rows";
 
 import type { LayaRequest } from "../laya";
 import type { Label } from "./labels";
@@ -71,13 +71,13 @@ describe("fittingState", () => {
   });
 });
 
-describe("referenceRow", () => {
+describe("referenceTurnRows", () => {
   const leave = (request: LayaRequest) => leaveRequest(request, names(), people);
 
   test("waits while any candidate has no label", () => {
     const into = emptyGateRows();
 
-    referenceRow("-7:3", live(["a-one", "b-two"]), new Map([label("-7:3", "a-one", "needed")]), leave, into);
+    referenceTurnRows("-7:3", live(["a-one", "b-two"]), new Map([label("-7:3", "a-one", "needed")]), leave, into);
 
     expect(into.rows).toEqual([]);
     expect([into.waiting, into.unlabelled]).toEqual([1, 1]);
@@ -86,7 +86,7 @@ describe("referenceRow", () => {
   test("carries BMO's input with each gold beside its own question, split by the turn", () => {
     const into = emptyGateRows();
 
-    referenceRow("-7:3", live(["a-one", "b-two"]), new Map([label("-7:3", "a-one", "needed"), label("-7:3", "b-two", "not-needed")]), leave, into);
+    referenceTurnRows("-7:3", live(["a-one", "b-two"]), new Map([label("-7:3", "a-one", "needed"), label("-7:3", "b-two", "not-needed")]), leave, into);
 
     const row = into.rows[0]!;
     const gold = JSON.parse(row.gold) as Record<string, { noul: number }>;
@@ -100,12 +100,43 @@ describe("referenceRow", () => {
   });
 });
 
+describe("a turn of more candidates than one call holds", () => {
+  const slugs = Array.from({ length: 300 }, (_, at) => `piece-${at}`);
+  const labelled = (skip: string | null) =>
+    new Map(slugs.filter((slug) => slug !== skip).map((slug) => label("-7:6", slug, slug === "piece-200" ? "needed" : "not-needed")));
+
+  test("is a row for each call BMO's client asks it in, its questions in order under one state", () => {
+    const into = emptyGateRows();
+
+    referenceTurnRows("-7:6", live(slugs), labelled(null), (request) => request, into);
+
+    const questions = into.rows.map((row) => Object.keys(JSON.parse(row.questions) as object));
+    const gold = JSON.parse(into.rows[1]!.gold) as Record<string, { noul: number }>;
+
+    expect(into.refused).toEqual({});
+    expect(questions.map((ids) => ids.length)).toEqual([128, 128, 44]);
+    expect(questions.flat()).toEqual(slugs);
+    expect(new Set(into.rows.map((row) => row.state)).size).toBe(1);
+    expect(new Set(into.rows.map((row) => row.split))).toEqual(new Set([splitOf("-7:6", referenceShares)]));
+    expect([gold["piece-200"]!.noul, gold["piece-199"]!.noul]).toEqual([0.95, 0.05]);
+  });
+
+  test("waits only in the row whose own candidate has no label", () => {
+    const into = emptyGateRows();
+
+    referenceTurnRows("-7:6", live(slugs), labelled("piece-299"), (request) => request, into);
+
+    expect(into.rows.map((row) => Object.keys(JSON.parse(row.questions) as object).length)).toEqual([128, 128]);
+    expect([into.waiting, into.unlabelled]).toEqual([1, 1]);
+  });
+});
+
 describe("a slug as long as BMO's writers made it", () => {
   test("is a question the gate asks", () => {
     const slug = "p90000001-agent-log-sqlite-postgres-schema-deep-dive";
     const into = emptyGateRows();
 
-    referenceRow("-7:5", live([slug]), new Map([label("-7:5", slug, "needed")]), (request) => request, into);
+    referenceTurnRows("-7:5", live([slug]), new Map([label("-7:5", slug, "needed")]), (request) => request, into);
 
     expect([into.rows.length, into.refused]).toEqual([1, {}]);
   });

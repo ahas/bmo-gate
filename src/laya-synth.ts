@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { foldState } from "./fold-state";
-import { layaFits } from "./laya";
+import { layaFits, layaQuestionsPerCall } from "./laya";
 import { splitOf } from "./laya-dataset";
 import { jsonArrayIn, jsonObjectsIn } from "./laya-teach";
 
@@ -659,7 +659,7 @@ const systemDocuments: GateSynthesis = {
   textFields: [],
   transcript: { shape: "plain", fields: [] },
   perCandidate: true,
-  candidates: { min: 1, max: 128 },
+  candidates: { min: 1, max: layaQuestionsPerCall },
   candidateWord: "문서",
   questions: [{ id: "needed", type: "noul", instructions: "이 대화에 답하려면 이 참고 문서가 필요한가?" }],
   language: { korean: 0.7, english: 0.1, mixed: 0.2 },
@@ -691,7 +691,7 @@ const roomRules: GateSynthesis = {
   textFields: [],
   transcript: { shape: "plain", fields: [] },
   perCandidate: true,
-  candidates: { min: 1, max: 128 },
+  candidates: { min: 1, max: layaQuestionsPerCall },
   candidateWord: "규칙",
   questions: [{ id: "needed", type: "noul", instructions: "이 대화에 답하려면 이 방 규칙이 필요한가?" }],
   language: { korean: 0.8, english: 0.05, mixed: 0.15 },
@@ -713,7 +713,7 @@ const libraryKnowledge: GateSynthesis = {
   textFields: [],
   transcript: { shape: "plain", fields: [] },
   perCandidate: true,
-  candidates: { min: 1, max: 128 },
+  candidates: { min: 1, max: layaQuestionsPerCall },
   candidateWord: "문서",
   questions: [{ id: "needed", type: "noul", instructions: "이 대화에 답하려면 이 지식 문서가 필요한가?" }],
   language: { korean: 0.75, english: 0.08, mixed: 0.17 },
@@ -902,7 +902,7 @@ const personBook: GateSynthesis = {
   textFields: [],
   transcript: { shape: "plain", fields: [] },
   perCandidate: true,
-  candidates: { min: 1, max: 128 },
+  candidates: { min: 1, max: layaQuestionsPerCall },
   candidateWord: "기록",
   questions: [{ id: "needed", type: "noul", instructions: "이 대화에 답하려면 이 인물 기록이 필요한가?" }],
   language: { korean: 0.8, english: 0.05, mixed: 0.15 },

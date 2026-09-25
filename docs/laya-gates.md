@@ -22,10 +22,17 @@ balance its distilled training data is to be drawn to.
   question is answered with one of its named options. The `score` type exists in the client and no
   gate uses it, so no gate here asks one.
 - **A gate may ask several questions of one input.** The three reference splits, the situation-rule
-  matcher and the person-book search each ask one question per candidate, and the confidence the
-  filter compares with τ is then the lowest of them.
+  matcher and the person-book search each ask one question per candidate.
+- **The four reference gates are settled candidate by candidate.** In the three reference splits and
+  the person-book search the filter compares each candidate's own confidence with τ: the candidates
+  that reach it are Laya's, and only the rest go to the LLM (BMO's `docs/laya.md`, 「A gate settled
+  one question at a time」). The situation-rule matcher is settled whole, and the confidence the
+  filter compares with τ is then the lowest of its questions'.
 - **What one call holds:** at most 128 questions, a state of at most 768 tokens and a question of at
   most 256. Every row of every gate's data fits inside that or it is not a row.
+- **A row is one call's worth.** A turn whose gate asks more than 128 questions is not cut short: the
+  client asks it in several calls — its questions in their order, 128 to a call, each call with the
+  same state — and the turn is as many rows as it is calls.
 
 ## The three transcript shapes
 
@@ -273,8 +280,8 @@ gate on each road, same bar, same audit.
 - **Asymmetry:** none. Neither answer is the safe one: a document wrongly left out costs an answer
   written without it, and one wrongly carried costs prompt room, and neither is the kind of harm that
   makes a verdict settleable on its own.
-- **Candidates per row:** 1 to 128 — whatever the narrowing keeps, capped at one Laya call. A room
-  that does not read the lore offers only the system reference index's own slugs, which are few; a
+- **Candidates per row:** 1 to 128 — one call's worth of whatever the narrowing keeps; a turn offered
+  more is several rows (「Question types」). A room that does not read the lore offers only the system reference index's own slugs, which are few; a
   room that reads it offers the lore's chunks beside them, which are many. Both ends are real and the
   data carries both.
 
@@ -287,7 +294,7 @@ gate on each road, same bar, same audit.
 - **Question:** one yes/no per candidate — 「이 대화에 답하려면 이 방 규칙이 필요한가?」
 - **Answers:** the set of slugs answered yes, or none.
 - **Asymmetry:** none.
-- **Candidates per row:** 1 to 128 — whatever the narrowing keeps.
+- **Candidates per row:** 1 to 128 — one call's worth of whatever the narrowing keeps.
 
 ## 3. 서고 지식 분류기
 
@@ -298,7 +305,7 @@ gate on each road, same bar, same audit.
 - **Question:** one yes/no per candidate — 「이 대화에 답하려면 이 지식 문서가 필요한가?」
 - **Answers:** the set of slugs answered yes, or none.
 - **Asymmetry:** none.
-- **Candidates per row:** 1 to 128 — whatever the narrowing keeps.
+- **Candidates per row:** 1 to 128 — one call's worth of whatever the narrowing keeps.
 
 ## 4. 상황 규칙 매칭기
 
@@ -398,7 +405,8 @@ gate on each road, same bar, same audit.
 - **Question:** one yes/no per candidate — 「이 대화에 답하려면 이 인물 기록이 필요한가?」
 - **Answers:** the set of slugs answered yes, or none.
 - **Asymmetry:** none.
-- **Candidates per row:** 1 to 128 — whatever the narrowing keeps, which for a large book is the cap.
+- **Candidates per row:** 1 to 128 — one call's worth of whatever the narrowing keeps. A large book
+  offers more than one call holds, and such a turn is several rows.
 
 ## 9. 응답 여부 판정기
 

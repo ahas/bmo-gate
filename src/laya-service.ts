@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 
+import { layaRequestParts } from "./laya";
 import { serviceKeyPath, TUNNEL_LISTEN } from "./llm-install";
 
 import type { LayaRequest } from "./laya";
@@ -60,9 +61,29 @@ export function servedCheckpoints(health: Record<string, unknown> | null): Map<s
     : []);
 }
 
-// One decision, asked once more where the connection itself dropped: the service closes an idle
+// One decision, asked in the calls BMO's client cuts the request into and joined into one reply; a
+// call without an answer leaves the decision without one.
+export async function layaDecide(
+  gate: string,
+  request: LayaRequest,
+  url: string = layaUrl(),
+  decide: (gate: string, part: LayaRequest, url: string) => Promise<unknown | null> = layaDecidePart,
+): Promise<unknown | null> {
+  const parts = layaRequestParts(request);
+
+  if (parts.length === 1) {
+    return await decide(gate, parts[0]!, url);
+  }
+
+  const replies = await Promise.all(parts.map((part) => decide(gate, part, url)));
+  const answers = replies.map((reply) => typeof reply === "object" && reply !== null ? (reply as { answers?: unknown }).answers : null);
+
+  return answers.every((one) => typeof one === "object" && one !== null) ? { answers: Object.assign({}, ...answers) as unknown } : null;
+}
+
+// One call, asked once more where the connection itself dropped: the service closes an idle
 // connection the client may still be about to reuse, and that is not an answer about the input.
-export async function layaDecide(gate: string, request: LayaRequest, url: string = layaUrl()): Promise<unknown | null> {
+async function layaDecidePart(gate: string, request: LayaRequest, url: string): Promise<unknown | null> {
   const key = serviceKey();
 
   if (key === null) {

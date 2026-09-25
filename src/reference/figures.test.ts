@@ -30,12 +30,16 @@ describe("gateFigures", () => {
     expect([figures.llmMatchGold, figures.llmComparable]).toEqual([1, 1]);
   });
 
-  test("settles a turn at τ by its least sure candidate", () => {
-    const laya = new Map([["a/room-rules", { quiet: 0.9, photos: 0.2, links: 0.6 }]]);
-    const byTau = gateFigures("room-rules", [{ key: "a", recorded: [] }], labels, laya).laya!.byTau;
+  test("settles each candidate at τ by its own confidence", () => {
+    // quiet and photos answered right, links answered no where its gold is yes.
+    const laya = new Map([["a/room-rules", { quiet: 0.9, photos: 0.2, links: 0.3 }]]);
+    const figures = gateFigures("room-rules", [{ key: "a", recorded: [] }], labels, laya).laya!;
+    const at = (tau: number) => figures.byTau.find((one) => one.tau === tau);
 
-    expect(byTau.find((one) => one.tau === 0.5)).toMatchObject({ settled: 1, matchGold: 1 });
-    expect(byTau.find((one) => one.tau === 0.7)).toMatchObject({ settled: 0 });
+    expect([figures.turns, figures.candidates]).toEqual([1, 3]);
+    expect(at(0.7)).toMatchObject({ settled: 3, share: 1, matchGold: 2, accuracyGold: 0.6667, wholeTurns: 1 });
+    expect(at(0.8)).toMatchObject({ settled: 2, share: 0.6667, matchGold: 2, accuracyGold: 1, wholeTurns: 0 });
+    expect(at(0.95)).toMatchObject({ settled: 0, accuracyGold: null, wholeTurns: 0 });
   });
 });
 

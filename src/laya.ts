@@ -19,6 +19,21 @@ export interface LayaRequest {
 // the question and its options, so the state has the rest.
 export const layaMaxTokens = 1_024;
 export const layaQuestionTokens = 256;
+// The most questions the server takes in one call.
+export const layaQuestionsPerCall = 128;
+
+// The request as the calls BMO's client carries it in: its questions in their order, as many to a
+// call as the server takes, each call with the whole state (docs/laya-gates.md, 「Question types」).
+export function layaRequestParts(request: LayaRequest): LayaRequest[] {
+  const entries = Object.entries(request.questions);
+  const parts: LayaRequest[] = [];
+
+  for (let at = 0; at < entries.length; at += layaQuestionsPerCall) {
+    parts.push({ state: request.state, questions: Object.fromEntries(entries.slice(at, at + layaQuestionsPerCall)) });
+  }
+
+  return parts;
+}
 
 // A generous count of what the checkpoint's tokenizer makes of a text: a character outside ASCII
 // (Hangul, mostly) as one token, and about three ASCII characters to a token.

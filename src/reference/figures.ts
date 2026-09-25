@@ -11,12 +11,24 @@ export const taus = [0, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99] as const;
 // Laya's answer for one turn and gate, per candidate slug: its probability of yes.
 export type LayaAnswers = Record<string, number>;
 
+// A reference gate's filter settles it candidate by candidate, so the figures at τ count candidates:
+// those whose own confidence reaches τ, their share of the ones Laya answered, how many of them
+// matched the gold among the uncontested ones, and the turns every candidate of which reached τ —
+// the turns the LLM is not asked at all.
 export interface TauFigures {
   tau: number;
   settled: number;
   share: number;
   matchGold: number;
   accuracyGold: number | null;
+  wholeTurns: number;
+}
+
+// Laya's answer to one candidate: its confidence, and whether it matched the gold where the gold
+// is uncontested.
+interface LayaCandidate {
+  confidence: number;
+  right: boolean | null;
 }
 
 export interface GateFigures {
@@ -34,7 +46,7 @@ export interface GateFigures {
   llmMatchGold: number;
   llmComparable: number;
   llmAccuracyGold: number | null;
-  laya: { turns: number; byTau: TauFigures[] } | null;
+  laya: { turns: number; candidates: number; byTau: TauFigures[] } | null;
 }
 
 function share(part: number, whole: number): number | null {
@@ -87,7 +99,7 @@ export function gateFigures(
     gate, turns: 0, attached: 0, used: 0, related: 0, unused: 0, overSelection: null, offered: 0, needed: 0, missTurns: 0,
     llmMatchGold: 0, llmComparable: 0, llmAccuracyGold: null, laya: null,
   };
-  const layaTurns: { confidence: number; gold: boolean | null }[] = [];
+  const layaTurns: LayaCandidate[][] = [];
 
   for (const turn of turns) {
     const mine = byTurn.get(turn.key) ?? [];
@@ -130,24 +142,31 @@ export function gateFigures(
       continue;
     }
 
-    layaTurns.push({
-      confidence: Math.min(...Object.values(answers).map((yes) => Math.max(yes, 1 - yes))),
-      gold: matches(mine, (slug) => slug in answers ? answers[slug]! >= 0.5 : null),
-    });
+    const gold = new Map(mine.map((label) => [label.slug, goldYes(label.word)]));
+
+    layaTurns.push(Object.entries(answers).map(([slug, yes]) => {
+      const wanted = gold.get(slug) ?? null;
+
+      return { confidence: Math.max(yes, 1 - yes), right: wanted === null ? null : (yes >= 0.5) === wanted };
+    }));
   }
 
   figures.overSelection = share(figures.unused, figures.used + figures.related + figures.unused);
   figures.llmAccuracyGold = share(figures.llmMatchGold, figures.llmComparable);
 
   if (layaTurns.length > 0) {
+    const candidates = layaTurns.flat();
+
     figures.laya = {
       turns: layaTurns.length,
+      candidates: candidates.length,
       byTau: taus.map((tau) => {
-        const settled = layaTurns.filter((one) => one.confidence >= tau);
-        const judged = settled.filter((one) => one.gold !== null);
-        const matchGold = judged.filter((one) => one.gold === true).length;
+        const settled = candidates.filter((one) => one.confidence >= tau);
+        const judged = settled.filter((one) => one.right !== null);
+        const matchGold = judged.filter((one) => one.right === true).length;
+        const wholeTurns = layaTurns.filter((turn) => turn.every((one) => one.confidence >= tau)).length;
 
-        return { tau, settled: settled.length, share: share(settled.length, layaTurns.length) ?? 0, matchGold, accuracyGold: share(matchGold, judged.length) };
+        return { tau, settled: settled.length, share: share(settled.length, candidates.length) ?? 0, matchGold, accuracyGold: share(matchGold, judged.length), wholeTurns };
       }),
     };
   }
