@@ -15,13 +15,14 @@ import type { GateSynthesis, LanguageBucket, SynthAsk, SynthRefusal } from "./la
 // last frozen one. The plan is a pure function of the gate, the row count and the batch size, so a
 // resumed run asks for exactly what the dead one would have asked for next.
 
-// Which road the rows are written on (docs/gate-data.md). The two differ in more than their model:
-// codex holds a thread across a gate's batches and reads its fixed prefix out of the prompt cache,
-// and J3090 keeps no session at all and reads the whole prefix afresh on every call.
-export type SynthRoad = "codex" | "j3090";
+// Which road the rows are written or judged on (docs/gate-data.md). They differ in more than their
+// model: codex holds a thread across a gate's batches and reads its fixed prefix out of the prompt
+// cache, while J3090 and the claude judging road keep no session at all and carry the whole prefix
+// afresh on every call.
+export type SynthRoad = "codex" | "j3090" | "claude";
 
 export function roadHoldsSession(road: SynthRoad): boolean {
-  return road !== "j3090";
+  return road === "codex";
 }
 
 export interface TokenTally {

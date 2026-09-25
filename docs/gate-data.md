@@ -169,9 +169,10 @@ Every label is made afresh, on a road, against the gate exactly as it stands.
 
 ## The roads
 
-A gate's rows are written on a road. There are two: codex, which most gates ride, and J3090, for a
-gate codex will not write. A run is told which road to drive with, and a gate stopped on one road is
-taken up on the other, its frozen batches left as they stand.
+A gate's rows are written or judged on a road. There are three: codex, which most gates ride; J3090,
+for a gate codex will not write; and claude, which judges real rows while the codex account is shut
+and writes none. A run is told which road to drive with, and a gate stopped on one road is taken up
+on another, its frozen batches left as they stand.
 
 ## The codex road
 
@@ -278,7 +279,7 @@ policy, which no model inside codex gets past. The rows are the gate's whole poi
 softened to slip by; the road is changed instead.
 
 The second road is J3090, the qwen model that runs at home. It is not claude, which is the one thing
-the choice was told to avoid, and it writes the same attack rows without flinching. It is reached as
+the choice of a road for writing rows was told to avoid, and it writes the same attack rows without flinching. It is reached as
 one HTTPS request per batch against a small MCP service.
 
 - **One request, one batch, no thread.** The road holds no session and reads no cache: every batch
@@ -298,9 +299,39 @@ one HTTPS request per batch against a small MCP service.
   this road tallies no tokens. The zero is the absence of a reading, not a batch that cost nothing —
   the same as the flat-rate codex login reports no price.
 
+## The claude road
+
+A judging pass can ride Claude Code instead of codex, for the stretch the codex account is shut. It
+judges and writes nothing: the writing driver does not offer it, since writing rows is what the
+choice of a writing road keeps off claude.
+
+- **One login, pinned.** The road rides the second Claude account — the one whose credentials stand
+  in `~/.claude` — and no other. It names that directory outright as the CLI's configuration
+  directory and strips every variable that could carry another login in beside it (a login token,
+  an API key), so the login the job itself runs under never leaks into a batch. Before the first
+  batch it reads the account that directory is logged into and refuses to start where it is not
+  the one the road is pinned to.
+- **It never walks to another account.** A batch refused for a spent limit fails like any other
+  failed batch: it stops the gate, the frozen batches stand, and the gate is taken up on the same
+  road once the limit has reset. Nothing here knows of the other logins, so nothing can fall over
+  to one.
+- **The tier**: model `claude-sonnet-5`, effort `high`, named on every call, with no fallback model.
+  The model that answered is read back off the result, and a batch answered by any other model is a
+  failed batch rather than a label written under a name that did not make it.
+- **The CLI runs bare of this machine's own setup.** Safe mode, so no `CLAUDE.md`, hook, plugin,
+  skill or MCP server of the machine's rides along; no tools at all; the judge's own few lines
+  replace the default system prompt; nothing is kept of the session. It starts in a directory
+  holding nothing, the same as codex.
+- **One call, one batch, no session.** The batch goes in on stdin and one JSON result comes back:
+  the answer is its result text, a result marked as an error is a failed batch carrying its words,
+  and the usage gives fresh input, cache reads, cache writes and output apart.
+- **Its unit does not restart on failure.** A spent limit lasts hours or days, and a unit that
+  restarted on it would only meet it again. The run ends failed where it stopped, and it is taken
+  up with `--resume` once the limit has reset.
+
 ### A gate carried across roads
 
-A gate stopped on one road is taken up on the other without rebuilding what the first road wrote.
+A gate stopped on one road is taken up on another without rebuilding what the first road wrote.
 
 - **The frozen batches stand.** Freezing is per batch, so the batches a gate already froze on its
   first road are read back as they are, and the run takes up at the batch after the last frozen one.
@@ -446,6 +477,8 @@ In order, with the rebuilt gate's own run name:
    `systemd-run --user --unit bmo-gate-judge-<run> --same-dir -E PATH="$PATH" -p Restart=on-failure
    bun scripts/laya-judge.ts <run> --gate <gate> --road codex --batch 20 --resume`. It always
    resumes, so a restart takes up at the batch after the last one frozen, as the standing unit does.
+   On the claude road the same line is written with `--road claude` and without the restart, as
+   that road asks (「The claude road」).
 4. The readings that close a run on that run: `bun scripts/laya-audit.ts` for the verdict and
    `bun scripts/laya-ledger.ts` for the ledger.
 5. The training: `bun scripts/laya-train.ts judging:<run> --gate <gate>`, a source whose curve is

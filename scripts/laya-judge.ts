@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { asksUsage, allOf, asked, lastOf, readFlags } from "../src/flags";
+import { claudeEffort, claudeJudgeRoad, claudeModel } from "../src/claude-road";
 import { codexEffort, codexJudgeRoad, codexModel } from "../src/codex-road";
 import { answersPerBatch, gateFor, judgeBatches, judgePrompt, judgeSystem, judgedRows, readJudgements } from "../src/gate-judge";
 import { j3090Effort, j3090JudgeRoad, j3090Model } from "../src/j3090-road";
@@ -25,12 +26,12 @@ import type { RealMeta, UnjudgedRow } from "../src/real-rows";
 // It writes into the same folders a generation writes, batch by batch, so the status, the merge,
 // the verdict and the ledger read a judged gate exactly as they read a written one.
 
-const usage = `usage: bun scripts/laya-judge.ts <실행> [--gate <게이트>]… [--road codex|j3090] [--batch <n>] [--answers <n>] [--at-once <n>] [--resume] [--overwrite] [--limit <n>]
+const usage = `usage: bun scripts/laya-judge.ts <실행> [--gate <게이트>]… [--road codex|j3090|claude] [--batch <n>] [--answers <n>] [--at-once <n>] [--resume] [--overwrite] [--limit <n>]
 
 실행 폴더의 게이트마다 unjudged.jsonl 을 읽어 지금 게이트 구조 그대로 판정하고, 묶음이 올 때마다 굳힌다.
 <실행> 은 런타임 데이터 뿌리 아래의 이름이거나 절대 경로다. laya-real.ts 가 먼저 그 폴더를 채워야 한다.
 --gate 는 게이트를 고른다(여러 번). 없으면 실행 폴더에 unjudged.jsonl 이 있는 게이트 전부.
---road 는 판정을 맡을 길(기본 codex). --batch 는 한 묶음의 최대 행 수(기본 20).
+--road 는 판정을 맡을 길(기본 codex). claude 는 2번 Claude 계정(~/.claude)에 못박힌 claude-sonnet-5 high 이다. --batch 는 한 묶음의 최대 행 수(기본 20).
 --answers 는 한 묶음이 물을 수 있는 최대 답 수(기본 ${answersPerBatch}). 후보마다 질문이 붙는 게이트는 이쪽이 묶음을 정한다.
 --at-once 는 동시에 판정할 게이트 수(기본 1). --limit 은 게이트당 판정할 행 수, 연습 실행용.
 --resume 은 굳은 묶음 다음부터 이어 간다. --overwrite 는 이미 굳은 폴더를 다시 쓴다.`;
@@ -63,14 +64,19 @@ if (!existsSync(join(root, realMetaFile))) {
 const built = JSON.parse(readFileSync(join(root, realMetaFile), "utf8")) as RealMeta;
 const roadName = (lastOf(reading, "--road") ?? "codex") as SynthRoad;
 
-if (roadName !== "codex" && roadName !== "j3090") {
-  console.error("laya-judge: --road 는 codex 나 j3090 입니다.");
+// What each road judges with: the road itself, and the model and effort recorded beside its batches.
+const roads: Record<SynthRoad, () => { road: JudgeRoad; model: string; effort: string }> = {
+  codex: () => ({ road: codexJudgeRoad(), model: codexModel, effort: codexEffort }),
+  j3090: () => ({ road: j3090JudgeRoad(), model: j3090Model, effort: j3090Effort }),
+  claude: () => ({ road: claudeJudgeRoad(), model: claudeModel, effort: claudeEffort }),
+};
+
+if (!Object.hasOwn(roads, roadName)) {
+  console.error(`laya-judge: --road 는 ${Object.keys(roads).join(", ")} 중 하나입니다.`);
   process.exit(2);
 }
 
-const road: JudgeRoad = roadName === "codex" ? codexJudgeRoad() : j3090JudgeRoad();
-const model = roadName === "codex" ? codexModel : j3090Model;
-const effort = roadName === "codex" ? codexEffort : j3090Effort;
+const { road, model, effort } = roads[roadName]();
 const batchSize = Number(lastOf(reading, "--batch") ?? "20");
 const answerCap = Number(lastOf(reading, "--answers") ?? String(answersPerBatch));
 const atOnce = Math.max(1, Number(lastOf(reading, "--at-once") ?? "1"));

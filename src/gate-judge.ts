@@ -263,7 +263,7 @@ export function gateFor(gate: string): GateSynthesis {
 export type JudgeRefusal = SynthRefusal;
 
 // The road a batch of judgements rides. It is the asker's shape less the batch plan: a judgement
-// is a system prompt, a prompt and the thread the last batch left behind, and the two roads answer
+// is a system prompt, a prompt and the thread the last batch left behind, and every road answers
 // it the same way whatever else differs between them.
 export type JudgeRoad = (system: string, prompt: string, resumeSessionId: string | null) => Promise<JudgeAnswer>;
 
