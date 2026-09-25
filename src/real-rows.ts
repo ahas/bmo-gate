@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import { foldState } from "./fold-state";
 import { layaFits } from "./laya";
@@ -385,6 +387,13 @@ export function situationRows(
 
 // Where a gate's unjudged rows stand in its own folder, beside the batches a judging pass freezes.
 export const unjudgedFile = "unjudged.jsonl";
+
+// A gate's unjudged rows, read out of its own folder.
+export function readUnjudged(folder: string): UnjudgedRow[] {
+  return readFileSync(join(folder, unjudgedFile), "utf8")
+    .split("\n").filter((line) => line.trim() !== "")
+    .map((line) => JSON.parse(line) as UnjudgedRow);
+}
 
 // What the build settled, written once in the run's own root so the judging pass reads it back
 // rather than being told it again. The splits are fixed when a row is built, and a judging pass

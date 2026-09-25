@@ -5,10 +5,12 @@ import { claimGate, releaseGate } from "./gate-claim";
 import { frozenHere } from "./laya-frozen";
 import { gateFolder, gatesFolderName } from "./roots";
 import { gateOnDisk, guardFolder, plannedBatches, readProgress, roadHoldsSession, roadsOf, runSynthesis } from "./laya-synth-run";
+import { judgeBatches } from "./gate-judge";
+import { readUnjudged, unjudgedFile } from "./real-rows";
 
 import type { SplitShares } from "./laya-dataset";
 import type { GateSynthesis } from "./laya-synth";
-import type { SynthAsker, SynthMeta, SynthRoad, TokenTally } from "./laya-synth-run";
+import type { SynthAsker, SynthMeta, SynthProgress, SynthRoad, TokenTally } from "./laya-synth-run";
 
 // Ten gates at once, one thread and one folder each (docs/gate-data.md 「A run」). The gates are
 // run beside each other rather than one after another because they share nothing: no gate reads
@@ -182,6 +184,17 @@ export interface GateStanding {
   effort: string;
 }
 
+// The batches a gate is driven by. A judging pass — the one that records an answer bound — cuts
+// its plan from the rows standing in the gate's folder; a writing run cuts it from the rows it was
+// asked for, which on a judging pass is only the build's cap and says nothing of the rows there are.
+function plannedCount(folder: string, spec: GateSynthesis, progress: SynthProgress): number {
+  if (progress.answerCap !== undefined && existsSync(join(folder, unjudgedFile))) {
+    return judgeBatches(readUnjudged(folder), progress.batchSize, progress.answerCap).length;
+  }
+
+  return plannedBatches(spec, progress.rows, progress.batchSize).length;
+}
+
 // How far a run got, read out of the folders while it is still going. Nothing here attaches to a
 // running driver or asks it anything: a gate writes its progress after every batch, so the folder
 // is the account of it and can be read by anybody at any time.
@@ -213,7 +226,7 @@ export function readRunStanding(root: string, gates: readonly GateSynthesis[]): 
     }
 
     const held = progress.gates[spec.gate];
-    const planned = plannedBatches(spec, progress.rows, progress.batchSize).length;
+    const planned = plannedCount(folder, spec, progress);
     const stands = gateOnDisk(folder, spec.gate, planned);
 
     return {

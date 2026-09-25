@@ -6,7 +6,8 @@ import { describe, expect, test } from "bun:test";
 import { claimsIn } from "./gate-claim";
 import { clearGate, driveGates, readRunStanding, standingLines } from "./gate-run";
 import { gateFolder, gatesFolderName } from "./roots";
-import { batchName, batchesFolder, freezeBatch, noTokens, progressFile, readProgress } from "./laya-synth-run";
+import { batchName, batchesFolder, freezeBatch, noTokens, progressFile, readProgress, writeProgress } from "./laya-synth-run";
+import { unjudgedFile } from "./real-rows";
 import { splitFiles } from "./laya-frozen";
 import { synthesisFor } from "./laya-synth";
 import { scratchDir } from "./scratch";
@@ -384,6 +385,27 @@ describe("how far a run got, read off the folder", () => {
     });
 
     expect(readRunStanding(root, [sanitizer])[0]).toMatchObject({ state: "running", done: 2, planned: 3, kept: 4 });
+  });
+
+  // A judging pass records the build's cap on rows, which says nothing of how many rows there are
+  // to judge; its plan is the one cut from the rows in the folder.
+  test("a judging gate is planned over the rows standing in its folder, not the build's cap", () => {
+    const root = scratch();
+    const folder = gateFolder(root, sanitizer.gate);
+    const unjudged = Array.from({ length: 7 }, (_, index) => ({
+      id: `row-${index}`, gate: sanitizer.gate, split: "train", state: {}, questions: { keeps: {} },
+    }));
+
+    mkdirSync(folder, { recursive: true });
+    writeFileSync(join(folder, unjudgedFile), unjudged.map((row) => JSON.stringify(row)).join("\n") + "\n");
+    writeProgress(folder, {
+      started: "2026-09-25T00:00:00.000Z", model: "claude-sonnet-5", effort: "high", road: "claude",
+      rows: 6_000, batchSize: 5, answerCap: 100, builtAt: "2026-09-25T00:00:00.000Z",
+      shares: { calibration: 0.15, test: 0.15 }, gates: {},
+    });
+    freezeBatch(folder, sanitizer.gate, 0, []);
+
+    expect(readRunStanding(root, [sanitizer])[0]).toMatchObject({ state: "running", done: 1, planned: 2 });
   });
 
   test("it counts the batches on disk, not the count a killed run left behind", async () => {

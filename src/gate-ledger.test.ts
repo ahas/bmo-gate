@@ -313,11 +313,7 @@ describe("what the ledger says about the price", () => {
       throw new Error(ledger);
     }
 
-    const lines = ledgerLines(ledger);
-
-    for (const said of noPriceHere) {
-      expect(lines).toContain(said);
-    }
+    expect(ledgerLines(ledger)).toContain(noPriceHere);
   });
 
   test("it names the account as a flat-rate login", async () => {
@@ -330,8 +326,24 @@ describe("what the ledger says about the price", () => {
     const ledger = readLedger(await runOf([sanitizer]), [sanitizer]);
     const said = ledgerLines(ledger as Exclude<typeof ledger, string>).join("\n");
 
-    expect(said).toContain("토큰당 값은 매기지 않으므로");
+    expect(said).toContain("토큰당 값은 매기지 않습니다");
     expect(said).toContain("0원이 아니라 값이라는 것이 없습니다");
+  });
+
+  // A run the codex login never drove must not be told it rode one.
+  test("each road names its own login, and a road that did not drive the run is not named", async () => {
+    const root = await runOf([sanitizer]);
+    const path = join(gateFolder(root, sanitizer.gate), metaFile);
+    const meta = JSON.parse(readFileSync(path, "utf8")) as SynthMeta;
+
+    writeFileSync(path, JSON.stringify({ ...meta, road: "claude", roads: ["claude"] }));
+
+    const ledger = readLedger(root, [sanitizer]);
+    const said = ledgerLines(ledger as Exclude<typeof ledger, string>).join("\n");
+
+    expect(said).toContain("정액제 Claude 구독 로그인");
+    expect(said).not.toContain("ChatGPT");
+    expect(said).toContain(noPriceHere);
   });
 });
 

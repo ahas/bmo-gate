@@ -479,8 +479,12 @@ In order, with the rebuilt gate's own run name:
    resumes, so a restart takes up at the batch after the last one frozen, as the standing unit does.
    On the claude road the same line is written with `--road claude` and without the restart, as
    that road asks (「The claude road」).
-4. The readings that close a run on that run: `bun scripts/laya-audit.ts` for the verdict and
-   `bun scripts/laya-ledger.ts` for the ledger.
+4. The readings that close a run, on that run: `bun scripts/laya-merge.ts <run> --gate <gate>` for
+   the merged folder, `bun scripts/laya-audit.ts <run>/dataset --gate <gate>` for the verdict, since
+   the audit reads split files and the run's root holds none, and `bun scripts/laya-ledger.ts <run>`
+   for the ledger. The audit's floors are the finished dataset's; the training reads a judging run
+   against its own, lower floor (`docs/training.md`, 「When a gate is trained」), so a gate the audit
+   sends back may still be trained from this folder.
 5. The training: `bun scripts/laya-train.ts judging:<run> --gate <gate>`, a source whose curve is
    its own (`docs/training.md`, 「A pass」).
 6. The checkpoint into service with `bun scripts/laya-serve.ts <gate>/<run>/step-<n> --gate <gate>`
@@ -547,11 +551,16 @@ the road, the model and the effort that wrote it; and the wall time.
   includes the cached part, so the fresh figure is that count less the cached one. Added together
   instead, every cached batch would read as though it had been paid for in full — which is the
   opposite of what holding a thread per gate achieves.
-- **There is no price in the ledger, and the ledger says so.** This account is a flat-rate ChatGPT
-  login: codex reports tokens and no charge, because per-token charging is not what this account
-  does. The tokens stand in for a price that does not exist.
+- **There is no price in the ledger, and the ledger says so, road by road.** No road charges per
+  token: codex rides a flat-rate ChatGPT login, the claude road a flat-rate Claude subscription
+  login, and J3090 a card of the house's own. Each road the run was driven on names what stands
+  behind its counts, and the tokens stand in for a price that does not exist.
 - **A road that reports no price announces it** rather than writing a zero somebody finds later and
   reads as free.
+- **Batches planned are the plan the gate is driven by.** A judging pass cuts its plan from the rows
+  standing in the gate's folder under its row and answer bounds, a writing run from the rows it was
+  asked for, so a judging gate reads done against the batches it will actually ask for rather than
+  against the build's cap on rows. The status reading counts the same way.
 - **A gate that never started is left out of the ledger**, not entered as a row of zeroes. A row of
   zeroes reads as a gate that ran and produced nothing, which is a different thing entirely.
 - **The run's wall time is the run's own**, from its first gate starting to its last one

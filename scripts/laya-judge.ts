@@ -11,7 +11,7 @@ import {
   addTokens, freezeBatch, freezeSplits, frozenState, gateOnDisk, guardFolder, keepBarrenAnswer,
   keepLostAnswer, noTokens, readProgress, writeProgress,
 } from "../src/laya-synth-run";
-import { realMetaFile, unjudgedFile } from "../src/real-rows";
+import { readUnjudged, realMetaFile, unjudgedFile } from "../src/real-rows";
 import { gateFolder, runFolder } from "../src/roots";
 
 import type { JudgeRoad } from "../src/gate-judge";
@@ -93,9 +93,7 @@ if (gates.length === 0) {
 const wants = { resume: asked(reading, "--resume"), overwrite: asked(reading, "--overwrite") };
 
 function unjudgedOf(gate: string): UnjudgedRow[] {
-  const rows = readFileSync(join(gateFolder(root, gate), unjudgedFile), "utf8")
-    .split("\n").filter((line) => line.trim() !== "")
-    .map((line) => JSON.parse(line) as UnjudgedRow);
+  const rows = readUnjudged(gateFolder(root, gate));
 
   return limit > 0 ? rows.slice(0, limit) : rows;
 }

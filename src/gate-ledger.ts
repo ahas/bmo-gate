@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { generationOf } from "./laya-audit";
-import { addTokens, metaFile, noTokens, roadsOf } from "./laya-synth-run";
+import { addTokens, metaFile, noTokens, roadPriceNote, roadsOf } from "./laya-synth-run";
 import { gateFolder } from "./roots";
 import { readRunStanding } from "./gate-run";
 
@@ -12,14 +12,14 @@ import type { SynthMeta, SynthRoad, TokenTally } from "./laya-synth-run";
 
 // What a run cost and what it made, gate by gate (docs/gate-data.md 「The ledger」).
 //
-// The tokens are the whole of what there is to report. This account is a flat-rate ChatGPT login:
-// codex counts what a turn read and wrote and there is no per-token charge behind those counts, so
-// the ledger says that outright. A road that reports no price announcing it is the same rule the
-// specification already holds the J3090 road to — a zero left standing unexplained is read as free.
-export const noPriceHere = [
-  "이 계정은 정액제 ChatGPT 로그인입니다. codex 는 토큰만 세고 토큰당 값은 매기지 않으므로,",
-  "원장에 적히는 것은 토큰뿐이고 값은 없습니다. 0원이 아니라 값이라는 것이 없습니다.",
-];
+// The tokens are the whole of what there is to report. No road charges per token, so the ledger
+// says that outright, each road the run was driven on naming what stands behind its counts — a
+// zero left standing unexplained is read as free.
+export const noPriceHere = "원장에 적히는 것은 토큰뿐이고 값은 없습니다. 0원이 아니라 값이라는 것이 없습니다.";
+
+export function priceLines(roads: readonly SynthRoad[]): string[] {
+  return [...roads.map(roadPriceNote), noPriceHere];
+}
 
 export interface GateLedgerRow {
   gate: string;
@@ -207,6 +207,6 @@ export function ledgerLines(ledger: RunLedger): string[] {
     `새 입력 ${ledger.totals.tokens.inputTokens} · 캐시읽기 ${ledger.totals.tokens.cacheReadTokens}`
       + ` · 캐시쓰기 ${ledger.totals.tokens.cacheWriteTokens} · 출력 ${ledger.totals.tokens.outputTokens} · ${clock(ledger.totals.seconds)}`,
     "",
-    ...noPriceHere,
+    ...priceLines(ledger.roads),
   ];
 }

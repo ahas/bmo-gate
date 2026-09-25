@@ -25,6 +25,19 @@ export function roadHoldsSession(road: SynthRoad): boolean {
   return road === "codex";
 }
 
+// What stands behind a road's token counts where a price would stand. No road charges per token,
+// and a zero left unexplained is read as free, so each road names what it rides on.
+export function roadPriceNote(road: SynthRoad): string {
+  switch (road) {
+    case "codex":
+      return "codex 길은 정액제 ChatGPT 로그인입니다. 토큰만 세고 토큰당 값은 매기지 않습니다.";
+    case "claude":
+      return "claude 길은 정액제 Claude 구독 로그인입니다. 토큰만 세고 토큰당 값은 매기지 않습니다.";
+    case "j3090":
+      return "J3090 길은 집 안의 카드입니다. 토큰당 값이 없고, 토큰도 세지 않습니다.";
+  }
+}
+
 export interface TokenTally {
   inputTokens: number;
   outputTokens: number;
