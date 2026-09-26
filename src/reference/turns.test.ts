@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { contextSlug, readTurns, replyAfter } from "./turns";
+import { contextSlug, quietInstructions, readTurns, replyAfter } from "./turns";
 
 import type { ArchivedMessage } from "../archive";
 import type { RecordedPick, TurnReads, TurnScope } from "./turns";
@@ -120,5 +120,28 @@ describe("contextSlug", () => {
   test("reads a piece's slug off a path, and a root document's off its file name", () => {
     expect(contextSlug("/brain/rooms/-7/rules/quiet.md")).toBe("quiet");
     expect(contextSlug("STRUCTURE.md")).toBe("structure");
+  });
+});
+
+describe("quietInstructions", () => {
+  test("reads the instructions a turn prompt carries in its quiet-instruction block, whole", () => {
+    const prompt = [
+      'TURN SCOPE: {"chatId":-7,"messageIds":[],"referenceMessageIds":[]}',
+      "Chat id: -7",
+      "",
+      "Quiet instruction from the system (2):",
+      "[잡 끝남] #12",
+      "",
+      "second line",
+      "END OF QUIET INSTRUCTION",
+      "",
+      "ANSWER LANGUAGE: Korean",
+    ].join("\n");
+
+    expect(quietInstructions(prompt)).toBe("[잡 끝남] #12\n\nsecond line");
+  });
+
+  test("a prompt with no block carries no instructions", () => {
+    expect(quietInstructions("TURN SCOPE: {}\nNew messages (1):\nhi\nEND OF NEW MESSAGES")).toBe("");
   });
 });

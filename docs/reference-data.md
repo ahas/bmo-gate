@@ -27,8 +27,9 @@ A turn is one run of messages BMO answered together, named by its room and the l
 messages — the key BMO's own records name a turn by — or one run BMO's own instructions opened with
 no message at all, named by the run.
 
-- **A turn run names its own messages.** BMO's turn run writes a scope line into the agent log naming
-  the room, every message it answers and the quiet instructions it was handed, and a context line
+- **A turn run names its own messages.** BMO's turn run writes its prompt into the agent log: a scope
+  line naming the room and every message it answers, the quiet instructions it was handed in their own
+  block, which a scope line of an older run carries itself, and a context line
   for every piece that went into its prompt, the piece's slug ending the path it names. A run of that
   kind is a turn with its messages, and its instructions after them, exactly as the gates read them
   and with what attached known.
@@ -43,9 +44,9 @@ no message at all, named by the run.
 - **The reply is the first run of BMO's own messages after the turn**, within thirty minutes of it,
   taken whole up to the next message somebody else sends. A turn with no reply inside the bound has
   nothing to judge a piece against and is left out and counted.
-- **A turn the bot's own instructions opened is a turn.** A scope line naming no message but
+- **A turn the bot's own instructions opened is a turn.** A scope line naming no message, in a prompt
   carrying instructions — a job's state, a deployment's notice, a document's update notice, a watch's
-  note, nobody's words — is a turn named by its run, with those instructions, as the scope line
+  note, nobody's words — is a turn named by its run, with those instructions, as the prompt
   carries them, for its lines, and what attached known from its context lines. The gates were asked
   on it as on any turn, so the checkpoints have to have seen it.
 - **Its reply is what the run answered**, its own text lines joined, read off the run rather than the
@@ -55,7 +56,8 @@ no message at all, named by the run.
   nothing else in the archive holds the instructions as the turn read them. So each one a pass reads
   is written once to the run's `instruction-turns.jsonl`, and every pass takes those beside the
   archive's own, the archive's reading winning where both stand.
-- **A scope line naming neither a message nor an instruction answers nobody** and is no turn.
+- **A prompt whose scope line names no message and which carries no instruction answers nobody** and
+  is no turn.
 - **What the LLM gate picked** is read from the reference record, one row per candidate, where the
   turn has rows there. It is kept for the figures and never shown to the judge.
 - **Every turn of every room is a turn**, newest first. The judging is what costs, so how many turns a

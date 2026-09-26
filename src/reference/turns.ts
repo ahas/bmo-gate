@@ -40,13 +40,13 @@ export interface ReferenceTurn {
   attached: ReadonlySet<string> | null;
   reply: string;
   recorded: RecordedPick[];
-  // The bot's own instructions the turn run was handed, as its scope line carries them, where it was
+  // The bot's own instructions the turn run was handed, as its prompt carries them, where it was
   // handed any; on a turn they opened with no message, they are all its lines.
   instructions?: string;
 }
 
-// One turn run's scope line: the room, the messages it answers, and the bot's own instructions it
-// was handed, empty where there were none.
+// One turn run's scope: the room and the messages it answers, off its scope line, and the bot's own
+// instructions it was handed, off its quiet-instruction block, empty where there were none.
 export interface TurnScope {
   run: string;
   chatId: number;
@@ -264,6 +264,14 @@ export function contextSlug(text: string): string {
   return (text.split("/").at(-1) ?? text).replace(/\.md$/i, "").toLowerCase();
 }
 
+// The bot's own instructions a turn prompt carries in its quiet-instruction block, as they were
+// handed: a scope line that leaves them out leaves them to that block. Empty where it has none.
+export function quietInstructions(prompt: string): string {
+  const block = /^Quiet instruction from the system \(\d+\):\n([\s\S]*?)\nEND OF QUIET INSTRUCTION$/m.exec(prompt);
+
+  return block?.[1] ?? "";
+}
+
 // The same reads over BMO's archive, opened read-only.
 export function archiveTurnReads(db: Database, rooms: () => number[], room: (chatId: number) => ArchivedMessage[]): TurnReads {
   return {
@@ -272,8 +280,8 @@ export function archiveTurnReads(db: Database, rooms: () => number[], room: (cha
     scopes: () => {
       const read: TurnScope[] = [];
 
-      for (const one of db.query(`SELECT run, at, substr(text, 1, instr(text || char(10), char(10)) - 1) AS line FROM agent_log
-          WHERE agent = 'bmo' AND kind = 'prompt' AND text LIKE 'TURN SCOPE:%' ORDER BY id`).all() as { run: string; at: number; line: string }[]) {
+      for (const one of db.query(`SELECT run, at, substr(text, 1, instr(text || char(10), char(10)) - 1) AS line, text FROM agent_log
+          WHERE agent = 'bmo' AND kind = 'prompt' AND text LIKE 'TURN SCOPE:%' ORDER BY id`).all() as { run: string; at: number; line: string; text: string }[]) {
         try {
           const scope = JSON.parse(one.line.slice("TURN SCOPE:".length)) as { chatId?: number; messageIds?: number[]; instructions?: unknown };
 
@@ -282,7 +290,7 @@ export function archiveTurnReads(db: Database, rooms: () => number[], room: (cha
               run: one.run,
               chatId: scope.chatId,
               messageIds: scope.messageIds.filter((id) => typeof id === "number"),
-              instructions: typeof scope.instructions === "string" ? scope.instructions : "",
+              instructions: typeof scope.instructions === "string" ? scope.instructions : quietInstructions(one.text),
               at: one.at,
             });
           }
