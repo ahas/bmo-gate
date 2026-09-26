@@ -81,11 +81,11 @@ asks (BMO's `docs/laya.md`).
   |---|---|---|
   | `output-format` | `output-format` — the gate whose provider is Laya, asked the reduced state | served (`real-2-fold`) |
   | `output-format` | `output-decide` — a BMO build older than its one formatting gate, asking the original, the converted message and the fold | served (`real-1-hand`) until no running BMO asks it |
-  | `library-knowledge` | `library-knowledge` | served (`data-p0002`) |
-  | `room-rules` | `room-rules` | served (`data-p0002`) |
+  | `library-knowledge` | `library-knowledge` | served (`ref852-p0002`) |
+  | `room-rules` | `room-rules` | served (`ref852-p0001`) |
   | `situation-rules` | `situation-rules` | served |
-  | `system-documents` | `system-documents` | served (`data-p0002`) |
-  | `people-search` | `people-search` | served (`data-p0002`) |
+  | `system-documents` | `system-documents` | served (`ref852-p0001`) |
+  | `people-search` | `people-search` | served (`ref852-p0002`) |
   | `content-judge` | `content-judge` | not served: the gate's mode is `off`, and its trained checkpoint answers a question the gate no longer asks (`docs/gate-data.md`, 「A gate whose question moved」) |
   | `reply-wanted` | none — no gate code in BMO | trained, not served |
   | `sanitizer` | `sanitizer` | not trained |
