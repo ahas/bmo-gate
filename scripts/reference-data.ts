@@ -14,7 +14,7 @@ import { isReferenceGate, isWordFor } from "../src/reference/labels";
 import { bmoCommit, bmoInputs } from "../src/reference/live-inputs";
 import { leaveRequest, leaveRoom } from "../src/reference/rows";
 import { judgedPerPass, referenceTick } from "../src/reference/tick";
-import { archiveTurnReads, readTurns } from "../src/reference/turns";
+import { archiveTurnReads, isTurnSource, readTurns, turnSources } from "../src/reference/turns";
 import { plainShapeLine } from "../src/room-shape";
 import { dataPath, refuseInsideCheckout } from "../src/roots";
 
@@ -25,7 +25,7 @@ import type { UseWord } from "../src/reference/labels";
 // the inputs BMO's own code builds for them today, the labels still wanting judged within the pass's
 // bound, every row assembled afresh, Laya asked again, and the figures.
 
-const usage = `usage: bun scripts/reference-data.ts <실행> [--judge <n>] [--at-once <n>] [--road codex|claude] [--effort <수준>] [--rejudge <낱말> --before <시각>] [--gate <게이트>]… [--checkout <경로>] [--import <turns.jsonl>] [--no-judge] [--no-laya]
+const usage = `usage: bun scripts/reference-data.ts <실행> [--judge <n>] [--at-once <n>] [--road codex|claude] [--effort <수준>] [--rejudge <낱말> --before <시각>] [--gate <게이트>]… [--source <출처>]… [--checkout <경로>] [--import <turns.jsonl>] [--no-judge] [--no-laya]
 
 참조 게이트 네 개의 학습 데이터를 한 회차 만든다(docs/reference-data.md). 비모가 답한 턴을 아카이브에서 읽고,
 게이트마다 비모 코드가 지금 조립하는 입력을 받아, 라벨이 없는 후보를 최신 턴부터 판정하고, 행을 모두 새로
@@ -36,6 +36,8 @@ const usage = `usage: bun scripts/reference-data.ts <실행> [--judge <n>] [--at
 --effort 는 codex 추론 수준(기본 ${codexEffort}). --checkout 은 입력을 조립할 비모 체크아웃(기본 ~/.local/share/bmo/deploy).
 --rejudge 는 라벨이 없는 후보 대신, <시각> 전에 그 낱말로 판정된 라벨을 지금의 낱말로 다시 판정한다.
 --gate 는 이번 회차가 판정할 게이트를 그것들로만 묶는다(여러 번 줄 수 있다).
+--source 는 이번 회차가 판정할 턴을 그 출처(${turnSources.join(", ")})의 턴으로만 묶는다(여러 번 줄 수 있다).
+  instructions 는 사람 말 없이 비모 내부 지시만으로 열린 턴이다.
 회차마다 비모 아카이브의 사본을 떠서 턴과 입력을 모두 그 사본에서 읽는다.
 --import 는 처음 판정의 턴 파일로, 라벨이 하나도 없는 실행에 한 번 들여온다(기본 reference-use/use-1/turns.jsonl).
 --no-judge 는 판정 없이 행과 수치만, --no-laya 는 Laya 재질의 없이 돈다.`;
@@ -48,7 +50,7 @@ if (asksUsage(argv)) {
 }
 
 const reading = readFlags(argv, {
-  "--judge": true, "--at-once": true, "--road": true, "--effort": true, "--rejudge": true, "--before": true, "--gate": true,
+  "--judge": true, "--at-once": true, "--road": true, "--effort": true, "--rejudge": true, "--before": true, "--gate": true, "--source": true,
   "--checkout": true, "--import": true, "--no-judge": false, "--no-laya": false,
 });
 
@@ -84,6 +86,14 @@ const strangeGate = gates.find((gate) => !isReferenceGate(gate));
 
 if (strangeGate !== undefined) {
   console.error(`reference-data: ${strangeGate} 는 참조 게이트가 아닙니다.`);
+  process.exit(2);
+}
+
+const sources = allOf(reading, "--source");
+const strangeSource = sources.find((source) => !isTurnSource(source));
+
+if (strangeSource !== undefined) {
+  console.error(`reference-data: ${strangeSource} 는 턴의 출처가 아닙니다 — ${turnSources.join(", ")} 중 하나입니다.`);
   process.exit(2);
 }
 
@@ -167,6 +177,7 @@ const report = await referenceTick({
   inputs: bmoInputs(checkout, copy.path),
   road: judge,
   wanting,
+  ...sources.length === 0 ? {} : { sources: sources.filter(isTurnSource) },
   judged: Number(lastOf(reading, "--judge") ?? judgedPerPass),
   atOnce: Math.max(1, Number(lastOf(reading, "--at-once") ?? "4")),
   messages: (turn) => {

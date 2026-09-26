@@ -19,6 +19,8 @@ const answerBytes = 1 << 30;
 export interface InputsAsk {
   chatId: number;
   messageIds: number[];
+  // The bot's own instructions the turn was handed, where there were any.
+  instructions?: string;
   // The pieces whose body and index line are wanted, by gate.
   bodies?: Partial<Record<ReferenceGate, string[]>>;
 }
@@ -42,7 +44,10 @@ export interface LivePiece {
 export interface LiveTurn {
   chatId: number;
   messageIds: number[];
-  // Whether one of the turn's messages is gone from the archive.
+  // The instructions the answer was built over, as the script repeats them back.
+  instructions?: string;
+  // Whether one of the turn's messages is gone from the archive, or the instructions it was asked
+  // over were not read.
   missing: boolean;
   gates: LiveGate[];
   pieces: LivePiece[];
@@ -56,6 +61,7 @@ export function readLiveTurn(line: string): LiveTurn {
   const said = JSON.parse(line) as {
     chatId: number;
     messageIds: number[];
+    instructions?: string;
     missing?: boolean;
     gates?: { gate: string; request: LayaRequest; candidates: { slug: string; about: string }[]; held: number; capped: number }[];
     pieces?: { gate: string; slug: string; about: string | null; body: string | null }[];
@@ -64,6 +70,7 @@ export function readLiveTurn(line: string): LiveTurn {
   return {
     chatId: said.chatId,
     messageIds: said.messageIds,
+    ...said.instructions === undefined ? {} : { instructions: said.instructions },
     missing: said.missing === true,
     gates: (said.gates ?? []).flatMap((one) => isReferenceGate(one.gate)
       ? [{ gate: one.gate, request: one.request, candidates: one.candidates, held: one.held, capped: one.capped }]
@@ -99,8 +106,15 @@ export function bmoInputs(checkout: string, archive: string, env: Record<string,
       throw new Error(`BMO 의 ${inputsScript} 가 턴 ${asks.length}개에 ${read.length}줄로 답했어요.`);
     }
 
-    return read;
+    return read.map((one, index) => checkInstructions(asks[index]!, one));
   };
+}
+
+// A turn asked over instructions whose answer does not repeat them back was answered by a checkout
+// that does not read them — for a turn with no lines at all — and is missing (docs/reference-data.md,
+// 「The input」).
+export function checkInstructions(ask: InputsAsk, live: LiveTurn): LiveTurn {
+  return ask.instructions === undefined || live.instructions === ask.instructions ? live : { ...live, missing: true, gates: [], pieces: [] };
 }
 
 // The commit of BMO's checkout that built the inputs, recorded with the pass.

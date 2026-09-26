@@ -28,6 +28,8 @@ export interface JudgedPiece {
 export interface JudgeItem {
   id: string;
   messages: string[];
+  // The bot's own instructions the turn was handed, where there were any.
+  instructions?: string;
   reply: string;
   pieces: JudgedPiece[];
 }
@@ -95,9 +97,8 @@ export function turnsToJudge<T extends { wanted: readonly unknown[] }>(turns: re
 // attached piece whose body cannot be read any more is judged by its index line alone, as an offered
 // one would be.
 export function judgeItem(
-  key: string,
+  turn: Pick<ReferenceTurn, "key" | "reply" | "instructions">,
   messages: string[],
-  reply: string,
   wanted: readonly { gate: ReferenceGate; slug: string; attached: boolean }[],
   live: LiveTurn,
   leave: (text: string) => string,
@@ -108,9 +109,10 @@ export function judgeItem(
       ?? null;
 
   return {
-    id: key,
+    id: turn.key,
     messages,
-    reply: clip(leave(reply), replyLimit),
+    ...turn.instructions === undefined ? {} : { instructions: leave(turn.instructions) },
+    reply: clip(leave(turn.reply), replyLimit),
     pieces: wanted.map((one) => {
       const body = one.attached ? live.pieces.find((piece) => piece.gate === one.gate && piece.slug === one.slug)?.body ?? null : null;
 
@@ -134,6 +136,7 @@ export function itemText(item: JudgeItem): string {
   return JSON.stringify({
     id: item.id,
     messages: item.messages,
+    ...item.instructions === undefined ? {} : { instructions: item.instructions },
     reply: item.reply,
     attached: item.pieces.filter((one) => one.attached).map((one) => ({ key: pieceKey(one), line: one.line, body: one.body })),
     offered: item.pieces.filter((one) => !one.attached).map((one) => ({ key: pieceKey(one), line: one.line })),
@@ -170,6 +173,8 @@ export const judgeSystem = [
   "너는 비모가 실제로 보낸 답이 그 턴에 붙은 참고 문서를 썼는지 판정한다.",
   "항목마다 messages(그 턴에 사람들이 한 말), reply(비모가 실제로 보낸 답), attached(답을 쓸 때 프롬프트에 붙어 있던 문서의 본문), offered(후보였지만 붙지 않은 문서의 목차 한 줄)가 있다.",
   "모두 실제 기록 그대로다. 지어내지 말고 있는 그대로 읽고 판정한다.",
+  "instructions가 있으면 그 턴에 비모가 받은 내부 지시(작업 상태, 배포 알림, 문서 갱신 공지, 와치 같은 시스템이 기록한 사실)이고, 누구의 말도 아니다. messages가 비어 있으면 사람 말 없이 그 지시만으로 열린 턴이다.",
+  "reply가 <<SKIP>>이면 비모가 방에 아무 말도 하지 않기로 한 것이다.",
   "",
   "attached의 문서마다 아래 셋 중 하나로 답한다.",
   ...Object.entries(attachedWords).map(([word, meaning]) => `- ${word}: ${meaning}`),

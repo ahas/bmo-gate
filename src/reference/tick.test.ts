@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { scratchDir } from "../scratch";
 import { labelKey, readLabels } from "./labels";
-import { gateDataFile, gatesFolder, labelsFile, referenceTick } from "./tick";
+import { gateDataFile, gatesFolder, instructionTurnsFile, labelsFile, referenceTick } from "./tick";
 
 import type { JudgeRoad } from "../gate-judge";
 import type { InputsAsk, LiveTurn } from "./live-inputs";
@@ -143,6 +143,31 @@ describe("referenceTick", () => {
 
     expect(report.imported).toBe(1);
     expect(report.figures.find((one) => one.gate === "room-rules")!.unused).toBe(1);
+  });
+
+  test("a turn the bot's instructions opened is asked over them, and kept once the archive lets it go", async () => {
+    const where = folder();
+    const opened: ReferenceTurn = {
+      key: "chat:-7:9:1", chatId: -7, messageIds: [], at: 10, source: "instructions", attached: new Set(), reply: "<<SKIP>>", recorded: [], instructions: "[배포 알림]",
+    };
+    const first: InputsAsk[][] = [];
+    const later: InputsAsk[][] = [];
+
+    await referenceTick(options(where, first, { road: null, built: { turns: [opened, ...turns], skipped: { noReply: 0, noMessage: 0, noText: 0 } } }));
+    await referenceTick(options(where, later, { road: null, built: { turns: [opened, ...turns], skipped: { noReply: 0, noMessage: 0, noText: 0 } } }));
+
+    const report = await referenceTick(options(where, later, { road: null }));
+
+    expect(first[0]![0]).toEqual({ chatId: -7, messageIds: [], instructions: "[배포 알림]" });
+    expect(later[1]![0]).toEqual({ chatId: -7, messageIds: [], instructions: "[배포 알림]" });
+    expect(report.turns).toBe(4);
+    expect(readFileSync(join(where, instructionTurnsFile), "utf8").trim().split("\n")).toHaveLength(1);
+
+    const held = await referenceTick(options(where, [], { sources: ["instructions"], judged: 5 }));
+
+    expect(held.judgedTurns).toBe(1);
+    expect(readLabels(join(where, labelsFile)).has(labelKey("chat:-7:9:1", "room-rules", "quiet"))).toBe(true);
+    expect(readLabels(join(where, labelsFile)).has(labelKey("-7:3", "room-rules", "quiet"))).toBe(false);
   });
 
   test("asks Laya again only where the checkpoint or the input moved", async () => {

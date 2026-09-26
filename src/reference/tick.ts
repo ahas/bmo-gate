@@ -18,13 +18,14 @@ import type { JudgeItem, Wanting } from "./judge";
 import type { Label, ReferenceGate } from "./labels";
 import type { InputsAsk, InputsReader, LiveTurn } from "./live-inputs";
 import type { GateRows } from "./rows";
-import type { ReferenceTurn, TurnBuild } from "./turns";
+import type { ReferenceTurn, TurnBuild, TurnSource } from "./turns";
 
 // One pass of the reference gates' data (docs/reference-data.md, 「A run and its folder」): the
 // turns, BMO's inputs for them, the labels still wanting judged within the pass's bound, every row
 // assembled afresh and put in place whole, Laya asked again, and the figures.
 
 export const labelsFile = "labels.jsonl";
+export const instructionTurnsFile = "instruction-turns.jsonl";
 export const gatesFolder = "gates";
 export const gateDataFile = "data.json";
 
@@ -45,6 +46,8 @@ export interface TickOptions {
   road: JudgeRoad | null;
   // Which pieces the pass asks about; an ordinary pass asks about what has no label.
   wanting?: Wanting;
+  // The sources of the turns the pass judges; every source where none is named.
+  sources?: readonly TurnSource[];
   judged: number;
   atOnce: number;
   // The turn's messages as the judge reads them, and a text or an input as it leaves the room.
@@ -164,6 +167,53 @@ export function writeGates(root: string, built: Record<ReferenceGate, GateRows>)
   return data;
 }
 
+// What BMO is asked for one turn: its room, its messages, and the instructions it was handed.
+function askOf(turn: ReferenceTurn): InputsAsk {
+  return {
+    chatId: turn.chatId,
+    messageIds: turn.messageIds,
+    ...turn.instructions === undefined ? {} : { instructions: turn.instructions },
+  };
+}
+
+interface KeptTurn {
+  key: string;
+  chatId: number;
+  at: number;
+  instructions: string;
+  reply: string;
+  attached: string[];
+}
+
+// The turns the bot's own instructions opened, kept once read, since the archive's run log lets them
+// go after a week: each one read now and not yet kept is appended, and every one kept that the
+// archive no longer holds joins the turns read (docs/reference-data.md, 「The turns」).
+export function withKeptTurns(root: string, read: readonly ReferenceTurn[]): ReferenceTurn[] {
+  const file = join(root, instructionTurnsFile);
+  const kept = new Map<string, ReferenceTurn>();
+
+  for (const line of existsSync(file) ? readFileSync(file, "utf8").split("\n").filter((one) => one.trim() !== "") : []) {
+    const one = JSON.parse(line) as KeptTurn;
+
+    kept.set(one.key, {
+      key: one.key, chatId: one.chatId, messageIds: [], at: one.at, source: "instructions",
+      attached: new Set(one.attached), reply: one.reply, recorded: [], instructions: one.instructions,
+    });
+  }
+
+  const fresh = read.filter((turn) => turn.source === "instructions" && !kept.has(turn.key));
+
+  if (fresh.length > 0) {
+    appendFileSync(file, fresh.map((turn) => `${JSON.stringify({
+      key: turn.key, chatId: turn.chatId, at: turn.at, instructions: turn.instructions ?? "", reply: turn.reply, attached: [...turn.attached ?? []],
+    } satisfies KeptTurn)}\n`).join(""));
+  }
+
+  const standing = new Set(read.map((turn) => turn.key));
+
+  return [...read, ...[...kept.values()].filter((turn) => !standing.has(turn.key))].sort((left, right) => right.at - left.at);
+}
+
 function hashOf(request: LayaRequest): string {
   return createHash("sha256").update(JSON.stringify(request)).digest("hex").slice(0, 16);
 }
@@ -182,12 +232,11 @@ async function judgeTurns(
   const now = options.now ?? (() => new Date());
   const say = options.say ?? (() => {});
   const withBodies = options.inputs(chosen.map((one): InputsAsk => ({
-    chatId: one.turn.chatId,
-    messageIds: one.turn.messageIds,
+    ...askOf(one.turn),
     bodies: Object.fromEntries(referenceGates.map((gate) => [gate, one.wanted.filter((piece) => piece.gate === gate && piece.attached).map((piece) => piece.slug)])),
   })));
   const items = chosen.map((one, index) =>
-    judgeItem(one.turn.key, options.messages(one.turn), one.turn.reply, one.wanted, withBodies[index]!, options.leaveText));
+    judgeItem(one.turn, options.messages(one.turn), one.wanted, withBodies[index]!, options.leaveText));
   const plan = judgeBatches(items);
   const base = nextBatch(judgedFolder);
   const spent = { calls: 0, judgedTurns: 0, failedBatches: 0, tokens: noTokens };
@@ -307,11 +356,12 @@ export async function referenceTick(options: TickOptions): Promise<TickReport> {
     say(`처음 판정의 라벨 ${imported}개를 들여왔어요.`);
   }
 
-  const turns = options.built.turns;
-  const live = options.inputs(turns.map((turn): InputsAsk => ({ chatId: turn.chatId, messageIds: turn.messageIds })));
+  const turns = withKeptTurns(options.root, options.built.turns);
+  const live = options.inputs(turns.map(askOf));
   const missing = live.filter((one) => one.missing).length;
   const wanting = turns.map((turn, index) => ({ turn, live: live[index]!, wanted: unjudged(turn, live[index]!, labels, options.wanting) }));
-  const chosen = options.road === null ? [] : turnsToJudge(wanting.filter((one) => !one.live.missing), options.judged);
+  const judgeable = wanting.filter((one) => !one.live.missing && (options.sources === undefined || options.sources.includes(one.turn.source)));
+  const chosen = options.road === null ? [] : turnsToJudge(judgeable, options.judged);
 
   say(`턴 ${turns.length}개 · 라벨을 기다리는 턴 ${wanting.filter((one) => one.wanted.length > 0).length}개 · 이번에 판정할 턴 ${chosen.length}개`);
 

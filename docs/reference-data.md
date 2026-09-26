@@ -6,11 +6,12 @@ turn could have carried. This document is the canonical statement of how their d
 turns it is made of, how a row's input is assembled, what the judge is asked and in which words, how
 its verdicts are kept, how rows and figures are read off them, and how it grows every hour.
 
-- **The only thing frozen is the judgement.** A label says whether one turn's answer used or needed
-  one piece, and it is kept for good. A row is not kept: every pass assembles every row afresh from
-  the turns in BMO's archive, the input BMO's own code builds for that turn today, and the labels. When
-  BMO rewrites what an index line says, narrows candidates differently, or retires a piece, the next
-  pass's rows say so, and nothing here has to be told.
+- **The only things frozen are the judgement and the turns the archive lets go of.** A label says
+  whether one turn's answer used or needed one piece, and it is kept for good; so is a turn the bot's
+  own instructions opened, since the archive holds its words only for a week (「The turns」). A row is
+  not kept: every pass assembles every row afresh from the turns, the input BMO's own code builds for
+  that turn today, and the labels. When BMO rewrites what an index line says, narrows candidates
+  differently, or retires a piece, the next pass's rows say so, and nothing here has to be told.
 - **The input is BMO's, byte for byte.** What a gate is handed — the turn's messages as a state, and
   one question per candidate the narrowing kept, in the probe's own words — is built by BMO's code
   and read from it (「The input」). This repository never reads the fragment table or the brain.
@@ -23,12 +24,14 @@ its verdicts are kept, how rows and figures are read off them, and how it grows 
 ## The turns
 
 A turn is one run of messages BMO answered together, named by its room and the last of those
-messages — the key BMO's own records name a turn by.
+messages — the key BMO's own records name a turn by — or one run BMO's own instructions opened with
+no message at all, named by the run.
 
 - **A turn run names its own messages.** BMO's turn run writes a scope line into the agent log naming
-  the room and every message it answers, and a context line for every piece that went into its
-  prompt, the piece's slug ending the path it names. A run of that kind is a turn with its messages
-  exactly as the gates read them and with what attached known.
+  the room, every message it answers and the quiet instructions it was handed, and a context line
+  for every piece that went into its prompt, the piece's slug ending the path it names. A run of that
+  kind is a turn with its messages, and its instructions after them, exactly as the gates read them
+  and with what attached known.
 - **An answered run older than those lines is rebuilt.** Every run of BMO's own messages that answers
   something nobody's scope line claims is a turn too: its messages are the run of other people's
   messages ending just before BMO spoke, no two of them more than ten minutes apart, which is how
@@ -40,7 +43,19 @@ messages — the key BMO's own records name a turn by.
 - **The reply is the first run of BMO's own messages after the turn**, within thirty minutes of it,
   taken whole up to the next message somebody else sends. A turn with no reply inside the bound has
   nothing to judge a piece against and is left out and counted.
-- **A notice BMO voiced unprompted is no turn.** A scope line naming no message answers nobody.
+- **A turn the bot's own instructions opened is a turn.** A scope line naming no message but
+  carrying instructions — a job's state, a deployment's notice, a document's update notice, a watch's
+  note, nobody's words — is a turn named by its run, with those instructions, as the scope line
+  carries them, for its lines, and what attached known from its context lines. The gates were asked
+  on it as on any turn, so the checkpoints have to have seen it.
+- **Its reply is what the run answered**, its own text lines joined, read off the run rather than the
+  room: an answer of `<<SKIP>>` sends nothing to the room and is still the answer, and is the reply.
+  A run that wrote no text is left out and counted as a turn with no reply.
+- **Such a turn is kept once read.** The archive's run log lets go of a run after about a week, and
+  nothing else in the archive holds the instructions as the turn read them. So each one a pass reads
+  is written once to the run's `instruction-turns.jsonl`, and every pass takes those beside the
+  archive's own, the archive's reading winning where both stand.
+- **A scope line naming neither a message nor an instruction answers nobody** and is no turn.
 - **What the LLM gate picked** is read from the reference record, one row per candidate, where the
   turn has rows there. It is kept for the figures and never shown to the judge.
 - **Every turn of every room is a turn**, newest first. The judging is what costs, so how many turns a
@@ -49,11 +64,16 @@ messages — the key BMO's own records name a turn by.
 ## The input
 
 - **BMO builds it.** `bun scripts/reference-inputs.ts` in BMO's live checkout is handed the pass's
-  archive copy by `--db` and the turns — their room and their messages — and answers, for each gate the narrowing leaves something to, the
-  Laya request the gate would be asked today: the state as the gates are handed it and one question
-  per candidate kept, named by its slug. It answers the index line of each candidate beside it, and
-  the body of any piece it is asked for by gate and slug. Nothing is asked of a model and nothing is
-  written.
+  archive copy by `--db` and the turns — their room, their messages, and the instructions the turn
+  was handed — and answers, for each gate the narrowing leaves something to,
+  the Laya request the gate would be asked today: the state as the gates are handed it and one
+  question per candidate kept, named by its slug. On a turn of the bot's instructions alone that is
+  only the gates such a turn asks, narrowed as such a turn narrows them. It answers the index line of
+  each candidate beside it, and the body of any piece it is asked for by gate and slug. Nothing is
+  asked of a model and nothing is written.
+- **A turn whose instructions BMO's answer does not repeat back is counted missing**, as a turn whose
+  message is gone is: a checkout of BMO that does not read instructions would answer for a turn with
+  no lines at all.
 - **A gate the narrowing leaves nothing is no row**, the same as on the live road, where it is not
   asked.
 - **The inputs are asked for once a pass, for every turn.** A pass takes BMO's answer as it stands at
@@ -85,6 +105,9 @@ with its one login and tier (`docs/gate-data.md`, 「The claude road」).
 - **What is judged** is every candidate a turn's rows would carry that has no label yet, and every
   piece the reference record says a gate attached on that turn, whether or not the narrowing offers it
   today — those are what the LLM gates' over-selection is read from.
+- **The bot's own instructions stand in the item.** An item carries the instructions its turn was
+  handed beside its messages, which are empty on a turn the instructions opened, and the judge is
+  told that instructions are nobody's words and that a reply of `<<SKIP>>` is the bot saying nothing.
 - **An attached piece is answered with one of three words.** A piece is attached where the turn run's
   context lines or the reference record say it reached the prompt. These three lines are the judge's
   instructions word for word, and the code's prompt carries them unchanged:
@@ -197,6 +220,8 @@ data root's `reference-data/` folder, never inside this checkout.
   `data.json` with the counts above and a digest of the three files. The whole `gates/` folder is
   written under a partial name and put in place in one rename, so a training pass reading it reads one
   pass's rows and never half of two.
+- `instruction-turns.jsonl` — every turn the bot's own instructions opened, as it was first read: its
+  key, room, moment, instructions, reply and what attached. Only ever appended to.
 - `turns.jsonl` — one line per turn: its key, where it was read from, its messages' numbers, whether
   what attached is known, and why it was left out where it was.
 - `ticks.jsonl` — one line per pass: when, the BMO commit that built the inputs, when the archive copy
@@ -222,6 +247,9 @@ data root's `reference-data/` folder, never inside this checkout.
   `bun scripts/reference-data.ts ref-1 --judge <n>` — followed by
   `bun scripts/laya-train.ts reference:ref-1`. A frozen batch is never judged again, so a pass cut off
   loses only the batches it had not frozen, and the next pass takes their turns up.
+- **A kind of turn new to the data is judged ahead of the backlog** by a pass held to the turns of
+  one source — `bun scripts/reference-data.ts ref-1 --source instructions --judge <n>` judges only
+  the turns the bot's own instructions opened — followed by the same training pass.
 - **A word is judged again by a pass of its own** (「Judging a word again」) —
   `bun scripts/reference-data.ts ref-1 --rejudge needed --before <moment> --judge <n>`, with
   `--gate <gate>` for each gate it is held to and `--road claude` while codex is shut — followed by

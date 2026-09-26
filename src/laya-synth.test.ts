@@ -235,6 +235,11 @@ describe("the transcript shapes", () => {
   test("an unknown sender number is allowed", () => {
     expect(inTranscriptShape("plain", "이름 없는 사람 (id unknown): 안녕")).toBe(true);
   });
+
+  test("a quiet instruction the bot was handed is an entry of the plain shape, and of no other", () => {
+    expect(inTranscriptShape("plain", "quiet instruction from the bot: [작업 실행 상태]\n{\"state\":\"job-ended\"}")).toBe(true);
+    expect(inTranscriptShape("room", "quiet instruction from the bot: [작업 실행 상태]")).toBe(false);
+  });
 });
 
 describe("naming a per-candidate question", () => {

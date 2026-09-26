@@ -12,8 +12,23 @@ function said(messageId: number, senderId: number, sentAt: number, text = `말 $
   return { chatId: chat, messageId, senderId, senderName: senderId === bmo ? "BMO" : `사람${senderId}`, sentAt, text, imagePath: null, replyToMessageId: null };
 }
 
-function reads(room: ArchivedMessage[], scopes: TurnScope[] = [], contexts = new Map<string, Set<string>>(), recorded = new Map<string, RecordedPick[]>()): TurnReads {
-  return { rooms: () => [chat], room: () => room, scopes: () => scopes, contexts: () => contexts, recorded: () => recorded };
+type Scope = Pick<TurnScope, "run" | "chatId" | "messageIds"> & Partial<TurnScope>;
+
+function reads(
+  room: ArchivedMessage[],
+  scopes: Scope[] = [],
+  contexts = new Map<string, Set<string>>(),
+  recorded = new Map<string, RecordedPick[]>(),
+  answers = new Map<string, string[]>(),
+): TurnReads {
+  return {
+    rooms: () => [chat],
+    room: () => room,
+    scopes: () => scopes.map((one) => ({ instructions: "", at: 0, ...one })),
+    contexts: () => contexts,
+    recorded: () => recorded,
+    answers: () => answers,
+  };
 }
 
 describe("replyAfter", () => {
@@ -36,6 +51,14 @@ describe("readTurns", () => {
     expect(built.turns).toHaveLength(1);
     expect(built.turns[0]).toMatchObject({ key: `${chat}:2`, messageIds: [1, 2], source: "run", reply: "말 3" });
     expect([...built.turns[0]!.attached!]).toEqual(["structure"]);
+    expect(built.turns[0]).not.toHaveProperty("instructions");
+  });
+
+  test("the instructions a turn run with messages was handed stand beside its messages", () => {
+    const room = [said(1, 5, 0), said(2, bmo, 20)];
+    const built = readTurns(reads(room, [{ run: "r1", chatId: chat, messageIds: [1], instructions: "[배포 알림] 올라갔다" }]), bmo);
+
+    expect(built.turns[0]).toMatchObject({ key: `${chat}:1`, source: "run", instructions: "[배포 알림] 올라갔다" });
   });
 
   test("an answered run before the room's first scope is rebuilt, its attachments unknown", () => {
@@ -62,6 +85,27 @@ describe("readTurns", () => {
 
     expect(record).toMatchObject({ key: `${chat}:1`, messageIds: [1], recorded: picks });
     expect([...record.attached!]).toEqual(["quiet"]);
+  });
+
+  test("a run the bot's own instructions opened is a turn named by the run, answered by what the run said", () => {
+    const room = [said(1, 5, 0), said(2, bmo, 5)];
+    const opened = { run: "chat:-7:1:4", chatId: chat, messageIds: [], instructions: "[작업 실행 상태] #793 끝", at: 3_000 };
+    const built = readTurns(reads(room, [opened], new Map([["chat:-7:1:4", new Set(["job-793"])]]), new Map(), new Map([["chat:-7:1:4", ["", "<<SKIP>>"]]])), bmo);
+    const turn = built.turns.find((one) => one.source === "instructions")!;
+
+    expect(turn).toMatchObject({ key: "chat:-7:1:4", messageIds: [], at: 3_000, reply: "<<SKIP>>", instructions: "[작업 실행 상태] #793 끝", recorded: [] });
+    expect([...turn.attached!]).toEqual(["job-793"]);
+    expect(built.turns[0]).toBe(turn);
+  });
+
+  test("a run the instructions opened that said nothing is counted with no reply, and a scope of neither is no turn", () => {
+    const built = readTurns(reads([], [
+      { run: "silent", chatId: chat, messageIds: [], instructions: "[배포 알림]" },
+      { run: "empty", chatId: chat, messageIds: [] },
+    ], new Map(), new Map(), new Map([["empty", ["말"]]])), bmo);
+
+    expect(built.turns).toEqual([]);
+    expect(built.skipped.noReply).toBe(1);
   });
 
   test("a turn with no reply inside the bound is left out and counted", () => {

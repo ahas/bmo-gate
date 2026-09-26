@@ -5,14 +5,20 @@ import type { ArchivedMessage } from "../archive";
 import type { ReferenceGate } from "./labels";
 
 // The turns the reference gates' data is made of (docs/reference-data.md, 「The turns」): every run of
-// messages BMO answered together, with the answer it sent and, where anything says, what reached its
-// prompt. Everything here reads what the archive reads hands it, so each rule is driven from a test.
+// messages BMO answered together, and every run its own instructions opened, with the answer it gave
+// and, where anything says, what reached its prompt. Everything here reads what the archive reads
+// hands it, so each rule is driven from a test.
 
 // How far a reply may stand from the turn it answers, and how far apart two messages of one turn.
 export const replyBoundSeconds = 1_800;
 export const turnGapSeconds = 600;
 
-export type TurnSource = "run" | "record" | "answered";
+export const turnSources = ["run", "record", "answered", "instructions"] as const;
+export type TurnSource = typeof turnSources[number];
+
+export function isTurnSource(name: string): name is TurnSource {
+  return (turnSources as readonly string[]).includes(name);
+}
 
 // One row of BMO's per-candidate reference record.
 export interface RecordedPick {
@@ -34,13 +40,20 @@ export interface ReferenceTurn {
   attached: ReadonlySet<string> | null;
   reply: string;
   recorded: RecordedPick[];
+  // The bot's own instructions the turn run was handed, as its scope line carries them, where it was
+  // handed any; on a turn they opened with no message, they are all its lines.
+  instructions?: string;
 }
 
-// One turn run's scope line: the room and the messages it answers.
+// One turn run's scope line: the room, the messages it answers, and the bot's own instructions it
+// was handed, empty where there were none.
 export interface TurnScope {
   run: string;
   chatId: number;
   messageIds: number[];
+  instructions: string;
+  // When the run was handed its prompt, in seconds.
+  at: number;
 }
 
 export interface TurnReads {
@@ -50,6 +63,8 @@ export interface TurnReads {
   // The slugs a turn run's context lines name, by run.
   contexts(): ReadonlyMap<string, ReadonlySet<string>>;
   recorded(): ReadonlyMap<string, RecordedPick[]>;
+  // What a turn run answered, its text lines in order, by run.
+  answers(): ReadonlyMap<string, readonly string[]>;
 }
 
 export interface TurnBuild {
@@ -104,12 +119,37 @@ function recordedAttached(picks: readonly RecordedPick[]): ReadonlySet<string> |
   return new Set(picks.filter((one) => one.attached === true).map((one) => one.slug));
 }
 
+// A turn the bot's own instructions opened, named by its run: its reply is what the run answered,
+// `<<SKIP>>` included, since such an answer sends nothing to the room to be read back from it.
+function instructionTurn(scope: TurnScope, answered: readonly string[], attached: ReadonlySet<string>): ReferenceTurn | null {
+  const said = answered.filter((text) => text.trim() !== "");
+
+  if (said.length === 0) {
+    return null;
+  }
+
+  return {
+    key: scope.run,
+    chatId: scope.chatId,
+    messageIds: [],
+    at: scope.at,
+    source: "instructions",
+    attached,
+    reply: said.join("\n\n"),
+    recorded: [],
+    instructions: scope.instructions,
+  };
+}
+
 // Every turn, newest first. A turn run's scope line names its messages exactly; an answered run no
-// scope line claims, from before those lines were written, is rebuilt the way the gates cut a turn.
+// scope line claims, from before those lines were written, is rebuilt the way the gates cut a turn;
+// a run the bot's own instructions opened is a turn of its own.
 export function readTurns(reads: TurnReads, bmoId: number): TurnBuild {
-  const scopes = reads.scopes().filter((one) => one.messageIds.length > 0);
+  const read = reads.scopes();
+  const scopes = read.filter((one) => one.messageIds.length > 0);
   const contexts = reads.contexts();
   const recorded = reads.recorded();
+  const answers = reads.answers();
   const scopedRooms = new Map<number, TurnScope[]>();
 
   for (const scope of scopes) {
@@ -123,11 +163,11 @@ export function readTurns(reads: TurnReads, bmoId: number): TurnBuild {
     const room = reads.room(chatId);
     const at = new Map(room.map((one, index) => [one.messageId, index]));
     const claimed = new Set<number>();
-    const add = (messageIds: number[], source: TurnSource, attached: ReadonlySet<string> | null): void => {
+    const add = (messageIds: number[], source: TurnSource, attached: ReadonlySet<string> | null, instructions = ""): void => {
       const last = at.get(messageIds.at(-1)!)!;
       const key = turnKey(chatId, room[last]!.messageId);
 
-      if (messageIds.every((id) => room[at.get(id)!]!.text.trim() === "")) {
+      if (instructions.trim() === "" && messageIds.every((id) => room[at.get(id)!]!.text.trim() === "")) {
         skipped.noText += 1;
         return;
       }
@@ -145,6 +185,7 @@ export function readTurns(reads: TurnReads, bmoId: number): TurnBuild {
         key, chatId, messageIds, at: room[last]!.sentAt, source,
         attached: attached ?? recordedAttached(picks),
         reply, recorded: picks,
+        ...instructions.trim() === "" ? {} : { instructions },
       });
     };
 
@@ -161,7 +202,7 @@ export function readTurns(reads: TurnReads, bmoId: number): TurnBuild {
         claimed.add(id);
       }
 
-      add(ordered, "run", contexts.get(scope.run) ?? new Set());
+      add(ordered, "run", contexts.get(scope.run) ?? new Set(), scope.instructions);
     }
 
     // The runs before the first scope line of the room: after it, every turn BMO took wrote one, and a
@@ -199,6 +240,21 @@ export function readTurns(reads: TurnReads, bmoId: number): TurnBuild {
     }
   }
 
+  for (const scope of read) {
+    if (scope.messageIds.length > 0 || scope.instructions.trim() === "") {
+      continue;
+    }
+
+    const turn = instructionTurn(scope, answers.get(scope.run) ?? [], contexts.get(scope.run) ?? new Set());
+
+    if (turn === null) {
+      skipped.noReply += 1;
+      continue;
+    }
+
+    turns.set(turn.key, turn);
+  }
+
   return { turns: [...turns.values()].sort((left, right) => right.at - left.at), skipped };
 }
 
@@ -216,13 +272,19 @@ export function archiveTurnReads(db: Database, rooms: () => number[], room: (cha
     scopes: () => {
       const read: TurnScope[] = [];
 
-      for (const one of db.query(`SELECT run, substr(text, 1, instr(text || char(10), char(10)) - 1) AS line FROM agent_log
-          WHERE agent = 'bmo' AND kind = 'prompt' AND text LIKE 'TURN SCOPE:%' ORDER BY id`).all() as { run: string; line: string }[]) {
+      for (const one of db.query(`SELECT run, at, substr(text, 1, instr(text || char(10), char(10)) - 1) AS line FROM agent_log
+          WHERE agent = 'bmo' AND kind = 'prompt' AND text LIKE 'TURN SCOPE:%' ORDER BY id`).all() as { run: string; at: number; line: string }[]) {
         try {
-          const scope = JSON.parse(one.line.slice("TURN SCOPE:".length)) as { chatId?: number; messageIds?: number[] };
+          const scope = JSON.parse(one.line.slice("TURN SCOPE:".length)) as { chatId?: number; messageIds?: number[]; instructions?: unknown };
 
           if (typeof scope.chatId === "number" && Array.isArray(scope.messageIds)) {
-            read.push({ run: one.run, chatId: scope.chatId, messageIds: scope.messageIds.filter((id) => typeof id === "number") });
+            read.push({
+              run: one.run,
+              chatId: scope.chatId,
+              messageIds: scope.messageIds.filter((id) => typeof id === "number"),
+              instructions: typeof scope.instructions === "string" ? scope.instructions : "",
+              at: one.at,
+            });
           }
         } catch {
           // A scope line that does not read names no message.
@@ -255,6 +317,19 @@ export function archiveTurnReads(db: Database, rooms: () => number[], room: (cha
       }
 
       return picks;
+    },
+    answers: () => {
+      const said = new Map<string, string[]>();
+
+      for (const one of db.query(`SELECT run, text FROM agent_log WHERE agent = 'bmo' AND kind = 'text' ORDER BY id`).all() as
+          { run: string; text: string }[]) {
+        const held = said.get(one.run) ?? [];
+
+        held.push(one.text);
+        said.set(one.run, held);
+      }
+
+      return said;
     },
   };
 }

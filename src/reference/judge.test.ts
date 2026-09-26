@@ -73,7 +73,15 @@ describe("turnsToJudge", () => {
 });
 
 describe("the judge's item and answer", () => {
-  const item = judgeItem("-7:3", ["사람 (id 1): 밤에 알림 보내도 돼?"], "안 돼요", unjudged(turn(["quiet"]), live, new Map()), live, (text) => text);
+  const item = judgeItem({ key: "-7:3", reply: "안 돼요" }, ["사람 (id 1): 밤에 알림 보내도 돼?"], unjudged(turn(["quiet"]), live, new Map()), live, (text) => text);
+
+  test("a turn the bot's instructions opened carries them, and the judge is told what such a turn is", () => {
+    const opened = judgeItem({ key: "chat:-7:1:2", reply: "<<SKIP>>", instructions: "[문서 갱신 공지] STRUCTURE.md" }, [], [], live, (text) => text);
+
+    expect(JSON.parse(judgePrompt([opened]).split("\n")[1]!)).toMatchObject({ messages: [], instructions: "[문서 갱신 공지] STRUCTURE.md", reply: "<<SKIP>>" });
+    expect(JSON.parse(judgePrompt([item]).split("\n")[1]!)).not.toHaveProperty("instructions");
+    expect(judgeSystem).toContain("<<SKIP>>");
+  });
 
   test("shows an attached piece's body and an offered piece's index line, and never who picked it", () => {
     const shown = judgePrompt([item]);

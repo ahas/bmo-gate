@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { scratchDir } from "../scratch";
-import { bmoInputs, inputsScript, readLiveTurn } from "./live-inputs";
+import { bmoInputs, checkInstructions, inputsScript, readLiveTurn } from "./live-inputs";
 
 describe("readLiveTurn", () => {
   test("keeps the gates this repository trains and passes over any other", () => {
@@ -46,6 +46,15 @@ describe("bmoInputs", () => {
 
   test("says what the script said when it fails", () => {
     expect(() => bmoInputs(checkout, copy)([{ chatId: 0, messageIds: [1] }])).toThrow("no such room");
+  });
+
+  test("a turn asked over instructions its answer does not repeat back is missing", () => {
+    const opened = { chatId: -7, messageIds: [], instructions: "[배포 알림]" };
+    const answered = { chatId: -7, messageIds: [], missing: false, gates: [], pieces: [] };
+
+    expect(bmoInputs(checkout, copy)([opened])[0]!.missing).toBe(false);
+    expect(checkInstructions(opened, answered).missing).toBe(true);
+    expect(checkInstructions({ chatId: -7, messageIds: [3] }, answered).missing).toBe(false);
   });
 
   test("asks nothing of the script for no turns", () => {

@@ -59,6 +59,16 @@ that gate really receives.
   marker in this shape. It is what the three reference splits and the person-book search are given —
   the four gates that read a turn's messages only to pick documents out of a library.
 
+  A quiet instruction the bot was handed — a job's state, a deployment's notice, a document's update
+  notice, a watch's note — is an entry of its own in the same transcript, with no sender and no
+  number, since it is nobody's words:
+
+  ```
+  quiet instruction from the bot: <본문>
+  ```
+
+  A turn the bot's instructions opened with no message is a transcript of such entries alone.
+
 - **The pipe shape** — one line per message, six fields, the reply marker last:
 
   ```

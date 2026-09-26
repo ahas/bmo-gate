@@ -221,7 +221,9 @@ function lines(value: unknown): string[] {
 // A name is anything up to the marker, so a name carrying a colon still reads. A line opening with
 // a bracket is the room shape's time and never a plain line, and without that guard the room shape
 // reads as the plain one too — the name would simply swallow the time and the message number.
-const plainLine = /^(?!\[).{1,64}? \(id (?:\d{1,20}|unknown)\): /;
+// A quiet instruction the bot was handed is an entry of its own, nobody's words, so it carries no
+// sender and no number.
+const plainLine = /^(?:(?!\[).{1,64}? \(id (?:\d{1,20}|unknown)\): |quiet instruction from the bot: )/;
 // A message's own number may be negative: the archive numbers some of what it holds from below, and
 // the room shape writes the number it was given rather than one of its own.
 const roomLine = /^\[[^\]]{1,40}\] #-?\d{1,20} .{1,64}? \(id (?:\d{1,20}|unknown)(?:, OWNER)?\): /;
