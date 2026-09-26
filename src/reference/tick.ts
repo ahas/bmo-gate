@@ -178,7 +178,7 @@ async function judgeTurns(
   options: Pick<TickOptions, "inputs" | "messages" | "leaveText" | "atOnce" | "now" | "say">,
   judgedFolder: string,
   labelsPath: string,
-): Promise<{ calls: number; failedBatches: number; tokens: TokenTally }> {
+): Promise<{ calls: number; judgedTurns: number; failedBatches: number; tokens: TokenTally }> {
   const now = options.now ?? (() => new Date());
   const say = options.say ?? (() => {});
   const withBodies = options.inputs(chosen.map((one): InputsAsk => ({
@@ -190,7 +190,7 @@ async function judgeTurns(
     judgeItem(one.turn.key, options.messages(one.turn), one.turn.reply, one.wanted, withBodies[index]!, options.leaveText));
   const plan = judgeBatches(items);
   const base = nextBatch(judgedFolder);
-  const spent = { calls: 0, failedBatches: 0, tokens: noTokens };
+  const spent = { calls: 0, judgedTurns: 0, failedBatches: 0, tokens: noTokens };
 
   mkdirSync(judgedFolder, { recursive: true });
 
@@ -204,6 +204,7 @@ async function judgeTurns(
       appendLabels(labelsPath, read);
       spent.tokens = addTokens(spent.tokens, answer.tokens);
       spent.calls += 1;
+      spent.judgedTurns += batch.length;
       say(`판정 묶음 ${index + 1}/${plan.length}: 라벨 ${read.length}개`);
     } catch (error) {
       spent.failedBatches += 1;
@@ -314,8 +315,8 @@ export async function referenceTick(options: TickOptions): Promise<TickReport> {
 
   say(`턴 ${turns.length}개 · 라벨을 기다리는 턴 ${wanting.filter((one) => one.wanted.length > 0).length}개 · 이번에 판정할 턴 ${chosen.length}개`);
 
-  const { calls, failedBatches, tokens } = options.road === null || chosen.length === 0
-    ? { calls: 0, failedBatches: 0, tokens: noTokens }
+  const { calls, judgedTurns, failedBatches, tokens } = options.road === null || chosen.length === 0
+    ? { calls: 0, judgedTurns: 0, failedBatches: 0, tokens: noTokens }
     : await judgeTurns(chosen, options.road, options, judgedFolder, labelsPath);
 
   labels = readLabels(labelsPath);
@@ -334,7 +335,7 @@ export async function referenceTick(options: TickOptions): Promise<TickReport> {
     turns: turns.length,
     skipped: { ...options.built.skipped, missing },
     wanting: wanting.filter((one) => one.wanted.length > 0).length,
-    judgedTurns: chosen.length,
+    judgedTurns,
     calls,
     failedBatches,
     tokens,

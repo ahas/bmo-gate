@@ -130,7 +130,7 @@ describe("referenceTick", () => {
       road: spent, judged: 20, built: { turns: many, skipped: { noReply: 0, noMessage: 0, noText: 0 } },
     }));
 
-    expect([sent, report.calls, report.failedBatches]).toEqual([1, 0, 1]);
+    expect([sent, report.calls, report.failedBatches, report.judgedTurns]).toEqual([1, 0, 1, 0]);
   });
 
   test("takes the first judging's labels in once, where the run has none", async () => {
