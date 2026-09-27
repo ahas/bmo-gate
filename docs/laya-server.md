@@ -85,8 +85,8 @@ asks (BMO's `docs/laya.md`).
   | `room-rules` | `room-rules` | served (`ref877-p0001`) |
   | `situation-rules` | `situation-rules` | served |
   | `system-documents` | `system-documents` | served (`ref852-p0001`) |
-  | `people-search` | `people-search` | served (`ref854-p0001`) |
-  | `content-judge` | `content-judge` | not served: the gate's mode is `off`, and its trained checkpoint answers a question the gate no longer asks (`docs/gate-data.md`, 「A gate whose question moved」) |
+  | `people-search` | `people-search` | served (`ref895-plain-p0001`), trained on the input that carries the message the turn follows on from |
+  | `content-judge` | `content-judge` | loaded (`content-judge-1.content-judge-topup-1-p0001`) and asked by nobody: the gate's mode is `off`, and the checkpoint answers a question the gate no longer asks (`docs/gate-data.md`, 「A gate whose question moved」) |
   | `reply-wanted` | none — no gate code in BMO | trained, not served |
   | `sanitizer` | `sanitizer` | not trained |
 
@@ -243,7 +243,13 @@ run here trains one gate's model on a card of its own, so there is nothing for D
    calibration error the fit changes and not the agreement.
 6. **Try it without putting it in service:** the server's loader can be pointed at the checkpoint in a
    process of its own (`LAYA_CHECKPOINTS=<gate>=<dir>` with `server.load_decider()`), which loads it
-   and makes one decision while the unit goes on serving what it serves.
+   and makes one decision while the unit goes on serving what it serves. **Asking a checkpoint
+   outside the service** about many inputs is `predict.py --model <dir> --rows <rows.jsonl> --out
+   <answers.jsonl>` on a training node: each row's state and questions go through the same predict
+   call the server makes, under the checkpoint's own temperatures, and each row comes back as one
+   line — its id, gate and turn, and every question's probability of yes. Two checkpoints asked about
+   the same rows are set side by side question by question, which is how a slice of the test — the
+   short turns, one room — is compared before either is put in service.
 7. **Put it in service** with `bun scripts/laya-serve.ts <training gate>/<run>/step-<n> --gate <gate>`,
    which carries the collected checkpoint to n6 in the same layout, names it for its gate in
    `LAYA_CHECKPOINTS` (「Which checkpoint answers which gate」) and restarts the unit. `/health` then
@@ -280,7 +286,7 @@ run here trains one gate's model on a card of its own, so there is nothing for D
   python versions and the installed package versions move with the machine, so the setup verb reports
   the nodes side by side rather than this document stating them (`docs/training.md`).
 - **What is put there:** `~/bmo-laya` in the node's own account — `finetune.py`, `calibrate.py`,
-  `compare.py`, the resume bookkeeping they share and `pyproject.toml`, a uv venv built from it with
+  `compare.py`, `predict.py`, the resume bookkeeping they share and `pyproject.toml`, a uv venv built from it with
   `laya` pinned, and the dataset folders under `data/`. No server, no unit and no token: a node
   trains, and the deciding stays on n6. `uv pip install -r pyproject.toml --extra savings` adds
   bitsandbytes, which only the 8-bit optimizer run needs.

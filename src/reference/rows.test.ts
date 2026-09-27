@@ -74,13 +74,25 @@ describe("fittingState", () => {
 describe("referenceTurnRows", () => {
   const leave = (request: LayaRequest) => leaveRequest(request, names(), people);
 
-  test("waits while any candidate has no label", () => {
+  test("carries the labelled candidates and leaves out the one with no label yet", () => {
     const into = emptyGateRows();
 
-    referenceTurnRows("-7:3", live(["a-one", "b-two"]), new Map([label("-7:3", "a-one", "needed")]), leave, into);
+    referenceTurnRows("-7:3", live(["a-one", "b-two", "c-three"]), new Map([label("-7:3", "a-one", "needed"), label("-7:3", "c-three", "not-needed")]), leave, into);
+
+    const gold = JSON.parse(into.rows[0]!.gold) as Record<string, { noul: number }>;
+
+    expect(Object.keys(JSON.parse(into.rows[0]!.questions) as object)).toEqual(["a-one", "c-three"]);
+    expect([gold["a-one"]!.noul, gold["c-three"]!.noul]).toEqual([0.95, 0.05]);
+    expect([into.waiting, into.unlabelled]).toEqual([0, 1]);
+  });
+
+  test("waits while no candidate has a label", () => {
+    const into = emptyGateRows();
+
+    referenceTurnRows("-7:3", live(["a-one", "b-two"]), new Map(), leave, into);
 
     expect(into.rows).toEqual([]);
-    expect([into.waiting, into.unlabelled]).toEqual([1, 1]);
+    expect([into.waiting, into.unlabelled]).toEqual([1, 2]);
   });
 
   test("carries BMO's input with each gold beside its own question, split by the turn", () => {
@@ -121,13 +133,13 @@ describe("a turn of more candidates than one call holds", () => {
     expect([gold["piece-200"]!.noul, gold["piece-199"]!.noul]).toEqual([0.95, 0.05]);
   });
 
-  test("waits only in the row whose own candidate has no label", () => {
+  test("leaves a candidate with no label out of its own call's row alone", () => {
     const into = emptyGateRows();
 
     referenceTurnRows("-7:6", live(slugs), labelled("piece-299"), (request) => request, into);
 
-    expect(into.rows.map((row) => Object.keys(JSON.parse(row.questions) as object).length)).toEqual([128, 128]);
-    expect([into.waiting, into.unlabelled]).toEqual([1, 1]);
+    expect(into.rows.map((row) => Object.keys(JSON.parse(row.questions) as object).length)).toEqual([128, 128, 43]);
+    expect([into.waiting, into.unlabelled]).toEqual([0, 1]);
   });
 });
 

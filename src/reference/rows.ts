@@ -104,7 +104,7 @@ export type RowRefusal = SynthRefusal | "too-large";
 
 export interface GateRows {
   rows: ReferenceRow[];
-  // Rows that wait on a label, and the candidates without one.
+  // Rows none of whose candidates has a label yet, and the candidates without one in every row.
   waiting: number;
   unlabelled: number;
   // Rows whose state was cut to its newest messages.
@@ -158,13 +158,18 @@ function partRow(
 ): void {
   const missing = words.filter((word) => word === null).length;
 
-  if (missing > 0) {
+  into.unlabelled += missing;
+
+  if (missing === words.length) {
     into.waiting += 1;
-    into.unlabelled += missing;
     return;
   }
 
-  const left = leave(part);
+  // Laya reads each question on its own beside the state, so the labelled ones make a row without
+  // the rest.
+  const labelled = Object.entries(part.questions).flatMap(([id, question], at) => words[at] === null ? [] : [[id, question] as const]);
+  const judged = words.filter((word) => word !== null);
+  const left = leave({ ...part, questions: Object.fromEntries(labelled) });
   const request = fittingState(left);
 
   if (request === null) {
@@ -179,7 +184,7 @@ function partRow(
   // The questions keep the order BMO gave them, and each gold goes with its question by place, since
   // the rewriting renamed the question.
   const ids = Object.keys(request.questions);
-  const gold = Object.fromEntries(ids.map((id, at) => [id, noul(goldShare(words[at]!))]));
+  const gold = Object.fromEntries(ids.map((id, at) => [id, noul(goldShare(judged[at]!))]));
   const spec = specOf(gate);
   const state = String(request.state);
   const verdict = validateSynthRow(spec, { state, questions: { ...request.questions }, gold }, languageOf(state));

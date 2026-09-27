@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import { jakeExecArgs, jakeUploadArgs, parseHome } from "./jake";
 import {
@@ -254,6 +256,13 @@ describe("whether a node can take a gate", () => {
 
   test("a node with nothing on it needs every file", () => {
     expect(outdatedFiles(digests, null)).toEqual([...NODE_FILES].sort());
+  });
+
+  test("the probe hashes every file a node is given, so a file put across reads as current", () => {
+    const probe = readFileSync(join(import.meta.dir, "..", "laya-server", "node-probe.sh"), "utf8");
+    const hashed = /for file in ([^;]+); do\n\s+if \[ -f "\$here\/\$file" \]/.exec(probe)?.[1]?.split(/\s+/);
+
+    expect(hashed?.sort()).toEqual([...NODE_FILES].sort());
   });
 
   test("the pin is read from the project file rather than kept beside it", () => {

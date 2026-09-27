@@ -38,7 +38,7 @@ export const NODE_DIR = "bmo-laya";
 // What a node needs to train. The server and its unit belong to the Laya service on n6 and are put
 // there by its own installer.
 export const NODE_FILES: readonly string[] = [
-  "finetune.py", "balance.py", "calibrate.py", "compare.py", "resume.py", "metrics.py", "pyproject.toml", "node-probe.sh", "node-setup.sh", "node-train.sh", "node-collect.sh",
+  "finetune.py", "balance.py", "calibrate.py", "compare.py", "predict.py", "resume.py", "metrics.py", "pyproject.toml", "node-probe.sh", "node-setup.sh", "node-train.sh", "node-collect.sh",
 ];
 
 // What the setup script says on its last line, being the one thing a poll waits for.

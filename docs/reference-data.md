@@ -176,8 +176,13 @@ The rows take the shape every row of this repository takes, the one the training
 - **The questions are BMO's questions**, rewritten as above, under their slugs.
 - **The gold of a question** is a yes/no distribution: yes at 0.95 for `used` and `needed`, no at
   0.95 for `unused` and `not-needed`, and an even half for `related`.
-- **A row waits until every one of its own candidates has a label.** A row with a hole in its gold is a
-  row the training cannot read; it is counted as waiting and made on the pass its last label lands.
+- **A row carries the candidates of its call that have a label.** Laya reads each question as a
+  sequence of its own — the state and that one question — so a candidate left out changes nothing any
+  other question of the row is taught or measured on. A candidate with no label yet is left out and
+  counted as unlabelled, and joins the row on the pass its label lands. A call none of whose
+  candidates has a label is no row and is counted as waiting. The person book grows new pieces every
+  day, each offered on every turn of its owner, so a row held back for its last label would hold back
+  nearly every turn of a busy room until each new piece had been judged on all of them.
 - **A row's id is its input's hash; its split is its turn's.** The split is drawn from the turn's key
   at fifteen per cent calibration and fifteen per cent test, so a turn stays in its split however its
   input changes, and a test turn is never trained on in a later pass because its description moved.
