@@ -81,8 +81,8 @@ asks (BMO's `docs/laya.md`).
   |---|---|---|
   | `output-format` | `output-format` — the gate whose provider is Laya, asked the reduced state | served (`real-2-fold`) |
   | `output-format` | `output-decide` — a BMO build older than its one formatting gate, asking the original, the converted message and the fold | served (`real-1-hand`) until no running BMO asks it |
-  | `library-knowledge` | `library-knowledge` | served (`ref877-p0001`) |
-  | `room-rules` | `room-rules` | served (`ref877-p0001`) |
+  | `library-knowledge` | `library-knowledge` | served (`ref895-answered-p0002`), trained on the input that carries the message the turn follows on from |
+  | `room-rules` | `room-rules` | served (`ref895-answered-s2-p0001`), trained on the input that carries the message the turn follows on from |
   | `situation-rules` | `situation-rules` | served |
   | `system-documents` | `system-documents` | served (`ref852-p0001`) |
   | `people-search` | `people-search` | served (`ref895-plain-p0001`), trained on the input that carries the message the turn follows on from |
