@@ -72,6 +72,9 @@ pinned to one Claude login.
 - `bmo-gate-reference-data.service` and its `.timer` make a pass of the reference gates' data and
   then a training pass over it every hour, symlinked the same way. The data pass reads BMO's
   `scripts/reference-inputs.ts` in BMO's live checkout, pointed at the pass's archive copy.
+- `bmo-gate-downgrade.service` and its `.timer` resume the standing downgrade harvest every six
+  hours, so the sanitiser gate's missed material accrues as new downgrades happen, symlinked the
+  same way. It gathers and judges only; nothing trains on it by itself.
 
 ## Checking a change
 

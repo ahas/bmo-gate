@@ -1,0 +1,12 @@
+[Unit]
+Description=bmo-gate-downgrade — 6시간마다 새로 생긴 강등을 무해화 게이트 데이터에 쌓는다
+
+[Timer]
+# Six hours after the last pass ended, so a pass waiting out a busy card is never stacked on.
+OnActiveSec=1min
+OnBootSec=30min
+OnUnitInactiveSec=6h
+Persistent=false
+
+[Install]
+WantedBy=timers.target

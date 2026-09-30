@@ -14,8 +14,8 @@ import {
   addTokens, batchName, batchesFolder, freezeBatch, freezeByCategory, freezeSplits, guardFolder, noTokens,
   readProgress, writeProgress,
 } from "../src/laya-synth-run";
-import { TEXT_NODES, textHealthUrl } from "../src/n5-llm-install";
-import { n5Model, n5StreamerFor, n5TimeoutMs } from "../src/n5-road";
+import { TEXT_NODES } from "../src/n5-llm-install";
+import { n5Model, n5StreamerFor, n5TimeoutMs, readyTextNodes } from "../src/n5-road";
 import { scrubText } from "../src/pii";
 import { refuseInsideCheckout, runFolder } from "../src/roots";
 
@@ -163,31 +163,9 @@ function trouble(cause: unknown): string {
   return cause instanceof Error ? (cause.message.split("\n")[0] ?? cause.message) : String(cause);
 }
 
-// Which of the wanted nodes answer their health right now, and why the rest are left out. A node whose
-// front is not up cannot serve the model, so the run goes on with the ones that answered and names the
-// ones it dropped (todo #1039: 되는 노드만으로 생성하고 어느 노드가 왜 빠졌는지 보고).
-async function readyNodes(candidates: readonly string[]): Promise<{ ready: string[]; dropped: Array<[string, string]> }> {
-  const ready: string[] = [];
-  const dropped: Array<[string, string]> = [];
-
-  for (const node of candidates) {
-    try {
-      const answered = await fetch(textHealthUrl(node), { signal: AbortSignal.timeout(8_000) });
-
-      if (answered.status === 200) {
-        ready.push(node);
-      } else {
-        dropped.push([node, `health ${answered.status}`]);
-      }
-    } catch (cause) {
-      dropped.push([node, trouble(cause)]);
-    }
-  }
-
-  return { ready, dropped };
-}
-
-const { ready: nodes, dropped } = await readyNodes(candidateNodes);
+// The run goes on with the nodes that answer their health and names the ones it dropped (todo #1039:
+// 되는 노드만으로 생성하고 어느 노드가 왜 빠졌는지 보고).
+const { ready: nodes, dropped } = await readyTextNodes(candidateNodes);
 
 for (const [node, why] of dropped) {
   say(`노드 ${node} 는 빠집니다: ${why}`);

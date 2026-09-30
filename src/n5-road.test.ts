@@ -5,7 +5,7 @@ import { describe, expect, test } from "bun:test";
 
 import { scratchDir } from "./scratch";
 import { synthesisFor } from "./laya-synth";
-import { cutSseEvents, n5Asker, n5Body, n5JudgeRoad, n5Model, n5Streamer, readN5Answer, readN5Key, readSseEvent } from "./n5-road";
+import { cutSseEvents, n5Asker, n5Body, n5JudgeRoad, n5Model, n5Streamer, readN5Answer, readN5Key, readSseEvent, readyTextNodes } from "./n5-road";
 
 import type { N5Fetch, N5Settings } from "./n5-road";
 import type { SynthAsk } from "./laya-synth";
@@ -173,6 +173,29 @@ describe("the judging road", () => {
     expect(answer.text).toBe(rowsText);
     expect(answer.sessionId).toBeNull();
     expect(answer.tokens.outputTokens).toBe(4);
+  });
+});
+
+describe("the nodes a pass spreads over", () => {
+  test("keeps the nodes whose health answers and names why the rest were left out", async () => {
+    const probe: N5Fetch = async (input) => {
+      const url = String(input);
+
+      if (url.includes("18020")) {
+        return new Response("ok");
+      }
+
+      if (url.includes("18021")) {
+        return new Response("busy", { status: 503 });
+      }
+
+      throw new Error("connection refused");
+    };
+
+    const { ready, dropped } = await readyTextNodes(["n5", "n2", "n3"], probe);
+
+    expect(ready).toEqual(["n5"]);
+    expect(dropped).toEqual([["n2", "health 503"], ["n3", "connection refused"]]);
   });
 });
 

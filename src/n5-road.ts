@@ -2,7 +2,7 @@ import { statSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { batchPrompts, noTokens } from "./laya-synth-run";
-import { textBaseUrl, textKeyPath } from "./n5-llm-install";
+import { textBaseUrl, textHealthUrl, textKeyPath } from "./n5-llm-install";
 import { dataRoot } from "./roots";
 
 import type { JudgeRoad } from "./gate-judge";
@@ -441,6 +441,38 @@ export function n5JudgeRoad(settings: Partial<N5Settings> = {}): JudgeRoad {
 
     return { text, sessionId: null, tokens };
   };
+}
+
+// A judging road aimed at one text-model node's front, for a judging pass spread across n2 to n5.
+export function n5JudgeRoadFor(node: string, settings: Partial<N5Settings> = {}): JudgeRoad {
+  return n5JudgeRoad({ baseUrl: textBaseUrl(node), readKey: () => readN5Key(textKeyPath(node)), ...settings });
+}
+
+// Which of the given text-model nodes answer their health right now, and why the rest are left out.
+// A node whose front is not up cannot serve the model, so a pass goes on with the ones that answered
+// and names the ones it dropped.
+export async function readyTextNodes(
+  candidates: readonly string[],
+  probe: N5Fetch = fetch,
+): Promise<{ ready: string[]; dropped: Array<[string, string]> }> {
+  const ready: string[] = [];
+  const dropped: Array<[string, string]> = [];
+
+  for (const node of candidates) {
+    try {
+      const answered = await probe(textHealthUrl(node), { signal: AbortSignal.timeout(8_000) });
+
+      if (answered.status === 200) {
+        ready.push(node);
+      } else {
+        dropped.push([node, `health ${answered.status}`]);
+      }
+    } catch (cause) {
+      dropped.push([node, cause instanceof Error ? (cause.message.split("\n")[0] ?? cause.message) : String(cause)]);
+    }
+  }
+
+  return { ready, dropped };
 }
 
 // The asker `runSynthesis` drives on this road: one batch in, one answer out, no session between

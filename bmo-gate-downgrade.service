@@ -1,0 +1,15 @@
+[Unit]
+Description=bmo-gate-downgrade — 새 아카이브 사본에서 강등을 찾아 아직 판정 못 한 구간만 판정해 무해화 게이트 데이터에 쌓는 한 회차
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/repos/ahas/bmo-gate
+Environment=PATH=%h/.bun/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+# One pass of the standing harvest: every downgrade in a fresh archive copy, the passages the folder
+# already holds skipped, the rest judged on the n5 road and frozen into the same folder. It only
+# gathers; taking the folder into a training pass is a separate step (docs/gate-data.md 「The downgrade
+# harvest」).
+ExecStart=%h/.bun/bin/bun scripts/laya-downgrade.ts --run downgrade --resume
+TimeoutStartSec=infinity

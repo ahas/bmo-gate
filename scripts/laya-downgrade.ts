@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -7,18 +7,18 @@ import {
 import { releaseArchiveCopy, takeArchiveCopy } from "../src/archive-copy";
 import { claudeEffort, claudeJudgeRoad, claudeModel } from "../src/claude-road";
 import { codexEffort, codexJudgeRoad, codexModel } from "../src/codex-road";
-import { asked, asksUsage, lastOf, readFlags } from "../src/flags";
+import { allOf, asked, asksUsage, lastOf, readFlags } from "../src/flags";
 import { gateFor, judgeBatches, judgePrompt, judgeSystem, judgedRows, readJudgements } from "../src/gate-judge";
 import { j3090Effort, j3090JudgeRoad, j3090Model } from "../src/j3090-road";
 import {
   candidatesOf, defaultClusterSeconds, defaultWindowSeconds, downgradeEvents, eventKey, eventOutcome,
-  fallbackModels, windowTexts,
+  fallbackModels, keptAs, windowTexts,
 } from "../src/laya-downgrade";
 import { splitFiles } from "../src/laya-frozen";
 import { sanitizerGate } from "../src/laya-sanitize";
 import { languageOf, stateText } from "../src/laya-synth";
 import {
-  addTokens, batchesFolder, freezeBatch, freezeSplits, guardFolder, languageFile, noTokens, readFrozenBatches,
+  addTokens, batchesFolder, freezeBatch, freezeSplits, guardFolder, languageFile, noTokens, readFrozenBatches, readProgress,
   writeProgress,
 } from "../src/laya-synth-run";
 import { gateFolder, refuseInsideCheckout, runFolder } from "../src/roots";
@@ -33,23 +33,25 @@ import type { UnjudgedRow } from "../src/real-rows";
 
 // The downgrade harvest (docs/gate-data.md, 「The downgrade harvest」): sanitiser rows made of the
 // material the account safeguard balked at. It reads a copy of BMO's archive, finds the downgrades,
-// gathers the passed-through context standing before each, offers every attack-adjacent passage to the
-// gate's own question on a road, and freezes the judged rows as a sanitiser gate folder a training
+// gathers the passed-through context standing before each, offers every passage of it to the gate's
+// own question on a road, and freezes the rows worth keeping as a sanitiser gate folder a training
 // pass takes in as a top-up. No worker and no person reads the harmful body: it streams past the judge
 // and freezes, and only counts, outcomes and paths are said. Each downgrade's outcome lands in the
 // run's live.txt as it is settled, which is 하스's to watch; the worker reads the counts alone.
 
-const usage = `usage: bun scripts/laya-downgrade.ts [--run <이름>] [--road codex|j3090|claude|n5]
+const usage = `usage: bun scripts/laya-downgrade.ts [--run <이름>] [--road codex|j3090|claude|n5] [--node <n2|n3|n4|n5>]…
                                     [--window <초>] [--cluster <초>] [--limit <n>]
                                     [--batch <n>] [--answers <n>] [--db <경로>]
                                     [--calibration <비율>] [--test <비율>] [--resume] [--freeze-only] [--overwrite]
 
 강등된 대화를 모아 무해화 게이트(sanitizer) 추가 학습 데이터로 만든다. 강등은 계정 세이프가드가 세션
 맥락에 걸려 더 낮은 모델로 실행한 것이고, 그 맥락이 곧 게이트가 놓친 입력이다. 아카이브 사본에서 강등을
-찾아 직전 맥락(무해화 게이트를 지난 뒤의 글)을 모으고, 공격 어휘가 있는 구간만 길에서 판정한다.
-판정이 유해면 DEFUSE, 아니면 과잉 반응이라 CLEAN, 공격 구간이 하나도 없으면 원인 불명으로 뺀다.
+찾아 직전 맥락(무해화 게이트를 지난 뒤의 글)을 모으고, 모든 구간을 길에서 판정한다.
+유해로 판정된 구간은 DEFUSE, 무해인데 공격 어휘가 있는 구간은 CLEAN으로 남기고, 어휘 없는 무해 구간은
+판정 기록에만 적는다. 강등마다 유해 구간이 있으면 유해, 없고 공격 어휘가 있으면 과잉 반응, 둘 다 없으면 원인 불명이다.
 --run 을 주면 그 실행 폴더의 gates/sanitizer 에 굳히고, 안 주면 세기만 한다(판정 없음).
 --road 는 판정을 맡을 길(기본 n5). 세이프가드를 낳은 계정 대신 집 모델로 판정한다.
+--node 는 n5 길에서 판정에 쓸 텍스트 모델 노드. 없으면 답하는 노드를 모두 나눠 쓴다.
 --window 는 강등 직전 몇 초까지 거슬러 맥락을 모을지(기본 ${defaultWindowSeconds}).
 --cluster 는 같은 방의 강등을 한 건으로 묶는 간격(기본 ${defaultClusterSeconds}).
 --limit 은 판정할 구간 수 상한(연습용). --batch 와 --answers 는 한 묶음의 상한.
@@ -69,7 +71,7 @@ if (asksUsage(argv)) {
 }
 
 const reading = readFlags(argv, {
-  "--run": true, "--road": true, "--window": true, "--cluster": true, "--limit": true,
+  "--run": true, "--road": true, "--node": true, "--window": true, "--cluster": true, "--limit": true,
   "--batch": true, "--answers": true, "--db": true, "--calibration": true, "--test": true,
   "--resume": false, "--freeze-only": false, "--overwrite": false,
 });
@@ -107,16 +109,30 @@ const batchSize = Number(lastOf(reading, "--batch") ?? "2");
 const answerCap = Number(lastOf(reading, "--answers") ?? "100");
 const roadName = (lastOf(reading, "--road") ?? "n5") as SynthRoad;
 
-// The n5 road builder is loaded only when a road is actually driven, so a dry count needs nothing
-// standing on n5.
-const roads: Record<SynthRoad, () => Promise<{ road: JudgeRoad; model: string; effort: string }>> = {
-  codex: async () => ({ road: codexJudgeRoad(), model: codexModel, effort: codexEffort }),
-  j3090: async () => ({ road: j3090JudgeRoad(), model: j3090Model, effort: j3090Effort }),
-  claude: async () => ({ road: claudeJudgeRoad(), model: claudeModel, effort: claudeEffort }),
-  n5: async () => {
-    const { n5Effort, n5JudgeRoad, n5Model } = await import("../src/n5-road");
+const wantedNodes = allOf(reading, "--node");
 
-    return { road: n5JudgeRoad(), model: n5Model, effort: n5Effort };
+// Each road gives the judges a batch is handed to, one batch in hand a judge. The account roads are
+// one judge; the n5 road is one a text-model node that answers its health, so the batches spread
+// over n2 to n5. Its builder is loaded only when a road is actually driven, so a dry count needs
+// nothing standing on the nodes.
+interface Judges { judges: Array<{ name: string; road: JudgeRoad }>; model: string; effort: string }
+
+const roads: Record<SynthRoad, () => Promise<Judges>> = {
+  codex: async () => ({ judges: [{ name: "codex", road: codexJudgeRoad() }], model: codexModel, effort: codexEffort }),
+  j3090: async () => ({ judges: [{ name: "j3090", road: j3090JudgeRoad() }], model: j3090Model, effort: j3090Effort }),
+  claude: async () => ({ judges: [{ name: "claude", road: claudeJudgeRoad() }], model: claudeModel, effort: claudeEffort }),
+  n5: async () => {
+    const { TEXT_NODES } = await import("../src/n5-llm-install");
+    const { n5Effort, n5JudgeRoadFor, n5Model, readyTextNodes } = await import("../src/n5-road");
+    const { ready, dropped } = await readyTextNodes(wantedNodes.length > 0 ? wantedNodes : [...TEXT_NODES]);
+
+    for (const [node, why] of dropped) {
+      console.log(`노드 ${node} 는 빠집니다: ${why}`);
+    }
+
+    console.log(`판정 노드: ${ready.length === 0 ? "없음" : ready.join(", ")}`);
+
+    return { judges: ready.map((node) => ({ name: node, road: n5JudgeRoadFor(node) })), model: n5Model, effort: n5Effort };
   },
 };
 
@@ -150,6 +166,7 @@ console.log(`강등 ${events.length}건 (알림 ${notices.length}, 폴백으로 
 // per downgrade once the rows are judged. A passage that stands in more than one window is one row
 // judged once, but it counts towards every downgrade whose window held it.
 const rowsById = new Map<string, UnjudgedRow>();
+const adjacent = new Set<string>();
 const keysByEvent = new Map<string, string[]>();
 const eventOf = new Map<string, DowngradeEvent>();
 
@@ -162,6 +179,10 @@ for (const event of events) {
   keysByEvent.set(key, candidates.map((one) => one.row.id));
 
   for (const one of candidates) {
+    if (one.adjacent) {
+      adjacent.add(one.row.id);
+    }
+
     if (limit > 0 && rowsById.size >= limit && !rowsById.has(one.row.id)) {
       continue;
     }
@@ -171,9 +192,10 @@ for (const event of events) {
 }
 
 const uniqueRows = [...rowsById.values()];
-const withCandidates = [...keysByEvent.values()].filter((ids) => ids.length > 0).length;
+const withAdjacent = [...keysByEvent.values()].filter((ids) => ids.some((id) => adjacent.has(id))).length;
+const emptyWindows = [...keysByEvent.values()].filter((ids) => ids.length === 0).length;
 
-console.log(`판정할 구간 ${uniqueRows.length}개, 공격 구간이 있는 강등 ${withCandidates}건, 없는(원인 불명) 강등 ${events.length - withCandidates}건.`);
+console.log(`판정할 구간 ${uniqueRows.length}개(공격 어휘 ${uniqueRows.filter((row) => adjacent.has(row.id)).length}개), 공격 어휘가 있는 강등 ${withAdjacent}건, 맥락이 비어 있는 강등 ${emptyWindows}건.`);
 
 if (root === null) {
   console.log("굳히려면 실행 이름을 주세요: bun scripts/laya-downgrade.ts --run <이름>");
@@ -181,7 +203,7 @@ if (root === null) {
 }
 
 if (uniqueRows.length === 0) {
-  console.error("laya-downgrade: 판정할 공격 구간이 없어 굳힐 것이 없습니다.");
+  console.error("laya-downgrade: 강등 직전 맥락에 판정할 구간이 없어 굳힐 것이 없습니다.");
   process.exit(1);
 }
 
@@ -209,15 +231,25 @@ if (wantOverwrite) {
 
 mkdirSync(folder, { recursive: true });
 
-const { road, model, effort } = await roads[roadName]();
+// The judges are raised only when there is judging to do, so a freeze and a pass with nothing new
+// touch no road; until then the folder keeps the model it was judged with.
+const past = readProgress(folder);
+let judges: Judges["judges"] = [];
+
 const progress: SynthProgress = {
   started: new Date().toISOString(),
-  model, effort, road: roadName, roads: [roadName],
+  model: past?.model ?? "none", effort: past?.effort ?? "none", road: roadName, roads: [roadName],
   rows: uniqueRows.length, batchSize, answerCap, shares, gates: {},
 };
 const standing = { done: 0, sessionId: null, kept: 0, refused: {}, unreadable: 0, lostBatches: 0, tokens: noTokens };
 
 progress.gates[sanitizerGate] = standing;
+
+// Every verdict the judge gave, kept or not, one line a passage, appended as each batch lands. The
+// splits hold only the kept rows, so this is what tells a resume a clean passage without the
+// vocabulary was already judged (docs/gate-data.md, 「Resuming the harvest」).
+const judgedFile = "judged.jsonl";
+const judgedPath = join(folder, judgedFile);
 
 const harmful = new Set<string>();
 const judged = new Set<string>();
@@ -243,21 +275,25 @@ function seedFromExisting(): void {
     }
   }
 
-  const existing: FrozenRow[] = haveSplits
-    ? Object.values(splitFiles).flatMap((name) => {
-        const path = join(folder, name);
+  const saved: FrozenRow[] = Object.values(splitFiles).flatMap((name) => {
+    const path = join(folder, name);
 
-        if (!existsSync(path)) {
-          return [];
-        }
+    if (!existsSync(path)) {
+      return [];
+    }
 
-        return readFileSync(path, "utf8").split("\n").filter((line) => line.trim() !== "").map((line) => {
-          const row = JSON.parse(line) as DatasetRow;
+    return readFileSync(path, "utf8").split("\n").filter((line) => line.trim() !== "").map((line) => {
+      const row = JSON.parse(line) as DatasetRow;
 
-          return { row, language: languages.get(row.id) ?? languageOf(stateText(spec, JSON.parse(row.state) as LayaState)) };
-        });
-      })
-    : readFrozenBatches(folder);
+      return { row, language: languages.get(row.id) ?? languageOf(stateText(spec, JSON.parse(row.state) as LayaState)) };
+    });
+  });
+  const savedIds = new Set(saved.map((one) => one.row.id));
+
+  // A run stopped before its end froze kept rows into batches its splits never took in, and the verdict
+  // record already names them judged, so the batches' rows join the saved ones rather than being
+  // cleared with the batches.
+  const existing: FrozenRow[] = [...saved, ...readFrozenBatches(folder).filter((one) => !savedIds.has(one.row.id))];
 
   for (const one of existing) {
     judged.add(one.row.id);
@@ -272,6 +308,18 @@ function seedFromExisting(): void {
     }
   }
 
+  const notKept = existsSync(judgedPath)
+    ? readFileSync(judgedPath, "utf8").split("\n").filter((line) => line.trim() !== "").map((line) => JSON.parse(line) as { id: string; harmful: boolean })
+    : [];
+
+  for (const one of notKept) {
+    judged.add(one.id);
+
+    if (one.harmful) {
+      harmful.add(one.id);
+    }
+  }
+
   rmSync(join(folder, batchesFolder), { recursive: true, force: true });
 
   if (existing.length > 0) {
@@ -279,7 +327,7 @@ function seedFromExisting(): void {
     nextBatch = 1;
   }
 
-  console.log(`이미 판정된 ${existing.length}개를 이어받았습니다 (유해 ${harmful.size}).`);
+  console.log(`이미 판정된 ${judged.size}개를 이어받았습니다 (남긴 행 ${existing.length}, 유해 ${harmful.size}).`);
 }
 
 if (wantResume || wantFreezeOnly) {
@@ -292,62 +340,104 @@ if (wantResume || wantFreezeOnly) {
 // guessed at — a passage the judge never read is not a passage it found clean.
 const retryRounds = 3;
 
-async function judgeRows(rows: readonly UnjudgedRow[], size: number): Promise<void> {
-  for (const batch of judgeBatches(rows, size, answerCap)) {
-    const index = nextBatch;
-    const items = batch.map((row) => ({ id: row.id, state: row.state, questions: row.questions }));
-    let answer: Awaited<ReturnType<JudgeRoad>>;
+// One batch on one judge: asked, read, its verdicts recorded, and the passages worth keeping frozen.
+async function judgeBatch(judge: Judges["judges"][number], batch: readonly UnjudgedRow[]): Promise<void> {
+  const items = batch.map((row) => ({ id: row.id, state: row.state, questions: row.questions }));
+  let answer: Awaited<ReturnType<JudgeRoad>>;
 
-    try {
-      answer = await road(judgeSystem, judgePrompt(spec, items), null);
-    } catch (error) {
-      // A road that fails a batch after its own retries stops that batch, not the run: the rows
-      // stay unread and are asked again in a retry round or counted, so one busy stretch of a shared
-      // card never throws away the batches already frozen.
-      console.error(`laya-downgrade: 묶음 ${index + 1} 판정 실패, 건너뜁니다 — ${error instanceof Error ? error.message : String(error)}`);
-      continue;
-    }
-
-    standing.tokens = addTokens(standing.tokens, answer.tokens);
-
-    const reading = readJudgements(answer.text, items);
-
-    // The sanitiser asks one question of a row, so a row's one gold is the intrusion verdict: a gold
-    // read as harmful marks the passage a DEFUSE and the downgrade it came from as harmful, and any
-    // gold read at all marks the row read so a retry does not ask it again.
-    for (const [id, golds] of reading.golds) {
-      judged.add(id);
-
-      const gold = Object.values(golds)[0];
-
-      if (gold !== undefined && gold.type === "noul" && gold.label === "true") {
-        harmful.add(id);
-      }
-    }
-
-    const outcome = judgedRows(spec, batch, reading, shares, "archive");
-    const frozen: FrozenRow[] = outcome.rows.map((one) => {
-      if (harmful.has(one.row.id)) {
-        defuseRows += 1;
-      } else {
-        cleanRows += 1;
-      }
-
-      return { row: one.row, language: languageOf(stateText(spec, JSON.parse(one.row.state) as LayaState)) };
-    });
-
-    freezeBatch(folder, sanitizerGate, index, frozen);
-    nextBatch = index + 1;
-    standing.done = nextBatch;
-    writeProgress(folder, progress);
-    console.log(`묶음 ${nextBatch}: ${frozen.length}행 굳음 (유해 ${harmful.size}).`);
+  try {
+    answer = await judge.road(judgeSystem, judgePrompt(spec, items), null);
+  } catch (error) {
+    // A road that fails a batch after its own retries stops that batch, not the run: the rows
+    // stay unread and are asked again in a retry round or counted, so one busy stretch of a shared
+    // card never throws away the batches already frozen.
+    console.error(`laya-downgrade: ${judge.name} 의 묶음 판정 실패, 건너뜁니다 — ${error instanceof Error ? error.message : String(error)}`);
+    return;
   }
+
+  standing.tokens = addTokens(standing.tokens, answer.tokens);
+
+  const reading = readJudgements(answer.text, items);
+  const verdicts: string[] = [];
+
+  // The sanitiser asks one question of a row, so a row's one gold is its verdict: a gold read as
+  // harmful marks the passage a DEFUSE and the downgrade it came from as harmful, and any gold read
+  // at all marks the row read so neither a retry nor a resume asks it again.
+  for (const [id, golds] of reading.golds) {
+    const gold = Object.values(golds)[0];
+    const isHarmful = gold !== undefined && gold.type === "noul" && gold.label === "true";
+
+    judged.add(id);
+
+    if (isHarmful) {
+      harmful.add(id);
+    }
+
+    verdicts.push(JSON.stringify({ id, harmful: isHarmful }));
+  }
+
+  const outcome = judgedRows(spec, batch, reading, shares, "archive");
+  const frozen: FrozenRow[] = outcome.rows.flatMap((one) => {
+    const kept = keptAs(harmful.has(one.row.id), adjacent.has(one.row.id));
+
+    if (kept === null) {
+      return [];
+    }
+
+    if (kept === "DEFUSE") {
+      defuseRows += 1;
+    } else {
+      cleanRows += 1;
+    }
+
+    return [{ row: one.row, language: languageOf(stateText(spec, JSON.parse(one.row.state) as LayaState)) }];
+  });
+
+  // The index is taken as the batch lands, so judges answering side by side never share one.
+  const index = nextBatch;
+
+  nextBatch += 1;
+  freezeBatch(folder, sanitizerGate, index, frozen);
+
+  if (verdicts.length > 0) {
+    appendFileSync(judgedPath, `${verdicts.join("\n")}\n`);
+  }
+
+  standing.done = nextBatch;
+  writeProgress(folder, progress);
+  console.log(`묶음 ${nextBatch} (${judge.name}): 판정 ${verdicts.length}, ${frozen.length}행 굳음 (유해 ${harmful.size}).`);
+}
+
+// The batches go to whichever judge is free, one batch in hand a judge.
+async function judgeRows(rows: readonly UnjudgedRow[], size: number): Promise<void> {
+  const queue = [...judgeBatches(rows, size, answerCap)];
+
+  await Promise.all(judges.map(async (judge) => {
+    for (let batch = queue.shift(); batch !== undefined; batch = queue.shift()) {
+      await judgeBatch(judge, batch);
+    }
+  }));
 }
 
 if (!wantFreezeOnly) {
   // A resume seeded the rows a past run judged, so the pass takes only what is left — on a fresh run
   // that is every candidate, on a resume only the ones still unjudged.
-  await judgeRows(uniqueRows.filter((row) => !judged.has(row.id)), batchSize);
+  const pending = uniqueRows.filter((row) => !judged.has(row.id));
+
+  if (pending.length > 0) {
+    const raised = await roads[roadName]();
+
+    if (raised.judges.length === 0) {
+      console.error(`laya-downgrade: ${roadName} 길에서 판정할 곳이 없습니다. 먼저 텍스트 모델 앞단을 세우세요 (bun scripts/n5-llm-install.ts).`);
+      process.exit(1);
+    }
+
+    judges = raised.judges;
+    progress.model = raised.model;
+    progress.effort = raised.effort;
+  }
+
+  await judgeRows(pending, batchSize);
 
   for (let round = 0; round < retryRounds; round += 1) {
     const unread = uniqueRows.filter((row) => !judged.has(row.id));
@@ -378,7 +468,7 @@ const liveLines: string[] = [];
 
 for (const [key, ids] of keysByEvent) {
   const event = eventOf.get(key)!;
-  const outcome = eventOutcome(ids, harmful);
+  const outcome = eventOutcome(ids, harmful, adjacent);
 
   if (outcome === "harmful") {
     harmfulEvents += 1;

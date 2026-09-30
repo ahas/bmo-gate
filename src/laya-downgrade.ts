@@ -169,46 +169,55 @@ export function passages(text: string, budget: number = stateTokenBudget): strin
 }
 
 // A passage the judge is offered: the row it becomes, the downgrade it came from, and whether it
-// carries the vocabulary of an attack. Only attack-adjacent passages are judged and become rows: a
-// passage with none of the vocabulary is clean the same way the built-apart generator's ordinary
-// rows are, and adds nothing the judge has to settle.
+// carries the vocabulary of an attack. Every passage is judged, since the gate answers for far more
+// than a word list names; the vocabulary only tells an over-refusal from a cause never found, and a
+// clean passage worth keeping from ordinary text.
 export interface Candidate {
   row: UnjudgedRow;
   eventKey: string;
+  adjacent: boolean;
 }
 
-// The candidates one downgrade's window gives: every attack-adjacent passage of every text in it,
-// scrubbed of secrets and identifiers first as every real row is.
+// The candidates one downgrade's window gives: every passage of every text in it, scrubbed of
+// secrets and identifiers first as every real row is.
 export function candidatesOf(event: DowngradeEvent, texts: readonly SanitisedText[], shares: SplitShares): Candidate[] {
   const key = eventKey(event);
   const questions = sanitizerQuestions();
-  const out: Candidate[] = [];
 
-  for (const one of texts) {
-    for (const passage of passages(scrubText(one.text))) {
-      if (!mightTrigger(passage)) {
-        continue;
-      }
-
-      out.push({ row: unjudgedRowOf(sanitizerGate, passage, questions, shares), eventKey: key });
-    }
-  }
-
-  return out;
+  return texts.flatMap((one) => passages(scrubText(one.text)).map((passage) => ({
+    row: unjudgedRowOf(sanitizerGate, passage, questions, shares),
+    eventKey: key,
+    adjacent: mightTrigger(passage),
+  })));
 }
 
 // What one downgrade came to once its candidates were judged. Harmful where any candidate was judged
-// to carry intrusion material; over-refusal where it had candidates but none were harmful — the
-// vocabulary of an attack over a legitimate request; cause unknown where its window held no
-// attack-adjacent passage at all, so the causing text was never recovered.
+// harmful; over-refusal where none was but one carries the vocabulary of an attack — a legitimate
+// request that reads like one; cause unknown where neither holds, so the causing text was never
+// recovered.
 export type EventOutcome = "harmful" | "over-refusal" | "unknown";
 
-export function eventOutcome(candidateKeys: readonly string[], harmfulKeys: ReadonlySet<string>): EventOutcome {
+export function eventOutcome(
+  candidateKeys: readonly string[],
+  harmfulKeys: ReadonlySet<string>,
+  adjacentKeys: ReadonlySet<string>,
+): EventOutcome {
   if (candidateKeys.some((key) => harmfulKeys.has(key))) {
     return "harmful";
   }
 
-  return candidateKeys.length === 0 ? "unknown" : "over-refusal";
+  return candidateKeys.some((key) => adjacentKeys.has(key)) ? "over-refusal" : "unknown";
+}
+
+// What a judged passage is kept as. A harmful verdict is a DEFUSE row; a clean one is kept as CLEAN
+// only where it carries the vocabulary, since ordinary text adds nothing the gate's own build lacks
+// and, in a window whose cause was not found, may be the cause the judge missed.
+export function keptAs(harmful: boolean, adjacent: boolean): "DEFUSE" | "CLEAN" | null {
+  if (harmful) {
+    return "DEFUSE";
+  }
+
+  return adjacent ? "CLEAN" : null;
 }
 
 // The harvest's own reckoning, which is the whole of what it reports: how many downgrades it found,

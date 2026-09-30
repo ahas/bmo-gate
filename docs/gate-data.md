@@ -442,7 +442,11 @@ or that it was dangerous at all.
   harvest counts both the events and the turns.
 - **Every past downgrade is gathered and new ones accrue.** The harvest reads a copy of the archive
   from its first line to its last, so it reaches every downgrade the traces still hold; run again over
-  a newer copy, it reaches the ones since.
+  a newer copy, it reaches the ones since. It is run again on its own: the standing harvest run
+  `downgrade` is resumed every six hours over a fresh copy by the unit `bmo-gate-downgrade` and its
+  timer, so each pass judges only the passages the downgrades since have added and the ones a past
+  pass left unread, and freezes them into the same folder. A pass with nothing new judges nothing and
+  holds no card. It stops at the data: taking the folder into a training pass stays a separate step.
 - **The input is the text the model was actually handed.** What the safeguard read is the session's
   context after the sanitiser gate had already passed it — the messages, the documents a session
   reads, and the job prompt a worker is given, each recorded as it stood once the gate was through
@@ -453,25 +457,37 @@ or that it was dangerous at all.
   a text whose note names no room is kept by time alone, because concurrent sessions share the clock
   and the judge is what tells their material apart.
 - **Which text caused it is found by judging, never by a person reading it.** A downgrade fires on the
-  whole context, so the window holds more than the cause. Each passed-through text in the window is
-  offered to the gate's own question on a road, exactly as a real row is judged, and the road's
-  verdict is what localises the cause. No worker and no person reads the harmful body: it streams
-  past the judge and freezes into the run folder, and only counts, labels and paths are reported. What
+  whole context, so the window holds more than the cause. Every passed-through text in the window,
+  cut into passages of one Laya call, is offered to the gate's own question on a road, exactly as a
+  real row is judged, and the road's verdict is what localises the cause. No vocabulary decides which
+  passages are offered: the gate answers for fourteen risk categories and for injected orders that
+  name no attack at all, and a word list reads only a sliver of that, so a passage it skipped would
+  be a missed cause never looked at. No worker and no person reads the harmful body: it streams past
+  the judge and freezes into the run folder, and only counts, labels and paths are reported. What
   reaches the judge is scrubbed of secrets and identifiers first, as every real row is.
-- **The three outcomes are told apart by the verdict and the vocabulary.** For each downgrade:
-  - **Harmful** — at least one text in its window is judged to carry intrusion material. Those texts
-    become DEFUSE rows: material the gate was handed and let through.
-  - **Over-refusal** — no text is judged harmful, yet the window carries the vocabulary of an attack.
-    This is a legitimate request that reads like one — remote administration of the owner's own
-    machine, a tunnel that runs commands, and their kind — and the safeguard over-reacted. Its texts
-    become CLEAN rows, so the gate learns not to defuse the words alone.
-  - **Cause unknown** — no text is judged harmful and none carries attack vocabulary. The causing text
-    was not recovered, so the downgrade is set aside, counted and left out of the data rather than
-    guessed at.
+- **The three outcomes are told apart by the verdict and the vocabulary.** The vocabulary is the
+  gate's own list of attack words, the one its build counts clean rows against. For each downgrade:
+  - **Harmful** — at least one passage in its window is judged to carry what the gate's question asks
+    about. Those passages become DEFUSE rows: material the gate was handed and let through.
+  - **Over-refusal** — no passage is judged harmful, yet the window carries the vocabulary of an
+    attack. This is a legitimate request that reads like one — remote administration of the owner's
+    own machine, a tunnel that runs commands, work on the gate's own attack data, and their kind — and
+    the safeguard over-reacted. The passages that carry the vocabulary become CLEAN rows, so the gate
+    learns not to defuse the words alone.
+  - **Cause unknown** — no passage is judged harmful and none carries the vocabulary, or the window
+    holds no passed-through text at all. The causing text was not recovered, so the downgrade is set
+    aside, counted and left out of the data rather than guessed at.
+- **What is kept is the verdict and the vocabulary, passage by passage.** A passage judged harmful is
+  kept as DEFUSE and one judged clean that carries the vocabulary as CLEAN, whatever window it stood
+  in. A passage judged clean without the vocabulary is recorded as judged and not kept: it is ordinary
+  text the gate's own build already covers, and in a window whose cause was not found it may be the
+  cause the judge missed.
 - **The road is a home model, not the account.** The judging rides the same uncensored home text
   model the sanitiser's own build uses, because the account that would be asked to judge attack
-  material is the one whose safeguard produced these downgrades in the first place. The claude road
-  stands in for a judging pass while that account is shut.
+  material is the one whose safeguard produced these downgrades in the first place. On that road the
+  batches are spread over every text-model node whose front answers its health, one batch in hand a
+  node, and a node that does not answer is named and left out. The claude road stands in for a judging
+  pass while that account is shut.
 - **What it freezes is one gate's data like any other.** The harvest writes a sanitiser gate folder
   of its own — its three splits, the language sidecar, the meta — so the merge and the training read
   it as sanitiser rows beside the built-apart generator's, and a training pass takes it in as a
@@ -484,13 +500,15 @@ wanted for something else — and taken up later from where it stood, without re
 the account for anything it already settled.
 
 - **The saved data says what is already judged.** The frozen splits are the authoritative record of
-  the passages a past pass settled; a resume reads them, skips those passages, and judges only the
-  ones still unjudged — the ones the judge never read and the downgrades gathered since. A stop
-  leaves the splits standing, so what was judged is never lost to a stop.
+  the passages a past pass kept, and beside them the folder keeps a record of every verdict the judge
+  gave, kept or not, written as each batch lands; a resume reads both, skips those passages, and judges only
+  the ones still unjudged — the ones the judge never read and the downgrades gathered since. A stop
+  leaves both standing, so what was judged is never lost to a stop.
 - **A stop may leave the raw batches in a mix**, where a run wrote over part of an earlier run's
-  batches before it was stopped. So a resume rebuilds one consolidation batch from the saved splits
-  and clears the rest, leaving the frozen batches in step with the saved dataset before it judges
-  anything more.
+  batches before it was stopped, and a stop before a pass's end leaves kept rows frozen in batches the
+  splits never took in. So a resume rebuilds one consolidation batch from the saved splits and the
+  batches' rows the splits lack, each passage once, and clears the rest, leaving the frozen batches in
+  step with the saved dataset before it judges anything more.
 - **Stopping saves without judging.** The harvest can be told to freeze only — to settle the saved
   splits into a clean, consistent, resumable folder and report the tally so far — touching no road
   and holding no card, which is how a stop hands the card back at once.
@@ -818,6 +836,10 @@ flowchart TB
   the gates still being judged as well, each cut at the whole batches it has frozen so far, and
   writes nothing into any gate's folder; it is the same cut a training pass reads a judging run by
   (`docs/training.md`, 「Where the data comes from」).
+- `bun scripts/laya-downgrade.ts` — the downgrade harvest: with no run name it counts the downgrades
+  and the passages it would judge; given one, it judges them and freezes a sanitiser gate folder.
+  `--resume` skips what the folder already holds and `--freeze-only` settles the folder without
+  judging. The standing run is resumed by the unit `bmo-gate-downgrade`, never by a session.
 - `bun scripts/laya-audit.ts` — the figures per gate, and the verdict against the bars.
 - `bun scripts/laya-ledger.ts` — the ledger for a run.
 
