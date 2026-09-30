@@ -56,7 +56,8 @@ installer.
   - a context of 1,048,576 tokens, and past the trained 262,144 YaRN scaling by their ratio, 4, with
     the trained context as YaRN's original;
   - the K and V store in host memory (`--no-kv-offload`), in `q4_0`, and the attention over it
-    computed by the CPU (「The KV store in host memory」);
+    computed on the card for a prompt's batches and by the CPU for an answer's tokens (「The KV store
+    in host memory」, 「The attention over it」);
   - one slot, so the whole context is one request's and requests that overlap are answered one after
     another by the same engine;
   - MTP speculative decoding with two draft tokens (`--spec-type draft-mtp`), which
@@ -71,13 +72,15 @@ installer.
   the file fits the card; a larger file that does not fit is served by raising it until the engine
   starts with about 500 MiB of the card free: an engine that starts with 409 MiB free fails its first
   request for want of card memory, and one with 511 MiB free answers.
-- **Prompts:** the weights' part computed on the card, the attention's by the CPU.
+- **Prompts:** computed on the card whole, the weights' part and the attention's, for as long as the
+  card has room for the store the attention reads (「The attention over it」); past that, the attention
+  of the prompt's remaining batches is computed by the CPU.
 
 ### The KV store in host memory
 
 - **Why in RAM:** the KV store of 1,048,576 tokens is 18 GiB in `q4_0`, which no card of 12 GiB
-  holds beside the model; in RAM it costs only the attention's own work, done by the CPU over the
-  store where it lies.
+  holds beside the model; in RAM it costs an answer's attention done by the CPU over the store where
+  it lies, and a prompt's the copy of each block's store to the card (「The attention over it」).
 - **Why `q4_0`:** a node has 62 GiB. While an answer is made it holds the front's locked model
   (10.8 GiB), the voice server where one stands (about 10.5 GB), the running engine with its KV store
   and the rest of the system, which leaves 13.0 GB available on n5 and 23.7 GB on n2. `q8_0` would
@@ -86,10 +89,11 @@ installer.
 - **The patch the build carries,** `n5-llm/llama-nkvo.patch`, applied by the node setup on the pinned
   commit, since upstream's `--no-kv-offload` does not do this alone on a hybrid model:
   - upstream leaves the flash attention itself to the scheduler, which runs it on the card and copies
-    the part of the store it reads there for every token. Sized for the full context that asks
-    6.35 GiB of the card at start, and the engine fails; the patch runs flash attention on the CPU
-    whenever the KV store is in host memory, so only the query and the attention's output cross the
-    link;
+    the part of the store it reads there for every batch. The engine reserves the card's room at
+    start for its worst case, a batch over the store of the full context, which asks 6.35 GiB, and
+    the engine fails; the patch leaves the attention to the scheduler only for a prompt's batch the
+    card has room for and runs it on the CPU otherwise, so the worst case the start reserves for is
+    computed by the CPU (「The attention over it」);
   - upstream keeps the Gated DeltaNet blocks' recurrent state, 449 MiB, in host memory beside the KV
     store, copied to the card and back for every token; the patch keeps it on the card.
   Upstream alone does not start at the full context at all, and where it does start, the patch
@@ -99,6 +103,43 @@ installer.
   a card short of that much, at less than half the speed.
 - **Thinking:** the model thinks before it answers unless the request's
   `chat_template_kwargs` carries `enable_thinking: false`, which the embedded chat template reads.
+
+### The attention over it
+
+- **On the card:** a batch of at least 32 tokens, the bar llama.cpp's device backend itself sets for
+  carrying host data to the card (`GGML_OP_OFFLOAD_MIN_BATCH`, left unset), while the card has room
+  for it. A prompt is computed in batches of 512, so every batch of a prompt but a short last one has
+  its attention on the card for as long as the room lasts, and a prompt of 32,652 tokens is read at
+  about 800 t/s instead of the CPU's 8 to 19 (「Prompts and the first token」).
+- **How the store gets there:** the scheduler copies a full attention block's store, up to the
+  batch's last cell, into the card's compute buffer when that block's attention comes, the card
+  turns it into the `f16` its attention reads, and the next block's store takes the same room. So
+  the card holds one block's store of the batch's span at a time and never the whole store; the
+  store itself stays in RAM, where the batch's own tokens are written.
+- **The room:** as each batch's graph is built, the engine asks the card how much memory it has free
+  and weighs what that batch's store adds to the room its compute buffer already holds: the store's
+  copy, its `f16` form and the batch's mask, the main context's and the MTP head's each against its
+  own buffer. It goes to the card when that fits the free memory less 64 MiB kept for the card's own
+  working buffers (`LLAMA_NKVO_ATTN_KEEP_MIB` in the engine's environment, which a drop-in of the
+  front's unit sets, since the engine inherits the front's). A card that still refuses the larger
+  buffer has that batch built again with its attention on the CPU, and every longer store after it
+  in the same engine goes to the CPU too, so a card short of room slows a prompt rather than failing
+  it.
+- **How far the room reaches:** with nothing else on the card, a prompt's first 39,000 tokens or so;
+  beside a CUDA context the size of the voice server's (223 MiB), about 18,000 (「Prompts and the
+  first token」).
+- **By the CPU:** an answer's tokens (one token, or the one and its MTP drafts), the one token of a
+  way back to a saved prompt, a short last batch, and every batch over a store the card has no room
+  for. A prompt that runs past the room has its batches from there on computed at the CPU's pace.
+- **Why the room and not the whole context in chunks:** beside the model and its buffers the card
+  has about 150 to 370 MiB free, and one block's store of the full context is 1.1 GiB in `q4_0` and
+  4 GiB in the `f16` the card reads. Computing one attention over the store in chunks and joining
+  them needs each chunk's softmax sums, which llama.cpp's flash attention does not give out, so the
+  store a batch reads on the card is what the room holds.
+- **When the room is taken:** not at the engine's start, whose worst case is a batch over the full
+  context and computed by the CPU. The first prompt batch the card computes grows the engine's
+  compute buffers to what it needs, each longer store grows them again, and they keep their largest
+  size until the engine stops.
 
 ## How it holds the card
 
@@ -403,6 +444,19 @@ CPU.
 | A prompt of 25 tokens | 0.2 s (105–121 t/s) | 0.2 s | 1.8 s (13.6 t/s, computed by the CPU) |
 | A prompt of 37 to 63 tokens | not measured | 0.2 s | 1.1 s |
 | A prompt of 5,476 tokens | not measured | 5.6 s (974 t/s) | 12.1 s (451 t/s) |
+| A prompt of 11,707 tokens, beside a CUDA context of 223 MiB | 13.0 s (900 t/s) | not measured | not measured |
+| A prompt of 32,652 tokens | 41.6 s (785 t/s) | not measured | not measured |
+
+- **The prompts of thousands of tokens** on the served IQ3_XXS were run by hand on n5 on 1 October
+  2026 with its attention on the card; the context of 223 MiB stood in for the voice server's. Each
+  asked which colour and door stood on one of its numbered lines, and each answer was right.
+- **Past the card's room** a prompt goes on at the CPU's pace: a prompt of about 48,600 tokens was
+  read at about 800 t/s to its 38,912th token and then at 2.6 t/s; beside the 223 MiB context the
+  change came between its 18,432nd and 20,480th token, at 8 t/s after it. With the free memory's
+  check set aside, the card refused a buffer at the 24,576th token beside that context, and the
+  engine went on with the batch on the CPU.
+- **An answer after a long prompt** is made with its attention by the CPU over the whole store: 1.9 t/s
+  after 32,652 tokens, against 35 t/s after 26.
 
 - **Through the front, from main-host,** the first token of IQ2_XS comes 2.1 to 2.4 seconds after the
   request, the engine's start included, and the rest at 46 to 48 t/s for a short answer on every
@@ -416,15 +470,17 @@ CPU.
 
 Through the front on n2 on 1 October 2026, at temperature 0 with thinking off, the served setting.
 
-- **A conversation of 21,664 tokens,** a long system prompt and one question, computed from its first
-  token: its first token came 2,649 seconds after the request, the prompt at 8.2 t/s.
-- **Its next request,** the answer and one more question on top, 46 tokens new: the saved 21,661
-  tokens were loaded and the first token came 22.9 seconds after the request: the engine's start
-  took 8.4 seconds, the load 0.09 seconds and the 46 tokens 12.4 seconds.
-- **A save** took 254 to 267 ms for 557 MB, and **a load** 36 to 87 ms, both from and to the page
-  cache. **Going back** to the prompt cost the engine one token, 0.16 seconds at 3,125 tokens.
+- **A conversation of 32,652 tokens,** numbered lines and one question about one of them, computed
+  from its first token: the engine's start took 8.3 seconds and the prompt 42.0 seconds, at
+  778 t/s with its attention on the card.
+- **Its next request,** the answer and one more question on top, 41 tokens new: the saved 32,649
+  tokens were loaded in 0.14 seconds after the engine's start of 8.2 seconds, and the 41 tokens took
+  17.1 seconds.
+- **The request after that,** 999 tokens new on the 32,687 saved: the 999 tokens took 11.9 seconds.
+- **A save** took 254 to 337 ms for 557 to 760 MB, and **a load** 36 to 136 ms, both from and to the
+  page cache. **Going back** to the prompt cost the engine one token, 0.16 seconds at 3,125 tokens.
 - **A file's size** is about 157 MB of recurrent state and 18.5 KB a token: 215 MB for 3,125 tokens and
-  557 MB for 21,661, so about 19 GB for the whole context.
+  760 MB for 32,649, so about 19 GB for the whole context.
 - **A load holds the whole state:** at 3,128 tokens, the answer after a load was the one computed
   afresh, and the MTP head's drafts were accepted 8 of 8.
 - **A prompt that parts from the file** at its last user message, the same system prompt and another
@@ -439,6 +495,11 @@ Through the front on n2 on 1 October 2026, at temperature 0 with thinking off, t
   n5, the voice server's context included, which leaves 581 MiB free, and 11,477 MiB on n2. IQ2_XS
   with its KV store on the card at 32,768 holds 11,143 to 11,183 MiB, and Q4_K_M split at 42 blocks
   11,565 to 11,607 MiB.
+- **While a prompt is read with its attention on the card,** the card's use grows with the store it
+  reads, up to the room there is: 11,759 MiB at 32,652 tokens with nothing else on the card, 11,811
+  MiB at the 38,912 tokens a prompt of about 48,600 reached there, and 11,811 MiB beside the 223 MiB
+  context, that context included. The compute buffers grow from 122 MiB each to 276 MiB (the main
+  context's) and 228 MiB (the MTP head's) at 32,652 tokens.
 - **Between requests** no engine process is on the card, and the card holds only the voice server's
   context; the front itself never opens the card.
 - **The front locks 11.6 GB** (the whole file), and its resident set is the same. A running engine
