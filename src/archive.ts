@@ -184,3 +184,98 @@ export function sentMessages(db: Database, bmoId: number): SentMessage[] {
 
   return sent;
 }
+
+// The traces a downgrade leaves, which the harvest reads to find where the safeguard balked
+// (docs/gate-data.md, 「The downgrade harvest」). The bot keeps no per-turn downgrade table: what
+// stands is the notice it owes the room, and the model a run's spend says actually answered.
+
+// A downgrade the bot recorded a notice for, in the room it happened in and the moment it was owed.
+// The notice's kind carries the room's own number, so a downgrade is read from the kind rather than
+// from the notice's words.
+export interface DowngradeNotice {
+  chatId: number;
+  at: number;
+}
+
+export function downgradeNotices(db: Database): DowngradeNotice[] {
+  return db.query(`SELECT chat_id AS chatId, created_at AS at FROM instructions
+    WHERE kind LIKE 'downgrade:%' ORDER BY created_at`).all() as DowngradeNotice[];
+}
+
+// Every model a run was launched on, read from the executions the bot records. A model that stands
+// here is a model the bot chose to run; a model that never stands here but still answers is a
+// safeguard's fallback (「The downgrade harvest」).
+export function launchedModels(db: Database): Set<string> {
+  const rows = db.query("SELECT body FROM agent_executions").all() as { body: string }[];
+  const models = new Set<string>();
+
+  for (const row of rows) {
+    try {
+      const body = JSON.parse(row.body) as { model?: unknown };
+
+      if (typeof body.model === "string" && body.model !== "") {
+        models.add(body.model);
+      }
+    } catch {
+      // A body that does not read back names no model, and is left out rather than guessed at.
+    }
+  }
+
+  return models;
+}
+
+// Every model that answered anything, whatever road or account it rode. Set beside the launched
+// models, a name that answers but was never launched is a safeguard's fallback (「The downgrade
+// harvest」).
+export function answeredModels(db: Database): string[] {
+  return (db.query("SELECT DISTINCT model FROM usage_runs WHERE model <> '' ORDER BY model").all() as
+    { model: string }[]).map((row) => row.model);
+}
+
+// A turn's spend: the run it belongs to, the model that answered it, and when. A run key of the
+// shape `chat:<room>:…` carries the room's number; a run with no such key belongs to no room and its
+// room is null.
+export interface SpendTurn {
+  run: string;
+  model: string;
+  chatId: number | null;
+  at: number;
+}
+
+export function chatIdOfRun(run: string): number | null {
+  const match = /^chat:(-?\d+):/.exec(run) ?? /^chat:(-?\d+)$/.exec(run);
+
+  return match === null ? null : Number(match[1]);
+}
+
+// Every turn answered by one of the named models, oldest first. The harvest hands it the fallback
+// models it found, and what comes back is the downgraded turns.
+export function turnsAnsweredBy(db: Database, models: readonly string[]): SpendTurn[] {
+  if (models.length === 0) {
+    return [];
+  }
+
+  const marks = models.map(() => "?").join(", ");
+  const rows = db.query(`SELECT run, model, MIN(at) AS at FROM usage_runs
+    WHERE run IS NOT NULL AND run <> '' AND model IN (${marks}) GROUP BY run, model ORDER BY at`)
+    .all(...models) as { run: string; model: string; at: number }[];
+
+  return rows.map((row) => ({ ...row, chatId: chatIdOfRun(row.run) }));
+}
+
+// A text the sanitiser gate passed, as it stood once the gate was through with it: the cleaned text,
+// whether the gate changed anything, the plain note of where it came from, and when it was judged.
+// The harvest gathers these in the window before a downgrade (「The downgrade harvest」).
+export interface SanitisedText {
+  text: string;
+  changed: boolean;
+  boundary: string;
+  at: number;
+}
+
+export function sanitisedBetween(db: Database, from: number, to: number): SanitisedText[] {
+  return (db.query(`SELECT text, changed, at AS boundary, judged_at AS at FROM sanitised_texts
+    WHERE judged_at BETWEEN ? AND ? ORDER BY judged_at`).all(from, to) as
+    { text: string; changed: number; boundary: string; at: number }[])
+    .map((row) => ({ text: row.text, changed: row.changed !== 0, boundary: row.boundary, at: row.at }));
+}

@@ -422,6 +422,82 @@ of the roster driver's default so its data is never made two ways at once.
   where the gate misses or over-refuses one category at a time; the training reads the combined splits,
   in which the categories are mixed evenly, the test split included.
 
+## The downgrade harvest
+
+The sanitiser's own build makes its harmful rows by construction. Its second source is the opposite:
+real material the gate already missed, gathered from the account safeguard's own reactions. When the
+safeguard reads a session's context and balks, it puts the run on a lesser model — a downgrade — and
+that reaction is a standing answer key for what the gate should have caught. The harvest turns each
+downgrade into sanitiser rows whose label is not fixed by construction but judged on a road, because
+a downgrade is a signal that something in the context was dangerous, not proof of which text it was
+or that it was dangerous at all.
+
+- **A downgrade is read from two durable traces.** The bot keeps, for every downgrade, a notice it
+  owes the room the downgrade happened in, stamped with that room and the moment. Beside it, a run's
+  spend records the model that actually answered, and a model that only ever answers and is never the
+  one a run was launched on is a safeguard's fallback; a turn answered by such a model is a downgraded
+  turn. The fallback models are read from the spend itself rather than named here, so a change of
+  which model the safeguard falls to needs no change in the harvest. One downgrade turns a session to
+  the fallback until it is woken fresh, so one notice stands for many fallback-answered turns; the
+  harvest counts both the events and the turns.
+- **Every past downgrade is gathered and new ones accrue.** The harvest reads a copy of the archive
+  from its first line to its last, so it reaches every downgrade the traces still hold; run again over
+  a newer copy, it reaches the ones since.
+- **The input is the text the model was actually handed.** What the safeguard read is the session's
+  context after the sanitiser gate had already passed it — the messages, the documents a session
+  reads, and the job prompt a worker is given, each recorded as it stood once the gate was through
+  with it. The harvest gathers the passed-through texts standing in the window before a downgrade,
+  which is the material the safeguard balked at.
+- **The window is matched to the room where it can be.** A passed-through text carries a plain note of
+  where it came from, and where that note names the room, only the downgraded room's texts are kept;
+  a text whose note names no room is kept by time alone, because concurrent sessions share the clock
+  and the judge is what tells their material apart.
+- **Which text caused it is found by judging, never by a person reading it.** A downgrade fires on the
+  whole context, so the window holds more than the cause. Each passed-through text in the window is
+  offered to the gate's own question on a road, exactly as a real row is judged, and the road's
+  verdict is what localises the cause. No worker and no person reads the harmful body: it streams
+  past the judge and freezes into the run folder, and only counts, labels and paths are reported. What
+  reaches the judge is scrubbed of secrets and identifiers first, as every real row is.
+- **The three outcomes are told apart by the verdict and the vocabulary.** For each downgrade:
+  - **Harmful** — at least one text in its window is judged to carry intrusion material. Those texts
+    become DEFUSE rows: material the gate was handed and let through.
+  - **Over-refusal** — no text is judged harmful, yet the window carries the vocabulary of an attack.
+    This is a legitimate request that reads like one — remote administration of the owner's own
+    machine, a tunnel that runs commands, and their kind — and the safeguard over-reacted. Its texts
+    become CLEAN rows, so the gate learns not to defuse the words alone.
+  - **Cause unknown** — no text is judged harmful and none carries attack vocabulary. The causing text
+    was not recovered, so the downgrade is set aside, counted and left out of the data rather than
+    guessed at.
+- **The road is a home model, not the account.** The judging rides the same uncensored home text
+  model the sanitiser's own build uses, because the account that would be asked to judge attack
+  material is the one whose safeguard produced these downgrades in the first place. The claude road
+  stands in for a judging pass while that account is shut.
+- **What it freezes is one gate's data like any other.** The harvest writes a sanitiser gate folder
+  of its own — its three splits, the language sidecar, the meta — so the merge and the training read
+  it as sanitiser rows beside the built-apart generator's, and a training pass takes it in as a
+  top-up of the gate's real, missed material without touching the test split of the main data.
+
+### Resuming the harvest
+
+The home model judges slowly and shares its card, so a harvest is stopped part way — when the card is
+wanted for something else — and taken up later from where it stood, without re-judging or re-asking
+the account for anything it already settled.
+
+- **The saved data says what is already judged.** The frozen splits are the authoritative record of
+  the passages a past pass settled; a resume reads them, skips those passages, and judges only the
+  ones still unjudged — the ones the judge never read and the downgrades gathered since. A stop
+  leaves the splits standing, so what was judged is never lost to a stop.
+- **A stop may leave the raw batches in a mix**, where a run wrote over part of an earlier run's
+  batches before it was stopped. So a resume rebuilds one consolidation batch from the saved splits
+  and clears the rest, leaving the frozen batches in step with the saved dataset before it judges
+  anything more.
+- **Stopping saves without judging.** The harvest can be told to freeze only — to settle the saved
+  splits into a clean, consistent, resumable folder and report the tally so far — touching no road
+  and holding no card, which is how a stop hands the card back at once.
+- **A busy card stops a batch, not the run.** The judging road waits out a busy card and asks again a
+  bounded number of times; a batch that still fails is left for a later round or counted unread, and
+  the batches already frozen stand. A passage the judge never read is counted, never taken for clean.
+
 ## A run
 
 A run is a name, a set of gates, a number of rows per gate and a batch size.
