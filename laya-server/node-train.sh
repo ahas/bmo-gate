@@ -10,11 +10,17 @@
 # Every run is detached: the hub stops a command it is streaming and the stop reaches the whole
 # process group, so a training that takes longer than that would die with the call that started it.
 # What survives is `setsid nohup … &` with its output in a log the next call reads.
+#
+# Every run holds the node's shared card lock from before it touches the card until it ends, waiting
+# for it where another service has it (docs/training.md, 「One gate on one node」). The lock is taken
+# on a descriptor the run itself inherits, so it goes with the run's last process and nothing else.
 set -uo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PATH="$PATH:$HOME/.local/bin:/usr/local/cuda/bin"
 python="$here/.venv/bin/python"
+lock="$HOME/.gpu.lock"
+held='exec 9>>"$0"; flock -n 9 || { echo "waiting for the card lock $0"; flock 9; }; exec "$@"'
 
 verb="${1:-}"
 shift || true
@@ -24,7 +30,7 @@ case "$verb" in
     data="$1"; out="$2"; log="$3"; shift 3
     mkdir -p "$(dirname "$log")"
     cd "$here" || exit 1
-    setsid nohup "$python" finetune.py --data "$data" --out "$out" "$@" > "$log" 2>&1 < /dev/null &
+    setsid nohup bash -c "$held" "$lock" "$python" finetune.py --data "$data" --out "$out" "$@" > "$log" 2>&1 < /dev/null &
     echo "launched pid=$!"
     ;;
   resume)
@@ -33,14 +39,14 @@ case "$verb" in
     cd "$here" || exit 1
     # The log is appended to rather than replaced, so what the killed run said stays readable beside
     # what the resumed one says.
-    setsid nohup "$python" finetune.py --resume "$out" --data "$data" "$@" >> "$log" 2>&1 < /dev/null &
+    setsid nohup bash -c "$held" "$lock" "$python" finetune.py --resume "$out" --data "$data" "$@" >> "$log" 2>&1 < /dev/null &
     echo "resumed pid=$!"
     ;;
   calibrate)
     out="$1"; data="$2"; log="$3"; shift 3
     mkdir -p "$(dirname "$log")"
     cd "$here" || exit 1
-    setsid nohup "$python" calibrate.py --model "$out" --data "$data" --write "$@" > "$log" 2>&1 < /dev/null &
+    setsid nohup bash -c "$held" "$lock" "$python" calibrate.py --model "$out" --data "$data" --write "$@" > "$log" 2>&1 < /dev/null &
     echo "calibrating pid=$!"
     ;;
   state)

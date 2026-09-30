@@ -138,6 +138,13 @@ picked up rather than begun again.
    and another training can take it in that gap. A card without room for a gate is waited on, and the wait
    is a run that does not move, so the hour below bounds it; a node that does not answer the reading
    is out of reach.
+   - **The node's card lock is held through every use.** The training, a resume and the calibration
+     each take the node's shared card lock (`docs/llm-server.md`, 「The shared card lock」) before
+     anything goes on the card and hold it until the process ends, waiting for it where another
+     service has it — the text model answering a request, a voice line. The free memory reading
+     alone cannot stop a service that follows the lock from putting its model on the card after the
+     gate has started. A launch waiting for the lock says so in its log, and that wait is a run that
+     does not move too.
 4. **A run is waited on while it moves.** The largest gates train for hours, so no clock bounds the
    wait; a run whose log has grown by no line, whose step has not moved and which has not passed from
    training to calibrating for an hour is given up on with the log's last line.

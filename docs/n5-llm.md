@@ -115,8 +115,9 @@ flowchart TD
   text model's requests.
 - **Laya's training passes** use n2 to n5 (`docs/training.md`). A pass reads a card's free memory
   right before each gate and takes a card with room for one, which a node's card has whenever no
-  request is in hand; a gate trains for up to hours and does not take the card lock. While one trains
-  on a node, every request to that node's front is answered 503.
+  request is in hand; a gate trains for up to hours and holds the card lock the whole time, having
+  waited for a request in hand to end. While one trains on a node, every request to that node's
+  front waits its sixty seconds and is answered 503.
 
 ## The front
 
