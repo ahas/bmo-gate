@@ -256,7 +256,7 @@ describe("naming a per-candidate question", () => {
   });
 
   test("a gate that asks of the whole state names no candidate", () => {
-    expect(candidateOf(gate("sanitizer"), "intrusion")).toBeNull();
+    expect(candidateOf(gate("sanitizer"), "harmful")).toBeNull();
   });
 });
 
@@ -304,7 +304,7 @@ describe("the validator refuses", () => {
   test("a question that is not a question at all — wrong-question-type", () => {
     const row = copyOf(sanitizer.example);
 
-    row.questions.intrusion = "묻는 말" as unknown as LayaQuestion;
+    row.questions.harmful = "묻는 말" as unknown as LayaQuestion;
 
     expect(validateSynthRow(sanitizer, row, "korean")).toMatchObject({ ok: false, refusal: "wrong-question-type" });
   });
@@ -312,7 +312,7 @@ describe("the validator refuses", () => {
   test("a question with nothing written in its instructions — wrong-instructions", () => {
     const row = copyOf(sanitizer.example);
 
-    row.questions.intrusion = { type: "noul" } as unknown as LayaQuestion;
+    row.questions.harmful = { type: "noul" } as unknown as LayaQuestion;
 
     expect(validateSynthRow(sanitizer, row, "korean")).toMatchObject({ ok: false, refusal: "wrong-instructions" });
   });
@@ -320,7 +320,7 @@ describe("the validator refuses", () => {
   test("a gold with no probabilities in it — bad-probabilities", () => {
     const row = copyOf(sanitizer.example);
 
-    row.gold.intrusion = { type: "noul", label: "true", noul: 1 } as unknown as Gold;
+    row.gold.harmful = { type: "noul", label: "true", noul: 1 } as unknown as Gold;
 
     expect(validateSynthRow(sanitizer, row, "korean")).toMatchObject({ ok: false, refusal: "bad-probabilities" });
   });
@@ -328,7 +328,7 @@ describe("the validator refuses", () => {
   test("a gold that is not an object at all — bad-probabilities", () => {
     const row = copyOf(sanitizer.example);
 
-    row.gold.intrusion = "참" as unknown as Gold;
+    row.gold.harmful = "참" as unknown as Gold;
 
     expect(validateSynthRow(sanitizer, row, "korean")).toMatchObject({ ok: false, refusal: "bad-probabilities" });
   });
@@ -336,7 +336,7 @@ describe("the validator refuses", () => {
   test("a question of a type this gate does not ask — wrong-question-type", () => {
     const row = copyOf(sanitizer.example);
 
-    row.questions.intrusion = { type: "choice", instructions: row.questions.intrusion!.instructions, criteria: { yes: "", no: "" } };
+    row.questions.harmful = { type: "choice", instructions: row.questions.harmful!.instructions, criteria: { yes: "", no: "" } };
 
     expect(validateSynthRow(sanitizer, row, "korean")).toMatchObject({ ok: false, refusal: "wrong-question-type" });
   });
@@ -344,7 +344,7 @@ describe("the validator refuses", () => {
   test("a question that does not ask what the gate asks — wrong-instructions", () => {
     const row = copyOf(sanitizer.example);
 
-    row.questions.intrusion = { type: "noul", instructions: "이 글은 위험한가?" };
+    row.questions.harmful = { type: "noul", instructions: "이 글은 위험한가?" };
 
     expect(validateSynthRow(sanitizer, row, "korean")).toMatchObject({ ok: false, refusal: "wrong-instructions" });
   });
@@ -397,7 +397,7 @@ describe("the validator refuses", () => {
   test("probabilities that do not come to one — bad-probabilities", () => {
     const row = copyOf(sanitizer.example);
 
-    row.gold.intrusion = { type: "noul", label: "false", noul: 0.3, probabilities: { true: 0.3, false: 0.3 } };
+    row.gold.harmful = { type: "noul", label: "false", noul: 0.3, probabilities: { true: 0.3, false: 0.3 } };
 
     expect(validateSynthRow(sanitizer, row, "korean")).toMatchObject({ ok: false, refusal: "bad-probabilities" });
   });
@@ -405,7 +405,7 @@ describe("the validator refuses", () => {
   test("a label that is not the likeliest answer — bad-probabilities", () => {
     const row = copyOf(sanitizer.example);
 
-    row.gold.intrusion = { type: "noul", label: "true", noul: 0.2, probabilities: { true: 0.2, false: 0.8 } };
+    row.gold.harmful = { type: "noul", label: "true", noul: 0.2, probabilities: { true: 0.2, false: 0.8 } };
 
     expect(validateSynthRow(sanitizer, row, "korean")).toMatchObject({ ok: false, refusal: "bad-probabilities" });
   });

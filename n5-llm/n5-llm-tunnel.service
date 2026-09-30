@@ -5,12 +5,12 @@ After=network-online.target n5-llm-front.service
 [Service]
 Type=simple
 EnvironmentFile=%h/.config/n5-llm/env
-# One remote forward, main-host's loopback 18020 to the front's 8020, and nothing else. The ssh rides
-# inside a WebSocket to the tunnel's door, since this network lets only HTTPS out; ws-dial.py carries
-# it with LLM_KEY from the settings file as its bearer. The host key is checked against the pinned
-# file under the name main-host and never trusted on first use; a forward that cannot be made ends the
-# connection so the unit makes it again.
-ExecStart=/usr/bin/ssh -N -i %h/.config/n5-llm/tunnel_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o UserKnownHostsFile=%h/.config/n5-llm/known_hosts -o StrictHostKeyChecking=yes -o HostKeyAlias=main-host "-oProxyCommand=%h/n5-llm/.venv/bin/python %h/n5-llm/ws-dial.py wss://llm-tunnel.ahas.io/" -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -R 127.0.0.1:18020:127.0.0.1:8020 ahas@main-host
+# One remote forward, the node's own loopback port on main-host (LISTEN from the settings file) to the
+# front's 8020, and nothing else. The ssh rides inside a WebSocket to the tunnel's door, since this
+# network lets only HTTPS out; ws-dial.py carries it with LLM_KEY from the settings file as its bearer.
+# The host key is checked against the pinned file under the name main-host and never trusted on first
+# use; a forward that cannot be made ends the connection so the unit makes it again.
+ExecStart=/usr/bin/ssh -N -i %h/.config/n5-llm/tunnel_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o UserKnownHostsFile=%h/.config/n5-llm/known_hosts -o StrictHostKeyChecking=yes -o HostKeyAlias=main-host "-oProxyCommand=%h/n5-llm/.venv/bin/python %h/n5-llm/ws-dial.py wss://llm-tunnel.ahas.io/" -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -R ${LISTEN}:127.0.0.1:8020 ahas@main-host
 Restart=always
 RestartSec=10
 

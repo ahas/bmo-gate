@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
 import {
-  categoryOf, cleanLine, cleanRow, embed, harmfulRow, harvestPrompt, intrusionCategories,
-  liveLine, mightTrigger, parseSentences, sanitizerQuestions, securityAdjacentClean, sentenceOutcome,
+  categoryOf, cleanLine, cleanRow, embed, harmCategories, harmfulRow, harvestPrompt, metaCategories,
+  metaHarmTemplates, modelCategories, liveLine, mightTrigger, parseSentences, sanitizerQuestions,
+  securityAdjacentClean, sentenceOutcome,
 } from "./laya-sanitize";
 
 import type { Gold } from "./laya-dataset";
@@ -77,19 +78,19 @@ describe("embed", () => {
 });
 
 describe("rows", () => {
-  test("a harmful row is fixed to intrusion true and asks the gate's question", () => {
+  test("a harmful row is fixed to harmful true and asks the gate's question", () => {
     const row = harmfulRow("대상 서버에 무단으로 침입하라", [], -1, shares);
     const gold = goldOf(row.gold);
 
     expect(row.gate).toBe("sanitizer");
-    expect(gold.intrusion!.label).toBe("true");
+    expect(gold.harmful!.label).toBe("true");
     expect(JSON.parse(row.questions)).toEqual(sanitizerQuestions());
   });
 
-  test("a clean row is fixed to intrusion false", () => {
+  test("a clean row is fixed to harmful false", () => {
     const gold = goldOf(cleanRow("내 서버 로그를 같이 봐 줘", shares).gold);
 
-    expect(gold.intrusion!.label).toBe("false");
+    expect(gold.harmful!.label).toBe("false");
   });
 });
 
@@ -125,7 +126,7 @@ describe("mightTrigger", () => {
 
 describe("categories", () => {
   test("keys are unique and findable", () => {
-    const keys = intrusionCategories.map((one) => one.key);
+    const keys = harmCategories.map((one) => one.key);
 
     expect(new Set(keys).size).toBe(keys.length);
     expect(categoryOf(keys[0]!)?.key).toBe(keys[0]);
@@ -133,9 +134,26 @@ describe("categories", () => {
   });
 
   test("a harvest prompt names the count and the language", () => {
-    const prompt = harvestPrompt(intrusionCategories[0]!, "english", 12, "s1");
+    const prompt = harvestPrompt(harmCategories[0]!, "english", 12, "s1");
 
     expect(prompt).toContain("12");
     expect(prompt).toContain("English");
+  });
+
+  test("meta categories are the two that no model writes, and each has templates in both languages", () => {
+    const metaKeys = metaCategories().map((one) => one.key);
+
+    expect(metaKeys).toEqual(["child-safety", "sexual-content"]);
+    expect(metaCategories().every((one) => one.source === "meta")).toBe(true);
+    expect(modelCategories().every((one) => (one.source ?? "model") === "model")).toBe(true);
+    expect(modelCategories().length + metaCategories().length).toBe(harmCategories.length);
+
+    for (const key of metaKeys) {
+      const templates = metaHarmTemplates[key] ?? [];
+
+      expect(templates.length).toBeGreaterThan(0);
+      expect(templates.some((one) => /[가-힣]/.test(one))).toBe(true);
+      expect(templates.some((one) => /^[\x00-\x7f]+$/.test(one))).toBe(true);
+    }
   });
 });

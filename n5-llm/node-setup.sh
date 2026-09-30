@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# The n5 text model's environment, stood up from what is already there (docs/n5-llm.md). It is run
-# detached with its output in setup.log, because building llama.cpp and fetching the model take longer
-# than the hub holds a streamed command open, and it says `N5-LLM-SETUP-DONE ok` or
-# `N5-LLM-SETUP-DONE failed:<step>` on its last line, which is what the caller waits for.
+# The text model's environment on a training node, stood up from what is already there
+# (docs/n5-llm.md). The same setup runs on n2 to n5, since the nodes carry the same card; the model,
+# the engine commit and the CUDA architecture are one for all of them. It is run detached with its
+# output in setup.log, because building llama.cpp and fetching the model take longer than the hub
+# holds a streamed command open, and it says `N5-LLM-SETUP-DONE ok` or `N5-LLM-SETUP-DONE
+# failed:<step>` on its last line, which is what the caller waits for.
 #
 # It is idempotent: what is already right is left alone and said so. It installs into the account
 # alone — no sudo and nothing written to the account's shell profile. The memlock limit it checks is
@@ -55,6 +57,12 @@ if [ "$standing" = "$LLAMA_COMMIT" ] && [ -x "$LLAMA_DIR/build/bin/llama-server"
   step "llama.cpp already built at $LLAMA_COMMIT"
 else
   step "building llama.cpp at $LLAMA_COMMIT"
+  # cmake and ninja on the account's PATH and nvcc in the CUDA path are host packages installed by
+  # hand, like the memlock limit (docs/n5-llm.md). Checked here so a node without them says which is
+  # missing rather than failing at the first command that needs it.
+  command -v cmake >/dev/null 2>&1 || fail cmake-missing
+  command -v ninja >/dev/null 2>&1 || fail ninja-missing
+  { [ -x "$CUDA_BIN/nvcc" ] || command -v nvcc >/dev/null 2>&1; } || fail nvcc-missing
   mkdir -p "$LLAMA_DIR" || fail engine-dir
   git -C "$LLAMA_DIR" init -q || fail engine-git
   git -C "$LLAMA_DIR" fetch -q --depth 1 "$LLAMA_REPO" "$LLAMA_COMMIT" || fail engine-fetch

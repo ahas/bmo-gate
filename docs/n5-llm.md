@@ -1,9 +1,15 @@
-# The text model on n5
+# The text model on n2 to n5
 
-A general text model served on n5 behind an OpenAI-compatible front, on a card it holds only while a
-request is being answered. It is no part of Laya and nothing asks it on its own: BMO has no provider
-and no gate pointed at it, and connecting one is 하스's decision. This repository holds it whole —
-the front, the units, the node setup and the installer.
+A general text model served behind an OpenAI-compatible front, on a card it holds only while a request
+is being answered. It first stood on n5 alone; the same setup now stands on each of the training nodes
+n2 to n5, one front a node, each reached from main-host through its own tunnel door on its own loopback
+port. The nodes carry the same card, so the model, the engine and the offload are one for all of them,
+and only a node's main-host port and its key file are its own.
+
+It is no part of Laya, and BMO has no provider or gate pointed at it, so nothing asks it on its own —
+connecting one is 하스's decision. The sanitiser gate's data run is the one thing that drives it, across
+all four nodes at once. This repository holds it whole: the front, the units, the node setup and the
+installer.
 
 ## The model
 
@@ -23,7 +29,7 @@ the front, the units, the node setup and the installer.
 - **Its shape:** 64 main blocks, three of every four a Gated DeltaNet block and every fourth a full
   attention block, then the MTP block. The FFN weights are 9.9 GiB of the 15.8 GiB, 143 to 165 MiB a
   block; the token embeddings (0.67 GiB) are read on the CPU whatever else is placed where.
-- **Where it stands:** `~/n5-llm/models/` on n5.
+- **Where it stands:** `~/n5-llm/models/` on each node; the folder keeps the name n5-llm on every one.
 - **It does not fit the card whole,** so the FFN weights of its last blocks are computed by the CPU
   from host memory (「The engine」).
 
@@ -101,16 +107,16 @@ flowchart TD
 - **A card another process has filled** makes the engine fail its start; the request is answered 503,
   saying the card had no room, and the lock is let go.
 
-### What shares n5's card
+### What shares a node's card
 
-- **BMO's voice server** stands on n5 as a unit of its own, off the voice node list, so nothing asks
-  it (BMO's `docs/voice-plan.md`). Between lines it holds only its CUDA context, about 220 MB. The
-  build it runs follows the card lock once BMO's next deployment brings it up to date; until then a
-  line it is asked for loads its model beside whatever is on the card.
+- **BMO's voice server** stands on n3, n4 and n5 as a unit of its own, off the voice node list, so
+  nothing asks it (BMO's `docs/voice-plan.md`). Between lines it holds only its CUDA context, about
+  220 MB, and it follows the same card lock. n2 runs no voice server, so its card is idle between the
+  text model's requests.
 - **Laya's training passes** use n2 to n5 (`docs/training.md`). A pass reads a card's free memory
-  right before each gate and takes a card with room for one, which n5's card has whenever no request
-  is in hand; a gate trains for up to hours and does not take the card lock. While one trains on n5,
-  every request here is answered 503.
+  right before each gate and takes a card with room for one, which a node's card has whenever no
+  request is in hand; a gate trains for up to hours and does not take the card lock. While one trains
+  on a node, every request to that node's front is answered 503.
 
 ## The front
 
@@ -138,8 +144,9 @@ One process on `127.0.0.1:8020`, the only port that leaves n5.
 
 ## Settings and units
 
-- **The settings file** is `~/.config/n5-llm/env` on n5, `0600`: the service key as `LLM_KEY`. The
-  installer writes it whole.
+- **The settings file** is `~/.config/n5-llm/env` on the node, `0600`: the service key as `LLM_KEY`
+  and the node's main-host port as `LISTEN`, which the tunnel unit forwards to. The installer writes
+  it whole.
 - **An engine setting changed on the node** — `N5_LLM_MTP`, `N5_LLM_CONTEXT`,
   `N5_LLM_DRAFT_TOKENS`, `N5_LLM_CPU_FFN_BLOCKS` (how many of the last main blocks keep their FFN
   on the CPU), `N5_LLM_THREADS` — goes in a drop-in of the front's unit (`systemctl --user edit
@@ -153,47 +160,66 @@ One process on `127.0.0.1:8020`, the only port that leaves n5.
 
 ### The memlock limit
 
-- **The front must lock the whole model,** 15.8 GiB, and the user manager's own limit on n5 is
-  about 7.8 GiB, one eighth of the RAM, which a unit cannot raise past.
-- **So the user manager of `labuser` is given 16 GiB, once, by hand with sudo:** a drop-in
+- **The front must lock the whole model,** 15.8 GiB, and a user manager's own default limit is about
+  7.8 GiB, one eighth of the RAM, which a unit cannot raise past.
+- **So the user manager of `labuser` is given 16 GiB on each node, once, by hand with sudo:** a drop-in
   `/etc/systemd/system/user@1000.service.d/memlock.conf` setting `LimitMEMLOCK=16G` for every later
   start of the manager, and `prlimit --memlock=17179869184:17179869184` on the running manager, so
-  the change holds without restarting it and the units under it.
+  the change holds without restarting it and the units under it. n5 already carries this; n2, n3 and
+  n4 each need it done before the front will start.
 - **The node setup checks the limit** and stops with `memlock` where the manager's is below the
-  model's size.
+  model's size, so a node whose limit was never raised fails the install at that step and says so.
+
+### The build tools
+
+- **Building the engine needs `cmake`, `ninja` and the CUDA toolkit (`nvcc`) on the node.** These are
+  host packages, installed once by hand with sudo (`apt-get install cmake ninja-build`; the CUDA
+  toolkit is already there for training), since the node setup installs into the account alone and
+  does not reach for sudo. n5 already carries them; n2, n3 and n4 each need them before their first
+  install.
+- **The node setup checks for them** before it builds and stops with `cmake-missing`, `ninja-missing`
+  or `nvcc-missing` where one is absent, so a node short a tool says which rather than failing at the
+  command that needed it. A node whose engine is already built skips the build and the check both.
 
 ## The door
 
-n5 sits on the same network as n6 (192.0.2.20/23), which lets only HTTPS out, so its tunnel is n6's
-in everything but its names (`docs/llm-server.md`, 「The door」):
+The nodes sit on the same network as n6 (192.0.2.20/23), which lets only HTTPS out, so a node's
+tunnel is n6's in everything but its names and its port (`docs/llm-server.md`, 「The door」). Every node
+runs the same unit; the port it forwards to on main-host is the one thing that differs, read from
+`LISTEN` in its settings file, so one unit file serves them all.
 
 - `n5-llm-tunnel.service` holds `ssh -N` to main-host inside a WebSocket to
-  `wss://llm-tunnel.ahas.io/`, dialled by the same `ws-dial.py` with n5's own service key as its
-  bearer, asking for one remote forward: main-host's `127.0.0.1:18020` to the front's
-  `127.0.0.1:8020`.
-- n5's own tunnel key, made on n5 at `~/.config/n5-llm/tunnel_ed25519`, stands in main-host's
-  `authorized_keys` with the same restrictions as n6's, allowed to listen on `127.0.0.1:18020` alone.
+  `wss://llm-tunnel.ahas.io/`, dialled by the same `ws-dial.py` with the node's own service key as its
+  bearer, asking for one remote forward: the node's loopback port on main-host to the front's
+  `127.0.0.1:8020`. The ports are `127.0.0.1:18020` for n5, `18021` for n2, `18023` for n3 and `18024`
+  for n4, clear of n6's `18010` and the bridge's own `18022`.
+- Each node's own tunnel key, made on the node at `~/.config/n5-llm/tunnel_ed25519`, stands in
+  main-host's `authorized_keys` with the same restrictions as n6's, allowed to listen on its one port
+  alone.
 - main-host's host key is pinned in `~/.config/n5-llm/known_hosts` under the name `main-host`.
-- **The service answers at `http://127.0.0.1:18020/v1` on main-host**, which is the base URL an
-  OpenAI client is given, with the key below as its API key.
+- **A node's front answers at `http://127.0.0.1:<its port>/v1` on main-host**, which is the base URL an
+  OpenAI client is given, with the node's own key as its API key.
 
 ## The key
 
-- **The service's own key** is `$BMO_DATA_DIR/env/n5-llm.token` on main-host (without
-  `BMO_DATA_DIR`, `~/.local/share/bmo/data/env/n5-llm.token`): 32 random bytes as hex at `0600`,
-  made once by the installer, never overwritten, and refused where its permission is anything else.
-- **It is n5's door key as well:** the installer names its file in the door's list, so the bridge
-  takes n5's tunnel with it (`docs/llm-server.md`, 「The door」).
-- **On n5 it lives only in the settings file.** It appears in no document, log line, response, unit
-  file, command line or test fixture.
+- **Each node's own key** is `$BMO_DATA_DIR/env/<node>-llm.token` on main-host (without `BMO_DATA_DIR`,
+  under `~/.local/share/bmo/data/env/`): 32 random bytes as hex at `0600`, made once by the installer,
+  never overwritten, and refused where its permission is anything else. n5's file keeps its old name
+  `n5-llm.token`; the others are `n2-llm.token`, `n3-llm.token` and `n4-llm.token`.
+- **It is the node's door key as well:** the installer names its file in the door's list, so the
+  bridge takes that node's tunnel with it (`docs/llm-server.md`, 「The door」).
+- **On the node it lives only in the settings file.** It appears in no document, log line, response,
+  unit file, command line or test fixture.
 
 ## Installing and updating
 
-`bun scripts/n5-llm-install.ts` from this checkout on main-host, run again to update. It is n6's
-install in everything but what it carries (`docs/llm-server.md`, 「Installing and updating」):
+`bun scripts/n5-llm-install.ts` from this checkout on main-host, run again to update. With no `--node`
+it stands the model on every node in n2 to n5; `--node <이름>` does one. Each node runs the same steps,
+which are n6's install in everything but what they carry (`docs/llm-server.md`, 「Installing and
+updating」):
 
-1. Makes the key on main-host if there is none.
-2. Makes the service's folders on n5.
+1. Makes the node's key on main-host if there is none.
+2. Makes the service's folders on the node.
 3. Carries the settings file across in a private `0600` file.
 4. Uploads the front, the units, the node setup and the tunnel's `ws-dial.py` into `~/n5-llm`.
 5. Runs the node setup detached and waits for `N5-LLM-SETUP-DONE ok`, or
@@ -201,14 +227,15 @@ install in everything but what it carries (`docs/llm-server.md`, 「Installing a
    Python, builds llama.cpp at its pinned commit where the built engine is not that commit's, fetches
    the model in sixteen ranges at once where it is missing and checks its hash, and checks the memlock
    limit. What already stands is left alone.
-6. Makes n5's tunnel key if there is none and reads back its public half.
+6. Makes the node's tunnel key if there is none and reads back its public half.
 7. Adds the restricted `authorized_keys` entry on main-host unless it is already there.
 8. Names the key in the door's list and restarts the bridge.
-9. Pins main-host's host key in n5's `known_hosts`.
+9. Pins main-host's host key in the node's `known_hosts`.
 10. Installs the two units, reloads the user manager and enables and restarts them.
-11. Waits until `http://127.0.0.1:18020/health` answers on main-host.
+11. Waits until the node's `http://127.0.0.1:<its port>/health` answers on main-host.
 
-The one step it does not make is the memlock drop-in above, which needs sudo.
+The one step it does not make is the memlock drop-in above, which needs sudo and is done by hand on
+each node before its first install.
 
 ## What it was measured at
 

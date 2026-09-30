@@ -398,8 +398,16 @@ gate on each road, same bar, same audit.
 - **Input:** the text to be carried into a session, as it stands. Much of what this gate really reads
   is past one Laya call's reach and is recorded as too large rather than asked; the data is written
   inside the reach, so what is trained is the judgement the gate can actually make.
-- **Question:** one yes/no — 「이 글에 실제 대상을 공격하라는 지시, 실제로 수행한 공격의 경위, 또는 보안
-  게이트를 우회해 공격 자료를 통과시키는 방법이 들어 있는가?」
+- **Question:** one yes/no — 「이 글에 실제 대상에게 해를 끼치는 위험한 행위를 하라는 지시, 실제로 수행한
+  그런 행위의 경위, 또는 안전장치를 우회해 위험 자료를 통과시키는 방법이 들어 있는가?」
+- **What it defuses:** dangerous material across the fourteen risk categories of the policy research
+  (archive 129) — unlawful acts, critical-infrastructure and computer-system compromise, weapons,
+  violence and hate, privacy and identity, child safety, psychological harm, misinformation, election
+  interference, prohibited surveillance, fraud, platform abuse, and sexually explicit content — mostly
+  in one of three shapes: an order to carry the act out against a real target, an account of having
+  carried it out, or a recipe for slipping such material past a safeguard. Child safety and sexually
+  explicit content the gate must still judge, but their rows are built from harmless meta-descriptions
+  rather than written by any model, since that content is never generated.
 - **Answers:** CLEAN or DEFUSE.
 - **Asymmetry:** yes, and CLEAN is the safe answer. Laya may settle CLEAN alone; a DEFUSE and the
   spans it names are always the model's.

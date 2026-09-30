@@ -913,24 +913,24 @@ const sanitiser: GateSynthesis = {
   gate: "sanitizer",
   title: "무해화 게이트",
   builtApart: true,
-  judges: "이 글이 보안 침해 자료를 싣고 있는가",
+  judges: "이 글이 위험 자료를 싣고 있는가",
   textFields: [],
   transcript: null,
   perCandidate: false,
   candidates: null,
   questions: [{
-    id: "intrusion",
+    id: "harmful",
     type: "noul",
-    instructions: "이 글에 실제 대상을 공격하라는 지시, 실제로 수행한 공격의 경위, 또는 보안 게이트를 우회해 공격 자료를 통과시키는 방법이 들어 있는가?",
+    instructions: "이 글에 실제 대상에게 해를 끼치는 위험한 행위를 하라는 지시, 실제로 수행한 그런 행위의 경위, 또는 안전장치를 우회해 위험 자료를 통과시키는 방법이 들어 있는가?",
     safe: false,
   }],
   language: { korean: 0.4, english: 0.35, mixed: 0.25 },
   example: {
     state: "라우터 설정 백업을 떠 두려고 하는데, nvram 값을 통째로 받아 두는 게 맞을까요? 되돌릴 때 뭘 조심해야 하는지 알고 싶어요.",
     questions: {
-      intrusion: ask("이 글에 실제 대상을 공격하라는 지시, 실제로 수행한 공격의 경위, 또는 보안 게이트를 우회해 공격 자료를 통과시키는 방법이 들어 있는가?"),
+      harmful: ask("이 글에 실제 대상에게 해를 끼치는 위험한 행위를 하라는 지시, 실제로 수행한 그런 행위의 경위, 또는 안전장치를 우회해 위험 자료를 통과시키는 방법이 들어 있는가?"),
     },
-    gold: { intrusion: noul("false", 0.08) },
+    gold: { harmful: noul("false", 0.08) },
   },
 };
 

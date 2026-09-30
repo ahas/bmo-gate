@@ -120,10 +120,13 @@ export function plannedBatches(spec: GateSynthesis, rows: number, batchSize: num
 }
 
 // One landed row, kept with the language its batch asked for, because a `DatasetRow` has nowhere to
-// put it and is not this item's to change.
+// put it and is not this item's to change. A gate that generates by category also carries the
+// category here, so a run's rows can be split into per-category files after they freeze; a gate with
+// no categories leaves it undefined and every reader but the per-category split ignores it.
 export interface FrozenRow {
   row: DatasetRow;
   language: LanguageBucket;
+  category?: string;
 }
 
 export interface GateProgress {
@@ -477,6 +480,69 @@ export function freezeSplits(folder: string, progress: SynthProgress): SynthMeta
   writeFileSync(join(folder, metaFile), `${JSON.stringify(made.meta, null, 2)}\n`);
 
   return made.meta;
+}
+
+export const byCategoryFolder = "by-category";
+
+// One category's share of the frozen rows, for the run's log; the worker reads these counts and never
+// the rows themselves.
+export interface CategoryFigures {
+  category: string;
+  rows: number;
+  splits: Record<DatasetSplit, number>;
+  language: Record<LanguageBucket, number>;
+}
+
+// Beside the combined splits, each category's rows written under `by-category/<category>/` as the same
+// three split files. A row keeps the split its input hash already fixed, so a category file is the
+// combined split narrowed to that category and nothing is re-hashed or re-labelled; the combined test
+// split therefore holds every category in the share its rows fell into. Rows with no category are left
+// out, since only a gate that generates by category carries one. Returns the per-category counts.
+export function freezeByCategory(folder: string): CategoryFigures[] {
+  const seen = new Map<string, FrozenRow>();
+
+  for (const one of readFrozenBatches(folder)) {
+    if (!seen.has(one.row.id)) {
+      seen.set(one.row.id, one);
+    }
+  }
+
+  const byCategory = new Map<string, FrozenRow[]>();
+
+  for (const one of seen.values()) {
+    if (one.category === undefined) {
+      continue;
+    }
+
+    const list = byCategory.get(one.category) ?? [];
+
+    list.push(one);
+    byCategory.set(one.category, list);
+  }
+
+  return [...byCategory.keys()].sort().map((category) => {
+    const rows = byCategory.get(category)!;
+    const dir = join(folder, byCategoryFolder, category);
+
+    mkdirSync(dir, { recursive: true });
+
+    const splits = { train: 0, calibration: 0, test: 0 } as Record<DatasetSplit, number>;
+
+    for (const [split, name] of Object.entries(splitFiles) as [DatasetSplit, string][]) {
+      const forSplit = rows.filter((one) => one.row.split === split);
+
+      splits[split] = forSplit.length;
+      writeFileSync(join(dir, name), jsonLines(forSplit.map((one) => one.row)));
+    }
+
+    const language = { korean: 0, english: 0, mixed: 0 } as Record<LanguageBucket, number>;
+
+    for (const one of rows) {
+      language[one.language] += 1;
+    }
+
+    return { category, rows: rows.length, splits, language };
+  });
 }
 
 function figuresFor(gate: string, kept: readonly FrozenRow[], progress: SynthProgress, duplicates: number): GateFigures {

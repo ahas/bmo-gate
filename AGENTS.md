@@ -11,9 +11,10 @@ here is a part of BMO:
 
 BMO holds only the client that asks the service and the configuration of which gate asks.
 
-Beside Laya stands one service that is not Laya's: **the text model on n5**, an OpenAI-compatible
-front over llama.cpp that holds the card only while it answers, reached from main-host through the
-same tunnel door. Nothing in BMO asks it.
+Beside Laya stands one service that is not Laya's: **the text model on n2 to n5**, an
+OpenAI-compatible front over llama.cpp that holds the card only while it answers, one front a node,
+each reached from main-host through its own tunnel door. It first stood on n5 alone; the sanitiser
+gate's data run drives all four at once. Nothing in BMO asks it.
 
 Most gates' rows ride the codex account; the sanitiser gate, whose attack rows codex refuses at the
 account level, rides a home model instead — the J3090 road, or the n5 text model reached over the same
@@ -36,7 +37,7 @@ pinned to one Claude login.
 - `docs/laya-server.md` — the server, which checkpoint answers which gate, how the card is shared,
   what it was measured at on n6, the training loop and its fixed settings, the calibration, and what
   the savings cost.
-- `docs/n5-llm.md` — the text model on n5: the model file, the engine, how the card is held only
+- `docs/n5-llm.md` — the text model on n2 to n5: the model file, the engine, how the card is held only
   while a request is in hand, the front, the units and the memlock limit, the door, the key, the
   install, what it was measured at, and the checks.
 - `docs/llm-server.md` — the Laya service on n6: the machine, the engine, the front with its MCP
@@ -59,8 +60,8 @@ pinned to one Claude login.
 - `scripts/llm-install.ts` puts the service on n6 through the jake console and is the one way it is
   installed or updated; `scripts/laya-serve.ts` carries a collected checkpoint there and names it
   for a gate.
-- `n5-llm/` holds the n5 text model's front, its node setup and its two user units, in a virtual
-  environment of its own on n5; `scripts/n5-llm-install.ts` is the one way it is installed or
+- `n5-llm/` holds the text model's front, its node setup and its two user units, in a virtual
+  environment of its own on each of n2 to n5; `scripts/n5-llm-install.ts` is the one way it is installed or
   updated.
 - `bmo-gate.service` is the unit a full run is carried by, symlinked into the user's own unit
   directory. A full run is a day's work and belongs to no session.

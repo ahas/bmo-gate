@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { installN5Llm, N5_FILES } from "./n5-llm-install";
+import { N5_FILES, N5_LLM_SERVICE, TEXT_NODES, installN5Llm, textBaseUrl, textKeyPath, textModelService } from "./n5-llm-install";
 import { scratchDir } from "./scratch";
 
 import type { NodeRunner, RunResult } from "./jake";
@@ -51,7 +51,7 @@ describe("the n5 text model's install", () => {
     expect(outcome.ok).toBe(true);
     expect(commands[1]).toBe("mkdir -p ~/n5-llm/models ~/.config/n5-llm && chmod 700 ~/.config/n5-llm");
     const key = readFileSync(keyPath, "utf8").trim();
-    expect(uploads[0]).toEqual({ local: expect.any(String), remote: "/home/labuser/.config/n5-llm/env", text: `LLM_KEY=${key}\n` });
+    expect(uploads[0]).toEqual({ local: expect.any(String), remote: "/home/labuser/.config/n5-llm/env", text: `LLM_KEY=${key}\nLISTEN=127.0.0.1:18020\n` });
     expect(uploads.slice(1, 2 + N5_FILES.length).map((one) => [one.local, one.remote])).toEqual([
       ...N5_FILES.map((name) => [`/checkout/n5-llm/${name}`, `/home/labuser/n5-llm/${name}`]),
       ["/checkout/llm-server/ws-dial.py", "/home/labuser/n5-llm/ws-dial.py"],
@@ -60,5 +60,45 @@ describe("the n5 text model's install", () => {
     expect(commands.at(-1)).toContain("systemctl --user enable n5-llm-front.service n5-llm-tunnel.service");
     expect(readFileSync(authorizedKeysPath, "utf8")).toContain('permitlisten="127.0.0.1:18020"');
     expect(readFileSync(doorListPath, "utf8")).toBe(`${keyPath}\n`);
+  });
+});
+
+describe("the text model service factory", () => {
+  test("n5 keeps its old values, so importers that name it read the same service", () => {
+    const n5 = textModelService("n5");
+
+    expect(N5_LLM_SERVICE.node).toBe("n5");
+    expect(N5_LLM_SERVICE.listen).toBe("127.0.0.1:18020");
+    expect(N5_LLM_SERVICE.serviceDir).toBe("n5-llm");
+    expect(N5_LLM_SERVICE.keyPath().endsWith("env/n5-llm.token")).toBe(true);
+    expect(n5.node).toBe("n5");
+    expect(n5.serviceDir).toBe("n5-llm");
+    expect(n5.configDir).toBe(".config/n5-llm");
+    expect(n5.listen).toBe("127.0.0.1:18020");
+    expect(n5.engineUnit).toBe("n5-llm-front");
+    expect(n5.units).toEqual(["n5-llm-front.service", "n5-llm-tunnel.service"]);
+    expect(n5.keyPath().endsWith("env/n5-llm.token")).toBe(true);
+    expect(n5.label).toContain("n5");
+    expect(n5.envFileText("KEY123")).toBe("LLM_KEY=KEY123\nLISTEN=127.0.0.1:18020\n");
+  });
+
+  test("another node takes its own port and key, the node-side names unchanged", () => {
+    const n2 = textModelService("n2");
+
+    expect(n2.node).toBe("n2");
+    expect(n2.serviceDir).toBe("n5-llm");
+    expect(n2.units).toEqual(["n5-llm-front.service", "n5-llm-tunnel.service"]);
+    expect(n2.listen).toBe("127.0.0.1:18021");
+    expect(n2.keyPath().endsWith("env/n2-llm.token")).toBe(true);
+    expect(n2.envFileText("K")).toBe("LLM_KEY=K\nLISTEN=127.0.0.1:18021\n");
+  });
+
+  test("the nodes, the base URLs and the key paths line up, and an unknown node is refused", () => {
+    expect([...TEXT_NODES]).toEqual(["n5", "n2", "n3", "n4"]);
+    expect(textBaseUrl("n3")).toBe("http://127.0.0.1:18023/v1");
+    expect(textBaseUrl("n4")).toBe("http://127.0.0.1:18024/v1");
+    expect(textKeyPath("n3").endsWith("env/n3-llm.token")).toBe(true);
+    expect(() => textModelService("n7")).toThrow();
+    expect(() => textBaseUrl("n6")).toThrow();
   });
 });

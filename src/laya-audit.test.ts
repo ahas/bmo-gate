@@ -58,7 +58,7 @@ function sanitizerRow(state: string, intrusion: boolean): SynthRow {
     state,
     questions: JSON.parse(JSON.stringify(sanitizer.example.questions)) as SynthRow["questions"],
     gold: {
-      intrusion: {
+      harmful: {
         type: "noul",
         label: intrusion ? "true" : "false",
         noul,
@@ -189,7 +189,7 @@ describe("the conformance figure", () => {
     const folder = scratch();
     const wrong = sanitizerRow(korean("bad"), false);
 
-    wrong.gold.intrusion = { type: "choice", label: "nope", probabilities: { nope: 1 } };
+    wrong.gold.harmful = { type: "choice", label: "nope", probabilities: { nope: 1 } };
 
     freeze(folder, [
       { spec: sanitizer, row: sanitizerRow(korean("good"), false) },
@@ -206,7 +206,7 @@ describe("the conformance figure", () => {
     const folder = scratch();
     const wrong = sanitizerRow(korean("bad"), false);
 
-    wrong.questions.intrusion = { type: "noul", instructions: "이 글은 위험한가?" };
+    wrong.questions.harmful = { type: "noul", instructions: "이 글은 위험한가?" };
 
     freeze(folder, [{ spec: sanitizer, row: wrong }]);
 
@@ -237,7 +237,7 @@ describe("the broken-format figure", () => {
   test("a row whose three parts cannot be read is counted unreadable and judged on nothing", () => {
     const folder = scratch();
 
-    freeze(folder, [{ spec: sanitizer, row: sanitizerRow(korean("a"), false) }]);
+    freeze(folder, [{ spec: sanitizer, row: sanitizerRow(korean("a"), false), split: "train" }]);
     writeFileSync(
       join(folder, splitFiles.train),
       `${JSON.stringify({ id: "sanitizer:x", gate: "sanitizer", split: "train", state: "{{{", questions: "{}", gold: "{}" })}\n`,

@@ -2,6 +2,7 @@ import { statSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { batchPrompts, noTokens } from "./laya-synth-run";
+import { textBaseUrl, textKeyPath } from "./n5-llm-install";
 import { dataRoot } from "./roots";
 
 import type { JudgeRoad } from "./gate-judge";
@@ -412,6 +413,13 @@ export function n5Streamer(settings: Partial<N5Settings> = {}): N5Streamer {
       return stream(full, key, system, prompt, onDelta);
     },
   };
+}
+
+// A streamer aimed at one text-model node's front, for the sanitiser harvest run across n2 to n5. The
+// node fixes the base URL and the key file; everything else keeps the streamer's own defaults, which a
+// caller may still override.
+export function n5StreamerFor(node: string, settings: Partial<N5Settings> = {}): N5Streamer {
+  return n5Streamer({ baseUrl: textBaseUrl(node), readKey: () => readN5Key(textKeyPath(node)), ...settings });
 }
 
 // The judging road here: one batch of real rows in, one answer out, no session between them. A

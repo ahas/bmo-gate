@@ -383,12 +383,24 @@ of the roster driver's default so its data is never made two ways at once.
 - **The gate the sanitiser trains is binary.** Laya answers CLEAN or DEFUSE, and only the downstream
   model names the spans a DEFUSE would defuse — Laya never does. So a row carries one gold, the
   intrusion yes/no, and nothing about a span.
-- **The model writes only the dangerous sentences.** The n5 text model, being uncensored, writes them
-  without flinching, one to a line, by category: an order to attack a real target, an operational
-  account of an attack carried out, and a recipe for slipping attack material past a safety gate — the
-  three things the gate defuses, drawn from the cyber-intrusion slice of the policy research. Every
-  sentence it writes is harmful by construction, so the label is fixed by how the row is made rather
-  than by anything the model says, and there is no whole row for the account to refuse.
+- **The model writes only the dangerous sentences.** The text model on n2 to n5, being uncensored,
+  writes them without flinching, one to a line, by category. The categories are the policy research's
+  full risk taxonomy (archive 129), its fourteen Usage Policy categories, each falling mostly under one
+  of three kinds: an order to carry a dangerous act out against a real target, an account of one
+  carried out, and a recipe for slipping such material past a safeguard. Every sentence a model writes
+  is harmful by construction, so the label is fixed by how the row is made rather than by anything the
+  model says, and there is no whole row for the account to refuse.
+- **Two categories are never written by a model.** Child safety and sexually explicit content the gate
+  must still judge, but no model is ever asked for their content. Their harmful rows are built from
+  harmless meta-descriptions held in the code — a plain description of the forbidden request, at the
+  level of a description and never the content — so the gate learns to defuse the category without the
+  content being made. These rows are fixed to harmful the same as a harvested sentence and are told
+  apart only by their category.
+- **Four nodes write at once.** The same text-model setup stands on n2, n3, n4 and n5, each an
+  uncensored front reached through its own tunnel door, and the run hands the category-and-language
+  harvests out across whichever of the four answered its readiness so the wall-clock of a slow model
+  is cut by the count of nodes. A node whose card cannot serve the model is left out and named; the
+  run goes on with the rest.
 - **The code makes the rows.** A harvested sentence is embedded among the rooms' ordinary lines —
   some standing bare as a short order, most hidden among a few lines of ordinary talk, which is where
   the gate really meets such material — and fixed to intrusion true. Where the sentence was embedded
@@ -403,9 +415,12 @@ of the roster driver's default so its data is never made two ways at once.
   kept or dropped and why. That file is 하스's to read; the worker and BMO read neither it nor the
   frozen sentences, and only the counts, the label and language balance, the drop reasons and the
   file's own path are reported.
-- **What it freezes is one gate's data like any other.** The batches, the three splits, the language
-  sidecar, the meta and the progress take the same shape the roster driver's gates take, so the merge
-  and the training read this gate's folder as one gate's data beside the nine.
+- **What it freezes is one gate's data like any other, and also split by category.** The batches, the
+  three splits, the language sidecar, the meta and the progress take the same shape the roster driver's
+  gates take, so the merge and the training read this gate's folder as one gate's data beside the nine.
+  Beside them the run writes each category's rows to a file of its own, so a later pass can measure
+  where the gate misses or over-refuses one category at a time; the training reads the combined splits,
+  in which the categories are mixed evenly, the test split included.
 
 ## A run
 
