@@ -61,6 +61,8 @@ installer.
     another by the same engine;
   - MTP speculative decoding with two draft tokens (`--spec-type draft-mtp`), which
     `N5_LLM_MTP=off` in the front's environment turns off;
+  - the slot folder `~/n5-llm/slots/` as the place its slot is saved to and restored from
+    (`--slot-save-path`, 「The slot's state between engines」);
   - no warmup run at start, since the request waiting on the start is the warmup.
 - **Its start** takes about nine seconds, most of it the engine allocating and clearing the KV store
   of the whole context in RAM.
@@ -110,10 +112,12 @@ flowchart TD
   B -- no --> C[Take the card lock]
   C --> D[Start the engine from RAM]
   D --> E[Wait for its health]
-  E --> F
+  E --> R[Load the saved state its prompt goes on from]
+  R --> F
   F --> G{Last request in hand?}
   G -- no --> H[Leave the engine up]
-  G -- yes --> I[Stop the engine]
+  G -- yes --> S[Save the slot's state]
+  S --> I[Stop the engine]
   I --> J[Let go of the lock]
 ```
 
@@ -134,10 +138,50 @@ flowchart TD
   seconds, which covers another service's single use, and is then answered 503, saying the card is
   busy.
 - **When the engine goes:** the moment the last request in hand ends — answered, refused, or cut off
-  by its caller — with no idle time. A request that arrives while it is going waits for it to be gone
-  and starts it again.
+  by its caller — and its slot's state is saved, with no idle time. A request that arrives while it
+  is going waits for it to be gone and starts it again.
 - **A card another process has filled** makes the engine fail its start; the request is answered 503,
   saying the card had no room, and the lock is let go.
+
+### The slot's state between engines
+
+The engine's KV store and recurrent state go with it when it stops, and a prompt of tens of thousands
+of tokens takes tens of minutes to compute again (「The slot's state, measured」). So the front writes the
+slot's state to a file before it stops the engine and loads a file back into the next engine before
+it passes the request on.
+
+- **What a file is reused by:** the Gated DeltaNet blocks keep one recurrent state, the one after the
+  last token, which cannot be taken back to an earlier token. A running engine goes back through the
+  context checkpoints it keeps in memory, but a file holds the state at its last token alone. So a
+  file is reused only by a request whose prompt carries the file's whole token sequence at its start
+  and goes on past it; a request that parts from it anywhere, one token before its end included, is
+  computed from its first token.
+- **Where the saved state ends:** a conversation's next request does not carry the answer the way the
+  engine made it, since the chat template renders a past answer its own way. So the front first takes
+  the slot back to its last request's prompt without that prompt's last three tokens, the opening of
+  the generation prompt, which the next request of the same conversation carries whole. It does so by
+  sending the engine that shortened prompt with nothing to generate: the engine goes back to the
+  checkpoint it made four tokens before the prompt's end and computes one token.
+- **A way back that would cost more** — the checkpoint missing, or the prompt not the one the slot
+  holds — is given ten seconds and then hung up on; the engine drops it once the batch of up to
+  2,048 tokens it is computing is done, and whatever the slot then holds is saved; a
+  prompt its caller cut off before its end is carried that much further and saved the same way. The
+  file's head says which tokens it holds, so what it holds is always what it is chosen by.
+- **How the front knows a prompt's tokens:** it asks the running engine to render a chat request
+  through its template and to tokenise the result, or to tokenise a completion's prompt, the way the
+  engine does for the request itself. The tokens are held in memory only while the request is in hand.
+- **The files:** in `~/n5-llm/slots/` on the node, which the installer makes, each named by a hash of
+  the tokens it holds and carrying them at its head. A save removes every file whose whole sequence
+  begins its own — the same conversation's earlier turns — so a conversation keeps its latest file.
+  Nothing is removed for its age.
+- **The choice at start:** once the engine answers its health, the front reads the heads of the files
+  and loads the longest one the request's prompt carries whole and goes on past; with none, the slot
+  starts empty. A request that arrives while the engine runs is answered on the slot as it stands.
+- **What a file holds:** the attention blocks' KV store for its tokens and the recurrent state, which
+  the patched build keeps on the card and saves and loads all the same. The MTP head's own store is not
+  in it; the head's drafts after a load are accepted as they are after a fresh prompt.
+- **A failure** to tokenise, load, go back or save is written to the front's log, and the request is
+  answered as if there were no file.
 
 ### What shares a node's card
 
@@ -167,12 +211,14 @@ One process on `127.0.0.1:8020`, the only port that leaves n5.
 - **The state `/health` gives with the key:** the model file and how many of its bytes are locked,
   whether the engine is stopped, waiting for the card lock, starting, running or stopping, how many
   requests are in hand,
-  whether the front holds the card lock, how long the last start and the last stop took, and the
-  engine's settings.
+  whether the front holds the card lock, how long the last start and the last stop took, how many
+  slot files there are and their bytes, the last save's and the last load's tokens, bytes and time,
+  and the engine's settings.
 - **The model's name** in `/v1/models` is the file's name without `.gguf`. The engine answers
   whatever `model` a request names, since it serves one.
 - **Nothing of a request is logged:** the front's log carries the engine's starts and stops with
-  their durations, and why a start failed. The engine's own log goes to the front, which keeps only
+  their durations, the slot's saves and loads with their token counts, bytes and durations, and why a
+  start, a save or a load failed. The engine's own log goes to the front, which keeps only
   its last few kilobytes for saying why a start failed and writes none of it anywhere.
 
 ## Settings and units
@@ -366,6 +412,27 @@ CPU.
 - **The engine's stop** takes about 1.2 seconds at the full context, most of it freeing the KV store,
   and 0.35 seconds at 32,768; either comes after the answer has reached the caller.
 
+### The slot's state, measured
+
+Through the front on n2 on 1 October 2026, at temperature 0 with thinking off, the served setting.
+
+- **A conversation of 21,664 tokens,** a long system prompt and one question, computed from its first
+  token: its first token came 2,649 seconds after the request, the prompt at 8.2 t/s.
+- **Its next request,** the answer and one more question on top, 46 tokens new: the saved 21,661
+  tokens were loaded and the first token came 22.9 seconds after the request — the engine's start
+  8.4 seconds, the load 0.09 seconds and the 46 tokens 12.4 seconds.
+- **A save** took 254 to 267 ms for 557 MB, and **a load** 36 to 87 ms, both from and to the page
+  cache. **Going back** to the prompt cost the engine one token, 0.16 seconds at 3,125 tokens.
+- **A file's size** is about 157 MB of recurrent state and 18.5 KB a token: 215 MB for 3,125 tokens and
+  557 MB for 21,661, so about 19 GB for the whole context.
+- **A load holds the whole state:** at 3,128 tokens, the answer after a load was the one computed
+  afresh, and the MTP head's drafts were accepted 8 of 8.
+- **A prompt that parts from the file** at its last user message, the same system prompt and another
+  question, was computed whole, all 3,130 tokens; a running engine took 3,100 of them from its
+  checkpoints.
+- **A way back hung up on** was dropped by the engine 21 seconds later, when its batch of 2,048 tokens
+  was done.
+
 ### Card and memory
 
 - **While an answer is made,** the served IQ3_XXS holds 11,701 MiB of the card's 12,282 on n3, n4 and
@@ -391,3 +458,5 @@ key() { printf 'Authorization: Bearer %s\n' "$(cat "${BMO_DATA_DIR:-$HOME/.local
    locked, the engine stopped and the lock not held between requests.
 3. **A request:** `curl -s -H @<(key) -H 'content-type: application/json' -d '{"messages":[{"role":"user","content":"안녕"}],"max_tokens":64,"chat_template_kwargs":{"enable_thinking":false}}' http://127.0.0.1:18020/v1/chat/completions`
    answers, and `nvidia-smi` on n5 afterwards shows no engine process on the card.
+4. **The slot's state:** health with the key afterwards shows the last save and a slot file for the
+   request; the same request sent again shows a load of all but its last three tokens.

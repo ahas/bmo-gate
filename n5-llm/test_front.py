@@ -8,6 +8,7 @@ import http.client
 import json
 import os
 import socket
+import struct
 import sys
 import tempfile
 import threading
@@ -21,17 +22,21 @@ import uvicorn
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from front import Engine, build_app
+from front import Engine, SlotStore, build_app, held_tokens
 
 KEY = "front-key-5c1d8e"
 
-# The engine as the front sees it: a health that answers once it stands, and completions, whole or
-# streamed, held as long as the request asks. Every start is written down; a card without room is an
-# exit with the engine's own out-of-memory line.
+# The engine as the front sees it: a health that answers once it stands, completions, whole or
+# streamed, held as long as the request asks, and the one slot, whose tokens are a prompt's characters
+# and whose file is llama.cpp's head over a stand-in state. Every start and every load is written down;
+# a card without room is an exit with the engine's own out-of-memory line.
 STAND_IN = r"""
-import json, sys, time
+import json, os, struct, sys, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-port, starts, mode = int(sys.argv[1]), sys.argv[2], sys.argv[3]
+port, starts, mode, slots, loads = int(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
+slot = []
+def render(asked):
+    return "".join(f"<{m['role']}>{m['content']}" for m in asked.get("messages", [])) + "<assistant>"
 if mode == "oom":
     print("ggml_backend_cuda_buffer_type_alloc_buffer: cudaMalloc failed: out of memory", file=sys.stderr, flush=True)
     sys.exit(1)
@@ -47,8 +52,38 @@ class H(BaseHTTPRequestHandler):
         self.send_header("content-length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
+    def answer(self, value):
+        data = json.dumps(value).encode()
+        self.send_response(200)
+        self.send_header("content-type", "application/json")
+        self.send_header("content-length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
     def do_POST(self):
+        global slot
         asked = json.loads(self.rfile.read(int(self.headers["content-length"])))
+        if self.path == "/apply-template":
+            return self.answer({"prompt": render(asked)})
+        if self.path == "/tokenize":
+            return self.answer({"tokens": [ord(c) for c in asked["content"]]})
+        if self.path == "/completion":
+            slot = asked["prompt"]
+            return self.answer({"content": ""})
+        if self.path == "/slots/0?action=save":
+            with open(os.path.join(slots, asked["filename"]), "wb") as f:
+                f.write(struct.pack("<III", 0x67677371, 2, len(slot) + 4)
+                        + struct.pack(f"<iII{len(slot)}iI", -1, 1, len(slot), *slot, 0) + b"state")
+            return self.answer({"n_saved": len(slot), "n_written": 4 * len(slot) + 32, "timings": {"save_ms": 1.0}})
+        if self.path == "/slots/0?action=restore":
+            with open(os.path.join(slots, asked["filename"]), "rb") as f:
+                head = f.read()
+            count = struct.unpack("<I", head[20:24])[0]
+            slot = list(struct.unpack(f"<{count}i", head[24:24 + 4 * count]))
+            with open(loads, "a") as f:
+                f.write(asked["filename"] + "\n")
+            return self.answer({"n_restored": count, "n_read": len(head), "timings": {"restore_ms": 1.0}})
+        # An answer leaves its prompt and two tokens of its own in the slot.
+        slot = [ord(c) for c in (asked["prompt"] if "prompt" in asked else render(asked))] + [7, 7]
         time.sleep(asked.get("delay", 0))
         if asked.get("stream"):
             self.send_response(200)
@@ -84,9 +119,15 @@ class FrontTest(unittest.TestCase):
         self.lock = self.dir / "gpu.lock"
         self.starts = self.dir / "starts"
         self.starts.write_text("")
+        self.slots = self.dir / "slots"
+        self.slots.mkdir()
+        self.loads = self.dir / "loads"
+        self.loads.write_text("")
         engine_port = free_port()
-        argv = [sys.executable, "-c", STAND_IN, str(engine_port), str(self.starts), self.mode]
-        self.engine = Engine(argv, self.lock, f"http://127.0.0.1:{engine_port}/health", lock_wait_s=0.2, start_wait_s=10)
+        upstream = f"http://127.0.0.1:{engine_port}"
+        argv = [sys.executable, "-c", STAND_IN, str(engine_port), str(self.starts), self.mode, str(self.slots), str(self.loads)]
+        self.engine = Engine(argv, self.lock, f"{upstream}/health", lock_wait_s=0.2, start_wait_s=10,
+                             slots=SlotStore(self.slots, upstream))
         model = self.dir / "model.gguf"
         model.write_bytes(b"GGUF")
         app = build_app(KEY, self.engine, f"http://127.0.0.1:{engine_port}", model, None, {"context": 4096})
@@ -216,6 +257,40 @@ class TheCard(FrontTest):
         self.assertEqual(json.loads(body)["error"]["type"], "card_busy")
         self.assertEqual(self.started(), 0)
         self.assertEqual(self.health()["engine"], "stopped")
+
+
+def rendered(messages: list[dict]) -> list[int]:
+    return [ord(c) for c in "".join(f"<{m['role']}>{m['content']}" for m in messages) + "<assistant>"]
+
+
+class TheSlot(FrontTest):
+    first = [{"role": "system", "content": "창고 규칙"}, {"role": "user", "content": "상자 12는?"}]
+
+    def saved(self) -> list[list[int]]:
+        return sorted([list(struct.unpack(f"<{len(held) // 4}i", held)) for held in map(held_tokens, self.slots.glob("*.bin"))])
+
+    def loaded(self) -> list[str]:
+        return self.loads.read_text().splitlines()
+
+    def test_a_conversation_goes_on_from_its_saved_state_and_keeps_one_file(self) -> None:
+        self.assertEqual(self.call("/v1/chat/completions", {"messages": self.first})[0], 200)
+        self.assertEqual(self.saved(), [rendered(self.first)[:-3]])
+        first_file = [file.name for file in self.slots.glob("*.bin")]
+
+        after = [*self.first, {"role": "assistant", "content": "40개"}, {"role": "user", "content": "13은?"}]
+        self.assertEqual(self.call("/v1/chat/completions", {"messages": after})[0], 200)
+        self.assertEqual(self.loaded(), first_file)
+        self.assertEqual(self.saved(), [rendered(after)[:-3]])
+        health = self.health()
+        self.assertEqual((health["engine"], health["slots"]["files"], health["slots"]["last_restore"]["tokens"]),
+                         ("stopped", 1, len(rendered(self.first)) - 3))
+
+    def test_a_prompt_that_parts_from_every_file_starts_empty(self) -> None:
+        other = [self.first[0], {"role": "user", "content": "창고 5는?"}]
+        self.call("/v1/chat/completions", {"messages": self.first})
+        self.call("/v1/chat/completions", {"messages": other})
+        self.assertEqual(self.loaded(), [])
+        self.assertEqual(self.saved(), sorted([rendered(self.first)[:-3], rendered(other)[:-3]]))
 
 
 class ACardWithoutRoom(FrontTest):

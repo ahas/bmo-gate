@@ -49,7 +49,7 @@ describe("the n5 text model's install", () => {
     });
 
     expect(outcome.ok).toBe(true);
-    expect(commands[1]).toBe("mkdir -p ~/n5-llm/models ~/.config/n5-llm && chmod 700 ~/.config/n5-llm");
+    expect(commands[1]).toBe("mkdir -p ~/n5-llm/models ~/n5-llm/slots ~/.config/n5-llm && chmod 700 ~/.config/n5-llm");
     const key = readFileSync(keyPath, "utf8").trim();
     expect(uploads[0]).toEqual({ local: expect.any(String), remote: "/home/labuser/.config/n5-llm/env", text: `LLM_KEY=${key}\nLISTEN=127.0.0.1:18020\n` });
     expect(uploads.slice(1, 2 + N5_FILES.length).map((one) => [one.local, one.remote])).toEqual([

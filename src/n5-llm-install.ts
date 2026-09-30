@@ -70,7 +70,7 @@ export function textModelService(node: string): TunnelledService {
     // The tunnel unit reads LISTEN from here for its one remote forward, so the same unit file serves
     // every node and only this file carries the node's port.
     envFileText: (key) => `LLM_KEY=${key}\nLISTEN=${listen}\n`,
-    makeDirsCommand: () => `mkdir -p ~/${N5_SERVICE_DIR}/models ~/${N5_CONFIG_DIR} && chmod 700 ~/${N5_CONFIG_DIR}`,
+    makeDirsCommand: () => `mkdir -p ~/${N5_SERVICE_DIR}/models ~/${N5_SERVICE_DIR}/slots ~/${N5_CONFIG_DIR} && chmod 700 ~/${N5_CONFIG_DIR}`,
     carried: (checkout, home) => [
       ...N5_FILES.map((name): [string, string] => [join(checkout, "n5-llm", name), `${home}/${N5_SERVICE_DIR}/${name}`]),
       // The tunnel dials the door the way n6's does, with the same client.

@@ -1,7 +1,8 @@
 """The text model's front on n5 (docs/n5-llm.md): one process on the loopback, the only port that
 leaves the machine. It keeps the model file locked in RAM for as long as it runs, starts the engine
-under the card lock when a request arrives, passes the request to it, and stops the engine and lets
-go of the lock the moment the last request in hand ends.
+under the card lock when a request arrives, loads into it the saved slot state the request's prompt
+goes on from, passes the request to it, and saves the slot's state, stops the engine and lets go of
+the lock the moment the last request in hand ends.
 
 Run: LLM_KEY comes from the unit's settings file; python front.py
 """
@@ -12,10 +13,13 @@ import asyncio
 import ctypes
 import ctypes.util
 import fcntl
+import hashlib
 import hmac
+import json
 import mmap
 import os
 import signal
+import struct
 import sys
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -52,6 +56,9 @@ CPU_FFN_BLOCKS = int(os.environ.get("N5_LLM_CPU_FFN_BLOCKS", "0"))
 THREADS = int(os.environ.get("N5_LLM_THREADS", "8"))
 # The model's main blocks, numbered from 0; its MTP block comes after them and stays on the card.
 MAIN_BLOCKS = 64
+# Where the engine saves its slot and restores it from (docs/n5-llm.md, 「The slot's state between
+# engines」). The installer makes it.
+SLOT_DIR = Path(os.environ.get("N5_LLM_SLOT_DIR", str(HOME / "n5-llm/slots")))
 
 # Another service's single use of the card is seconds; past this the card is taken for longer than a
 # caller should be kept waiting on it.
@@ -60,6 +67,11 @@ LOCK_WAIT_S = float(os.environ.get("N5_LLM_LOCK_WAIT_S", "60"))
 # context; this only bounds a start that hangs.
 START_WAIT_S = float(os.environ.get("N5_LLM_START_WAIT_S", "120"))
 STOP_WAIT_S = 10.0
+# Taking the slot back to its last prompt costs one token where the engine's checkpoint is there; past
+# this it is computing a prompt it does not hold, and is hung up on rather than holding up the stop.
+REWIND_WAIT_S = float(os.environ.get("N5_LLM_REWIND_WAIT_S", "10"))
+# A save of the whole context's state is about 18 GiB; this only bounds one that hangs.
+SLOT_WAIT_S = 600.0
 POLL_S = 0.05
 LOG_TAIL_BYTES = 8192
 
@@ -76,7 +88,7 @@ def engine_argv() -> list[str]:
     argv = [
         str(ENGINE_BIN), "-m", str(MODEL), "--host", "127.0.0.1", "--port", str(ENGINE_PORT),
         "-ngl", "99", "-fa", "on", "--fit", "off", "-c", str(CONTEXT), "-ctk", KV_TYPE, "-ctv", KV_TYPE,
-        "--no-kv-offload", "-np", "1", "--no-warmup", "-t", str(THREADS),
+        "--no-kv-offload", "-np", "1", "--no-warmup", "-t", str(THREADS), "--slot-save-path", f"{SLOT_DIR}/",
     ]
     if CONTEXT > TRAINED_CONTEXT:
         argv += ["--rope-scaling", "yarn", "--rope-scale", f"{CONTEXT / TRAINED_CONTEXT:g}",
@@ -114,6 +126,137 @@ class LockedFile:
         self.locked = self.size
 
 
+# A slot file as llama.cpp writes it: its magic, its version and the count of the 32-bit words the
+# server packs the slot's tokens in, then those words — a null token, the packing's version, the token
+# count and the tokens — and after them the state, which is the engine's alone to read.
+STATE_MAGIC = 0x67677371
+TOKENS_PACKING = 1
+# How many of a prompt's last tokens the saved state leaves off: the opening of the generation prompt,
+# which a conversation's next request renders its own way.
+LEFT_OFF_TOKENS = 3
+SAVING = "saving.bin"
+JSON = {"content-type": "application/json"}
+
+
+def pack(tokens: list[int]) -> bytes:
+    """Token ids as the bytes they are compared in, so one sequence beginning another is one bytes
+    value beginning the other."""
+    return struct.pack(f"<{len(tokens)}i", *tokens)
+
+
+def held_tokens(path: Path) -> bytes | None:
+    """The tokens a slot file holds, read from its head alone; None for a file that is not one."""
+    try:
+        with path.open("rb") as file:
+            magic, _version, words = struct.unpack("<III", file.read(12))
+            if magic != STATE_MAGIC or words < 3:
+                return None
+            null, packing, count = struct.unpack("<iII", file.read(12))
+            if null != -1 or packing != TOKENS_PACKING or count > words - 3:
+                return None
+            tokens = file.read(4 * count)
+    except (OSError, struct.error):
+        return None
+    return tokens if len(tokens) == 4 * count else None
+
+
+@dataclass
+class SlotStore:
+    """The slot's state between engines (docs/n5-llm.md, 「The slot's state between engines」): the
+    tokens the engine makes of a request's prompt, the saved state that prompt goes on from loaded
+    after a start, and the slot taken back to its last prompt and saved before a stop. A failure is
+    logged and passed over, so the request is answered as if there were no file."""
+
+    folder: Path
+    upstream: str
+    rewind_wait_s: float = REWIND_WAIT_S
+    last_save: dict[str, Any] | None = None
+    last_restore: dict[str, Any] | None = None
+
+    def _client(self, timeout: float) -> httpx.AsyncClient:
+        return httpx.AsyncClient(base_url=self.upstream, timeout=timeout)
+
+    def _files(self) -> list[Path]:
+        return [file for file in sorted(self.folder.glob("*.bin")) if file.name != SAVING]
+
+    async def prompt(self, path: str, body: bytes) -> bytes | None:
+        """The tokens the engine makes of a request's prompt, rendered through its chat template for a
+        chat request. None where the request carries no one prompt."""
+        try:
+            asked = json.loads(body)
+            async with self._client(30.0) as client:
+                if path == "/v1/chat/completions":
+                    rendered = (await client.post("/apply-template", content=body, headers=JSON)).raise_for_status().json()["prompt"]
+                elif isinstance(asked.get("prompt"), str):
+                    rendered = asked["prompt"]
+                elif isinstance(asked.get("prompt"), list) and all(isinstance(token, int) for token in asked["prompt"]):
+                    return pack(asked["prompt"])
+                else:
+                    return None
+                tokenised = await client.post("/tokenize", json={"content": rendered, "add_special": True})
+                return pack(tokenised.raise_for_status().json()["tokens"])
+        except Exception as fault:
+            say(f"slot: the prompt's tokens were not had: {type(fault).__name__}")
+            return None
+
+    async def restore(self, prompt: bytes) -> None:
+        """Loads the longest file the prompt carries whole at its start and goes on past."""
+        chosen, chosen_tokens = None, b""
+        for file in self._files():
+            tokens = held_tokens(file)
+            if tokens and len(chosen_tokens) < len(tokens) < len(prompt) and prompt.startswith(tokens):
+                chosen, chosen_tokens = file, tokens
+        if chosen is None:
+            return
+        try:
+            async with self._client(SLOT_WAIT_S) as client:
+                done = (await client.post("/slots/0?action=restore", json={"filename": chosen.name})).raise_for_status().json()
+            self.last_restore = {"tokens": done["n_restored"], "bytes": done["n_read"], "ms": round(done["timings"]["restore_ms"])}
+            say(f"slot loaded: {self.last_restore['tokens']} tokens, {self.last_restore['bytes']} bytes in {self.last_restore['ms']} ms")
+        except Exception as fault:
+            say(f"slot: loading {chosen.name} failed: {type(fault).__name__}: {fault}")
+
+    async def save(self, prompt: bytes | None) -> None:
+        """Takes the slot back to the prompt without its last tokens, saves it, names the file by the
+        tokens it holds and removes the files it goes on from."""
+        try:
+            if prompt is not None and len(prompt) > 4 * LEFT_OFF_TOKENS:
+                await self._rewind(prompt[:-4 * LEFT_OFF_TOKENS])
+            saving = self.folder / SAVING
+            async with self._client(SLOT_WAIT_S) as client:
+                done = (await client.post("/slots/0?action=save", json={"filename": SAVING})).raise_for_status().json()
+            tokens = held_tokens(saving)
+            if not tokens:
+                saving.unlink(missing_ok=True)
+                return
+            for file in self._files():
+                earlier = held_tokens(file)
+                if earlier is not None and tokens.startswith(earlier):
+                    file.unlink(missing_ok=True)
+            saving.rename(self.folder / f"{hashlib.sha256(tokens).hexdigest()[:16]}.bin")
+            self.last_save = {"tokens": done["n_saved"], "bytes": done["n_written"], "ms": round(done["timings"]["save_ms"])}
+            say(f"slot saved: {self.last_save['tokens']} tokens, {self.last_save['bytes']} bytes in {self.last_save['ms']} ms")
+        except Exception as fault:
+            say(f"slot: saving failed: {type(fault).__name__}: {fault}")
+
+    async def _rewind(self, tokens: bytes) -> None:
+        """The slot taken back to these tokens by sending them with nothing to generate. Where that
+        costs more than the checkpoint's one token, the engine is hung up on and keeps what it had
+        computed by then."""
+        ids = list(struct.unpack(f"<{len(tokens) // 4}i", tokens))
+        try:
+            async with self._client(self.rewind_wait_s) as client:
+                (await client.post("/completion", json={"prompt": ids, "n_predict": 0, "cache_prompt": True})).raise_for_status()
+        except httpx.TimeoutException:
+            say(f"slot: going back took longer than {self.rewind_wait_s:g} s; the slot is saved as it stands")
+
+    def health(self) -> dict[str, Any]:
+        # A save may remove a file between the listing and its size.
+        sizes = [file.stat().st_size for file in self._files() if file.exists()]
+        return {"files": len(sizes), "bytes": sum(sizes),
+                "last_save": self.last_save, "last_restore": self.last_restore}
+
+
 @dataclass
 class CardBusy(Exception):
     reason: str
@@ -129,6 +272,7 @@ class Engine:
     health_url: str
     lock_wait_s: float = LOCK_WAIT_S
     start_wait_s: float = START_WAIT_S
+    slots: SlotStore | None = None
     users: int = 0
     state: str = "stopped"
     last_start_ms: float | None = None
@@ -137,28 +281,42 @@ class Engine:
     lock_fd: int | None = None
     draining: asyncio.Task[None] | None = None
     log_tail: bytes = b""
+    # The tokens of the last request to come in, which is the last the one slot answers.
+    prompt: bytes | None = None
     mutex: asyncio.Lock = field(default_factory=asyncio.Lock)
 
-    async def enter(self) -> None:
-        """One more request in hand; the engine running once this returns."""
+    async def enter(self, asked: tuple[str, bytes] | None = None) -> None:
+        """One more request in hand, given as its path and body; the engine running once this returns,
+        with the saved state its prompt goes on from loaded where it has just started."""
         async with self.mutex:
             self.users += 1
-            if self.proc is not None:
-                return
             try:
-                await self._start()
+                fresh = self.proc is None
+                if fresh:
+                    await self._start()
+                if self.slots is not None and asked is not None:
+                    self.prompt = await self.slots.prompt(*asked)
+                    if fresh and self.prompt is not None:
+                        await self.slots.restore(self.prompt)
             except BaseException:
-                self.users -= 1
+                with anyio.CancelScope(shield=True):
+                    self.users -= 1
+                    if self.users == 0 and self.proc is not None:
+                        await self._stop()
                 raise
 
     async def leave(self) -> None:
-        """One request fewer; the engine stopped and the lock let go when it was the last. A caller
-        that went away cancels the request's task, so this runs shielded from that cancellation and
-        always reaches its end."""
+        """One request fewer; when it was the last, the slot's state saved, the engine stopped and the
+        lock let go. A caller that went away cancels the request's task, so this runs shielded from
+        that cancellation and always reaches its end."""
         with anyio.CancelScope(shield=True):
             async with self.mutex:
                 self.users -= 1
                 if self.users == 0 and self.proc is not None:
+                    if self.slots is not None:
+                        self.state = "saving the slot"
+                        await self.slots.save(self.prompt)
+                    self.prompt = None
                     await self._stop()
 
     async def _take_lock(self) -> None:
@@ -261,6 +419,7 @@ class Engine:
             "lock_held": self.lock_fd is not None,
             "last_start_ms": self.last_start_ms,
             "last_stop_ms": self.last_stop_ms,
+            "slots": self.slots.health() if self.slots is not None else None,
         }
 
 
@@ -329,7 +488,7 @@ def build_app(key: str, engine: Engine, upstream: str, model: Path, locked: Lock
     async def passed(request: Request) -> Response:
         body = await request.body()
         try:
-            await engine.enter()
+            await engine.enter((request.url.path, body))
         except CardBusy as busy:
             return error(503, f"card busy: {busy.reason}", "card_busy")
         except (RuntimeError, OSError) as fault:
@@ -422,10 +581,11 @@ def main() -> int:
         return 2
     locked = LockedFile(MODEL)
     say(f"front: {locked.locked} bytes of {MODEL.name} locked in RAM")
-    engine = Engine(engine_argv(), GPU_LOCK, f"http://127.0.0.1:{ENGINE_PORT}/health")
+    upstream = f"http://127.0.0.1:{ENGINE_PORT}"
+    engine = Engine(engine_argv(), GPU_LOCK, f"{upstream}/health", slots=SlotStore(SLOT_DIR, upstream))
     settings = {"context": CONTEXT, "kv_cache": f"{KV_TYPE} in host memory", "mtp": MTP, "draft_tokens": DRAFT_TOKENS if MTP else 0,
                 "cpu_ffn_blocks": CPU_FFN_BLOCKS, "threads": THREADS}
-    app = build_app(key, engine, f"http://127.0.0.1:{ENGINE_PORT}", MODEL, locked, settings)
+    app = build_app(key, engine, upstream, MODEL, locked, settings)
     uvicorn.run(app, host=HOST, port=PORT, log_level="warning", access_log=False)
     return 0
 
