@@ -17,8 +17,9 @@ VENV_PYTHON="3.12"
 UV_INSTALLER="https://astral.sh/uv/install.sh"
 
 # The engine: upstream llama.cpp at a commit that reads the model's qwen35 tensors and its MTP head,
-# with the patch that computes the attention over a KV store in host memory on the card for a prompt's
-# batch while the card has room and on the CPU otherwise, and keeps the recurrent state on the card.
+# with the patch that computes the attention over a KV store in host memory on the card, a prompt's
+# batches and an answer's tokens alike, while the card has room for the store and on the CPU otherwise,
+# and keeps the recurrent state on the card.
 # The stamp beside the build names the commit and the patch it was built from.
 LLAMA_REPO="https://github.com/ggml-org/llama.cpp.git"
 LLAMA_COMMIT="2a53ace3be21b1231d42019a278f14aebc65d49c"

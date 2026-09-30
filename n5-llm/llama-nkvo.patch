@@ -25,34 +25,34 @@ index 87bb3cc..2daefd2 100644
              ret = GGML_STATUS_ALLOC_FAILED;
              return nullptr;
 diff --git a/src/llama-graph.cpp b/src/llama-graph.cpp
-index d398ee1..37a7361 100644
+index d398ee1..303462c 100644
 --- a/src/llama-graph.cpp
 +++ b/src/llama-graph.cpp
 @@ -2608,6 +2608,67 @@ ggml_tensor * llm_graph_context::build_pos_bias(ggml_tensor * pos_bucket, ggml_t
      return pos_bias;
  }
  
-+// Where the attention over a KV store kept in host memory (--no-kv-offload) is run. A batch of at least
-+// GGML_OP_OFFLOAD_MIN_BATCH tokens (32 unless set, the bar the device backend itself uses to carry host
-+// data to the device) is left to the scheduler, which copies each layer's store into the device's
-+// compute buffer, turns it into the f16 the device's flash attention reads, and runs the attention
-+// there, reusing that room for the next layer. It goes there only while the device has the room: what
-+// the store's copy, its f16 form and the mask add to the room the scheduler's compute buffer already
-+// holds must fit what the device has free, less LLAMA_NKVO_ATTN_KEEP_MIB (64 unless set) kept for its
-+// own buffers. A graph whose buffer the device still refuses is built again with that store's attention
-+// on the CPU, and so is every longer store from then on. The tokens of an answer, and a store the device
-+// has no room for, are run on the CPU over the store where it lies.
++// Where the attention over a KV store kept in host memory (--no-kv-offload) is run. A batch of any size, a
++// prompt's or an answer's, over a store of at least LLAMA_NKVO_ATTN_MIN_KV cells (0 unless set: the device
++// is no slower over the shortest store and far faster over a long one) is left to the scheduler, which
++// copies each layer's store into the device's compute buffer, turns it into the f16 the device's flash
++// attention reads, and runs the attention there, reusing that room for the next layer. It goes there only
++// while the device has the room: what the store's copy, its f16 form and the mask add to the room the
++// scheduler's compute buffer already holds must fit what the device has free, less
++// LLAMA_NKVO_ATTN_KEEP_MIB (64 unless set) kept for its own buffers. A graph whose buffer the device still
++// refuses is built again with that store's attention on the CPU, and so is every longer store from then
++// on. A store the device has no room for is run on the CPU where it lies.
 +static int64_t llm_nkvo_attn_ceiling = INT64_MAX; // stores longer than this are run on the CPU
 +static int64_t llm_nkvo_attn_last    = 0;         // the store the last graph ran on the device, 0 for none
 +static std::map<ggml_backend_sched_t, int64_t> llm_nkvo_attn_held; // the room each scheduler's buffer grew to
 +
 +static bool llm_nkvo_attn_on_device(ggml_backend_sched_t sched, const ggml_tensor * k, const ggml_tensor * v,
-+                                    const ggml_tensor * mask, int64_t n_tokens) {
-+    static const int64_t min_batch = getenv("GGML_OP_OFFLOAD_MIN_BATCH") ? atoll(getenv("GGML_OP_OFFLOAD_MIN_BATCH")) : 32;
-+    static const int64_t keep      = (getenv("LLAMA_NKVO_ATTN_KEEP_MIB") ? atoll(getenv("LLAMA_NKVO_ATTN_KEEP_MIB")) : 64) << 20;
++                                    const ggml_tensor * mask) {
++    static const int64_t min_kv = getenv("LLAMA_NKVO_ATTN_MIN_KV") ? atoll(getenv("LLAMA_NKVO_ATTN_MIN_KV")) : 0;
++    static const int64_t keep   = (getenv("LLAMA_NKVO_ATTN_KEEP_MIB") ? atoll(getenv("LLAMA_NKVO_ATTN_KEEP_MIB")) : 64) << 20;
 +
 +    const int64_t n_kv = k->ne[1];
-+    if (n_tokens < min_batch || n_kv > llm_nkvo_attn_ceiling) {
++    if (n_kv < min_kv || n_kv > llm_nkvo_attn_ceiling) {
 +        return false;
 +    }
 +
@@ -100,7 +100,7 @@ index d398ee1..37a7361 100644
                                    hparams.attn_soft_cap ? hparams.f_attn_logit_softcapping : 0.0f);
          res->add_fused_node({LLM_FUSED_OP_FLASH_ATTN, cur, il});
  
-+        if (!cparams.offload_kqv && !llm_nkvo_attn_on_device(sched, k, v, kq_mask, q->ne[1])) {
++        if (!cparams.offload_kqv && !llm_nkvo_attn_on_device(sched, k, v, kq_mask)) {
 +            // the KV store is in host memory, and this attention over it is run on the CPU where it lies
 +            ggml_backend_sched_set_tensor_backend(sched, cur, backend_cpu);
 +        }
