@@ -168,9 +168,14 @@ units this repository runs on main-host:
     `llm-server/llm-tunnel.ahas.io.conf`, with the row in NPM's table saying the same.
   - main-host's firewall opening port 18022 to NPM's address alone.
   - **The bridge** (`bmo-llm-bridge.service`, running `scripts/llm-bridge.ts`) listening on that port.
-    It takes a WebSocket only when its bearer is the service key, read from its file for each
-    connection, and then pipes it to main-host's own SSH on `127.0.0.1:22`. Anything else is refused
-    before a byte reaches SSH.
+    It takes a WebSocket only when its bearer is the key of a service that rides the door, and then
+    pipes it to main-host's own SSH on `127.0.0.1:22`. Anything else is refused before a byte reaches
+    SSH.
+  - **The door's list** is `$BMO_DATA_DIR/env/tunnel-door.keys` on main-host: one key file's path to
+    a line, each a service's own key, which that service's installer adds. The bridge reads the list
+    and every key file in it for each connection, and a key file that is missing or not `0600` admits
+    nothing. The door carries this service and the text model on n5 (`docs/n5-llm.md`), each dialling
+    with its own key and each allowed its own listen on main-host.
 - **The main-host end** is one entry in the account's `authorized_keys` for n6's tunnel key, which
   is an ed25519 key made on n6 with no passphrase and kept at `0600`. The entry allows nothing but
   port forwarding (`restrict,port-forwarding`), lets the key listen only on `127.0.0.1:18010`
@@ -194,8 +199,8 @@ units this repository runs on main-host:
   `~/.local/share/bmo/data/env/laya.token`): 32 random bytes as hex, kept at `0600`. The installer
   makes it once if there is none, never overwrites one, and refuses one found with any other
   permission rather than using it, since it may already have been read.
-- **What checks it:** the bridge on main-host for the tunnel's WebSocket, the front for every call
-  but the open health, and the engine behind the front.
+- **What checks it:** the bridge on main-host for the tunnel's WebSocket, where it stands in the
+  door's list, the front for every call but the open health, and the engine behind the front.
 - **On n6 it lives only in `~/.config/bmo-llm/env`,** at `0600`, as `LLM_KEY` for the front and the
   tunnel's dial and `LAYA_TOKEN` for the engine. That environment file is the only place it has on
   n6.
@@ -225,7 +230,8 @@ order, it:
    `LAYA-SETUP-DONE ok`. Running it again changes nothing that already stands.
 6. Makes n6's tunnel key if there is none and reads back only its public half.
 7. Adds the restricted `authorized_keys` entry on main-host unless it is already there.
-8. Links the bridge unit on main-host, and enables and restarts it.
+8. Names the key's file in the door's list, links the bridge unit on main-host, and enables and
+   restarts it.
 9. Pins main-host's host key in n6's `known_hosts` from main-host's own host key file.
 10. Installs the three units, reloads the user manager and enables and starts them.
 11. Waits until `http://127.0.0.1:18010/health` answers on main-host — which it does only once the

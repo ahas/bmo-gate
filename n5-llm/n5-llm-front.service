@@ -1,0 +1,19 @@
+[Unit]
+Description=The text model's front on n5 (docs/n5-llm.md in the bmo-gate repository)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/n5-llm
+# LLM_KEY comes from here.
+EnvironmentFile=%h/.config/n5-llm/env
+# The model file is locked in RAM whole for as long as the front runs, which the user manager's own
+# limit allows once it is raised by hand (docs/n5-llm.md, 「The memlock limit」).
+LimitMEMLOCK=16G
+# The engine is the front's child, started and stopped by it; it goes down with the unit.
+ExecStart=%h/n5-llm/.venv/bin/python %h/n5-llm/front.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

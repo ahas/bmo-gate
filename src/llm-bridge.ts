@@ -3,10 +3,11 @@ import { readFileSync, statSync } from "node:fs";
 
 import type { Server, ServerWebSocket, Socket } from "bun";
 
-// The Laya service's tunnel door on main-host (docs/llm-server.md, 「The door」). n6's network
-// lets only HTTPS out, so the tunnel's SSH reaches main-host inside a WebSocket that NPM hands here;
-// this takes one only when its bearer is the service key and pipes it to main-host's own SSH. The key
-// is read from its file for each connection and never kept, logged or answered with.
+// The tunnel door on main-host (docs/llm-server.md, 「The door」). The nodes' network lets only HTTPS
+// out, so a tunnel's SSH reaches main-host inside a WebSocket that NPM hands here; this takes one only
+// when its bearer is the key of a service named in the door's list, and pipes it to main-host's own
+// SSH. The list and the keys are read from their files for each connection and never kept, logged or
+// answered with.
 
 /** Where NPM forwards the tunnel's name to, and what the bridge pipes to. */
 export const BRIDGE_PORT = 18022;
@@ -15,7 +16,8 @@ export const SSH_TARGET = { hostname: "127.0.0.1", port: 22 } as const;
 export interface BridgeOptions {
   port?: number;
   hostname?: string;
-  keyPath: string;
+  /** The door's list: one key file's path to a line. */
+  doorListPath: string;
   target?: { hostname: string; port: number };
 }
 
@@ -37,6 +39,18 @@ export function readServiceKey(path: string): string | null {
   } catch {
     return null;
   }
+}
+
+/** The keys of every service the door's list names, each read as a key file is; a list that is
+ * missing names none. */
+export function readDoorKeys(listPath: string): string[] {
+  let listed: string[];
+  try {
+    listed = readFileSync(listPath, "utf8").split("\n").map((line) => line.trim()).filter((line) => line !== "");
+  } catch {
+    return [];
+  }
+  return listed.map(readServiceKey).filter((key): key is string => key !== null);
 }
 
 /** Whether a request's bearer is the key, compared in constant time. */
@@ -61,7 +75,8 @@ export function startBridge(options: BridgeOptions): Server<Pipe> {
     port: options.port ?? BRIDGE_PORT,
     fetch(request, server) {
       // A refusal says nothing about why, and repeats nothing of the request.
-      if (!bearerMatches(request.headers.get("authorization"), readServiceKey(options.keyPath))) {
+      const bearer = request.headers.get("authorization");
+      if (!readDoorKeys(options.doorListPath).some((key) => bearerMatches(bearer, key))) {
         return new Response("unauthorized\n", { status: 401 });
       }
       if (server.upgrade(request, { data: { socket: null, held: [], closed: false } })) {

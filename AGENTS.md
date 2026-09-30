@@ -11,6 +11,10 @@ here is a part of BMO:
 
 BMO holds only the client that asks the service and the configuration of which gate asks.
 
+Beside Laya stands one service that is not Laya's: **the text model on n5**, an OpenAI-compatible
+front over llama.cpp that holds the card only while it answers, reached from main-host through the
+same tunnel door. Nothing in BMO asks it.
+
 Most gates' rows ride the codex account; the sanitiser gate, whose attack rows codex refuses at the
 account level, rides the J3090 road instead. While the codex account is shut, a judging pass or a
 top-up run can ride the claude road, pinned to one Claude login.
@@ -31,6 +35,9 @@ top-up run can ride the claude road, pinned to one Claude login.
 - `docs/laya-server.md` — the server, which checkpoint answers which gate, how the card is shared,
   what it was measured at on n6, the training loop and its fixed settings, the calibration, and what
   the savings cost.
+- `docs/n5-llm.md` — the text model on n5: the model file, the engine, how the card is held only
+  while a request is in hand, the front, the units and the memlock limit, the door, the key, the
+  install, what it was measured at, and the checks.
 - `docs/llm-server.md` — the Laya service on n6: the machine, the engine, the front with its MCP
   tools and OpenAI-compatible call, the units, the tunnel that is its door, the key, the install,
   putting a checkpoint in service, and the checks.
@@ -40,8 +47,8 @@ top-up run can ride the claude road, pinned to one Claude login.
 - Bun and TypeScript, no runtime dependencies.
 - `src/` holds the generator, the freezing and resume machinery, the audit, the three roads (codex,
   J3090 and the claude road), the rehearsal, the checkpoint collection, the jake console plumbing that drives the nodes,
-  the service's install steps, carrying a checkpoint into service, and the tunnel's door on
-  main-host. `src/reference/` is the reference gates' data and `src/train/` the training driver.
+  the install steps the tunnelled services share and each one's own, carrying a checkpoint into
+  service, and the tunnel's door on main-host. `src/reference/` is the reference gates' data and `src/train/` the training driver.
 - `scripts/` holds the commands. Each takes `--help`.
 - `laya-server/` holds the Python server and the training and calibration scripts. It is a virtual
   environment of its own on the machine it runs on and shares nothing with the Bun side.
@@ -51,10 +58,13 @@ top-up run can ride the claude road, pinned to one Claude login.
 - `scripts/llm-install.ts` puts the service on n6 through the jake console and is the one way it is
   installed or updated; `scripts/laya-serve.ts` carries a collected checkpoint there and names it
   for a gate.
+- `n5-llm/` holds the n5 text model's front, its node setup and its two user units, in a virtual
+  environment of its own on n5; `scripts/n5-llm-install.ts` is the one way it is installed or
+  updated.
 - `bmo-gate.service` is the unit a full run is carried by, symlinked into the user's own unit
   directory. A full run is a day's work and belongs to no session.
-- `bmo-llm-bridge.service` runs `scripts/llm-bridge.ts`, the service's tunnel door on
-  main-host, symlinked the same way by the install.
+- `bmo-llm-bridge.service` runs `scripts/llm-bridge.ts`, the tunnel door on main-host that both
+  services ride, symlinked the same way by the install.
 - `bmo-gate-train.service` and its `.timer` run a training pass over the judging run every thirty
   minutes, symlinked the same way.
 - `bmo-gate-reference-data.service` and its `.timer` make a pass of the reference gates' data and
@@ -69,6 +79,8 @@ top-up run can ride the claude road, pinned to one Claude login.
   `python3 -m unittest laya-server/test_server.py laya-server/test_resume.py laya-server/test_metrics.py laya-server/test_balance.py laya-server/test_predict.py`.
 - The service front's Python side, which `bun test` does not reach:
   `uv run --no-project --with mcp --with httpx --with starlette --with uvicorn --with websockets python3 -m unittest llm-server/test_front.py llm-server/test_ws_dial.py`.
+- The n5 front's Python side, the same way:
+  `uv run --no-project --with httpx --with starlette --with uvicorn python3 -m unittest n5-llm/test_front.py`.
 
 ## What this repository does not touch
 

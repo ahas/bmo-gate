@@ -2,19 +2,20 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { ENGINE_FILES, installLlmService, LAYA_SERVICE, SERVICE_FILES, TUNNEL_LISTEN } from "./llm-install";
+import { scratchDir } from "./scratch";
 import {
   authorizedLine,
   bridgeCommand,
-  ENGINE_FILES,
   ensureAuthorized,
-  installLlmService,
   keyMaterial,
   knownHostsLine,
-  SERVICE_FILES,
   tunnelKeyCommand,
   type InstallOptions,
-} from "./llm-install";
-import { scratchDir } from "./scratch";
+} from "./tunnel-install";
+
+// The shared tunnelled install, run through the Laya service on n6. What another service answers
+// differently is checked in that service's own test.
 
 import type { NodeRunner, RunResult } from "./jake";
 
@@ -68,6 +69,7 @@ function fakeNode(options: { setup?: string; keyAnswer?: RunResult } = {}): { ru
 interface Stage {
   root: string;
   keyPath: string;
+  doorListPath: string;
   authorizedKeysPath: string;
   hostKeyPath: string;
   said: string[];
@@ -83,6 +85,7 @@ function stage(): Stage {
   return {
     root,
     keyPath: join(root, "data", "env", "laya.token"),
+    doorListPath: join(root, "data", "env", "tunnel-door.keys"),
     authorizedKeysPath: join(root, "home", ".ssh", "authorized_keys"),
     hostKeyPath,
     said: [],
@@ -95,9 +98,8 @@ function installing(runner: NodeRunner, at: Stage, changes: Partial<InstallOptio
   return {
     runner,
     console: CONSOLE,
-    folder: "/checkout/llm-server",
-    engineFolder: "/checkout/laya-server",
     keyPath: at.keyPath,
+    doorListPath: at.doorListPath,
     authorizedKeysPath: at.authorizedKeysPath,
     hostKeyPath: at.hostKeyPath,
     tmpRoot: join(at.root, "tmp"),
@@ -120,14 +122,14 @@ const commandOf = (one: Seen) => (one.argv[2] === "upload" ? `upload ${one.argv[
 
 describe("the pieces the install writes", () => {
   test("the tunnel's entry allows one forward and no shell", () => {
-    expect(authorizedLine("ssh-ed25519 AAAA")).toBe(
+    expect(authorizedLine("ssh-ed25519 AAAA", TUNNEL_LISTEN)).toBe(
       'restrict,port-forwarding,permitlisten="127.0.0.1:18010",command="/usr/sbin/nologin" ssh-ed25519 AAAA',
     );
   });
 
   test("a key is known by its type and body, not its comment or options", () => {
     expect(keyMaterial(TUNNEL_PUB)).toBe(TUNNEL_PUB.split(" ").slice(0, 2).join(" "));
-    expect(keyMaterial(authorizedLine(TUNNEL_PUB))).toBe(keyMaterial(TUNNEL_PUB));
+    expect(keyMaterial(authorizedLine(TUNNEL_PUB, TUNNEL_LISTEN))).toBe(keyMaterial(TUNNEL_PUB));
     expect(keyMaterial("no key here")).toBeNull();
   });
 
@@ -142,7 +144,8 @@ describe("the pieces the install writes", () => {
   });
 
   test("the tunnel key is made only where there is none, and only its public half is read back", () => {
-    const command = tunnelKeyCommand("n6");
+    const command = tunnelKeyCommand(LAYA_SERVICE);
+    expect(command).toContain("-C bmo-llm-tunnel@n6");
     expect(command.startsWith("test -f ~/.config/bmo-llm/tunnel_ed25519 || ssh-keygen")).toBe(true);
     expect(command.endsWith("cat ~/.config/bmo-llm/tunnel_ed25519.pub")).toBe(true);
   });
@@ -199,8 +202,11 @@ describe("the whole install", () => {
     const pinned = seen.find((one) => one.argv[4]?.endsWith("/known_hosts"))!.carried!;
     expect(pinned.text).toBe(`${knownHostsLine(HOST_PUB)}\n`);
 
-    expect(readFileSync(at.authorizedKeysPath, "utf8")).toBe(`${authorizedLine(keyMaterial(TUNNEL_PUB)!)}\n`);
+    expect(readFileSync(at.authorizedKeysPath, "utf8")).toBe(`${authorizedLine(keyMaterial(TUNNEL_PUB)!, TUNNEL_LISTEN)}\n`);
     expect(statSync(at.authorizedKeysPath).mode & 0o777).toBe(0o600);
+
+    // The door takes the tunnel by the key's file, named once in its list.
+    expect(readFileSync(at.doorListPath, "utf8")).toBe(`${at.keyPath}\n`);
   });
 
   test("a key already made and an entry already standing are left as they are", async () => {
@@ -290,9 +296,9 @@ describe("the whole install", () => {
     mkdirSync(join(at.root, "home", ".ssh"), { recursive: true });
     writeFileSync(at.authorizedKeysPath, "ssh-ed25519 AAAAotherKey someone@else", { mode: 0o600 });
 
-    expect(ensureAuthorized(at.authorizedKeysPath, TUNNEL_PUB)).toBe("added");
+    expect(ensureAuthorized(at.authorizedKeysPath, TUNNEL_PUB, TUNNEL_LISTEN)).toBe("added");
     expect(readFileSync(at.authorizedKeysPath, "utf8"))
-      .toBe(`ssh-ed25519 AAAAotherKey someone@else\n${authorizedLine(keyMaterial(TUNNEL_PUB)!)}\n`);
-    expect(ensureAuthorized(at.authorizedKeysPath, TUNNEL_PUB)).toBe("already there");
+      .toBe(`ssh-ed25519 AAAAotherKey someone@else\n${authorizedLine(keyMaterial(TUNNEL_PUB)!, TUNNEL_LISTEN)}\n`);
+    expect(ensureAuthorized(at.authorizedKeysPath, TUNNEL_PUB, TUNNEL_LISTEN)).toBe("already there");
   });
 });

@@ -1,0 +1,11 @@
+[project]
+name = "n5-llm"
+version = "0.1.0"
+description = "The text model's front on n5: an OpenAI-compatible front that holds the card only while it answers (docs/n5-llm.md)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "starlette==1.7.0",
+  "uvicorn==0.53.0",
+  "httpx==0.28.1",
+  "websockets==17.1",
+]

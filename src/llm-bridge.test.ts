@@ -2,15 +2,17 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { chmodSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { bearerMatches, readServiceKey, startBridge } from "./llm-bridge";
+import { bearerMatches, readDoorKeys, readServiceKey, startBridge } from "./llm-bridge";
 import { scratchDir } from "./scratch";
 
 import type { Server, TCPSocketListener } from "bun";
 
-// The tunnel's door on main-host: a WebSocket is taken only with the service key as its bearer, and
-// then carries bytes both ways to the TCP target it stands in front of — here an echo in place of SSH.
+// The tunnel's door on main-host: a WebSocket is taken only with the key of a service in the door's
+// list as its bearer, and then carries bytes both ways to the TCP target it stands in front of — here
+// an echo in place of SSH.
 
 const key = "a".repeat(64);
+const otherKey = "c".repeat(64);
 let bridge: Server<unknown> | null = null;
 let echo: TCPSocketListener<undefined> | null = null;
 
@@ -21,16 +23,22 @@ afterEach(() => {
   echo = null;
 });
 
-function keyFile(mode = 0o600): string {
-  const path = join(scratchDir("bmo-llm-bridge-"), "n6.key");
-  writeFileSync(path, `${key}\n`);
+function keyFile(mode = 0o600, text = key): string {
+  const path = join(scratchDir("bmo-llm-bridge-"), "service.key");
+  writeFileSync(path, `${text}\n`);
   chmodSync(path, mode);
   return path;
 }
 
-function stand(keyPath: string): string {
+function doorList(...keyPaths: string[]): string {
+  const path = join(scratchDir("bmo-llm-bridge-"), "tunnel-door.keys");
+  writeFileSync(path, keyPaths.map((one) => `${one}\n`).join(""));
+  return path;
+}
+
+function stand(...keyPaths: string[]): string {
   echo = Bun.listen({ hostname: "127.0.0.1", port: 0, socket: { data(socket, chunk) { socket.write(chunk); } } });
-  bridge = startBridge({ hostname: "127.0.0.1", port: 0, keyPath, target: { hostname: "127.0.0.1", port: echo.port } }) as Server<unknown>;
+  bridge = startBridge({ hostname: "127.0.0.1", port: 0, doorListPath: doorList(...keyPaths), target: { hostname: "127.0.0.1", port: echo.port } }) as Server<unknown>;
   return `127.0.0.1:${bridge.port}`;
 }
 
@@ -39,6 +47,11 @@ describe("the key the bridge asks for", () => {
     expect(readServiceKey(keyFile())).toBe(key);
     expect(readServiceKey(keyFile(0o644))).toBeNull();
     expect(readServiceKey("/nonexistent/n6.key")).toBeNull();
+  });
+
+  test("is any key the door's list names, and none where the list is missing", () => {
+    expect(readDoorKeys(doorList(keyFile(), "/nonexistent/n5.key", keyFile(0o600, otherKey)))).toEqual([key, otherKey]);
+    expect(readDoorKeys("/nonexistent/tunnel-door.keys")).toEqual([]);
   });
 
   test("is matched whole as a bearer", () => {
@@ -67,9 +80,10 @@ describe("the bridge", () => {
     expect((await fetch(`http://${loose}/`, { headers: { authorization: `Bearer ${key}` } })).status).toBe(401);
   });
 
-  test("asks for an upgrade from a request that has the key and is no WebSocket", async () => {
-    const at = stand(keyFile());
+  test("asks for an upgrade from a request that has any listed service's key and is no WebSocket", async () => {
+    const at = stand(keyFile(), keyFile(0o600, otherKey));
     expect((await fetch(`http://${at}/`, { headers: { authorization: `Bearer ${key}` } })).status).toBe(426);
+    expect((await fetch(`http://${at}/`, { headers: { authorization: `Bearer ${otherKey}` } })).status).toBe(426);
   });
 
   test("carries bytes both ways between the WebSocket and its target", async () => {
