@@ -7,6 +7,7 @@ carries the service key as its bearer. docs/laya-server.md is the whole account 
 
 from __future__ import annotations
 
+import fcntl
 import hmac
 import json
 import os
@@ -65,6 +66,10 @@ class CallerLeft(Exception):
     """The caller hung up before its turn at the card came."""
 
 
+class Busy(Exception):
+    """Another service holds the shared card lock."""
+
+
 def read_token(env: Optional[Dict[str, str]] = None) -> str:
     """The service key, which the unit reads out of the service's environment file."""
     token = (os.environ if env is None else env).get("LAYA_TOKEN", "").strip()
@@ -117,6 +122,49 @@ def check_request(body: Any) -> tuple[str, Any, Dict[str, Dict[str, Any]]]:
     return gate, state, questions
 
 
+class CardLock:
+    """The lock the services sharing a card take turns by: an exclusive flock on one file, taken
+    before anything goes on the card and let go once everything is off it. With no file named there is
+    no lock, and taking it always succeeds."""
+
+    def __init__(self, path: Optional[str]):
+        self.path = path
+        self.fd: Optional[int] = None
+
+    @property
+    def held(self) -> bool:
+        return self.fd is not None
+
+    def take(self, wait: bool = False) -> bool:
+        if self.path is None or self.fd is not None:
+            return True
+        fd = os.open(self.path, os.O_RDWR | os.O_CREAT, 0o666)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | (0 if wait else fcntl.LOCK_NB))
+        except BlockingIOError:
+            os.close(fd)
+            return False
+        self.fd = fd
+        return True
+
+    def release(self) -> None:
+        if self.fd is not None:
+            fcntl.flock(self.fd, fcntl.LOCK_UN)
+            os.close(self.fd)
+            self.fd = None
+
+    def described(self) -> Dict[str, Any]:
+        return {"path": self.path, "held": self.held}
+
+
+def after(seconds: float, action: Callable[[], None]) -> Any:
+    """Run action once, seconds from now, on a thread of its own; the handle it gives back cancels it."""
+    timer = threading.Timer(seconds, action)
+    timer.daemon = True
+    timer.start()
+    return timer
+
+
 class Checkpoint:
     """One gate's loaded checkpoint, on the card or waiting in host memory.
 
@@ -135,6 +183,7 @@ class Checkpoint:
         self.device = agent.device
         self.dtype = agent.dtype
         self.on_card = True
+        self.move_ms: Optional[float] = None
         guard_forward(agent.model)
         self.slots = []
         for module in agent.model.modules():
@@ -150,10 +199,12 @@ class Checkpoint:
     def put_on_card(self) -> None:
         import torch
 
+        started = time.perf_counter()
         for table, name, dtype, host in self.slots:
             table[name].data = host.to(self.device, non_blocking=True).to(dtype)
         torch.cuda.synchronize(self.device)
         self.on_card = True
+        self.move_ms = round((time.perf_counter() - started) * 1000, 1)
 
     def take_off_card(self) -> None:
         import torch
@@ -177,7 +228,9 @@ class Checkpoint:
     def described(self) -> Dict[str, Any]:
         return {
             "model": self.source,
-            "onCard": self.on_card,
+            "where": "card" if self.on_card else "pinned",
+            "pinnedBytes": sum(host.numel() * host.element_size() for _, _, _, host in self.slots),
+            "moveMs": self.move_ms,
             "loadMs": self.load_ms,
             "temperature": getattr(self.agent, "temperature", None),
             "temperatureByOptions": getattr(self.agent, "temperature_by_options", None),
@@ -209,14 +262,25 @@ def guard_forward(model: Any) -> None:
 class Decider:
     """The gates' checkpoints and the card they take turns on. One decision at a time.
 
-    At most card_models checkpoints are on the card; asking a gate whose checkpoint waits in host
-    memory takes the least recently asked one off first. A decision that runs out of card lowers
-    card_models to the number that left it room.
+    The card is used only under the card lock, and a call that finds the lock held elsewhere is
+    refused at once. At most card_models checkpoints are on the card; asking a gate whose checkpoint
+    waits in host memory takes the least recently asked one off first. A decision that runs out of
+    card lowers card_models to the number that left it room. idle_seconds after the last decision
+    every checkpoint leaves the card and the lock is let go; with none given they stay.
     """
 
     def __init__(self, checkpoints: Dict[str, Any], card_models: int, device: str, versions: Dict[str, str],
-                 vram: Callable[[], Optional[int]]):
+                 vram: Callable[[], Optional[int]], card_lock: Optional[CardLock] = None,
+                 idle_seconds: Optional[float] = None, schedule: Callable[[float, Callable[[], None]], Any] = after,
+                 clock: Callable[[], float] = time.monotonic):
         self.checkpoints = checkpoints
+        self.card_lock = card_lock or CardLock(None)
+        self.idle_seconds = idle_seconds
+        self.schedule = schedule
+        self.clock = clock
+        self.rest_timer: Any = None
+        self.last_decision = clock()
+        self.busy_refused = 0
         self.card_models = max(1, card_models)
         self.device = device
         self.versions = versions
@@ -281,8 +345,11 @@ class Decider:
             if not caller_waiting():
                 self.dropped_calls += 1
                 raise CallerLeft(f"the caller of a {gate} decision left before its turn")
-            self.bring(checkpoint)
+            if not self.card_lock.take():
+                self.busy_refused += 1
+                raise Busy(f"the card is busy: another service holds {self.card_lock.path}")
             try:
+                self.bring(checkpoint)
                 result = self.predict_on_card(checkpoint, state, questions)
             except ValueError as error:
                 # Laya's own refusal of a question it cannot lay out (options past its head budget).
@@ -291,7 +358,30 @@ class Decider:
                 checkpoint.settle()
                 if not checkpoint.on_card:
                     self.card.pop(gate, None)
+                self.last_decision = self.clock()
+                self.plan_rest()
         return {**result, "ms": round((time.perf_counter() - started) * 1000, 2)}
+
+    def plan_rest(self) -> None:
+        if self.idle_seconds is None:
+            return
+        if self.rest_timer is not None:
+            self.rest_timer.cancel()
+        self.rest_timer = self.schedule(self.idle_seconds, self.rest)
+
+    def rest(self) -> None:
+        """Take every checkpoint off the card and let the lock go once the idle time has passed since
+        the last decision; a timer that fires early is planned again for what is left."""
+        with self.lock:
+            left = self.idle_seconds - (self.clock() - self.last_decision)
+            if left > 0:
+                self.rest_timer = self.schedule(left, self.rest)
+                return
+            for checkpoint in self.checkpoints.values():
+                if checkpoint.on_card:
+                    checkpoint.take_off_card()
+            self.card.clear()
+            self.card_lock.release()
 
     def model_line(self) -> str:
         return ", ".join(f"{gate}={checkpoint.source}" for gate, checkpoint in self.checkpoints.items()) or "no gate"
@@ -304,6 +394,8 @@ class Decider:
             "vramBytes": self.vram(),
             "loadMs": sum(checkpoint.load_ms for checkpoint in self.checkpoints.values()),
             "cardModels": self.card_models,
+            "cardLock": {**self.card_lock.described(), "idleSeconds": self.idle_seconds,
+                         "busyRefused": self.busy_refused},
             "roomMade": self.room_made,
             "droppedCalls": self.dropped_calls,
             "versions": self.versions,
@@ -379,7 +471,7 @@ def handler_for(decider: Decider, token: str):
                 sys.stderr.write(f"{self.address_string()} {error}\n")
             except Refused as error:
                 self.answer(error.status, {"error": str(error)})
-            except NoRoom as error:
+            except (Busy, NoRoom) as error:
                 self.answer(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(error)})
             except Exception as error:  # noqa: BLE001 - the process stays up for the next call
                 sys.stderr.write(f"decide failed: {type(error).__name__}: {str(error)[:300]}\n")
@@ -395,6 +487,12 @@ def load_decider() -> Decider:
 
     named = read_checkpoints(os.environ.get("LAYA_CHECKPOINTS", ""))
     card_models = int(os.environ.get("LAYA_CARD_MODELS", "1"))
+    idle = os.environ.get("LAYA_CARD_IDLE_SECONDS", "").strip()
+    card_lock = CardLock(os.environ.get("LAYA_GPU_LOCK", "").strip() or None)
+    if card_lock.path is not None:
+        # The one wait on the lock: nothing is answered before every checkpoint has been tried anyway.
+        sys.stderr.write(f"laya-server: waiting for the card lock {card_lock.path}\n")
+        card_lock.take(wait=True)
     checkpoints: Dict[str, Checkpoint] = {}
     for gate, directory in named.items():
         started = time.perf_counter()
@@ -414,8 +512,9 @@ def load_decider() -> Decider:
     def vram() -> Optional[int]:
         return int(torch.cuda.memory_reserved()) if torch.cuda.is_available() else None
 
+    card_lock.release()
     versions = {"laya": laya.__version__, "torch": torch.__version__, "transformers": transformers.__version__}
-    return Decider(checkpoints, card_models, "cuda", versions, vram)
+    return Decider(checkpoints, card_models, "cuda", versions, vram, card_lock, float(idle) if idle else None)
 
 
 def main() -> None:

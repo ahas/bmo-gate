@@ -21,12 +21,14 @@ asks (BMO's `docs/laya.md`).
   carries. A kernel is built once for each of the few shapes the input padding leaves, costs 40 to 120
   milliseconds the once, and is kept in the account's triton cache on disk, so it survives a restart
   and the shapes a gate asks are warm within a handful of calls.
-- **What it holds:** one checkpoint per gate, never one shared by all of them. On start it loads
-  every checkpoint the unit's settings name (「Which checkpoint answers which gate」), one after the
-  other, and each makes one decision of its own on the card before the next is loaded. Only then does
-  it open the port, so a server that answers `/health` can decide for every gate it names, and one
-  whose checkpoint cannot decide stops and is restarted by the unit. It never falls back to the hub
-  model: a gate no checkpoint is named for is refused, not answered by another gate's checkpoint.
+- **What it holds:** one checkpoint per gate, never one shared by all of them. On start it waits for
+  the card lock where one is named (「Sharing the card」), loads every checkpoint the unit's settings
+  name (「Which checkpoint answers which gate」) one after the other, and each makes one decision of
+  its own on the card and is taken off into pinned host memory before the next is loaded. Then it lets
+  the lock go and opens the port, so a server that answers `/health` can decide for every gate it
+  names, and one whose checkpoint cannot decide stops and is restarted by the unit. It never falls
+  back to the hub model: a gate no checkpoint is named for is refused, not answered by another gate's
+  checkpoint.
 - **Its environment:**
   - `USE_TF=0`, which the model card names as the cure for a load that hangs.
   - torch comes as PyPI's default build (CUDA 13), which n6's driver runs.
@@ -35,20 +37,24 @@ asks (BMO's `docs/laya.md`).
 - **Port:** `7431` on n6's loopback alone. The front is the only way to it.
 - **One call carries at most 128 questions**; more is refused as a request it cannot read.
 - **Its two calls:**
-  - `GET /health` — for each gate it serves, the checkpoint directory, whether it is on the card now,
-    how long it took to load and the calibration temperatures it carries; beside those the device,
-    the VRAM the process holds, how many checkpoints may be on the card at once, how many decisions
-    ran out of card and were asked again with room made (`roomMade`), how many calls were dropped
-    because their caller had left (`droppedCalls`), and the Laya and torch versions. Its `model` line
-    names every gate with its checkpoint, so a change of any one of them is a change of the model a
-    watcher sees.
+  - `GET /health` — for each gate it serves, the checkpoint directory, where it is now (`pinned` in
+    host memory or on the `card`), the bytes its pinned copy takes, how long its last move onto the
+    card took (`moveMs`, none before its first), how long it took to load and the calibration
+    temperatures it carries; beside those the device, the VRAM the process holds, how many
+    checkpoints may be on the card at once, the card lock (its path, whether the server holds it, the
+    idle time after which it lets go, and how many calls were answered busy), how many decisions ran
+    out of card and were asked again with room made (`roomMade`), how many calls were dropped because
+    their caller had left (`droppedCalls`), and the Laya and torch versions. Its `model` line names
+    every gate with its checkpoint, so a change of any one of them is a change of the model a watcher
+    sees.
   - `POST /decide` — the gate asking, a state and a set of named questions in, Laya's answer for each
     question out, as that gate's checkpoint gives it: the probabilities, the chosen option and the
     confidence. A call that names no gate is refused as a request it cannot read (400); one that names
-    a gate no checkpoint serves is refused as not served here (404); one whose checkpoint cannot be put
-    on the card because something else holds it is answered 503, and none of them is asked of a
-    checkpoint. A decision that does not fit on the card even with its checkpoint alone there is
-    answered 503 too (「Sharing the card」).
+    a gate no checkpoint serves is refused as not served here (404); one that finds the card lock held
+    by another service is answered 503 at once, saying the card is busy; one whose checkpoint cannot
+    be put on the card for want of room is answered 503; and none of them is asked of a checkpoint. A
+    decision that does not fit on the card even with its checkpoint alone there is answered 503 too
+    (「Sharing the card」).
 - **One decision at a time.** Calls wait in line for the card. A call whose caller has hung up by the
   time its turn comes — the front gave up on it — is dropped unasked, with one log line and no answer,
   so calls nobody waits for any more never hold up the ones behind them. An answer whose caller left
@@ -101,11 +107,21 @@ asks (BMO's `docs/laya.md`).
 
 ## Sharing the card
 
-A card the server does not hold alone can keep only some of the checkpoints on it at once and let the
-rest wait in host memory. n6's card is the server's alone, so the service lets every checkpoint onto
-it for as long as the decisions leave them room (`docs/llm-server.md`, 「The engine」); what follows
-is the mechanism.
+Every checkpoint waits in pinned host memory, and the card is used only while decisions are being
+made. n6's card is shared with other services under one lock (`docs/llm-server.md`, 「The shared
+card lock」); what follows is the mechanism, and the unit's settings are its policy.
 
+- **The card lock:** `LAYA_GPU_LOCK` names a file the server takes an exclusive, non-blocking
+  `flock` on before it puts a checkpoint on the card. It holds the lock for as long as any checkpoint
+  is on the card and lets it go when it has taken them all off and emptied the allocator's cache.
+  Where nothing names a file the server takes no lock.
+- **A busy card is answered at once:** a call that finds the lock held by another process is
+  answered 503 without waiting and without touching the card, and counted in `/health`.
+- **The idle time:** `LAYA_CARD_IDLE_SECONDS` after the last decision, every checkpoint is taken off
+  the card and the lock let go. A call inside that time finds its checkpoint on the card, or puts it
+  there beside the others. Where nothing sets it, checkpoints stay on the card until a decision
+  needs their room.
+- **What stays on the card without the lock** is the process's CUDA context and nothing more.
 - **What a checkpoint costs on the card:** 1.2 to 1.4 GB each as `nvidia-smi` reads it — the weights
   are kept in 32 bits there, as Laya builds them. A decision needs working memory of its own beside
   them, which grows with the tokens it lays out, so the card that holds every checkpoint of eight
@@ -117,9 +133,11 @@ is the mechanism.
   measured on four checkpoints over three rounds each.
 - **How they wait:** in pinned host memory, each weight in the 16 bits it was saved in wherever that
   holds it exactly, and in 32 bits where it does not — so the move back reproduces the card's copy
-  bit for bit. Four checkpoints hold about 2.6 GB of host memory that way.
-- **What a move costs:** putting a checkpoint on the card takes about half a second; taking one off
-  takes a hundredth, since only the card's copy is dropped. The card's cache is let go with it, so
+  bit for bit. A checkpoint holds about 644 MB of host memory that way, eight about 5.2 GB. The pinned copies are
+  page-locked by the CUDA driver, which the account's memlock limit does not count, so the limit does
+  not bound how many checkpoints can wait there.
+- **What a move costs:** putting a checkpoint on the card takes about 56 milliseconds on n6; taking
+  one off takes a hundredth of a second, since only the card's copy is dropped. The card's cache is let go with it, so
   what a large call reserved goes back to the others.
 - **Which one goes:** the one asked least recently. A turn that asks two served gates pays one move
   each; a run of calls to one gate pays none.
@@ -177,6 +195,18 @@ Five gates served (`output-decide`, `library-knowledge`, `room-rules`, `situatio
   reading 11,751 MiB of its 12,282. A part of 128 questions at the same state does not fit: it has the
   three least recently asked checkpoints taken off and is answered on the card in 2.8 to 3.0 seconds,
   where Laya's own fallback takes over a minute on the CPU.
+- **Eight gates under the card lock,** the unit's settings (every checkpoint pinned, ten seconds
+  idle), one question, from main-host:
+  - **The first decision after the card was let go** takes 104 to 124 ms, median of three per gate:
+    the move onto the card 55 to 57 ms of it, the decision inside the server about 81 ms. A decision
+    with its checkpoint already on the card takes 40 to 59 ms.
+  - **All eight gates asked in turn** from a card let go take 0.75 seconds, each paying its move once.
+  - **VRAM:** 242 MiB while the card is let go, which is the process's CUDA context alone, and 9,214
+    MiB with all eight on the card.
+  - **Host memory:** the eight pinned copies take 5.2 GB.
+  - **The answers do not move:** 20 test rows of each of the eight gates, 4,421 questions, answered
+    the same to the last digit by a server that keeps checkpoints on the card between calls and by
+    one that gives the card back after each use.
 
 ## The training loop and calibration
 

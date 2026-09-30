@@ -2,20 +2,23 @@
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import socket
 import sys
+import tempfile
 import threading
 import time
 import unittest
 import urllib.error
 import urllib.request
 from http.server import ThreadingHTTPServer
+from types import SimpleNamespace
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from server import CardFull, Decider, ForwardFailed, guard_forward, handler_for, read_checkpoints, read_token  # noqa: E402
+from server import CardFull, CardLock, Decider, ForwardFailed, guard_forward, handler_for, read_checkpoints, read_token  # noqa: E402
 
 TOKEN = "test-token"
 
@@ -65,7 +68,32 @@ class StandIn:
                                                        for qid in questions}}
 
     def described(self):
-        return {"model": self.source, "onCard": self.on_card, "loadMs": self.load_ms}
+        return {"model": self.source, "where": "card" if self.on_card else "pinned", "loadMs": self.load_ms}
+
+
+class Timers:
+    """The Decider's idle timer and clock, run by hand instead of by the wall clock."""
+
+    def __init__(self):
+        self.now = 100.0
+        self.planned = []
+
+    def clock(self):
+        return self.now
+
+    def schedule(self, seconds, action):
+        timer = {"at": self.now + seconds, "action": action, "cancelled": False}
+        self.planned.append(timer)
+        return SimpleNamespace(cancel=lambda: timer.update(cancelled=True))
+
+    def live(self):
+        return [timer for timer in self.planned if not timer["cancelled"]]
+
+    def fire(self):
+        timer = self.live()[-1]
+        self.planned.remove(timer)
+        self.now = max(self.now, timer["at"])
+        timer["action"]()
 
 
 def noul(gate, state="안녕", qid="fold"):
@@ -73,12 +101,12 @@ def noul(gate, state="안녕", qid="fold"):
 
 
 class ServerTest(unittest.TestCase):
-    def serve(self, gates, card_models=1, full=None):
+    def serve(self, gates, card_models=1, full=None, **lock):
         if getattr(self, "server", None) is not None:
             self.tearDown()
         self.moves = []
         self.gates = {gate: StandIn(gate, self.moves, (full or {}).get(gate, 0)) for gate in gates}
-        decider = Decider(self.gates, card_models, "cuda", {"laya": "0.3.5"}, lambda: 700_000_000)
+        self.decider = decider = Decider(self.gates, card_models, "cuda", {"laya": "0.3.5"}, lambda: 700_000_000, **lock)
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), handler_for(decider, TOKEN))
         threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True).start()
         self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
@@ -108,7 +136,7 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(body["model"], "output-decide=checkpoints/output-decide/run/step-000001, "
                                         "library-knowledge=checkpoints/library-knowledge/run/step-000001")
         self.assertEqual(body["gates"]["library-knowledge"]["model"], "checkpoints/library-knowledge/run/step-000001")
-        self.assertFalse(body["gates"]["output-decide"]["onCard"])
+        self.assertEqual(body["gates"]["output-decide"]["where"], "pinned")
         self.assertEqual(body["device"], "cuda")
         self.assertEqual(body["vramBytes"], 700_000_000)
         self.assertEqual(body["loadMs"], 2000)
@@ -175,6 +203,58 @@ class ServerTest(unittest.TestCase):
         self.assertIn("no room", body["error"])
         self.assertEqual(self.gates["output-decide"].asked, [])
         self.assertEqual(self.call("/decide", noul("output-decide"))[0], 200)
+
+    def lock_file(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        return os.path.join(folder.name, ".gpu.lock")
+
+    def other_service_holds(self, path):
+        """The lock as another service on the card holds it, let go when the test ends."""
+        fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o666)
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        self.addCleanup(os.close, fd)
+        return fd
+
+    def test_a_card_another_service_holds_is_busy_at_once(self):
+        path = self.lock_file()
+        other = self.other_service_holds(path)
+        self.serve(["output-decide"], card_lock=CardLock(path))
+        status, body = self.call("/decide", noul("output-decide"))
+        self.assertEqual(status, 503)
+        self.assertIn("busy", body["error"])
+        self.assertEqual((self.moves, self.gates["output-decide"].asked), ([], []))
+        self.assertEqual(self.call("/health")[1]["cardLock"]["busyRefused"], 1)
+
+        fcntl.flock(other, fcntl.LOCK_UN)
+        self.assertEqual(self.call("/decide", noul("output-decide"))[0], 200)
+        self.assertTrue(self.call("/health")[1]["cardLock"]["held"])
+        with self.assertRaises(BlockingIOError):
+            fcntl.flock(other, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def test_an_idle_card_is_emptied_and_its_lock_let_go(self):
+        path, timers = self.lock_file(), Timers()
+        self.serve(["output-decide", "library-knowledge"], card_models=2, card_lock=CardLock(path),
+                   idle_seconds=10, schedule=timers.schedule, clock=timers.clock)
+        for gate in ["output-decide", "library-knowledge"]:
+            self.assertEqual(self.call("/decide", noul(gate))[0], 200)
+        self.assertEqual(len(timers.live()), 1)
+
+        # A timer that fires before the idle time has passed since the last decision leaves the card.
+        timers.now += 4
+        self.decider.rest()
+        self.assertEqual(len(self.moves), 2)
+        self.assertEqual(timers.live()[-1]["at"], 110.0)
+
+        timers.fire()
+        self.assertEqual(self.moves[2:], [("off", "output-decide"), ("off", "library-knowledge")])
+        health = self.call("/health")[1]
+        self.assertFalse(health["cardLock"]["held"])
+        self.assertEqual({gate["where"] for gate in health["gates"].values()}, {"pinned"})
+        fcntl.flock(self.other_service_holds(path), fcntl.LOCK_UN)
+
+        self.assertEqual(self.call("/decide", noul("output-decide"))[0], 200)
+        self.assertEqual(self.moves[4:], [("on", "output-decide")])
 
     def test_a_call_whose_caller_left_before_its_turn_is_dropped_unasked(self):
         first = self.gates["output-decide"]

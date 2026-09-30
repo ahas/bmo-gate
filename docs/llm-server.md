@@ -10,8 +10,9 @@ that asks it and the configuration of which gate asks (BMO's `docs/laya.md`).
 ## The machine
 
 - **The card:** n6 is an RTX 4070 with 12,282 MiB (11.99 GiB), driver 595.58.03 (CUDA 13.2), on an
-  i9-9900KF with 62 GiB of RAM and Ubuntu on kernel 5.15. The card is Laya's alone: nothing else is
-  served from n6 and nothing is trained there.
+  i9-9900KF with 62 GiB of RAM and Ubuntu on kernel 5.15. The card is shared: Laya, BMO's voice and
+  its songs each put their model on it only while they use it, under one lock (「The shared card
+  lock」). Nothing is trained there.
 - **The account** is `labuser`. Everything the service is made of stands in it, under `~/bmo-laya`,
   `~/bmo-llm` and `~/.config/bmo-llm`, and none of it asks for sudo.
 
@@ -28,12 +29,44 @@ that asks it and the configuration of which gate asks (BMO's `docs/laya.md`).
 - **Which checkpoint answers which gate** is `LAYA_CHECKPOINTS` in `~/.config/bmo-laya/env` on n6
   (`docs/laya-server.md`, 「Which checkpoint answers which gate」). The checkpoints stand under
   `~/bmo-laya/checkpoints/<training gate>/<run>/step-<n>`, the layout of the collection on main-host.
-- **How many checkpoints are on the card at once:** as many as leave room for the decisions. The
-  unit sets `LAYA_CARD_MODELS` to 8, the most it lets on, so each checkpoint goes onto the card the
-  first time its gate asks and stays there until a decision needs its room. The first decision that
-  runs out of card has the least recently asked checkpoints taken off until it fits, and from then on
-  the card holds that many and the rest pay a move of about half a second when their gate asks
-  (`docs/laya-server.md`, 「Sharing the card」).
+- **Where the checkpoints wait:** every one in pinned host memory, from the moment it is loaded. A
+  call puts its gate's checkpoint on the card, under the shared lock; ten seconds after the last
+  decision (`LAYA_CARD_IDLE_SECONDS=10` in the unit) every checkpoint is taken off again and the lock
+  let go (`docs/laya-server.md`, 「Sharing the card」).
+- **How many checkpoints are on the card at once** while the engine holds it: as many as leave room
+  for the decisions. The unit sets `LAYA_CARD_MODELS` to 8, the most it lets on, so a turn that asks
+  several gates keeps each one on the card until the card is let go. The first decision that runs out
+  of card has the least recently asked checkpoints taken off until it fits, and from then on the card
+  holds that many.
+- **The lock it takes** is `LAYA_GPU_LOCK=/home/labuser/.gpu.lock` in the unit.
+
+## The shared card lock
+
+n6's one card is shared by every service that runs a model there: Laya (this repository), BMO's
+voice and BMO's songs. None of them keeps its model on the card while it is not using it, and they
+take turns by one lock.
+
+- **The lock:** an exclusive `flock` on `/home/labuser/.gpu.lock`, the same path for every service,
+  opened with create so whoever comes first makes it. The file's content means nothing.
+- **Taken before anything goes on the card:** a model's weights, a decision's or a generation's
+  working memory. A service that has not got the lock puts nothing on the card.
+- **Let go only once everything is off the card:** the weights dropped and the process's CUDA
+  allocator cache emptied, so what the holder used is free for the next one. What a process may keep
+  on the card without the lock is its CUDA context alone, a few hundred MiB that cannot be let go
+  short of ending the process.
+- **Held no longer than the use:** a holder lets go after a short idle time of its own, never keeps
+  it between uses that are minutes apart, and holds it through one use however long that use is.
+- **A process that dies lets go of it,** since the kernel drops a flock with its last open file, so
+  a crash never leaves the card locked.
+- **Waiting is each service's own choice.** The lock says only who is on the card:
+  - Laya never waits. A call that finds the lock held elsewhere is answered 503 at once, saying the
+    card is busy, so BMO's call ends as a Laya that is not reachable and goes the way its gate goes
+    then (BMO's `docs/laya.md`). Laya's own start is the one exception: it waits for the lock to load
+    and try its checkpoints, since it answers nothing before that anyway.
+  - The voice and the songs choose for themselves whether they wait, and how long, in their own
+    documents.
+- **What a holder may assume:** nothing else runs on the card while it holds the lock, so it may use
+  the whole card less the other services' contexts.
 
 ## The front
 
@@ -228,8 +261,8 @@ collection」) to n6.
 ## n6 carries no training
 
 - **n6 is the service's machine.** Laya's training and measurement run on n2 to n5 only
-  (`docs/training.md`). The Laya node commands refuse n6 by name, because the served
-  checkpoints hold its card and a training run there would take it from them.
+  (`docs/training.md`). The Laya node commands refuse n6 by name, because its card is shared by the
+  services that answer there and a training run would hold it for hours.
 - **Putting training back on n6** takes, in order:
   1. Point BMO's `BMO_LAYA_URL` at another Laya server, since its calls would otherwise go
      unanswered.
@@ -249,7 +282,8 @@ mcp=(-H 'content-type: application/json' -H 'accept: application/json, text/even
 
 1. **Health, without a key:** `curl -s http://127.0.0.1:18010/health` answers 200 and nothing more.
 2. **Health, with the key:** `curl -s -H @<(key) http://127.0.0.1:18010/health` names every gate with
-   its checkpoint, and says it is on the card once its gate has asked.
+   its checkpoint and where it is, `pinned` or `card`, and whether the engine holds the card lock;
+   within the idle time after a call, the gate asked is on the card and the lock held.
 3. **The model list:** `curl -s -H @<(key) http://127.0.0.1:18010/v1/models` lists the served gates.
 4. **The MCP handshake:** an `initialize` posted to `/mcp` answers with the server's capabilities,
    and `tools/list` names `laya_decide` and `laya_gates`.
