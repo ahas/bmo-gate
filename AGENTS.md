@@ -16,8 +16,9 @@ front over llama.cpp that holds the card only while it answers, reached from mai
 same tunnel door. Nothing in BMO asks it.
 
 Most gates' rows ride the codex account; the sanitiser gate, whose attack rows codex refuses at the
-account level, rides the J3090 road instead. While the codex account is shut, a judging pass or a
-top-up run can ride the claude road, pinned to one Claude login.
+account level, rides a home model instead — the J3090 road, or the n5 text model reached over the same
+tunnel. While the codex account is shut, a judging pass or a top-up run can ride the claude road,
+pinned to one Claude login.
 
 ## The documents, which come before the code
 
@@ -45,8 +46,8 @@ top-up run can ride the claude road, pinned to one Claude login.
 ## What it is made of
 
 - Bun and TypeScript, no runtime dependencies.
-- `src/` holds the generator, the freezing and resume machinery, the audit, the three roads (codex,
-  J3090 and the claude road), the rehearsal, the checkpoint collection, the jake console plumbing that drives the nodes,
+- `src/` holds the generator, the freezing and resume machinery, the audit, the four roads (codex,
+  J3090, the n5 road and the claude road), the rehearsal, the checkpoint collection, the jake console plumbing that drives the nodes,
   the install steps the tunnelled services share and each one's own, carrying a checkpoint into
   service, and the tunnel's door on main-host. `src/reference/` is the reference gates' data and `src/train/` the training driver.
 - `scripts/` holds the commands. Each takes `--help`.

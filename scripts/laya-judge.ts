@@ -6,6 +6,7 @@ import { claudeEffort, claudeJudgeRoad, claudeModel } from "../src/claude-road";
 import { codexEffort, codexJudgeRoad, codexModel } from "../src/codex-road";
 import { answersPerBatch, gateFor, judgeBatches, judgePrompt, judgeSystem, judgedRows, readJudgements } from "../src/gate-judge";
 import { j3090Effort, j3090JudgeRoad, j3090Model } from "../src/j3090-road";
+import { n5Effort, n5JudgeRoad, n5Model } from "../src/n5-road";
 import { languageOf, stateText } from "../src/laya-synth";
 import {
   addTokens, freezeBatch, freezeSplits, frozenState, gateOnDisk, guardFolder, keepBarrenAnswer,
@@ -69,6 +70,7 @@ const roads: Record<SynthRoad, () => { road: JudgeRoad; model: string; effort: s
   codex: () => ({ road: codexJudgeRoad(), model: codexModel, effort: codexEffort }),
   j3090: () => ({ road: j3090JudgeRoad(), model: j3090Model, effort: j3090Effort }),
   claude: () => ({ road: claudeJudgeRoad(), model: claudeModel, effort: claudeEffort }),
+  n5: () => ({ road: n5JudgeRoad(), model: n5Model, effort: n5Effort }),
 };
 
 if (!Object.hasOwn(roads, roadName)) {

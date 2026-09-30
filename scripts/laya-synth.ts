@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { claudeAccount, claudeAsker, claudeConfigDir, claudeEffort, claudeModel, claudeTimeoutMs } from "../src/claude-road";
 import { codexAsker, codexEffort, codexModel, codexTimeoutMs, emptyCwd } from "../src/codex-road";
 import { j3090Asker, j3090Effort, j3090Model, j3090TimeoutMs } from "../src/j3090-road";
+import { n5Asker, n5Effort, n5Model, n5TimeoutMs } from "../src/n5-road";
 import { driveGates } from "../src/gate-run";
 import { asksUsage, allOf, asked, lastOf, readFlags } from "../src/flags";
 import { answersOf, gatesChosen } from "../src/laya-synth";
@@ -24,7 +25,7 @@ const defaultBatch = 20;
 
 const usage = `usage: bun scripts/laya-synth.ts --run <이름> [--gate <게이트>]… [--except <게이트>]…
                                  [--rows <n>] [--batch <n>]
-                                 [--road codex|j3090|claude] [--top-up <답>] [--at-once <n>]
+                                 [--road codex|j3090|claude|n5] [--top-up <답>] [--at-once <n>]
                                  [--model <모델>] [--effort <노력>] [--timeout <초>] [--resume] [--overwrite]
 
 게이트마다 실 하나를 붙들고 증류 데이터를 지어 <이름> 실행 폴더 아래에 굳힌다.
@@ -35,6 +36,8 @@ const usage = `usage: bun scripts/laya-synth.ts --run <이름> [--gate <게이�
 --road 는 codex(기본, 실을 붙들어 캐시를 쓴다) 또는 j3090(집의 qwen, 세션도 캐시도 없다).
   codex 가 계정 차원에서 거부하는 게이트를 codex 아닌 길로 이어 지을 때 j3090 을 쓴다.
   claude 는 2번 Claude 계정(~/.claude)에 못박힌 길로, codex 가 막힌 동안 쓴다. 세션도 캐시도 없다.
+  n5 는 main-host 의 OpenAI 호환 앞단(127.0.0.1:18020/v1)에 붙은 집의 텍스트 모델이다. 세션도
+  캐시도 없고, 카드가 바쁘면 503 을 잠깐 기다렸다 다시 묻는다. 무해화 게이트를 이 길로 짓는다.
 --top-up 은 모든 묶음을 이 답 하나로만 짓고 시험 쪽에는 한 행도 두지 않는다. 실제 판정 회차에
   모자란 드문 답을 학습·보정 쪽에 보태는 실행이다(docs/gate-data.md 「Invented data」).
 --at-once 는 동시에 쓸 게이트 수(기본: 고른 게이트 전부).
@@ -90,8 +93,8 @@ const gates = chosen;
 
 const road = (lastOf(reading, "--road") ?? "codex") as SynthRoad;
 
-if (road !== "codex" && road !== "j3090" && road !== "claude") {
-  console.error("laya-synth: --road 는 codex, j3090, claude 가운데 하나입니다.");
+if (road !== "codex" && road !== "j3090" && road !== "claude" && road !== "n5") {
+  console.error("laya-synth: --road 는 codex, j3090, claude, n5 가운데 하나입니다.");
   process.exit(2);
 }
 
@@ -106,9 +109,11 @@ if (unanswerable.length > 0) {
 // Each road brings its own model, its own effort and its own wait, and the asker that speaks it.
 const roadDefaults = road === "j3090"
   ? { model: j3090Model, effort: j3090Effort, timeoutSeconds: j3090TimeoutMs / 1000 }
-  : road === "claude"
-    ? { model: claudeModel, effort: claudeEffort, timeoutSeconds: claudeTimeoutMs / 1000 }
-    : { model: codexModel, effort: codexEffort, timeoutSeconds: codexTimeoutMs / 1000 };
+  : road === "n5"
+    ? { model: n5Model, effort: n5Effort, timeoutSeconds: n5TimeoutMs / 1000 }
+    : road === "claude"
+      ? { model: claudeModel, effort: claudeEffort, timeoutSeconds: claudeTimeoutMs / 1000 }
+      : { model: codexModel, effort: codexEffort, timeoutSeconds: codexTimeoutMs / 1000 };
 
 const rows = Number(lastOf(reading, "--rows") ?? String(defaultRows));
 const batchSize = Number(lastOf(reading, "--batch") ?? String(defaultBatch));
@@ -142,16 +147,20 @@ const started = Date.now();
 // directory.
 const asker: SynthAsker = road === "j3090"
   ? j3090Asker({ model, timeoutMs })
-  : road === "claude"
-    ? claudeAsker({ model, effort, timeoutMs })
-    : codexAsker({ model, effort, timeoutMs });
+  : road === "n5"
+    ? n5Asker({ model, timeoutMs })
+    : road === "claude"
+      ? claudeAsker({ model, effort, timeoutMs })
+      : codexAsker({ model, effort, timeoutMs });
 
 say(`${root}: ${gates.length}게이트, 게이트당 ${rows}행, 한 묶음 ${batchSize}행, 동시에 ${Math.min(atOnce, gates.length)}개.`);
 say(road === "j3090"
   ? `모델 ${model} (${effort}), 길 j3090.`
-  : road === "claude"
-    ? `모델 ${model} (${effort}), 길 claude — ${claudeConfigDir()} 의 ${claudeAccount} 에 못박힘. 작업 폴더 ${emptyCwd()}.`
-    : `모델 ${model} (${effort}), 길 codex. 작업 폴더 ${emptyCwd()}.`);
+  : road === "n5"
+    ? `모델 ${model} (${effort}), 길 n5 — main-host 127.0.0.1:18020/v1.`
+    : road === "claude"
+      ? `모델 ${model} (${effort}), 길 claude — ${claudeConfigDir()} 의 ${claudeAccount} 에 못박힘. 작업 폴더 ${emptyCwd()}.`
+      : `모델 ${model} (${effort}), 길 codex. 작업 폴더 ${emptyCwd()}.`);
 
 if (topUp !== null) {
   say(`드문 답 보태기: 모든 묶음을 ${topUp} 로 짓고, 시험 쪽에는 두지 않습니다.`);

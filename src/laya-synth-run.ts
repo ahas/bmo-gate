@@ -19,7 +19,7 @@ import type { GateSynthesis, LanguageBucket, SynthAsk, SynthRefusal } from "./la
 // model: codex holds a thread across a gate's batches and reads its fixed prefix out of the prompt
 // cache, while J3090 and the claude judging road keep no session at all and carry the whole prefix
 // afresh on every call.
-export type SynthRoad = "codex" | "j3090" | "claude";
+export type SynthRoad = "codex" | "j3090" | "claude" | "n5";
 
 export function roadHoldsSession(road: SynthRoad): boolean {
   return road === "codex";
@@ -35,6 +35,8 @@ export function roadPriceNote(road: SynthRoad): string {
       return "claude 길은 정액제 Claude 구독 로그인입니다. 토큰만 세고 토큰당 값은 매기지 않습니다.";
     case "j3090":
       return "J3090 길은 집 안의 카드입니다. 토큰당 값이 없고, 토큰도 세지 않습니다.";
+    case "n5":
+      return "n5 길은 집 안의 카드입니다. 앞단이 사용량을 돌려주어 토큰은 세지만, 토큰당 값은 매기지 않습니다.";
   }
 }
 

@@ -172,10 +172,10 @@ Every label is made afresh, on a road, against the gate exactly as it stands.
 
 ## The roads
 
-A gate's rows are written or judged on a road. There are three: codex, which most gates ride; J3090,
-for a gate codex will not write; and claude, which judges real rows while the codex account is shut
-and writes none. A run is told which road to drive with, and a gate stopped on one road is taken up
-on another, its frozen batches left as they stand.
+A gate's rows are written or judged on a road. There are four: codex, which most gates ride; J3090
+and n5, home models for a gate codex will not write; and claude, which judges real rows while the
+codex account is shut and writes none. A run is told which road to drive with, and a gate stopped on
+one road is taken up on another, its frozen batches left as they stand.
 
 ## The codex road
 
@@ -301,6 +301,28 @@ one HTTPS request per batch against a small MCP service.
 - **The road reports no tokens.** The MCP answer carries the text alone and no usage, so a gate on
   this road tallies no tokens. The zero is the absence of a reading, not a batch that cost nothing —
   the same as the flat-rate codex login reports no price.
+
+## The n5 road
+
+The other home model codex cannot make write is the general text model on n5, reached through
+main-host's tunnel door as an OpenAI-compatible front (`docs/n5-llm.md`). It is uncensored, so it
+writes the sanitiser gate's attack material without flinching, and it is a road for that gate.
+
+- **One chat completion, one batch, no thread.** The road holds no session and reads no cache: every
+  batch carries the gate's whole fixed prefix afresh as a system message and the answer comes back as
+  the completion's text, so nothing here resumes a thread.
+- **The front serves one model and the road checks it once**, so a front that swapped its model out
+  cannot label another model's rows as this one's. The model is asked not to think before it answers,
+  since a batch wants the whole answer slot for its work.
+- **A busy card is waited on, not counted as a failure.** The front shares one card with the voice
+  server and with Laya's training passes and answers 503 while another of them holds it; an empty
+  completion is a transient of a small model. Either is waited a short while and asked again a bounded
+  number of times before the road gives up and stops the gate, which the unit takes up again where it
+  left off.
+- **The road reports tokens over a house card**, so a gate on it tallies fresh input and output
+  tokens while the tokens stand in for a price that does not exist.
+- **The key** is the front's own service key at the runtime data root's `env/n5-llm.token`, read only
+  when its permission is exactly `0600`.
 
 ## The claude road
 
