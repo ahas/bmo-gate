@@ -23,9 +23,9 @@ CUDA_BIN="/usr/local/cuda/bin"
 # The model, fetched in ranges at once since one connection from this network is slow, and given its
 # name only once its hash is the repository's.
 MODEL_URL="https://huggingface.co/0bserverx/Qwen3.8-27B-Heretic-Abliterated-Uncensored-GGUF/resolve/main"
-MODEL_FILE="RVN-IQ2_XS-multilingual-mtp.gguf"
-MODEL_BYTES=9541912032
-MODEL_SHA256="4ecdd5d7192cc146078baf601d085eed25acbd6784d9313ad3f955594217cf13"
+MODEL_FILE="RVN-Q4_K_M-multilingual-mtp.gguf"
+MODEL_BYTES=16998720992
+MODEL_SHA256="8b20771570e85d1988aa3d1574698370a8b79f746eb02b96f25bf05c48f14b95"
 RANGES=16
 
 step() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*"; }

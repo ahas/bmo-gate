@@ -34,12 +34,18 @@ HOST = "127.0.0.1"
 PORT = int(os.environ.get("N5_LLM_PORT", "8020"))
 ENGINE_PORT = int(os.environ.get("N5_LLM_ENGINE_PORT", "8021"))
 HOME = Path.home()
-MODEL = Path(os.environ.get("N5_LLM_MODEL", str(HOME / "n5-llm/models/RVN-IQ2_XS-multilingual-mtp.gguf")))
+MODEL = Path(os.environ.get("N5_LLM_MODEL", str(HOME / "n5-llm/models/RVN-Q4_K_M-multilingual-mtp.gguf")))
 ENGINE_BIN = Path(os.environ.get("N5_LLM_ENGINE", str(HOME / "n5-llm/build/llama.cpp/build/bin/llama-server")))
 GPU_LOCK = Path(os.environ.get("N5_LLM_GPU_LOCK", "/home/labuser/.gpu.lock"))
 CONTEXT = int(os.environ.get("N5_LLM_CONTEXT", "32768"))
 MTP = os.environ.get("N5_LLM_MTP", "on") != "off"
 DRAFT_TOKENS = int(os.environ.get("N5_LLM_DRAFT_TOKENS", "2"))
+# The model does not fit the card whole: the FFN weights of this many of its last main blocks stay in
+# host memory and are computed by the CPU, enough that the card keeps room for a request.
+CPU_FFN_BLOCKS = int(os.environ.get("N5_LLM_CPU_FFN_BLOCKS", "42"))
+THREADS = int(os.environ.get("N5_LLM_THREADS", "8"))
+# The model's main blocks, numbered from 0; its MTP block comes after them and stays on the card.
+MAIN_BLOCKS = 64
 
 # Another service's single use of the card is seconds; past this the card is taken for longer than a
 # caller should be kept waiting on it.
@@ -64,8 +70,11 @@ def engine_argv() -> list[str]:
     argv = [
         str(ENGINE_BIN), "-m", str(MODEL), "--host", "127.0.0.1", "--port", str(ENGINE_PORT),
         "-ngl", "99", "-fa", "on", "--fit", "off", "-c", str(CONTEXT), "-ctk", "q8_0", "-ctv", "q8_0",
-        "-np", "1", "--no-warmup",
+        "-np", "1", "--no-warmup", "-t", str(THREADS),
     ]
+    if CPU_FFN_BLOCKS > 0:
+        blocks = "|".join(str(block) for block in range(MAIN_BLOCKS - CPU_FFN_BLOCKS, MAIN_BLOCKS))
+        argv += ["-ot", f"blk\\.({blocks})\\.ffn_(up|gate|down)\\.weight=CPU"]
     if MTP:
         argv += ["--spec-type", "draft-mtp", "--spec-draft-n-max", str(DRAFT_TOKENS)]
     return argv
@@ -405,7 +414,8 @@ def main() -> int:
     locked = LockedFile(MODEL)
     say(f"front: {locked.locked} bytes of {MODEL.name} locked in RAM")
     engine = Engine(engine_argv(), GPU_LOCK, f"http://127.0.0.1:{ENGINE_PORT}/health")
-    settings = {"context": CONTEXT, "kv_cache": "q8_0", "mtp": MTP, "draft_tokens": DRAFT_TOKENS if MTP else 0}
+    settings = {"context": CONTEXT, "kv_cache": "q8_0", "mtp": MTP, "draft_tokens": DRAFT_TOKENS if MTP else 0,
+                "cpu_ffn_blocks": CPU_FFN_BLOCKS, "threads": THREADS}
     app = build_app(key, engine, f"http://127.0.0.1:{ENGINE_PORT}", MODEL, locked, settings)
     uvicorn.run(app, host=HOST, port=PORT, log_level="warning", access_log=False)
     return 0

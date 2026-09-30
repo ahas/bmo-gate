@@ -19,14 +19,14 @@ import type { SynthAnswer, SynthAsker, TokenTally } from "./laya-synth-run";
 // The one model the front serves, its answer slot, and its wait. A batch is a long answer — twenty
 // rows, each with its state and its sanitised text, not a one-line verdict — and an answer cut off
 // mid-list holds no rows at all, so the slot is sized well past what one batch needs.
-export const n5Model = "RVN-IQ2_XS-multilingual-mtp";
+export const n5Model = "RVN-Q4_K_M-multilingual-mtp";
 export const n5Effort = "none";
 export const n5AnswerTokens = 16_384;
 
 // The front shares one card with the voice server and with Laya's training passes, so it answers
-// 503 while another of them holds the card. A batch is minutes of writing, so the per-call wait is
-// sized like the other roads' rather than like a gate's own verdict.
-export const n5TimeoutMs = 600_000;
+// 503 while another of them holds the card. The model writes about six tokens a second with part of
+// it on the CPU (docs/n5-llm.md), so the per-call wait lets the whole answer slot be written.
+export const n5TimeoutMs = 3_000_000;
 
 // The base URL an OpenAI client is given on main-host, where the tunnel door lands the front.
 export const n5BaseUrl = "http://127.0.0.1:18020/v1";
