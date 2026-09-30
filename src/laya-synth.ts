@@ -52,6 +52,12 @@ export interface GateSynthesis {
   // The gate's name, which is what the row's `gate` column holds.
   gate: string;
   title: string;
+  // Whether this gate's data is built by a generator of its own rather than by the roster driver
+  // that has a model write whole rows. The 무해화 게이트 is: its rows are wall-to-wall attack
+  // material and its label is fixed by how each row is made, so it is harvested and assembled apart
+  // (docs/gate-data.md, 「The 무해화 게이트's own build」). The spec still stands here for its
+  // question's wording and its balance; only the roster driver leaves it out.
+  builtApart?: boolean;
   // What this gate decides, in one line, as the prompt tells a model.
   judges: string;
   // Where the natural text of a state lives. Empty means the state is itself a string of text; a
@@ -906,6 +912,7 @@ const answerContent: GateSynthesis = {
 const sanitiser: GateSynthesis = {
   gate: "sanitizer",
   title: "무해화 게이트",
+  builtApart: true,
   judges: "이 글이 보안 침해 자료를 싣고 있는가",
   textFields: [],
   transcript: null,
@@ -1014,8 +1021,16 @@ export function gatesChosen(wanted: readonly string[], leftOut: readonly string[
     return `${unknown.join(", ")} 은 게이트 이름이 아닙니다. 이 중에서 고르세요: ${gateSyntheses.map((one) => one.gate).join(", ")}`;
   }
 
-  const chosen = wanted.length === 0 ? [...gateSyntheses] : wanted.map((name) => synthesisFor(name)!);
+  // The default roster is the gates this driver writes, which leaves out the ones built by a
+  // generator of their own; a gate built apart is written only when it is named outright, and then
+  // it is turned back with where it is really built rather than written the wrong way.
+  const chosen = wanted.length === 0 ? gateSyntheses.filter((one) => one.builtApart !== true) : wanted.map((name) => synthesisFor(name)!);
   const kept = chosen.filter((one) => !leftOut.includes(one.gate));
+  const apart = kept.filter((one) => one.builtApart === true);
+
+  if (apart.length > 0) {
+    return `${apart.map((one) => one.gate).join(", ")} 은 이 드라이버가 짓지 않습니다. scripts/laya-sanitize.ts 로 지으세요.`;
+  }
 
   if (kept.length === 0) {
     return "남는 게이트가 없습니다. --gate 와 --except 를 다시 보세요.";

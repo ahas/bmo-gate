@@ -306,11 +306,15 @@ one HTTPS request per batch against a small MCP service.
 
 The other home model codex cannot make write is the general text model on n5, reached through
 main-host's tunnel door as an OpenAI-compatible front (`docs/n5-llm.md`). It is uncensored, so it
-writes the sanitiser gate's attack material without flinching, and it is a road for that gate.
+writes the sanitiser gate's attack material without flinching, and it is the road that gate's own
+generator drives (「The 무해화 게이트's own build」).
 
 - **One chat completion, one batch, no thread.** The road holds no session and reads no cache: every
   batch carries the gate's whole fixed prefix afresh as a system message and the answer comes back as
   the completion's text, so nothing here resumes a thread.
+- **The sanitiser harvest streams.** Where the sanitiser generator drives this road, the completion is
+  asked to hand its text back token by token so the sentences it writes can be watched as they land in
+  the run's live file; the usage rides the final chunk so a streamed harvest still tallies its tokens.
 - **The front serves one model and the road checks it once**, so a front that swapped its model out
   cannot label another model's rows as this one's. The model is asked not to think before it answers,
   since a batch wants the whole answer slot for its work.
@@ -369,12 +373,47 @@ A gate stopped on one road is taken up on another without rebuilding what the fi
 - **The rows are one gate's either way.** Every row conforms to the same gate specification whatever
   road wrote it, so the audit and the merge read a two-road gate as one gate's data.
 
+## The 무해화 게이트's own build
+
+One gate is not written by the roster driver at all. Its rows are wall-to-wall attack material, and
+a model asked to write whole rows for it is either turned back at the account level or graded against
+a sentence rule nobody set. It is built the other way round, by a generator of its own, and left out
+of the roster driver's default so its data is never made two ways at once.
+
+- **The gate the sanitiser trains is binary.** Laya answers CLEAN or DEFUSE, and only the downstream
+  model names the spans a DEFUSE would defuse — Laya never does. So a row carries one gold, the
+  intrusion yes/no, and nothing about a span.
+- **The model writes only the dangerous sentences.** The n5 text model, being uncensored, writes them
+  without flinching, one to a line, by category: an order to attack a real target, an operational
+  account of an attack carried out, and a recipe for slipping attack material past a safety gate — the
+  three things the gate defuses, drawn from the cyber-intrusion slice of the policy research. Every
+  sentence it writes is harmful by construction, so the label is fixed by how the row is made rather
+  than by anything the model says, and there is no whole row for the account to refuse.
+- **The code makes the rows.** A harvested sentence is embedded among the rooms' ordinary lines —
+  some standing bare as a short order, most hidden among a few lines of ordinary talk, which is where
+  the gate really meets such material — and fixed to intrusion true. Where the sentence was embedded
+  is not a trained field; it only makes the state look like the ones the gate is handed.
+- **The clean side asks no model.** It is the rooms' own ordinary talk, with the attack words filtered
+  out so a harmful order hiding in a message is never mislabelled clean, together with the
+  over-refusal cases — security-adjacent requests that carry the vocabulary of an attack and still
+  read CLEAN — fixed to intrusion false. As many clean rows carry attack words as harmful ones do, so
+  the gate cannot settle on the words alone.
+- **The sentences stream to a live file 하스 watches.** Each sentence the model writes lands as it
+  arrives in the run folder's `live.txt`, one line with its category, its language, and whether it was
+  kept or dropped and why. That file is 하스's to read; the worker and BMO read neither it nor the
+  frozen sentences, and only the counts, the label and language balance, the drop reasons and the
+  file's own path are reported.
+- **What it freezes is one gate's data like any other.** The batches, the three splits, the language
+  sidecar, the meta and the progress take the same shape the roster driver's gates take, so the merge
+  and the training read this gate's folder as one gate's data beside the nine.
+
 ## A run
 
 A run is a name, a set of gates, a number of rows per gate and a batch size.
 
-- **The ten gates run at once**, one per thread, one per folder. Nothing a gate writes is read or
-  written by another.
+- **The gates the roster driver writes run at once**, one per thread, one per folder — the nine, the
+  10번째 무해화 게이트 being built apart by its own generator into the same folder's gate slot. Nothing
+  a gate writes is read or written by another.
 - **A gate another run is writing is left out.** One run folder can be driven by two runs at once —
   sanitiser on its own road beside the other nine on codex — and the run that is not writing a gate
   is told to leave it out, so neither ever asks for the other's batch. A run names the gates it

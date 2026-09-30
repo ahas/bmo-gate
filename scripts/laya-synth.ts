@@ -37,7 +37,8 @@ const usage = `usage: bun scripts/laya-synth.ts --run <이름> [--gate <게이�
   codex 가 계정 차원에서 거부하는 게이트를 codex 아닌 길로 이어 지을 때 j3090 을 쓴다.
   claude 는 2번 Claude 계정(~/.claude)에 못박힌 길로, codex 가 막힌 동안 쓴다. 세션도 캐시도 없다.
   n5 는 main-host 의 OpenAI 호환 앞단(127.0.0.1:18020/v1)에 붙은 집의 텍스트 모델이다. 세션도
-  캐시도 없고, 카드가 바쁘면 503 을 잠깐 기다렸다 다시 묻는다. 무해화 게이트를 이 길로 짓는다.
+  캐시도 없고, 카드가 바쁘면 503 을 잠깐 기다렸다 다시 묻는다.
+  무해화 게이트는 이 드라이버가 짓지 않는다. scripts/laya-sanitize.ts 로 짓는다.
 --top-up 은 모든 묶음을 이 답 하나로만 짓고 시험 쪽에는 한 행도 두지 않는다. 실제 판정 회차에
   모자란 드문 답을 학습·보정 쪽에 보태는 실행이다(docs/gate-data.md 「Invented data」).
 --at-once 는 동시에 쓸 게이트 수(기본: 고른 게이트 전부).

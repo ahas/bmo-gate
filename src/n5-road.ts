@@ -238,6 +238,182 @@ async function complete(settings: N5Settings, key: string, system: string, promp
   throw new Error(`n5 가 ${settings.busyRetries + 1}번 내내 답하지 못했습니다: ${lastBusy instanceof Error ? lastBusy.message : String(lastBusy)}`);
 }
 
+// The body of a streaming completion, which is a completion asked to hand its text back token by
+// token so the sentences it writes can be watched as they arrive. Usage rides the final chunk when
+// the front is asked to include it, so a streamed harvest still tallies its tokens.
+export function n5StreamBody(system: string, prompt: string, model: string, answerTokens: number): string {
+  return JSON.stringify({
+    model,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: prompt },
+    ],
+    max_tokens: answerTokens,
+    temperature: 0.9,
+    stream: true,
+    stream_options: { include_usage: true },
+    chat_template_kwargs: { enable_thinking: false },
+  });
+}
+
+// The whole events a buffer holds and the partial one left over, cut on the blank line that ends a
+// server-sent event. The remainder is carried into the next read, so an event split across two reads
+// is never read as two.
+export function cutSseEvents(buffer: string): { events: string[]; rest: string } {
+  const parts = buffer.split("\n\n");
+  const rest = parts.pop() ?? "";
+
+  return { events: parts.filter((event) => event.trim() !== ""), rest };
+}
+
+// What one server-sent event carries: the token text of a delta, the usage where the final chunk
+// holds it, and whether it is the stream's end marker. An event that is neither a data line nor the
+// end is read as an empty delta rather than a fault, since a front may send comments and keep-alives.
+export function readSseEvent(event: string): { text: string; tokens: TokenTally | null; done: boolean } {
+  const data = event
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("data:"))
+    .map((line) => line.slice("data:".length).trim())
+    .join("");
+
+  if (data === "" ) {
+    return { text: "", tokens: null, done: false };
+  }
+
+  if (data === "[DONE]") {
+    return { text: "", tokens: null, done: true };
+  }
+
+  const value = JSON.parse(data) as ChatCompletion & { choices?: { delta?: { content?: unknown } }[] };
+  const delta = value.choices?.[0]?.delta?.content;
+  const text = typeof delta === "string" ? delta : "";
+  const tokens = value.usage === undefined ? null : tokensOf(value.usage);
+
+  return { text, tokens, done: false };
+}
+
+// One streaming completion, retried while the shared card is busy the same way a whole one is. Each
+// token of text is handed to `onDelta` as it arrives, so a caller can write it out line by line; what
+// comes back is the whole text and the token tally the final chunk carried, or the zero tally where
+// the front sent none.
+async function stream(
+  settings: N5Settings,
+  key: string,
+  system: string,
+  prompt: string,
+  onDelta: (text: string) => void,
+): Promise<{ text: string; tokens: TokenTally }> {
+  let lastBusy: unknown = null;
+
+  for (let attempt = 0; attempt <= settings.busyRetries; attempt += 1) {
+    let response: Response;
+
+    try {
+      response = await settings.fetch(`${settings.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: headers(key),
+        body: n5StreamBody(system, prompt, settings.model, settings.answerTokens),
+        signal: AbortSignal.timeout(settings.timeoutMs),
+      });
+    } catch (trouble) {
+      lastBusy = trouble;
+
+      if (attempt < settings.busyRetries) {
+        await settings.wait(settings.busyBackoffMs);
+      }
+
+      continue;
+    }
+
+    if (response.status === 503) {
+      lastBusy = new Error("카드가 바빠 503 으로 답했습니다.");
+
+      if (attempt < settings.busyRetries) {
+        await settings.wait(settings.busyBackoffMs);
+      }
+
+      continue;
+    }
+
+    if (!response.ok || response.body === null) {
+      throw new Error(`n5 가 ${response.status} 로 답했습니다.`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let text = "";
+    let tokens: TokenTally = noTokens;
+
+    for (;;) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+
+      const cut = cutSseEvents(buffer);
+
+      buffer = cut.rest;
+
+      for (const event of cut.events) {
+        const read = readSseEvent(event);
+
+        if (read.text !== "") {
+          text += read.text;
+          onDelta(read.text);
+        }
+
+        if (read.tokens !== null) {
+          tokens = read.tokens;
+        }
+      }
+    }
+
+    if (text.trim() === "") {
+      lastBusy = new N5EmptyAnswer();
+
+      if (attempt < settings.busyRetries) {
+        await settings.wait(settings.busyBackoffMs);
+      }
+
+      continue;
+    }
+
+    return { text, tokens };
+  }
+
+  throw new Error(`n5 가 ${settings.busyRetries + 1}번 내내 답하지 못했습니다: ${lastBusy instanceof Error ? lastBusy.message : String(lastBusy)}`);
+}
+
+// The streaming road the sanitiser harvest drives: the front's model confirmed once, then one
+// streaming completion per harvest, its text delivered token by token. A harvest the front will not
+// answer throws rather than coming back empty, so the run stops at that harvest and takes it up again.
+export interface N5Streamer {
+  stream(system: string, prompt: string, onDelta: (text: string) => void): Promise<{ text: string; tokens: TokenTally }>;
+}
+
+export function n5Streamer(settings: Partial<N5Settings> = {}): N5Streamer {
+  const full = withDefaults(settings);
+  let confirmed = false;
+
+  return {
+    async stream(system, prompt, onDelta) {
+      const key = full.readKey();
+
+      if (!confirmed) {
+        await confirmModel(full, key);
+        confirmed = true;
+      }
+
+      return stream(full, key, system, prompt, onDelta);
+    },
+  };
+}
+
 // The judging road here: one batch of real rows in, one answer out, no session between them. A
 // batch the front does not answer throws rather than coming back empty, the same contract the codex
 // road keeps.

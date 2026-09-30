@@ -628,19 +628,27 @@ describe("which gates a run writes", () => {
   const namesOf = (chosen: ReturnType<typeof gatesChosen>): string[] =>
     typeof chosen === "string" ? [chosen] : chosen.map((one) => one.gate);
 
-  test("nothing chosen and nothing left out is every gate", () => {
-    expect(namesOf(gatesChosen([], []))).toEqual(gateSyntheses.map((one) => one.gate));
+  test("nothing chosen and nothing left out is every gate this driver writes", () => {
+    expect(namesOf(gatesChosen([], []))).toEqual(gateSyntheses.filter((one) => one.builtApart !== true).map((one) => one.gate));
   });
 
-  test("a gate left out is every other gate, in the roster order", () => {
-    const kept = namesOf(gatesChosen([], ["sanitizer"]));
-
-    expect(kept).not.toContain("sanitizer");
-    expect(kept).toEqual(gateSyntheses.map((one) => one.gate).filter((name) => name !== "sanitizer"));
+  test("a gate built apart is left out of the default roster", () => {
+    expect(namesOf(gatesChosen([], []))).not.toContain("sanitizer");
   });
 
-  test("a gate chosen outright is the only one written", () => {
-    expect(namesOf(gatesChosen(["sanitizer"], []))).toEqual(["sanitizer"]);
+  test("a gate left out is every other gate this driver writes, in the roster order", () => {
+    const kept = namesOf(gatesChosen([], ["room-rules"]));
+
+    expect(kept).not.toContain("room-rules");
+    expect(kept).toEqual(gateSyntheses.filter((one) => one.builtApart !== true && one.gate !== "room-rules").map((one) => one.gate));
+  });
+
+  test("a gate built apart, chosen outright, is turned back to where it is built", () => {
+    expect(namesOf(gatesChosen(["sanitizer"], []))[0]).toContain("laya-sanitize.ts");
+  });
+
+  test("an ordinary gate chosen outright is the only one written", () => {
+    expect(namesOf(gatesChosen(["room-rules"], []))).toEqual(["room-rules"]);
   });
 
   test("what is left out is left out of what was chosen too", () => {

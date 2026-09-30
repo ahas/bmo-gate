@@ -5,7 +5,7 @@ import { describe, expect, test } from "bun:test";
 
 import { scratchDir } from "./scratch";
 import { synthesisFor } from "./laya-synth";
-import { n5Asker, n5Body, n5JudgeRoad, n5Model, readN5Answer, readN5Key } from "./n5-road";
+import { cutSseEvents, n5Asker, n5Body, n5JudgeRoad, n5Model, n5Streamer, readN5Answer, readN5Key, readSseEvent } from "./n5-road";
 
 import type { N5Fetch, N5Settings } from "./n5-road";
 import type { SynthAsk } from "./laya-synth";
@@ -193,5 +193,43 @@ describe("the key", () => {
     chmodSync(path, 0o600);
 
     expect(readN5Key(path)).toBe("secret");
+  });
+});
+
+describe("streaming a harvest", () => {
+  test("cuts whole events and keeps the partial one for the next read", () => {
+    const first = cutSseEvents("data: a\n\ndata: b\n\ndata: c");
+
+    expect(first.events).toEqual(["data: a", "data: b"]);
+    expect(first.rest).toBe("data: c");
+  });
+
+  test("reads a delta, the usage on the final chunk, and the end marker", () => {
+    expect(readSseEvent(`data: ${JSON.stringify({ choices: [{ delta: { content: "한" } }] })}`).text).toBe("한");
+    expect(readSseEvent(`data: ${JSON.stringify({ choices: [{ delta: {} }], usage: { prompt_tokens: 5, completion_tokens: 7 } })}`).tokens)
+      .toEqual({ inputTokens: 5, outputTokens: 7, cacheReadTokens: 0, cacheWriteTokens: 0 });
+    expect(readSseEvent("data: [DONE]").done).toBe(true);
+    expect(readSseEvent(": keep-alive").text).toBe("");
+  });
+
+  test("delivers the streamed text delta by delta and returns the whole of it", async () => {
+    const body = [
+      `data: ${JSON.stringify({ choices: [{ delta: { content: "한 줄\n" } }] })}`,
+      `data: ${JSON.stringify({ choices: [{ delta: { content: "두 줄" } }], usage: { prompt_tokens: 3, completion_tokens: 4 } })}`,
+      "data: [DONE]",
+      "",
+    ].join("\n\n");
+
+    const fetch: N5Fetch = async (input) => String(input).endsWith("/models")
+      ? new Response(JSON.stringify({ data: [{ id: n5Model }] }), { status: 200 })
+      : new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
+
+    const streamer = n5Streamer({ readKey: () => "k", fetch, wait: async () => {} });
+    const deltas: string[] = [];
+    const answer = await streamer.stream("system", "prompt", (delta) => deltas.push(delta));
+
+    expect(deltas).toEqual(["한 줄\n", "두 줄"]);
+    expect(answer.text).toBe("한 줄\n두 줄");
+    expect(answer.tokens.outputTokens).toBe(4);
   });
 });
