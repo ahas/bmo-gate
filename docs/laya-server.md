@@ -41,8 +41,8 @@ asks (BMO's `docs/laya.md`).
     host memory or on the `card`), the bytes its pinned copy takes, how long its last move onto the
     card took (`moveMs`, none before its first), how long it took to load and the calibration
     temperatures it carries; beside those the device, the VRAM the process holds, how many
-    checkpoints may be on the card at once, the card lock (its path, whether the server holds it, the
-    idle time after which it lets go, and how many calls were answered busy), how many decisions ran
+    checkpoints may be on the card at once, the card lock (its path, whether the server holds it and
+    how many calls were answered busy), how many decisions ran
     out of card and were asked again with room made (`roomMade`), how many calls were dropped because
     their caller had left (`droppedCalls`), and the Laya and torch versions. Its `model` line names
     every gate with its checkpoint, so a change of any one of them is a change of the model a watcher
@@ -117,10 +117,13 @@ card lock」); what follows is the mechanism, and the unit's settings are its po
   Where nothing names a file the server takes no lock.
 - **A busy card is answered at once:** a call that finds the lock held by another process is
   answered 503 without waiting and without touching the card, and counted in `/health`.
-- **The idle time:** `LAYA_CARD_IDLE_SECONDS` after the last decision, every checkpoint is taken off
-  the card and the lock let go. A call inside that time finds its checkpoint on the card, or puts it
-  there beside the others. Where nothing sets it, checkpoints stay on the card until a decision
-  needs their room.
+- **When the card is let go:** where a lock is named, as soon as the last decision in hand ends.
+  Every call counts from the moment it asks, so one that is being decided or waits its turn behind
+  another keeps the card, and the decision that ends with no other call in hand takes every
+  checkpoint off and lets the lock go at once. Calls that overlap share the checkpoints already on
+  the card; a call that comes after the card was let go puts its own back, so a turn that asks
+  several gates one call after another pays one move a call. Where no lock is named, checkpoints
+  stay on the card until a decision needs their room.
 - **What stays on the card without the lock** is the process's CUDA context and nothing more.
 - **What a checkpoint costs on the card:** 1.2 to 1.4 GB each as `nvidia-smi` reads it — the weights
   are kept in 32 bits there, as Laya builds them. A decision needs working memory of its own beside
@@ -195,18 +198,23 @@ Five gates served (`output-decide`, `library-knowledge`, `room-rules`, `situatio
   reading 11,751 MiB of its 12,282. A part of 128 questions at the same state does not fit: it has the
   three least recently asked checkpoints taken off and is answered on the card in 2.8 to 3.0 seconds,
   where Laya's own fallback takes over a minute on the CPU.
-- **Eight gates under the card lock,** the unit's settings (every checkpoint pinned, ten seconds
-  idle), one question, from main-host:
-  - **The first decision after the card was let go** takes 104 to 124 ms, median of three per gate:
-    the move onto the card 55 to 57 ms of it, the decision inside the server about 81 ms. A decision
-    with its checkpoint already on the card takes 40 to 59 ms.
-  - **All eight gates asked in turn** from a card let go take 0.75 seconds, each paying its move once.
+- **Eight gates under the card lock,** the unit's settings (every checkpoint pinned, the card let go
+  as soon as the last decision in hand ends), one question, from main-host:
+  - **A decision alone on the card** takes 101 to 125 ms, median 108 over five calls a gate: the
+    move onto the card about 56 ms of it, the decision inside the server 85 to 92 ms with the
+    checkpoints taken off after it. The same decision with its checkpoint already on the card takes
+    37 to 44 ms, so giving the card back after every use costs about 65 ms a decision.
+  - **All eight gates asked in turn** take 0.97 seconds, each call paying its move.
+  - **Calls that overlap share the card:** eight calls to four gates sent together are answered in
+    0.63 seconds, and the card is let go when the last of them ends.
+  - **BMO's own test rows,** 20 of each gate, take 129 ms a call at the median against 71 ms on a
+    server that keeps checkpoints on the card between calls.
   - **VRAM:** 242 MiB while the card is let go, which is the process's CUDA context alone, and 9,214
     MiB with all eight on the card.
   - **Host memory:** the eight pinned copies take 5.2 GB.
   - **The answers do not move:** 20 test rows of each of the eight gates, 4,421 questions, answered
     the same to the last digit by a server that keeps checkpoints on the card between calls and by
-    one that gives the card back after each use.
+    one that gives the card back after every decision.
 
 ## The training loop and calibration
 

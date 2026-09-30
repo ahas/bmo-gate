@@ -157,14 +157,6 @@ class CardLock:
         return {"path": self.path, "held": self.held}
 
 
-def after(seconds: float, action: Callable[[], None]) -> Any:
-    """Run action once, seconds from now, on a thread of its own; the handle it gives back cancels it."""
-    timer = threading.Timer(seconds, action)
-    timer.daemon = True
-    timer.start()
-    return timer
-
-
 class Checkpoint:
     """One gate's loaded checkpoint, on the card or waiting in host memory.
 
@@ -265,21 +257,20 @@ class Decider:
     The card is used only under the card lock, and a call that finds the lock held elsewhere is
     refused at once. At most card_models checkpoints are on the card; asking a gate whose checkpoint
     waits in host memory takes the least recently asked one off first. A decision that runs out of
-    card lowers card_models to the number that left it room. idle_seconds after the last decision
-    every checkpoint leaves the card and the lock is let go; with none given they stay.
+    card lowers card_models to the number that left it room. Where the card is shared under a named
+    lock, the decision that ends with no other call in hand takes every checkpoint off and lets the
+    lock go; a call counts from the moment it asks, so one waiting its turn keeps the card. Where no
+    lock is named the checkpoints stay.
     """
 
     def __init__(self, checkpoints: Dict[str, Any], card_models: int, device: str, versions: Dict[str, str],
-                 vram: Callable[[], Optional[int]], card_lock: Optional[CardLock] = None,
-                 idle_seconds: Optional[float] = None, schedule: Callable[[float, Callable[[], None]], Any] = after,
-                 clock: Callable[[], float] = time.monotonic):
+                 vram: Callable[[], Optional[int]], card_lock: Optional[CardLock] = None):
         self.checkpoints = checkpoints
         self.card_lock = card_lock or CardLock(None)
-        self.idle_seconds = idle_seconds
-        self.schedule = schedule
-        self.clock = clock
-        self.rest_timer: Any = None
-        self.last_decision = clock()
+        # Calls asked and not yet ended, those waiting their turn included; counted under its own lock
+        # so a call is counted before it waits on the decision lock.
+        self.in_hand = 0
+        self.in_hand_lock = threading.Lock()
         self.busy_refused = 0
         self.card_models = max(1, card_models)
         self.device = device
@@ -341,47 +332,46 @@ class Decider:
         if checkpoint is None:
             raise Unserved(f"no checkpoint here serves the gate {gate}")
         started = time.perf_counter()
+        with self.in_hand_lock:
+            self.in_hand += 1
         with self.lock:
-            if not caller_waiting():
-                self.dropped_calls += 1
-                raise CallerLeft(f"the caller of a {gate} decision left before its turn")
-            if not self.card_lock.take():
-                self.busy_refused += 1
-                raise Busy(f"the card is busy: another service holds {self.card_lock.path}")
             try:
-                self.bring(checkpoint)
-                result = self.predict_on_card(checkpoint, state, questions)
-            except ValueError as error:
-                # Laya's own refusal of a question it cannot lay out (options past its head budget).
-                raise Refused(str(error)) from error
+                result = self.decide_in_turn(checkpoint, state, questions, caller_waiting)
             finally:
-                checkpoint.settle()
-                if not checkpoint.on_card:
-                    self.card.pop(gate, None)
-                self.last_decision = self.clock()
-                self.plan_rest()
+                with self.in_hand_lock:
+                    self.in_hand -= 1
+                    last = self.in_hand == 0
+                if last and self.card_lock.path is not None:
+                    self.rest()
         return {**result, "ms": round((time.perf_counter() - started) * 1000, 2)}
 
-    def plan_rest(self) -> None:
-        if self.idle_seconds is None:
-            return
-        if self.rest_timer is not None:
-            self.rest_timer.cancel()
-        self.rest_timer = self.schedule(self.idle_seconds, self.rest)
+    def decide_in_turn(self, checkpoint: Any, state: Any, questions: Dict[str, Dict[str, Any]],
+                       caller_waiting: Callable[[], bool]) -> Dict[str, Any]:
+        gate = checkpoint.gate
+        if not caller_waiting():
+            self.dropped_calls += 1
+            raise CallerLeft(f"the caller of a {gate} decision left before its turn")
+        if not self.card_lock.take():
+            self.busy_refused += 1
+            raise Busy(f"the card is busy: another service holds {self.card_lock.path}")
+        try:
+            self.bring(checkpoint)
+            return self.predict_on_card(checkpoint, state, questions)
+        except ValueError as error:
+            # Laya's own refusal of a question it cannot lay out (options past its head budget).
+            raise Refused(str(error)) from error
+        finally:
+            checkpoint.settle()
+            if not checkpoint.on_card:
+                self.card.pop(gate, None)
 
     def rest(self) -> None:
-        """Take every checkpoint off the card and let the lock go once the idle time has passed since
-        the last decision; a timer that fires early is planned again for what is left."""
-        with self.lock:
-            left = self.idle_seconds - (self.clock() - self.last_decision)
-            if left > 0:
-                self.rest_timer = self.schedule(left, self.rest)
-                return
-            for checkpoint in self.checkpoints.values():
-                if checkpoint.on_card:
-                    checkpoint.take_off_card()
-            self.card.clear()
-            self.card_lock.release()
+        """Take every checkpoint off the card and let the lock go. Called under the decision lock."""
+        for checkpoint in self.checkpoints.values():
+            if checkpoint.on_card:
+                checkpoint.take_off_card()
+        self.card.clear()
+        self.card_lock.release()
 
     def model_line(self) -> str:
         return ", ".join(f"{gate}={checkpoint.source}" for gate, checkpoint in self.checkpoints.items()) or "no gate"
@@ -394,8 +384,7 @@ class Decider:
             "vramBytes": self.vram(),
             "loadMs": sum(checkpoint.load_ms for checkpoint in self.checkpoints.values()),
             "cardModels": self.card_models,
-            "cardLock": {**self.card_lock.described(), "idleSeconds": self.idle_seconds,
-                         "busyRefused": self.busy_refused},
+            "cardLock": {**self.card_lock.described(), "busyRefused": self.busy_refused},
             "roomMade": self.room_made,
             "droppedCalls": self.dropped_calls,
             "versions": self.versions,
@@ -487,7 +476,6 @@ def load_decider() -> Decider:
 
     named = read_checkpoints(os.environ.get("LAYA_CHECKPOINTS", ""))
     card_models = int(os.environ.get("LAYA_CARD_MODELS", "1"))
-    idle = os.environ.get("LAYA_CARD_IDLE_SECONDS", "").strip()
     card_lock = CardLock(os.environ.get("LAYA_GPU_LOCK", "").strip() or None)
     if card_lock.path is not None:
         # The one wait on the lock: nothing is answered before every checkpoint has been tried anyway.
@@ -514,7 +502,7 @@ def load_decider() -> Decider:
 
     card_lock.release()
     versions = {"laya": laya.__version__, "torch": torch.__version__, "transformers": transformers.__version__}
-    return Decider(checkpoints, card_models, "cuda", versions, vram, card_lock, float(idle) if idle else None)
+    return Decider(checkpoints, card_models, "cuda", versions, vram, card_lock)
 
 
 def main() -> None:

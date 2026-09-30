@@ -14,7 +14,6 @@ import unittest
 import urllib.error
 import urllib.request
 from http.server import ThreadingHTTPServer
-from types import SimpleNamespace
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -69,31 +68,6 @@ class StandIn:
 
     def described(self):
         return {"model": self.source, "where": "card" if self.on_card else "pinned", "loadMs": self.load_ms}
-
-
-class Timers:
-    """The Decider's idle timer and clock, run by hand instead of by the wall clock."""
-
-    def __init__(self):
-        self.now = 100.0
-        self.planned = []
-
-    def clock(self):
-        return self.now
-
-    def schedule(self, seconds, action):
-        timer = {"at": self.now + seconds, "action": action, "cancelled": False}
-        self.planned.append(timer)
-        return SimpleNamespace(cancel=lambda: timer.update(cancelled=True))
-
-    def live(self):
-        return [timer for timer in self.planned if not timer["cancelled"]]
-
-    def fire(self):
-        timer = self.live()[-1]
-        self.planned.remove(timer)
-        self.now = max(self.now, timer["at"])
-        timer["action"]()
 
 
 def noul(gate, state="안녕", qid="fold"):
@@ -228,33 +202,33 @@ class ServerTest(unittest.TestCase):
 
         fcntl.flock(other, fcntl.LOCK_UN)
         self.assertEqual(self.call("/decide", noul("output-decide"))[0], 200)
-        self.assertTrue(self.call("/health")[1]["cardLock"]["held"])
-        with self.assertRaises(BlockingIOError):
-            fcntl.flock(other, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        self.assertEqual(self.moves, [("on", "output-decide"), ("off", "output-decide")])
 
-    def test_an_idle_card_is_emptied_and_its_lock_let_go(self):
-        path, timers = self.lock_file(), Timers()
-        self.serve(["output-decide", "library-knowledge"], card_models=2, card_lock=CardLock(path),
-                   idle_seconds=10, schedule=timers.schedule, clock=timers.clock)
-        for gate in ["output-decide", "library-knowledge"]:
-            self.assertEqual(self.call("/decide", noul(gate))[0], 200)
-        self.assertEqual(len(timers.live()), 1)
+    def test_the_card_is_let_go_when_the_last_call_in_hand_ends(self):
+        path = self.lock_file()
+        self.serve(["output-decide", "library-knowledge"], card_models=2, card_lock=CardLock(path))
+        first = self.gates["output-decide"]
+        first.hold = threading.Event()
+        ahead = threading.Thread(target=self.call, args=("/decide", noul("output-decide")))
+        ahead.start()
+        self.assertTrue(first.holding.wait(5))
+        behind = threading.Thread(target=self.call, args=("/decide", noul("library-knowledge")))
+        behind.start()
+        deadline = time.monotonic() + 5
+        while self.decider.in_hand < 2:
+            self.assertLess(time.monotonic(), deadline, "the second call was never counted")
+            time.sleep(0.01)
 
-        # A timer that fires before the idle time has passed since the last decision leaves the card.
-        timers.now += 4
-        self.decider.rest()
-        self.assertEqual(len(self.moves), 2)
-        self.assertEqual(timers.live()[-1]["at"], 110.0)
-
-        timers.fire()
-        self.assertEqual(self.moves[2:], [("off", "output-decide"), ("off", "library-knowledge")])
+        # The first decision ends with the second waiting its turn, so the card is kept for it.
+        first.hold.set()
+        ahead.join(5)
+        behind.join(5)
+        self.assertEqual(self.moves, [("on", "output-decide"), ("on", "library-knowledge"),
+                                      ("off", "output-decide"), ("off", "library-knowledge")])
         health = self.call("/health")[1]
         self.assertFalse(health["cardLock"]["held"])
         self.assertEqual({gate["where"] for gate in health["gates"].values()}, {"pinned"})
         fcntl.flock(self.other_service_holds(path), fcntl.LOCK_UN)
-
-        self.assertEqual(self.call("/decide", noul("output-decide"))[0], 200)
-        self.assertEqual(self.moves[4:], [("on", "output-decide")])
 
     def test_a_call_whose_caller_left_before_its_turn_is_dropped_unasked(self):
         first = self.gates["output-decide"]

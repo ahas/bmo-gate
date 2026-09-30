@@ -30,12 +30,12 @@ that asks it and the configuration of which gate asks (BMO's `docs/laya.md`).
   (`docs/laya-server.md`, 「Which checkpoint answers which gate」). The checkpoints stand under
   `~/bmo-laya/checkpoints/<training gate>/<run>/step-<n>`, the layout of the collection on main-host.
 - **Where the checkpoints wait:** every one in pinned host memory, from the moment it is loaded. A
-  call puts its gate's checkpoint on the card, under the shared lock; ten seconds after the last
-  decision (`LAYA_CARD_IDLE_SECONDS=10` in the unit) every checkpoint is taken off again and the lock
-  let go (`docs/laya-server.md`, 「Sharing the card」).
+  call puts its gate's checkpoint on the card, under the shared lock; as soon as the last decision in
+  hand ends, every checkpoint is taken off again and the lock let go (`docs/laya-server.md`,
+  「Sharing the card」).
 - **How many checkpoints are on the card at once** while the engine holds it: as many as leave room
-  for the decisions. The unit sets `LAYA_CARD_MODELS` to 8, the most it lets on, so a turn that asks
-  several gates keeps each one on the card until the card is let go. The first decision that runs out
+  for the decisions. The unit sets `LAYA_CARD_MODELS` to 8, the most it lets on, so calls that overlap
+  keep every gate they ask on the card until the card is let go. The first decision that runs out
   of card has the least recently asked checkpoints taken off until it fits, and from then on the card
   holds that many.
 - **The lock it takes** is `LAYA_GPU_LOCK=/home/labuser/.gpu.lock` in the unit.
@@ -283,7 +283,7 @@ mcp=(-H 'content-type: application/json' -H 'accept: application/json, text/even
 1. **Health, without a key:** `curl -s http://127.0.0.1:18010/health` answers 200 and nothing more.
 2. **Health, with the key:** `curl -s -H @<(key) http://127.0.0.1:18010/health` names every gate with
    its checkpoint and where it is, `pinned` or `card`, and whether the engine holds the card lock;
-   within the idle time after a call, the gate asked is on the card and the lock held.
+   between calls every gate is `pinned` and the lock is not held.
 3. **The model list:** `curl -s -H @<(key) http://127.0.0.1:18010/v1/models` lists the served gates.
 4. **The MCP handshake:** an `initialize` posted to `/mcp` answers with the server's capabilities,
    and `tools/list` names `laya_decide` and `laya_gates`.
