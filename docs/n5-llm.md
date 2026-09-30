@@ -137,8 +137,8 @@ flowchart TD
 - **Waiting for the lock:** a request that finds the lock held elsewhere waits for it up to sixty
   seconds, which covers another service's single use, and is then answered 503, saying the card is
   busy.
-- **When the engine goes:** the moment the last request in hand ends — answered, refused, or cut off
-  by its caller — and its slot's state is saved, with no idle time. A request that arrives while it
+- **When the engine goes:** the moment the last request in hand ends (answered, refused, or cut off
+  by its caller) and its slot's state is saved, with no idle time. A request that arrives while it
   is going waits for it to be gone and starts it again.
 - **A card another process has filled** makes the engine fail its start; the request is answered 503,
   saying the card had no room, and the lock is let go.
@@ -162,8 +162,8 @@ it passes the request on.
   the generation prompt, which the next request of the same conversation carries whole. It does so by
   sending the engine that shortened prompt with nothing to generate: the engine goes back to the
   checkpoint it made four tokens before the prompt's end and computes one token.
-- **A way back that would cost more** — the checkpoint missing, or the prompt not the one the slot
-  holds — is given ten seconds and then hung up on; the engine drops it once the batch of up to
+- **A way back that would cost more,** with the checkpoint missing or the prompt not the one the
+  slot holds, is given ten seconds and then hung up on; the engine drops it once the batch of up to
   2,048 tokens it is computing is done, and whatever the slot then holds is saved; a
   prompt its caller cut off before its end is carried that much further and saved the same way. The
   file's head says which tokens it holds, so what it holds is always what it is chosen by.
@@ -172,7 +172,7 @@ it passes the request on.
   engine does for the request itself. The tokens are held in memory only while the request is in hand.
 - **The files:** in `~/n5-llm/slots/` on the node, which the installer makes, each named by a hash of
   the tokens it holds and carrying them at its head. A save removes every file whose whole sequence
-  begins its own — the same conversation's earlier turns — so a conversation keeps its latest file.
+  begins its own (the same conversation's earlier turns), so a conversation keeps its latest file.
   Nothing is removed for its age.
 - **The choice at start:** once the engine answers its health, the front reads the heads of the files
   and loads the longest one the request's prompt carries whole and goes on past; with none, the slot
@@ -419,8 +419,8 @@ Through the front on n2 on 1 October 2026, at temperature 0 with thinking off, t
 - **A conversation of 21,664 tokens,** a long system prompt and one question, computed from its first
   token: its first token came 2,649 seconds after the request, the prompt at 8.2 t/s.
 - **Its next request,** the answer and one more question on top, 46 tokens new: the saved 21,661
-  tokens were loaded and the first token came 22.9 seconds after the request — the engine's start
-  8.4 seconds, the load 0.09 seconds and the 46 tokens 12.4 seconds.
+  tokens were loaded and the first token came 22.9 seconds after the request: the engine's start
+  took 8.4 seconds, the load 0.09 seconds and the 46 tokens 12.4 seconds.
 - **A save** took 254 to 267 ms for 557 MB, and **a load** 36 to 87 ms, both from and to the page
   cache. **Going back** to the prompt cost the engine one token, 0.16 seconds at 3,125 tokens.
 - **A file's size** is about 157 MB of recurrent state and 18.5 KB a token: 215 MB for 3,125 tokens and

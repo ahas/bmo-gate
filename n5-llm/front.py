@@ -127,8 +127,8 @@ class LockedFile:
 
 
 # A slot file as llama.cpp writes it: its magic, its version and the count of the 32-bit words the
-# server packs the slot's tokens in, then those words — a null token, the packing's version, the token
-# count and the tokens — and after them the state, which is the engine's alone to read.
+# server packs the slot's tokens in, then those words (a null token, the packing's version, the token
+# count and the tokens), and after them the state, which is the engine's alone to read.
 STATE_MAGIC = 0x67677371
 TOKENS_PACKING = 1
 # How many of a prompt's last tokens the saved state leaves off: the opening of the generation prompt,
