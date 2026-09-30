@@ -13,25 +13,28 @@ installer.
 
 ## The model
 
-- **What answers:** Qwen3.8-27B RVN Heretic Abliterated, the file `RVN-Q4_K_M-multilingual-mtp.gguf`
-  of `0bserverx/Qwen3.8-27B-Heretic-Abliterated-Uncensored-GGUF`: 16,998,720,992 bytes, checked
-  against the repository's own SHA-256 before it is given its name.
+- **What answers:** Qwen3.8-27B RVN Heretic Abliterated, the file `RVN-IQ2_XS-multilingual-mtp.gguf`
+  of `0bserverx/Qwen3.8-27B-Heretic-Abliterated-Uncensored-GGUF`: 9,541,912,032 bytes (8.9 GiB),
+  checked against the repository's own SHA-256 before it is given its name.
 - **Why this file:**
-  - The model answers conversations, not gates, so its quality comes before its speed. Four bits is
-    the size 하스 set for it; two bits lose too much of the model.
+  - Two bits is the size 하스 set for it: the whole model then fits the card, and it answers seven to
+    nine times as fast as the four-bit file, which does not fit and has part of every token computed
+    by the CPU (「What it was measured at」).
+  - `IQ2_XS` is the two-bit quantisation measured whole on this card with room left for a request at
+    the full context.
   - `RVN` names the model, a refinement of the Heretic abliteration, and not a quantisation of its
-    own. Its tensors are ordinary llama.cpp quantisations (`Q4_K` and `Q6_K`) of the `qwen35`
-    architecture, which upstream llama.cpp reads, so no special build is needed.
+    own. Its tensors are ordinary llama.cpp quantisations of the `qwen35` architecture, which
+    upstream llama.cpp reads, so no special build is needed.
   - The `-multilingual` family is calibrated on a corpus of many languages rather than English
     alone, which is what Korean wants.
   - The `-mtp` twin carries the model's own MTP draft head in a 65th block, so speculative decoding
     needs no second file. Its main tensors are byte for byte those of the plain file.
 - **Its shape:** 64 main blocks, three of every four a Gated DeltaNet block and every fourth a full
-  attention block, then the MTP block. The FFN weights are 9.9 GiB of the 15.8 GiB, 143 to 165 MiB a
-  block; the token embeddings (0.67 GiB) are read on the CPU whatever else is placed where.
+  attention block, then the MTP block. The token embeddings are read on the CPU whatever else is
+  placed where.
 - **Where it stands:** `~/n5-llm/models/` on each node; the folder keeps the name n5-llm on every one.
-- **It does not fit the card whole,** so the FFN weights of its last blocks are computed by the CPU
-  from host memory (「The engine」).
+- **It fits the card whole,** every block and the MTP head on the card beside a context of 32,768
+  tokens (「The engine」).
 
 ## The engine
 
@@ -40,10 +43,9 @@ installer.
 - **Where it listens:** `127.0.0.1:8021`, and only while a request is being answered. The front is
   the only way to it.
 - **What it runs with:**
-  - every block on the card except the FFN weights (`ffn_up`, `ffn_gate`, `ffn_down`) of the last
-    42 main blocks, 22 to 63, which stay in host memory and are computed by the CPU on 8 threads;
-  - the model file mapped rather than read, so the CPU's part is computed straight from the pages
-    the front keeps locked (「How it holds the card」);
+  - every block on the card, the MTP block included, with 8 CPU threads for what the CPU still does;
+  - the model file mapped rather than read, so the engine's start reads the weights straight from
+    the pages the front keeps locked (「How it holds the card」);
   - flash attention on, and no fitting of settings to the card at start, so a card without room
     fails at once rather than quietly running on a smaller context;
   - a context of 32,768 tokens, with the K and V cache in `q8_0`;
@@ -51,19 +53,12 @@ installer.
   - MTP speculative decoding with two draft tokens (`--spec-type draft-mtp`), which
     `N5_LLM_MTP=off` in the front's environment turns off;
   - no warmup run at start, since the request waiting on the start is the warmup.
-- **Why 42 blocks:** it is one more than the fewest that answer. With 40 the engine starts with
-  409 MiB of the card free and then fails its first request for want of card memory; 41 answers with
-  511 MiB free; 42 leaves 675 MiB. Without MTP the head and its context leave the card, and 36 blocks
-  are enough.
-- **Why the CPU computes the part that does not fit,** rather than the card after copying it up for
-  every token: one token reads every weight once, and the CPU reads its 6.3 GiB share from RAM at
-  about 30 GB/s while the card's link carries it at 11.5 to 12.8 GB/s (「The machine」). Copying
-  the share up and computing it on the card runs at 2.0 t/s without MTP and 3.3 to 3.5 t/s with it,
-  against 4.6 and 6.4 t/s for the CPU. Overlapping the copy of one chunk with the compute of the one
-  before gains nothing, since the card computes a chunk in under a thirtieth of the time its copy takes.
-- **Prompts:** a prompt of 32 tokens or more is computed on the card in steps of 512 tokens, the
-  CPU's weights copied up once a step, at about 450 tokens a second; a shorter one is computed by the
-  CPU.
+- **Offloading to the CPU:** `N5_LLM_CPU_FFN_BLOCKS` keeps the FFN weights (`ffn_up`, `ffn_gate`,
+  `ffn_down`) of that many of the last main blocks in host memory, computed by the CPU. It is 0, since
+  the file fits the card; a larger file that does not fit is served by raising it until the engine
+  starts with about 500 MiB of the card free: an engine that starts with 409 MiB free fails its first
+  request for want of card memory, and one with 511 MiB free answers.
+- **Prompts:** computed on the card, at about 970 tokens a second on a long one.
 - **Thinking:** the model thinks before it answers unless the request's
   `chat_template_kwargs` carries `enable_thinking: false`, which the embedded chat template reads.
 
@@ -89,9 +84,10 @@ flowchart TD
 - **Where the weights wait:** the front maps the model file and locks every page of it in RAM with
   `mlock` when it starts, and keeps it locked for as long as it runs. The engine maps the same file,
   so its start reads the card's weights from those locked pages, never from the disk, and computes
-  the CPU's part from them in place.
+  whatever part stays on the CPU from them in place.
 - **Why mapped and not read into the engine:** an engine that reads the CPU's part into its own
-  memory takes 5.0 seconds to start instead of 2.2 and generates more slowly (5.5 t/s against 6.4).
+  memory starts and generates more slowly; with Q4_K_M split at 42 blocks it takes 5.0 seconds to
+  start instead of 2.2 and generates at 5.5 t/s against 6.4.
 - **Why locked pages and not pinned memory:** pinned memory belongs to the process that allocated it,
   and the process that puts the weights on the card is a fresh engine each time. Locked page-cache
   pages are shared by every process that maps the file.
@@ -150,10 +146,10 @@ One process on `127.0.0.1:8020`, the only port that leaves n5.
   it whole.
 - **An engine setting changed on the node** — `N5_LLM_MTP`, `N5_LLM_CONTEXT`,
   `N5_LLM_DRAFT_TOKENS`, `N5_LLM_CPU_FFN_BLOCKS` (how many of the last main blocks keep their FFN
-  on the CPU), `N5_LLM_THREADS` — goes in a drop-in of the front's unit (`systemctl --user edit
-  n5-llm-front`), which the installer leaves standing.
+  on the CPU, 0 by default), `N5_LLM_THREADS` — goes in a drop-in of the front's unit
+  (`systemctl --user edit n5-llm-front`), which the installer leaves standing.
 - **`n5-llm-front.service`** runs the front, which starts and stops the engine as its own child. It
-  allows the process to lock 16 GiB of memory.
+  allows the process to lock 10 GiB of memory, room for the whole model file.
 - **`n5-llm-tunnel.service`** holds the tunnel below.
 - Both are systemd user units in n5's `labuser` account, restarting on any exit and started with
   `default.target`. Linger is on for the account, so they stand after a reboot with nobody logged
@@ -161,13 +157,14 @@ One process on `127.0.0.1:8020`, the only port that leaves n5.
 
 ### The memlock limit
 
-- **The front must lock the whole model,** 15.8 GiB, and a user manager's own default limit is about
+- **The front must lock the whole model,** 8.9 GiB, and a user manager's own default limit is about
   7.8 GiB, one eighth of the RAM, which a unit cannot raise past.
-- **So the user manager of `labuser` is given 16 GiB on each node, once, by hand with sudo:** a drop-in
+- **So the user manager of `labuser` is given 16 GiB on each node, once, by hand with sudo,** which
+  covers the unit's 10 GiB and leaves room for a larger file: a drop-in
   `/etc/systemd/system/user@1000.service.d/memlock.conf` setting `LimitMEMLOCK=16G` for every later
   start of the manager, and `prlimit --memlock=17179869184:17179869184` on the running manager, so
-  the change holds without restarting it and the units under it. n5 already carries this; n2, n3 and
-  n4 each need it done before the front will start.
+  the change holds without restarting it and the units under it. n2 to n5 all carry it; a node added
+  to them needs it done before the front will start.
 - **The node setup checks the limit** and stops with `memlock` where the manager's is below the
   model's size, so a node whose limit was never raised fails the install at that step and says so.
 
@@ -240,9 +237,9 @@ each node before its first install.
 
 ## What it was measured at
 
-Measured on 30 September 2026 on n5, at temperature 0 with thinking off. The figures are the engine's
-own timings, run by hand on n5 with the served settings and started afresh for each setting; those
-through the front are marked so.
+Measured at temperature 0 with thinking off: the engine's own timings on n5 on 30 September 2026, run
+by hand with the served settings and started afresh for each setting, and the figures through the
+front, which are marked so, on each of n2 to n5 on 1 October 2026.
 
 ### The machine
 
@@ -258,11 +255,14 @@ through the front are marked so.
 
 ### Generation
 
-Q4_K_M at a context of 32,768 tokens and 8 threads unless the row says otherwise.
+At a context of 32,768 tokens and 8 threads unless the row says otherwise. The served file is the
+first row; every other row is the four-bit Q4_K_M, which does not fit the card, under the ways of
+splitting it between the card and the CPU.
 
 | Setting | Short answer, 349–435 tokens | Long answer, 800 tokens |
 |---|---|---|
-| FFN of the last 42 blocks on the CPU, MTP with 2 draft tokens (served) | 6.40 t/s | 7.19 t/s |
+| IQ2_XS, every block on the card, MTP with 2 draft tokens (served) | 47.0 t/s | 66.1 t/s |
+| Q4_K_M, FFN of the last 42 blocks on the CPU, MTP 2 | 6.40 t/s | 7.19 t/s |
 | The same with 1 draft token | 6.15 t/s | 6.38 t/s |
 | The same with 3 draft tokens | 5.85 t/s | 6.88 t/s |
 | The same with n-gram drafting beside MTP (`draft-mtp,ngram-mod`) | 6.44 t/s | 7.14 t/s |
@@ -270,22 +270,27 @@ Q4_K_M at a context of 32,768 tokens and 8 threads unless the row says otherwise
 | The same on 6 threads | 5.65 t/s | not measured |
 | The same on 16 threads | 6.22 t/s | not measured |
 | The same with the CPU's part read into the engine's own memory | 5.47 t/s | not measured |
-| MTP off, FFN of the last 36 blocks on the CPU | 4.63 t/s | 4.63 t/s |
-| Whole blocks split instead: the first 27 main blocks on the CPU (`-ngl 38`), MTP 2 | 6.06 t/s | 6.99 t/s |
-| Context of 16,384 tokens, FFN of 38 blocks on the CPU, MTP 2 | 7.14 t/s | 7.83 t/s |
-| The CPU's part copied to the card every token and computed there, MTP off | 2.02 t/s | not measured |
+| Q4_K_M, MTP off, FFN of the last 36 blocks on the CPU | 4.63 t/s | 4.63 t/s |
+| Q4_K_M, whole blocks split instead: the first 27 main blocks on the CPU (`-ngl 38`), MTP 2 | 6.06 t/s | 6.99 t/s |
+| Q4_K_M, context of 16,384 tokens, FFN of 38 blocks on the CPU, MTP 2 | 7.14 t/s | 7.83 t/s |
+| Q4_K_M, the CPU's part copied to the card every token and computed there, MTP off | 2.02 t/s | not measured |
 | The same, MTP 2 | 3.33 t/s | not measured |
 | The same, MTP 3 | 3.47 t/s | not measured |
-| ik_llama.cpp, FFN of 46 blocks on the CPU, MTP 2 | 6.67 t/s | 7.12 t/s |
-| IQ2_XS, every block on the card, MTP 2 | 47.0 t/s | 66.1 t/s |
+| Q4_K_M on ik_llama.cpp, FFN of 46 blocks on the CPU, MTP 2 | 6.67 t/s | 7.12 t/s |
 
 - **The prompts:** the short answer is three paragraphs about spring in Seoul, the long one an
   account of Korean holidays. Four more questions (rent, a word problem, the word 눈치, a polite
-  message) run at 6.85 to 9.44 t/s served and 51.5 to 67.4 t/s on IQ2_XS, and a Python function with
-  its tests at 8.83 and 64.4 t/s.
+  message) run at 51.5 to 67.4 t/s on IQ2_XS and 6.85 to 9.44 t/s on Q4_K_M split at 42 blocks, and
+  a Python function with its tests at 64.4 and 8.83 t/s.
 - **MTP gains most where its drafts are accepted,** which is higher in longer and more predictable
-  text; with the CPU's part read once per pass, a pass that checks two drafted tokens costs little
-  more than one that checks none.
+  text: on IQ2_XS through the front, 169 of 414 drafted tokens were accepted on the short answer and
+  463 of 671 on the long one.
+- **The CPU computes the part of Q4_K_M that does not fit** faster than the card does after copying
+  it up for every token: one token reads every weight once, and the CPU reads its 6.3 GiB share from
+  RAM at about 30 GB/s while the card's link carries it at 11.5 to 12.8 GB/s (「The machine」).
+- **Q4_K_M split at 42 blocks** is one more than the fewest that answer. With 40 the engine starts
+  with 409 MiB of the card free and then fails its first request; 41 answers with 511 MiB free; 42
+  leaves 675 MiB. Without MTP the head and its context leave the card, and 36 blocks are enough.
 - **Copying the CPU's part to the card** is llama.cpp's own offload of host weights, lowered to one
   token (`GGML_OP_OFFLOAD_MIN_BATCH=1`). A copy of 6 GiB from pinned memory in 160 MiB chunks takes
   561 ms and the card's work on it 15 ms; overlapping the two on two buffers takes 548 to 570 ms a
@@ -293,32 +298,34 @@ Q4_K_M at a context of 32,768 tokens and 8 threads unless the row says otherwise
 - **DFlash2** (`z-lab/Qwen3.8-27B-DFlash2-GGUF`, Q4_K_M, 1.1 GB) drafts for the base Qwen3.8-27B;
   on this model its drafts are accepted 4 to 5 times in a hundred on a short answer and a quarter of the time on a summary, and with its own weights and
   context on the card 54 to 62 blocks' FFN must go to the CPU. It generates 1.1 to 1.3 t/s.
-- **ik_llama.cpp** reads the model and its MTP head, but its MTP context needs four more blocks'
-  FFN on the CPU, it copies the CPU's part into its own pinned memory at every start (4.3 seconds
+- **ik_llama.cpp** reads the model and its MTP head, but on Q4_K_M its MTP context needs four more
+  blocks' FFN on the CPU, it copies the CPU's part into its own pinned memory at every start (4.3 seconds
   instead of 2.2), and it takes a request's `chat_template_kwargs` only with `--jinja`.
 
 ### Prompts and the first token
 
-| | Served Q4_K_M | IQ2_XS |
+| | Served IQ2_XS | Q4_K_M split at 42 blocks |
 |---|---|---|
-| Engine start, from the locked pages to its first health | 2.2–2.3 s | 2.1 s |
-| A prompt of 25 tokens, computed by the CPU | 1.8 s (13.6 t/s) | 0.2 s |
-| A prompt of 37 to 63 tokens | 1.1 s | 0.2 s |
-| A prompt of 5,476 tokens | 12.1 s (451 t/s) | 5.6 s (974 t/s) |
+| Engine start, from the locked pages to its first health | 2.1 s | 2.2–2.3 s |
+| A prompt of 25 tokens | 0.2 s | 1.8 s (13.6 t/s, computed by the CPU) |
+| A prompt of 37 to 63 tokens | 0.2 s | 1.1 s |
+| A prompt of 5,476 tokens | 5.6 s (974 t/s) | 12.1 s (451 t/s) |
 
-- **Through the front, from main-host,** the first token comes 3.3 to 4.1 seconds after the request,
-  the engine's start included, and the rest at 6.4 t/s for the short answer and 7.2 t/s for the long;
-  IQ2_XS gave its first token in 2.0 to 2.3 seconds.
+- **Through the front, from main-host,** the first token of IQ2_XS comes 2.1 to 2.4 seconds after the
+  request, the engine's start included, and the rest at 46 to 48 t/s for a short answer on every
+  node and 61 t/s for the long one on n5. Q4_K_M split at 42 blocks gives its first token in 3.3 to 4.1 seconds and the rest
+  at 6.4 and 7.2 t/s.
 - **The engine's stop** takes about 0.35 seconds, after the answer has reached the caller.
 
 ### Card and memory
 
-- **While an answer is made,** the card holds 11,565 to 11,607 MiB of its 12,282, the voice
-  server's context included, which leaves 675 MiB free; IQ2_XS held 11,143 to 11,183 MiB.
+- **While an answer is made,** the card holds 11,143 to 11,183 MiB of its 12,282, the voice
+  server's context included, which leaves about 1.1 GiB free. Q4_K_M split at 42 blocks holds 11,565
+  to 11,607 MiB.
 - **Between requests** no engine process is on the card, and the card holds only the voice server's
   context; the front itself never opens the card.
-- **The front locks 17.0 GB** (the whole file), and its resident set is the same. A running engine
-  shows 16.3 GB resident, almost all of it the same locked pages mapped again.
+- **The front locks 9.5 GB** (the whole file), and its resident set is the same. A running engine
+  shows 1.3 GB resident, its weights being on the card.
 
 ## The checks
 

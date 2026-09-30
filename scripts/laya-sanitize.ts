@@ -15,7 +15,7 @@ import {
   readProgress, writeProgress,
 } from "../src/laya-synth-run";
 import { TEXT_NODES, textHealthUrl } from "../src/n5-llm-install";
-import { n5StreamerFor, n5TimeoutMs } from "../src/n5-road";
+import { n5Model, n5StreamerFor, n5TimeoutMs } from "../src/n5-road";
 import { scrubText } from "../src/pii";
 import { refuseInsideCheckout, runFolder } from "../src/roots";
 
@@ -306,7 +306,7 @@ function cleanTexts(): string[] {
 const started = Date.now();
 const progress: SynthProgress = readProgress(root) ?? {
   started: new Date().toISOString(),
-  model: "RVN-Q4_K_M-multilingual-mtp",
+  model: n5Model,
   effort: "none",
   road: "n5",
   roads: ["n5"],
@@ -354,7 +354,7 @@ if (resume) {
 }
 
 say(`${root}: 유해 계획 ${harmfulPlanned}행(목표 ${harmfulTarget}), 무해 ${cleanTarget}행. 범주×언어 ${groups.length}묶음(모델 ${modelGroupsRaw.length}, 메타 ${metaGroupsRaw.length}), 묶음마다 수확 ${harvestsPerGroup}회, 한 수확 ${perHarvest}문장.`);
-say(`모델 RVN-Q4_K_M-multilingual-mtp, 노드 ${nodes.join(", ")}. live.txt 에 문장이 쌓입니다.`);
+say(`모델 ${n5Model}, 노드 ${nodes.join(", ")}. live.txt 에 문장이 쌓입니다.`);
 
 // A run of accepted sentences a harvest streamed, read out line by line as they arrive on the given
 // node's streamer: each line is cleaned, judged against the language and the shape, written to the live

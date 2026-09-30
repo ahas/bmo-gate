@@ -9,7 +9,7 @@ WorkingDirectory=%h/n5-llm
 EnvironmentFile=%h/.config/n5-llm/env
 # The model file is locked in RAM whole for as long as the front runs, which the user manager's own
 # limit allows once it is raised by hand (docs/n5-llm.md, 「The memlock limit」).
-LimitMEMLOCK=16G
+LimitMEMLOCK=10G
 # The engine is the front's child, started and stopped by it; it goes down with the unit.
 ExecStart=%h/n5-llm/.venv/bin/python %h/n5-llm/front.py
 Restart=always

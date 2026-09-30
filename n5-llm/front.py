@@ -34,15 +34,16 @@ HOST = "127.0.0.1"
 PORT = int(os.environ.get("N5_LLM_PORT", "8020"))
 ENGINE_PORT = int(os.environ.get("N5_LLM_ENGINE_PORT", "8021"))
 HOME = Path.home()
-MODEL = Path(os.environ.get("N5_LLM_MODEL", str(HOME / "n5-llm/models/RVN-Q4_K_M-multilingual-mtp.gguf")))
+MODEL = Path(os.environ.get("N5_LLM_MODEL", str(HOME / "n5-llm/models/RVN-IQ2_XS-multilingual-mtp.gguf")))
 ENGINE_BIN = Path(os.environ.get("N5_LLM_ENGINE", str(HOME / "n5-llm/build/llama.cpp/build/bin/llama-server")))
 GPU_LOCK = Path(os.environ.get("N5_LLM_GPU_LOCK", "/home/labuser/.gpu.lock"))
 CONTEXT = int(os.environ.get("N5_LLM_CONTEXT", "32768"))
 MTP = os.environ.get("N5_LLM_MTP", "on") != "off"
 DRAFT_TOKENS = int(os.environ.get("N5_LLM_DRAFT_TOKENS", "2"))
-# The model does not fit the card whole: the FFN weights of this many of its last main blocks stay in
-# host memory and are computed by the CPU, enough that the card keeps room for a request.
-CPU_FFN_BLOCKS = int(os.environ.get("N5_LLM_CPU_FFN_BLOCKS", "42"))
+# The FFN weights of this many of the model's last main blocks stay in host memory and are computed by
+# the CPU. The served file fits the card whole, so none do; a file that does not fit raises it until
+# the card keeps room for a request.
+CPU_FFN_BLOCKS = int(os.environ.get("N5_LLM_CPU_FFN_BLOCKS", "0"))
 THREADS = int(os.environ.get("N5_LLM_THREADS", "8"))
 # The model's main blocks, numbered from 0; its MTP block comes after them and stays on the card.
 MAIN_BLOCKS = 64
