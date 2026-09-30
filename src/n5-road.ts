@@ -20,7 +20,7 @@ import type { SynthAnswer, SynthAsker, TokenTally } from "./laya-synth-run";
 // The one model the front serves, its answer slot, and its wait. A batch is a long answer — twenty
 // rows, each with its state and its sanitised text, not a one-line verdict — and an answer cut off
 // mid-list holds no rows at all, so the slot is sized well past what one batch needs.
-export const n5Model = "RVN-IQ2_XS-multilingual-mtp";
+export const n5Model = "RVN-IQ3_XXS-multilingual-mtp";
 export const n5Effort = "none";
 export const n5AnswerTokens = 16_384;
 

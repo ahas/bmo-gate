@@ -13,15 +13,16 @@ installer.
 
 ## The model
 
-- **What answers:** Qwen3.8-27B RVN Heretic Abliterated, the file `RVN-IQ2_XS-multilingual-mtp.gguf`
-  of `0bserverx/Qwen3.8-27B-Heretic-Abliterated-Uncensored-GGUF`: 9,541,912,032 bytes (8.9 GiB),
+- **What answers:** Qwen3.8-27B RVN Heretic Abliterated, the file `RVN-IQ3_XXS-multilingual-mtp.gguf`
+  of `0bserverx/Qwen3.8-27B-Heretic-Abliterated-Uncensored-GGUF`: 11,637,691,872 bytes (10.8 GiB),
   checked against the repository's own SHA-256 before it is given its name.
 - **Why this file:**
-  - Two bits is the size 하스 set for it: the whole model then fits the card, and it answers seven to
-    nine times as fast as the four-bit file, which does not fit and has part of every token computed
-    by the CPU (「What it was measured at」).
-  - `IQ2_XS` is the two-bit quantisation measured whole on this card with room left for a request at
-    the full context.
+  - Three bits is the size 하스 set for it. The whole model fits the card once the KV store is kept
+    in host memory (「The engine」), and it answers five times as fast as the four-bit file,
+    which does not fit and has part of every token computed by the CPU (「What it was measured at」).
+  - `IQ3_XXS` is the smallest three-bit quantisation of the model and fits the card whole beside the
+    recurrent state and the compute buffers at the full context, with 581 MiB of the card left on a
+    node with a voice server. The next, `IQ3_XS`, is 745 MiB larger.
   - `RVN` names the model, a refinement of the Heretic abliteration, and not a quantisation of its
     own. Its tensors are ordinary llama.cpp quantisations of the `qwen35` architecture, which
     upstream llama.cpp reads, so no special build is needed.
@@ -30,16 +31,20 @@ installer.
   - The `-mtp` twin carries the model's own MTP draft head in a 65th block, so speculative decoding
     needs no second file. Its main tensors are byte for byte those of the plain file.
 - **Its shape:** 64 main blocks, three of every four a Gated DeltaNet block and every fourth a full
-  attention block, then the MTP block. The token embeddings are read on the CPU whatever else is
-  placed where.
+  attention block (blocks 3, 7, … 63), then the MTP block. Only the sixteen full attention blocks and
+  the MTP block keep a KV store, 64 KiB a token in f16. The token embeddings are read on the CPU
+  whatever else is placed where.
+- **Its context:** trained to 262,144 tokens, served at 1,048,576 with YaRN stretching the RoPE
+  positions by the ratio of the two (「The engine」).
 - **Where it stands:** `~/n5-llm/models/` on each node; the folder keeps the name n5-llm on every one.
-- **It fits the card whole,** every block and the MTP head on the card beside a context of 32,768
-  tokens (「The engine」).
+- **It fits the card whole,** every block and the MTP head on the card, with the KV store of the full
+  context in host memory (「The engine」).
 
 ## The engine
 
-- **What it is:** upstream llama.cpp's `llama-server`, built on n5 with CUDA for the card's
-  architecture (sm_89) at the commit the node setup pins, under `~/n5-llm/build/llama.cpp`.
+- **What it is:** upstream llama.cpp's `llama-server`, built on each node with CUDA for the card's
+  architecture (sm_89) at the commit the node setup pins, with the patch below applied, under
+  `~/n5-llm/build/llama.cpp`.
 - **Where it listens:** `127.0.0.1:8021`, and only while a request is being answered. The front is
   the only way to it.
 - **What it runs with:**
@@ -48,17 +53,48 @@ installer.
     the pages the front keeps locked (「How it holds the card」);
   - flash attention on, and no fitting of settings to the card at start, so a card without room
     fails at once rather than quietly running on a smaller context;
-  - a context of 32,768 tokens, with the K and V cache in `q8_0`;
-  - one slot, so requests that overlap are answered one after another by the same engine;
+  - a context of 1,048,576 tokens, and past the trained 262,144 YaRN scaling by their ratio, 4, with
+    the trained context as YaRN's original;
+  - the K and V store in host memory (`--no-kv-offload`), in `q4_0`, and the attention over it
+    computed by the CPU (「The KV store in host memory」);
+  - one slot, so the whole context is one request's and requests that overlap are answered one after
+    another by the same engine;
   - MTP speculative decoding with two draft tokens (`--spec-type draft-mtp`), which
     `N5_LLM_MTP=off` in the front's environment turns off;
   - no warmup run at start, since the request waiting on the start is the warmup.
+- **Its start** takes about nine seconds, most of it the engine allocating and clearing the KV store
+  of the whole context in RAM.
 - **Offloading to the CPU:** `N5_LLM_CPU_FFN_BLOCKS` keeps the FFN weights (`ffn_up`, `ffn_gate`,
   `ffn_down`) of that many of the last main blocks in host memory, computed by the CPU. It is 0, since
   the file fits the card; a larger file that does not fit is served by raising it until the engine
   starts with about 500 MiB of the card free: an engine that starts with 409 MiB free fails its first
   request for want of card memory, and one with 511 MiB free answers.
-- **Prompts:** computed on the card, at about 970 tokens a second on a long one.
+- **Prompts:** the weights' part computed on the card, the attention's by the CPU.
+
+### The KV store in host memory
+
+- **Why in RAM:** the KV store of 1,048,576 tokens is 18 GiB in `q4_0`, which no card of 12 GiB
+  holds beside the model; in RAM it costs only the attention's own work, done by the CPU over the
+  store where it lies.
+- **Why `q4_0`:** a node has 62 GiB. While an answer is made it holds the front's locked model
+  (10.8 GiB), the voice server where one stands (about 10.5 GB), the running engine with its KV store
+  and the rest of the system, which leaves 13.0 GB available on n5 and 23.7 GB on n2. `q8_0` would
+  take 34 GiB for the store instead of 18, 17 GB more than n5 has left. `N5_LLM_KV_TYPE` names another
+  type where a node's memory allows it.
+- **The patch the build carries,** `n5-llm/llama-nkvo.patch`, applied by the node setup on the pinned
+  commit, since upstream's `--no-kv-offload` does not do this alone on a hybrid model:
+  - upstream leaves the flash attention itself to the scheduler, which runs it on the card and copies
+    the part of the store it reads there for every token. Sized for the full context that asks
+    6.35 GiB of the card at start, and the engine fails; the patch runs flash attention on the CPU
+    whenever the KV store is in host memory, so only the query and the attention's output cross the
+    link;
+  - upstream keeps the Gated DeltaNet blocks' recurrent state, 449 MiB, in host memory beside the KV
+    store, copied to the card and back for every token; the patch keeps it on the card.
+  Upstream alone does not start at the full context at all, and where it does start, the patch
+  makes a short answer 1.7 times as fast (「What it was measured at」).
+- **The full attention blocks' own weights** stay on the card with the rest. Keeping their
+  `attn_q`, `attn_k`, `attn_v` and `attn_output` (584 MiB) in host memory as well is the placement for
+  a card short of that much, at less than half the speed.
 - **Thinking:** the model thinks before it answers unless the request's
   `chat_template_kwargs` carries `enable_thinking: false`, which the embedded chat template reads.
 
@@ -144,12 +180,14 @@ One process on `127.0.0.1:8020`, the only port that leaves n5.
 - **The settings file** is `~/.config/n5-llm/env` on the node, `0600`: the service key as `LLM_KEY`
   and the node's main-host port as `LISTEN`, which the tunnel unit forwards to. The installer writes
   it whole.
-- **An engine setting changed on the node** — `N5_LLM_MTP`, `N5_LLM_CONTEXT`,
-  `N5_LLM_DRAFT_TOKENS`, `N5_LLM_CPU_FFN_BLOCKS` (how many of the last main blocks keep their FFN
-  on the CPU, 0 by default), `N5_LLM_THREADS` — goes in a drop-in of the front's unit
-  (`systemctl --user edit n5-llm-front`), which the installer leaves standing.
+- **An engine setting changed on the node** — `N5_LLM_MTP`, `N5_LLM_CONTEXT` (YaRN follows it past
+  the trained context), `N5_LLM_KV_TYPE` (`q4_0` by default), `N5_LLM_DRAFT_TOKENS`,
+  `N5_LLM_CPU_FFN_BLOCKS` (how many of the last main blocks keep their FFN on the CPU, 0 by default),
+  `N5_LLM_THREADS` — goes in a drop-in of the front's unit (`systemctl --user edit n5-llm-front`),
+  which the installer leaves standing.
 - **`n5-llm-front.service`** runs the front, which starts and stops the engine as its own child. It
-  allows the process to lock 10 GiB of memory, room for the whole model file.
+  allows the process to lock 12 GiB of memory, room for the whole model file. The KV store is
+  ordinary memory the engine allocates and is not locked.
 - **`n5-llm-tunnel.service`** holds the tunnel below.
 - Both are systemd user units in n5's `labuser` account, restarting on any exit and started with
   `default.target`. Linger is on for the account, so they stand after a reboot with nobody logged
@@ -157,10 +195,10 @@ One process on `127.0.0.1:8020`, the only port that leaves n5.
 
 ### The memlock limit
 
-- **The front must lock the whole model,** 8.9 GiB, and a user manager's own default limit is about
+- **The front must lock the whole model,** 10.8 GiB, and a user manager's own default limit is about
   7.8 GiB, one eighth of the RAM, which a unit cannot raise past.
 - **So the user manager of `labuser` is given 16 GiB on each node, once, by hand with sudo,** which
-  covers the unit's 10 GiB and leaves room for a larger file: a drop-in
+  covers the unit's 12 GiB: a drop-in
   `/etc/systemd/system/user@1000.service.d/memlock.conf` setting `LimitMEMLOCK=16G` for every later
   start of the manager, and `prlimit --memlock=17179869184:17179869184` on the running manager, so
   the change holds without restarting it and the units under it. n2 to n5 all carry it; a node added
@@ -177,7 +215,8 @@ One process on `127.0.0.1:8020`, the only port that leaves n5.
   install.
 - **The node setup checks for them** before it builds and stops with `cmake-missing`, `ninja-missing`
   or `nvcc-missing` where one is absent, so a node short a tool says which rather than failing at the
-  command that needed it. A node whose engine is already built skips the build and the check both.
+  command that needed it. A node whose engine is already built at the pinned commit with the current
+  patch skips the build and the check both.
 
 ## The door
 
@@ -219,12 +258,14 @@ updating」):
 1. Makes the node's key on main-host if there is none.
 2. Makes the service's folders on the node.
 3. Carries the settings file across in a private `0600` file.
-4. Uploads the front, the units, the node setup and the tunnel's `ws-dial.py` into `~/n5-llm`.
+4. Uploads the front, the units, the node setup, the engine's patch and the tunnel's `ws-dial.py`
+   into `~/n5-llm`.
 5. Runs the node setup detached and waits for `N5-LLM-SETUP-DONE ok`, or
    `N5-LLM-SETUP-DONE failed:<step>` naming the step. The setup builds the front's venv on uv's
-   Python, builds llama.cpp at its pinned commit where the built engine is not that commit's, fetches
-   the model in sixteen ranges at once where it is missing and checks its hash, and checks the memlock
-   limit. What already stands is left alone.
+   Python, builds llama.cpp at its pinned commit with the patch applied where the built engine is not
+   that commit and that patch's (a stamp beside the build names both), fetches the model in sixteen
+   ranges at once where it is missing and checks its hash, and checks the memlock limit. What already
+   stands is left alone.
 6. Makes the node's tunnel key if there is none and reads back its public half.
 7. Adds the restricted `authorized_keys` entry on main-host unless it is already there.
 8. Names the key in the door's list and restarts the bridge.
@@ -237,9 +278,10 @@ each node before its first install.
 
 ## What it was measured at
 
-Measured at temperature 0 with thinking off: the engine's own timings on n5 on 30 September 2026, run
-by hand with the served settings and started afresh for each setting, and the figures through the
-front, which are marked so, on each of n2 to n5 on 1 October 2026.
+Measured at temperature 0 with thinking off: the engine's own timings, run by hand and started afresh
+for each setting, on n5 on 30 September 2026 and for the IQ3_XXS rows at a context of 32,768 on n2 on
+1 October 2026, and the figures through the front, which are marked so, on each of n2 to n5 on
+30 September and 1 October 2026.
 
 ### The machine
 
@@ -255,13 +297,18 @@ front, which are marked so, on each of n2 to n5 on 1 October 2026.
 
 ### Generation
 
-At a context of 32,768 tokens and 8 threads unless the row says otherwise. The served file is the
-first row; every other row is the four-bit Q4_K_M, which does not fit the card, under the ways of
-splitting it between the card and the CPU.
+At a context of 32,768 tokens and 8 threads unless the row says otherwise, with the KV store on the
+card unless the row puts it in host memory. The served setting is the first row; the next two are the
+same file with more of it in host memory, then the two-bit IQ2_XS, and every other row is the
+four-bit Q4_K_M, which does not fit the card, under the ways of splitting it between the card and the
+CPU.
 
 | Setting | Short answer, 349–435 tokens | Long answer, 800 tokens |
 |---|---|---|
-| IQ2_XS, every block on the card, MTP with 2 draft tokens (served) | 47.0 t/s | 66.1 t/s |
+| IQ3_XXS, context of 1,048,576, KV store in host memory, every block on the card, MTP with 2 draft tokens (served, through the front on each node) | 34.1–36.2 t/s | not measured |
+| IQ3_XXS, KV store and the full attention blocks' attention weights in host memory, MTP 2 | 14.7 t/s | not measured |
+| The same on upstream llama.cpp without the patch | 8.58 t/s | not measured |
+| IQ2_XS, every block on the card, MTP 2 | 47.0 t/s | 66.1 t/s |
 | Q4_K_M, FFN of the last 42 blocks on the CPU, MTP 2 | 6.40 t/s | 7.19 t/s |
 | The same with 1 draft token | 6.15 t/s | 6.38 t/s |
 | The same with 3 draft tokens | 5.85 t/s | 6.88 t/s |
@@ -284,7 +331,7 @@ splitting it between the card and the CPU.
   a Python function with its tests at 64.4 and 8.83 t/s.
 - **MTP gains most where its drafts are accepted,** which is higher in longer and more predictable
   text: on IQ2_XS through the front, 169 of 414 drafted tokens were accepted on the short answer and
-  463 of 671 on the long one.
+  463 of 671 on the long one; on IQ3_XXS 172 of 392 on the short answer.
 - **The CPU computes the part of Q4_K_M that does not fit** faster than the card does after copying
   it up for every token: one token reads every weight once, and the CPU reads its 6.3 GiB share from
   RAM at about 30 GB/s while the card's link carries it at 11.5 to 12.8 GB/s (「The machine」).
@@ -304,28 +351,32 @@ splitting it between the card and the CPU.
 
 ### Prompts and the first token
 
-| | Served IQ2_XS | Q4_K_M split at 42 blocks |
-|---|---|---|
-| Engine start, from the locked pages to its first health | 2.1 s | 2.2–2.3 s |
-| A prompt of 25 tokens | 0.2 s | 1.8 s (13.6 t/s, computed by the CPU) |
-| A prompt of 37 to 63 tokens | 0.2 s | 1.1 s |
-| A prompt of 5,476 tokens | 5.6 s (974 t/s) | 12.1 s (451 t/s) |
+| | Served IQ3_XXS, 1,048,576 | IQ2_XS, 32,768 | Q4_K_M split at 42 blocks, 32,768 |
+|---|---|---|---|
+| Engine start, from the locked pages to its first health | 9.3 s | 2.1 s | 2.2–2.3 s |
+| A prompt of 25 tokens | 0.2 s (105–121 t/s) | 0.2 s | 1.8 s (13.6 t/s, computed by the CPU) |
+| A prompt of 37 to 63 tokens | not measured | 0.2 s | 1.1 s |
+| A prompt of 5,476 tokens | not measured | 5.6 s (974 t/s) | 12.1 s (451 t/s) |
 
 - **Through the front, from main-host,** the first token of IQ2_XS comes 2.1 to 2.4 seconds after the
   request, the engine's start included, and the rest at 46 to 48 t/s for a short answer on every
   node and 61 t/s for the long one on n5. Q4_K_M split at 42 blocks gives its first token in 3.3 to 4.1 seconds and the rest
-  at 6.4 and 7.2 t/s.
-- **The engine's stop** takes about 0.35 seconds, after the answer has reached the caller.
+  at 6.4 and 7.2 t/s. IQ3_XXS at the full context waits for its engine's 9.3 seconds before its
+  prompt.
+- **The engine's stop** takes about 1.2 seconds at the full context, most of it freeing the KV store,
+  and 0.35 seconds at 32,768; either comes after the answer has reached the caller.
 
 ### Card and memory
 
-- **While an answer is made,** the card holds 11,143 to 11,183 MiB of its 12,282, the voice
-  server's context included, which leaves about 1.1 GiB free. Q4_K_M split at 42 blocks holds 11,565
-  to 11,607 MiB.
+- **While an answer is made,** the served IQ3_XXS holds 11,701 MiB of the card's 12,282 on n3, n4 and
+  n5, the voice server's context included, which leaves 581 MiB free, and 11,477 MiB on n2. IQ2_XS
+  with its KV store on the card at 32,768 holds 11,143 to 11,183 MiB, and Q4_K_M split at 42 blocks
+  11,565 to 11,607 MiB.
 - **Between requests** no engine process is on the card, and the card holds only the voice server's
   context; the front itself never opens the card.
-- **The front locks 9.5 GB** (the whole file), and its resident set is the same. A running engine
-  shows 1.3 GB resident, its weights being on the card.
+- **The front locks 11.6 GB** (the whole file), and its resident set is the same. A running engine
+  shows 25.3 GiB resident, nearly all of it the KV store; the node then has 13.0 GB available on n5,
+  15.1 on n4, 20.9 on n3 and 23.7 on n2.
 
 ## The checks
 

@@ -34,10 +34,15 @@ HOST = "127.0.0.1"
 PORT = int(os.environ.get("N5_LLM_PORT", "8020"))
 ENGINE_PORT = int(os.environ.get("N5_LLM_ENGINE_PORT", "8021"))
 HOME = Path.home()
-MODEL = Path(os.environ.get("N5_LLM_MODEL", str(HOME / "n5-llm/models/RVN-IQ2_XS-multilingual-mtp.gguf")))
+MODEL = Path(os.environ.get("N5_LLM_MODEL", str(HOME / "n5-llm/models/RVN-IQ3_XXS-multilingual-mtp.gguf")))
 ENGINE_BIN = Path(os.environ.get("N5_LLM_ENGINE", str(HOME / "n5-llm/build/llama.cpp/build/bin/llama-server")))
 GPU_LOCK = Path(os.environ.get("N5_LLM_GPU_LOCK", "/home/labuser/.gpu.lock"))
-CONTEXT = int(os.environ.get("N5_LLM_CONTEXT", "32768"))
+CONTEXT = int(os.environ.get("N5_LLM_CONTEXT", "1048576"))
+# The context the model was trained to; past it the RoPE positions are stretched with YaRN by the ratio.
+TRAINED_CONTEXT = 262144
+# The KV store is kept in host memory, where the full context's fits in this type beside everything
+# else a node holds (docs/n5-llm.md, 「The KV store in host memory」).
+KV_TYPE = os.environ.get("N5_LLM_KV_TYPE", "q4_0")
 MTP = os.environ.get("N5_LLM_MTP", "on") != "off"
 DRAFT_TOKENS = int(os.environ.get("N5_LLM_DRAFT_TOKENS", "2"))
 # The FFN weights of this many of the model's last main blocks stay in host memory and are computed by
@@ -51,8 +56,8 @@ MAIN_BLOCKS = 64
 # Another service's single use of the card is seconds; past this the card is taken for longer than a
 # caller should be kept waiting on it.
 LOCK_WAIT_S = float(os.environ.get("N5_LLM_LOCK_WAIT_S", "60"))
-# The engine reaches its health in about two seconds from the locked pages; this only bounds a start
-# that hangs.
+# The engine reaches its health in about nine seconds, most of it allocating the KV store of the whole
+# context; this only bounds a start that hangs.
 START_WAIT_S = float(os.environ.get("N5_LLM_START_WAIT_S", "120"))
 STOP_WAIT_S = 10.0
 POLL_S = 0.05
@@ -70,9 +75,12 @@ def engine_argv() -> list[str]:
     """The engine as the unit runs it (docs/n5-llm.md, 「The engine」)."""
     argv = [
         str(ENGINE_BIN), "-m", str(MODEL), "--host", "127.0.0.1", "--port", str(ENGINE_PORT),
-        "-ngl", "99", "-fa", "on", "--fit", "off", "-c", str(CONTEXT), "-ctk", "q8_0", "-ctv", "q8_0",
-        "-np", "1", "--no-warmup", "-t", str(THREADS),
+        "-ngl", "99", "-fa", "on", "--fit", "off", "-c", str(CONTEXT), "-ctk", KV_TYPE, "-ctv", KV_TYPE,
+        "--no-kv-offload", "-np", "1", "--no-warmup", "-t", str(THREADS),
     ]
+    if CONTEXT > TRAINED_CONTEXT:
+        argv += ["--rope-scaling", "yarn", "--rope-scale", f"{CONTEXT / TRAINED_CONTEXT:g}",
+                 "--yarn-orig-ctx", str(TRAINED_CONTEXT)]
     if CPU_FFN_BLOCKS > 0:
         blocks = "|".join(str(block) for block in range(MAIN_BLOCKS - CPU_FFN_BLOCKS, MAIN_BLOCKS))
         argv += ["-ot", f"blk\\.({blocks})\\.ffn_(up|gate|down)\\.weight=CPU"]
@@ -415,7 +423,7 @@ def main() -> int:
     locked = LockedFile(MODEL)
     say(f"front: {locked.locked} bytes of {MODEL.name} locked in RAM")
     engine = Engine(engine_argv(), GPU_LOCK, f"http://127.0.0.1:{ENGINE_PORT}/health")
-    settings = {"context": CONTEXT, "kv_cache": "q8_0", "mtp": MTP, "draft_tokens": DRAFT_TOKENS if MTP else 0,
+    settings = {"context": CONTEXT, "kv_cache": f"{KV_TYPE} in host memory", "mtp": MTP, "draft_tokens": DRAFT_TOKENS if MTP else 0,
                 "cpu_ffn_blocks": CPU_FFN_BLOCKS, "threads": THREADS}
     app = build_app(key, engine, f"http://127.0.0.1:{ENGINE_PORT}", MODEL, locked, settings)
     uvicorn.run(app, host=HOST, port=PORT, log_level="warning", access_log=False)

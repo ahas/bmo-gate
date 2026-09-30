@@ -30,7 +30,9 @@ export const N5_SERVICE_DIR = "n5-llm";
 export const N5_CONFIG_DIR = ".config/n5-llm";
 
 /** What goes across from `n5-llm/`. The tests stay here. */
-export const N5_FILES: readonly string[] = ["front.py", "pyproject.toml", "node-setup.sh", "n5-llm-front.service", "n5-llm-tunnel.service"];
+export const N5_FILES: readonly string[] = [
+  "front.py", "pyproject.toml", "node-setup.sh", "llama-nkvo.patch", "n5-llm-front.service", "n5-llm-tunnel.service",
+];
 
 export const N5_UNITS: readonly string[] = ["n5-llm-front.service", "n5-llm-tunnel.service"];
 

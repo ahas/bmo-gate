@@ -1,0 +1,29 @@
+diff --git a/src/llama-graph.cpp b/src/llama-graph.cpp
+index d398ee1..d07ca6e 100644
+--- a/src/llama-graph.cpp
++++ b/src/llama-graph.cpp
+@@ -2656,6 +2656,11 @@ ggml_tensor * llm_graph_context::build_attn_mha(
+                                   hparams.attn_soft_cap ? hparams.f_attn_logit_softcapping : 0.0f);
+         res->add_fused_node({LLM_FUSED_OP_FLASH_ATTN, cur, il});
+ 
++        if (!cparams.offload_kqv) {
++            // the KV store is in host memory, so the attention over it is run on the CPU
++            ggml_backend_sched_set_tensor_backend(sched, cur, backend_cpu);
++        }
++
+         ggml_flash_attn_ext_add_sinks(cur, sinks);
+         GGML_ASSERT(n_kv_max >= 0 && n_kv_max <= INT32_MAX);
+         ggml_flash_attn_ext_set_n_kv_max(cur, static_cast<int32_t>(n_kv_max));
+diff --git a/src/llama-memory-hybrid.cpp b/src/llama-memory-hybrid.cpp
+index 62f12de..2765433 100644
+--- a/src/llama-memory-hybrid.cpp
++++ b/src/llama-memory-hybrid.cpp
+@@ -55,7 +55,7 @@ llama_memory_hybrid::llama_memory_hybrid(
+         model,
+         type_r,
+         type_s,
+-        offload,
++        true, // the recurrent state stays on the device when only the KV store is kept in host memory
+         rs_size,
+         n_seq_max,
+         n_rs_seq,
