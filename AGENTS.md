@@ -11,10 +11,11 @@ here is a part of BMO:
 
 BMO holds only the client that asks the service and the configuration of which gate asks.
 
-Beside Laya stands one service that is not Laya's: **the text model on n2 to n5**, an
-OpenAI-compatible front over llama.cpp that holds the card only while it answers, one front a node,
-each reached from main-host through its own tunnel door. It first stood on n5 alone; the sanitiser
-gate's data run drives all four at once. Nothing in BMO asks it.
+Beside Laya stands one service that is not Laya's: **the text model, Qwen ARA 27B**, an
+OpenAI-compatible front over llama.cpp on n5, reached from main-host through its own tunnel door,
+whose engine lays the model and its whole context across n5's card and the cards it borrows from
+n2, n3, n4 and n6 over the inner network, and holds them only while it answers and a minute after. BMO's gateway and the
+sanitiser gate's data run ask it.
 
 Most gates' rows ride the codex account; the sanitiser gate, whose attack rows codex refuses at the
 account level, rides a home model instead — the J3090 road, or the n5 text model reached over the same
@@ -37,9 +38,11 @@ pinned to one Claude login.
 - `docs/laya-server.md` — the server, which checkpoint answers which gate, how the card is shared,
   what it was measured at on n6, the training loop and its fixed settings, the calibration, and what
   the savings cost.
-- `docs/n5-llm.md` — the text model on n2 to n5: the model file, the engine, how the card is held only
-  while a request is in hand, the front, the units and the memlock limit, the door, the key, the
-  install, what it was measured at, and the checks.
+- `docs/n5-llm.md` — the text model, Qwen ARA 27B: what it runs as, the model file, where its weights
+  and KV store lie across the five cards, the engine and its patches, the cards it borrows over the
+  inner network, how they are held only while requests are in hand, the slot's state kept card by
+  card, the front, the units and the memlock limit, the door, the key, the install, what it was
+  measured at, and the checks.
 - `docs/llm-server.md` — the Laya service on n6: the machine, the engine, the front with its MCP
   tools and OpenAI-compatible call, the units, the tunnel that is its door, the key, the install,
   putting a checkpoint in service, and the checks.
@@ -60,9 +63,9 @@ pinned to one Claude login.
 - `scripts/llm-install.ts` puts the service on n6 through the jake console and is the one way it is
   installed or updated; `scripts/laya-serve.ts` carries a collected checkpoint there and names it
   for a gate.
-- `n5-llm/` holds the text model's front, its node setup and its two user units, in a virtual
-  environment of its own on each of n2 to n5; `scripts/n5-llm-install.ts` is the one way it is installed or
-  updated.
+- `n5-llm/` holds the text model's front, the holder of a borrowed card, the node setup, the engine's
+  two patches and the three user units, in a virtual environment of its own on each of its nodes;
+  `scripts/n5-llm-install.ts` is the one way it is installed or updated.
 - `bmo-gate.service` is the unit a full run is carried by, symlinked into the user's own unit
   directory. A full run is a day's work and belongs to no session.
 - `bmo-llm-bridge.service` runs `scripts/llm-bridge.ts`, the tunnel door on main-host that both

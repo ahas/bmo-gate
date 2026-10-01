@@ -20,13 +20,13 @@ import type { SynthAnswer, SynthAsker, TokenTally } from "./laya-synth-run";
 // The one model the front serves, its answer slot, and its wait. A batch is a long answer — twenty
 // rows, each with its state and its sanitised text, not a one-line verdict — and an answer cut off
 // mid-list holds no rows at all, so the slot is sized well past what one batch needs.
-export const n5Model = "RVN-IQ3_XXS-multilingual-mtp";
+export const n5Model = "RVN-Q4_K_M-multilingual-mtp";
 export const n5Effort = "none";
 export const n5AnswerTokens = 16_384;
 
-// The front shares one card with the voice server and with Laya's training passes, so it answers
-// 503 while another of them holds the card. The per-call wait lets the whole answer slot be written
-// even by a model that has part of itself computed on the CPU at a few tokens a second (docs/n5-llm.md).
+// The front's engine borrows cards that Laya's training passes take too, so it answers 503 while
+// another service holds one of them. The per-call wait lets the whole answer slot be written after a
+// long prompt read at a few hundred tokens a second (docs/n5-llm.md).
 export const n5TimeoutMs = 3_000_000;
 
 // The base URL an OpenAI client is given on main-host, where the tunnel door lands the front.
@@ -415,7 +415,7 @@ export function n5Streamer(settings: Partial<N5Settings> = {}): N5Streamer {
   };
 }
 
-// A streamer aimed at one text-model node's front, for the sanitiser harvest run across n2 to n5. The
+// A streamer aimed at one answering text-model node's front, for the sanitiser harvest. The
 // node fixes the base URL and the key file; everything else keeps the streamer's own defaults, which a
 // caller may still override.
 export function n5StreamerFor(node: string, settings: Partial<N5Settings> = {}): N5Streamer {
@@ -443,7 +443,7 @@ export function n5JudgeRoad(settings: Partial<N5Settings> = {}): JudgeRoad {
   };
 }
 
-// A judging road aimed at one text-model node's front, for a judging pass spread across n2 to n5.
+// A judging road aimed at one answering text-model node's front, for a judging pass.
 export function n5JudgeRoadFor(node: string, settings: Partial<N5Settings> = {}): JudgeRoad {
   return n5JudgeRoad({ baseUrl: textBaseUrl(node), readKey: () => readN5Key(textKeyPath(node)), ...settings });
 }

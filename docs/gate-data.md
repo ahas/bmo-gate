@@ -318,8 +318,8 @@ generator drives (「The 무해화 게이트's own build」).
 - **The front serves one model and the road checks it once**, so a front that swapped its model out
   cannot label another model's rows as this one's. The model is asked not to think before it answers,
   since a batch wants the whole answer slot for its work.
-- **A busy card is waited on, not counted as a failure.** The front shares one card with the voice
-  server and with Laya's training passes and answers 503 while another of them holds it; an empty
+- **A busy card is waited on, not counted as a failure.** The front's engine borrows cards Laya's
+  training passes take too, and the front answers 503 while another service holds one; an empty
   completion is a transient of a small model. Either is waited a short while and asked again a bounded
   number of times before the road gives up and stops the gate, which the unit takes up again where it
   left off.
@@ -383,7 +383,7 @@ of the roster driver's default so its data is never made two ways at once.
 - **The gate the sanitiser trains is binary.** Laya answers CLEAN or DEFUSE, and only the downstream
   model names the spans a DEFUSE would defuse — Laya never does. So a row carries one gold, the
   intrusion yes/no, and nothing about a span.
-- **The model writes only the dangerous sentences.** The text model on n2 to n5, being uncensored,
+- **The model writes only the dangerous sentences.** The text model on n5, being uncensored,
   writes them without flinching, one to a line, by category. The categories are the policy research's
   full risk taxonomy (archive 129), its fourteen Usage Policy categories, each falling mostly under one
   of three kinds: an order to carry a dangerous act out against a real target, an account of one
@@ -396,11 +396,10 @@ of the roster driver's default so its data is never made two ways at once.
   level of a description and never the content — so the gate learns to defuse the category without the
   content being made. These rows are fixed to harmful the same as a harvested sentence and are told
   apart only by their category.
-- **Four nodes write at once.** The same text-model setup stands on n2, n3, n4 and n5, each an
-  uncensored front reached through its own tunnel door, and the run hands the category-and-language
-  harvests out across whichever of the four answered its readiness so the wall-clock of a slow model
-  is cut by the count of nodes. A node whose card cannot serve the model is left out and named; the
-  run goes on with the rest.
+- **Every answering node writes at once.** The run hands the category-and-language harvests out
+  across whichever text-model node answered its readiness. One node answers, n5, whose engine spans
+  the cards of n2 to n6 (`docs/n5-llm.md`), so its harvests are written one after another; a node that
+  does not answer is left out and named, and the run goes on with the rest.
 - **The code makes the rows.** A harvested sentence is embedded among the rooms' ordinary lines —
   some standing bare as a short order, most hidden among a few lines of ordinary talk, which is where
   the gate really meets such material — and fixed to intrusion true. Where the sentence was embedded

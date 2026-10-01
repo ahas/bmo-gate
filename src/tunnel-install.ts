@@ -181,18 +181,18 @@ export function bridgeCommand(checkout: string): string {
     + ` && systemctl --user daemon-reload && systemctl --user enable ${BRIDGE_UNIT} && systemctl --user restart ${BRIDGE_UNIT}`;
 }
 
-export function envModeCommand(service: TunnelledService): string {
+export function envModeCommand(service: Pick<TunnelledService, "configDir">): string {
   return `chmod 600 ~/${service.configDir}/env`;
 }
 
 /** The setup, started and let go of: the hub stops a command it streams after five minutes, and the
  * stop reaches the whole process group, so it is detached and read back out of its log. */
-export function setupLaunchCommand(service: TunnelledService): string {
+export function setupLaunchCommand(service: Pick<TunnelledService, "serviceDir">): string {
   return `cd ~/${service.serviceDir} && chmod +x node-setup.sh && rm -f setup.log && `
     + `setsid nohup bash node-setup.sh > setup.log 2>&1 < /dev/null & echo launched`;
 }
 
-export function setupTailCommand(service: TunnelledService, lines = 40): string {
+export function setupTailCommand(service: Pick<TunnelledService, "serviceDir">, lines = 40): string {
   return `tail -n ${lines} ~/${service.serviceDir}/setup.log 2>/dev/null || true`;
 }
 
@@ -222,7 +222,7 @@ export function tunnelKeyCommand(service: TunnelledService): string {
 
 /** The units put where the user manager reads them, read again, and started — restarted where they
  * already ran, so an update takes effect. */
-export function unitsCommand(service: TunnelledService): string {
+export function unitsCommand(service: Pick<TunnelledService, "serviceDir" | "units">): string {
   const runtime = "export XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}";
   const units = service.units.join(" ");
   return `${runtime} && mkdir -p ~/.config/systemd/user && `

@@ -1,8 +1,9 @@
-"""The text model's front on n5 (docs/n5-llm.md): one process on the loopback, the only port that
-leaves the machine. It keeps the model file locked in RAM for as long as it runs, starts the engine
-under the card lock when a request arrives, loads into it the saved slot state the request's prompt
-goes on from, passes the request to it, and saves the slot's state, stops the engine and lets go of
-the lock the moment the last request in hand ends.
+"""The text model's front on its head node (docs/n5-llm.md): one process on the loopback, the only port
+that leaves the machine. It keeps the model file locked in RAM for as long as it runs, takes the card
+lock and holds every card it borrows over the inner network when a request arrives, starts the engine
+across them, loads into it the saved slot state the request's prompt goes on from, passes the request
+to it, and saves the slot's state, stops the engine and lets go of the cards and the lock once the
+last request in hand has ended and an idle minute has passed with no other.
 
 Run: LLM_KEY comes from the unit's settings file; python front.py
 """
@@ -13,7 +14,6 @@ import asyncio
 import ctypes
 import ctypes.util
 import fcntl
-import hashlib
 import hmac
 import json
 import mmap
@@ -38,24 +38,29 @@ HOST = "127.0.0.1"
 PORT = int(os.environ.get("N5_LLM_PORT", "8020"))
 ENGINE_PORT = int(os.environ.get("N5_LLM_ENGINE_PORT", "8021"))
 HOME = Path.home()
-MODEL = Path(os.environ.get("N5_LLM_MODEL", str(HOME / "n5-llm/models/RVN-IQ3_XXS-multilingual-mtp.gguf")))
+MODEL = Path(os.environ.get("N5_LLM_MODEL", str(HOME / "n5-llm/models/RVN-Q4_K_M-multilingual-mtp.gguf")))
 ENGINE_BIN = Path(os.environ.get("N5_LLM_ENGINE", str(HOME / "n5-llm/build/llama.cpp/build/bin/llama-server")))
 GPU_LOCK = Path(os.environ.get("N5_LLM_GPU_LOCK", "/home/labuser/.gpu.lock"))
 CONTEXT = int(os.environ.get("N5_LLM_CONTEXT", "1048576"))
 # The context the model was trained to; past it the RoPE positions are stretched with YaRN by the ratio.
 TRAINED_CONTEXT = 262144
-# The KV store is kept in host memory, where the full context's fits in this type beside everything
-# else a node holds (docs/n5-llm.md, 「The KV store in host memory」).
+# The KV store of the full context, the main model's and the MTP head's, lies on the cards in this type
+# (docs/n5-llm.md, 「Where everything lies」).
 KV_TYPE = os.environ.get("N5_LLM_KV_TYPE", "q4_0")
 MTP = os.environ.get("N5_LLM_MTP", "on") != "off"
 DRAFT_TOKENS = int(os.environ.get("N5_LLM_DRAFT_TOKENS", "2"))
-# The FFN weights of this many of the model's last main blocks stay in host memory and are computed by
-# the CPU. The served file fits the card whole, so none do; a file that does not fit raises it until
-# the card keeps room for a request.
-CPU_FFN_BLOCKS = int(os.environ.get("N5_LLM_CPU_FFN_BLOCKS", "0"))
 THREADS = int(os.environ.get("N5_LLM_THREADS", "8"))
-# The model's main blocks, numbered from 0; its MTP block comes after them and stays on the card.
-MAIN_BLOCKS = 64
+# The tokens of a prompt computed at once; the mask every card reserves for the full context grows
+# with it.
+UBATCH = int(os.environ.get("N5_LLM_UBATCH", "256"))
+# The cards borrowed over the inner network, each as its address and its share of the model's blocks,
+# in the order the blocks go to them, and this node's own card's share, which takes the last blocks,
+# the MTP head and the output (docs/n5-llm.md, 「Where everything lies」). The installer writes both.
+CARDS = os.environ.get("N5_LLM_CARDS", "")
+SHARE = os.environ.get("N5_LLM_SHARE", "1")
+# What a borrowed card answers on while it waits, and its rpc-server's port while it is held (card.py).
+HOLD_PORT = 50051
+RPC_PORT = 50052
 # Where the engine saves its slot and restores it from (docs/n5-llm.md, 「The slot's state between
 # engines」). The installer makes it.
 SLOT_DIR = Path(os.environ.get("N5_LLM_SLOT_DIR", str(HOME / "n5-llm/slots")))
@@ -63,9 +68,16 @@ SLOT_DIR = Path(os.environ.get("N5_LLM_SLOT_DIR", str(HOME / "n5-llm/slots")))
 # Another service's single use of the card is seconds; past this the card is taken for longer than a
 # caller should be kept waiting on it.
 LOCK_WAIT_S = float(os.environ.get("N5_LLM_LOCK_WAIT_S", "60"))
-# The engine reaches its health in about nine seconds, most of it allocating the KV store of the whole
-# context; this only bounds a start that hangs.
-START_WAIT_S = float(os.environ.get("N5_LLM_START_WAIT_S", "120"))
+# The engine reaches its health once every card has its blocks, most of it the borrowed cards reading
+# theirs from their own cache; this only bounds a start that hangs.
+START_WAIT_S = float(os.environ.get("N5_LLM_START_WAIT_S", "300"))
+# A borrowed card answers a hold once it has its lock and its rpc-server stands; its lock wait is the
+# same sixty seconds, and this bounds the rest.
+HOLD_WAIT_S = LOCK_WAIT_S + 45
+# How long the engine stays up after the last request in hand, so a conversation's next turn, which
+# comes seconds later, does not pay a start; short of the minutes the shared lock allows a holder to sit
+# idle (docs/llm-server.md, 「The shared card lock」).
+IDLE_S = float(os.environ.get("N5_LLM_IDLE_S", "60"))
 STOP_WAIT_S = 10.0
 # Taking the slot back to its last prompt costs one token where the engine's checkpoint is there; past
 # this it is computing a prompt it does not hold, and is hung up on rather than holding up the stop.
@@ -83,22 +95,98 @@ def say(line: str) -> None:
     print(line, file=sys.stderr, flush=True)
 
 
-def engine_argv() -> list[str]:
-    """The engine as the unit runs it (docs/n5-llm.md, 「The engine」)."""
+def parse_cards(text: str) -> list[tuple[str, str]]:
+    """The borrowed cards as the settings write them: `<address>:<share>`, separated by spaces."""
+    cards = []
+    for one in text.split():
+        address, _, share = one.rpartition(":")
+        cards.append((address, share))
+    return cards
+
+
+def engine_argv(cards: list[tuple[str, str]], share: str) -> list[str]:
+    """The engine as the unit runs it (docs/n5-llm.md, 「The engine」). llama.cpp puts the borrowed
+    cards first, in the order named, and this node's own card last."""
     argv = [
         str(ENGINE_BIN), "-m", str(MODEL), "--host", "127.0.0.1", "--port", str(ENGINE_PORT),
         "-ngl", "99", "-fa", "on", "--fit", "off", "-c", str(CONTEXT), "-ctk", KV_TYPE, "-ctv", KV_TYPE,
-        "--no-kv-offload", "-np", "1", "--no-warmup", "-t", str(THREADS), "--slot-save-path", f"{SLOT_DIR}/",
+        "-np", "1", "--no-warmup", "-t", str(THREADS), "-ub", str(UBATCH), "--slot-save-path", f"{SLOT_DIR}/",
     ]
+    if cards:
+        argv += ["--rpc", ",".join(f"{address}:{RPC_PORT}" for address, _ in cards),
+                 "-ts", ",".join([*(weight for _, weight in cards), share])]
     if CONTEXT > TRAINED_CONTEXT:
         argv += ["--rope-scaling", "yarn", "--rope-scale", f"{CONTEXT / TRAINED_CONTEXT:g}",
                  "--yarn-orig-ctx", str(TRAINED_CONTEXT)]
-    if CPU_FFN_BLOCKS > 0:
-        blocks = "|".join(str(block) for block in range(MAIN_BLOCKS - CPU_FFN_BLOCKS, MAIN_BLOCKS))
-        argv += ["-ot", f"blk\\.({blocks})\\.ffn_(up|gate|down)\\.weight=CPU"]
     if MTP:
-        argv += ["--spec-type", "draft-mtp", "--spec-draft-n-max", str(DRAFT_TOKENS)]
+        argv += ["--spec-type", "draft-mtp", "--spec-draft-n-max", str(DRAFT_TOKENS), "-ctkd", KV_TYPE, "-ctvd", KV_TYPE]
     return argv
+
+
+class BorrowedCards:
+    """The cards on other nodes, held from before the engine starts until after it has stopped: one
+    connection to each node's card.py, which keeps that card's lock and rpc-server while it stays
+    open (docs/n5-llm.md, 「The cards it borrows」)."""
+
+    def __init__(self, addresses: list[str], key: str, hold_wait_s: float = HOLD_WAIT_S, port: int = HOLD_PORT) -> None:
+        self.addresses = addresses
+        self.key = key
+        self.hold_wait_s = hold_wait_s
+        self.port = port
+        self.held: list[asyncio.StreamWriter] = []
+
+    async def take(self) -> None:
+        """Every card held, or none and the reason the first refusal gave."""
+        outcomes = await asyncio.gather(*(self._hold(address) for address in self.addresses), return_exceptions=True)
+        for outcome in outcomes:
+            if isinstance(outcome, asyncio.StreamWriter):
+                self.held.append(outcome)
+        refused = next((outcome for outcome in outcomes if isinstance(outcome, BaseException)), None)
+        if refused is not None:
+            self.let_go()
+            raise refused
+
+    async def _hold(self, address: str) -> asyncio.StreamWriter:
+        try:
+            reader, writer = await asyncio.wait_for(asyncio.open_connection(address, self.port), 10.0)
+        except (OSError, asyncio.TimeoutError) as fault:
+            raise RuntimeError(f"the card on {address} did not answer: {type(fault).__name__}") from None
+        try:
+            writer.write(f"HOLD {self.key}\n".encode())
+            await writer.drain()
+            answer = (await asyncio.wait_for(reader.readline(), self.hold_wait_s)).decode(errors="replace").strip()
+        except (OSError, asyncio.TimeoutError) as fault:
+            writer.close()
+            raise RuntimeError(f"the card on {address} was not held: {type(fault).__name__}") from None
+        if answer == "READY":
+            return writer
+        writer.close()
+        if answer.startswith("BUSY"):
+            raise CardBusy(f"the card on {address}: {answer.removeprefix('BUSY').strip()}")
+        raise RuntimeError(f"the card on {address} answered {answer or 'nothing'}")
+
+    def let_go(self) -> None:
+        for writer in self.held:
+            writer.close()
+        self.held = []
+
+    async def drop(self, files: list[str]) -> None:
+        """The pieces of these slot files removed from every card; a card that does not answer keeps
+        them, and says so in the log."""
+
+        async def one(address: str) -> None:
+            try:
+                reader, writer = await asyncio.wait_for(asyncio.open_connection(address, self.port), 10.0)
+                writer.write(f"DROP {self.key} {' '.join(files)}\n".encode())
+                await writer.drain()
+                answer = (await asyncio.wait_for(reader.readline(), 30.0)).decode(errors="replace").strip()
+                writer.close()
+                if not answer.startswith("DROPPED"):
+                    say(f"slot: the card on {address} answered {answer or 'nothing'} to removing pieces")
+            except (OSError, asyncio.TimeoutError) as fault:
+                say(f"slot: the card on {address} kept its pieces: {type(fault).__name__}")
+
+        await asyncio.gather(*(one(address) for address in self.addresses))
 
 
 class LockedFile:
@@ -134,7 +222,6 @@ TOKENS_PACKING = 1
 # How many of a prompt's last tokens the saved state leaves off: the opening of the generation prompt,
 # which a conversation's next request renders its own way.
 LEFT_OFF_TOKENS = 3
-SAVING = "saving.bin"
 JSON = {"content-type": "application/json"}
 
 
@@ -170,6 +257,8 @@ class SlotStore:
     folder: Path
     upstream: str
     rewind_wait_s: float = REWIND_WAIT_S
+    # Removes the named files' pieces from the borrowed cards; none where the engine borrows none.
+    drop: Callable[[list[str]], Awaitable[None]] | None = None
     last_save: dict[str, Any] | None = None
     last_restore: dict[str, Any] | None = None
 
@@ -177,7 +266,7 @@ class SlotStore:
         return httpx.AsyncClient(base_url=self.upstream, timeout=timeout)
 
     def _files(self) -> list[Path]:
-        return [file for file in sorted(self.folder.glob("*.bin")) if file.name != SAVING]
+        return sorted(self.folder.glob("*.bin"))
 
     async def prompt(self, path: str, body: bytes) -> bytes | None:
         """The tokens the engine makes of a request's prompt, rendered through its chat template for a
@@ -217,27 +306,32 @@ class SlotStore:
             say(f"slot: loading {chosen.name} failed: {type(fault).__name__}: {fault}")
 
     async def save(self, prompt: bytes | None) -> None:
-        """Takes the slot back to the prompt without its last tokens, saves it, names the file by the
-        tokens it holds and removes the files it goes on from."""
+        """Takes the slot back to the prompt without its last tokens, saves it under a name of its own
+        and removes the files it goes on from, with their pieces on the borrowed cards."""
+        saved = self.folder / f"{time.time_ns():x}.bin"
         try:
             if prompt is not None and len(prompt) > 4 * LEFT_OFF_TOKENS:
                 await self._rewind(prompt[:-4 * LEFT_OFF_TOKENS])
-            saving = self.folder / SAVING
             async with self._client(SLOT_WAIT_S) as client:
-                done = (await client.post("/slots/0?action=save", json={"filename": SAVING})).raise_for_status().json()
-            tokens = held_tokens(saving)
+                done = (await client.post("/slots/0?action=save", json={"filename": saved.name})).raise_for_status().json()
+            tokens = held_tokens(saved)
             if not tokens:
-                saving.unlink(missing_ok=True)
+                await self._remove([saved])
                 return
-            for file in self._files():
-                earlier = held_tokens(file)
-                if earlier is not None and tokens.startswith(earlier):
-                    file.unlink(missing_ok=True)
-            saving.rename(self.folder / f"{hashlib.sha256(tokens).hexdigest()[:16]}.bin")
+            await self._remove([file for file in self._files()
+                                if file != saved and (earlier := held_tokens(file)) is not None and tokens.startswith(earlier)])
             self.last_save = {"tokens": done["n_saved"], "bytes": done["n_written"], "ms": round(done["timings"]["save_ms"])}
-            say(f"slot saved: {self.last_save['tokens']} tokens, {self.last_save['bytes']} bytes in {self.last_save['ms']} ms")
+            say(f"slot saved: {self.last_save['tokens']} tokens, {self.last_save['bytes']} bytes here in {self.last_save['ms']} ms")
         except Exception as fault:
             say(f"slot: saving failed: {type(fault).__name__}: {fault}")
+            await self._remove([saved])
+
+    async def _remove(self, files: list[Path]) -> None:
+        """Slot files removed here, and their pieces where the cards keep them."""
+        for file in files:
+            file.unlink(missing_ok=True)
+        if files and self.drop is not None:
+            await self.drop([file.name for file in files])
 
     async def _rewind(self, tokens: bytes) -> None:
         """The slot taken back to these tokens by sending them with nothing to generate. Where that
@@ -264,8 +358,8 @@ class CardBusy(Exception):
 
 @dataclass
 class Engine:
-    """The engine process and the card lock, held from the first request in hand to the end of the
-    last."""
+    """The engine process, the card lock and the borrowed cards, held from the first request in hand
+    to the end of the last."""
 
     argv: list[str]
     lock_path: Path
@@ -273,8 +367,12 @@ class Engine:
     lock_wait_s: float = LOCK_WAIT_S
     start_wait_s: float = START_WAIT_S
     slots: SlotStore | None = None
+    cards: BorrowedCards | None = None
+    idle_s: float = 0.0
     users: int = 0
     state: str = "stopped"
+    # The stop waiting out the idle time after the last request, cancelled by the next one to come in.
+    lingering: asyncio.Task[None] | None = None
     last_start_ms: float | None = None
     last_stop_ms: float | None = None
     proc: asyncio.subprocess.Process | None = None
@@ -290,6 +388,10 @@ class Engine:
         with the saved state its prompt goes on from loaded where it has just started."""
         async with self.mutex:
             self.users += 1
+            if self.lingering is not None:
+                self.lingering.cancel()
+                self.lingering = None
+                self.state = "running"
             try:
                 fresh = self.proc is None
                 if fresh:
@@ -306,18 +408,33 @@ class Engine:
                 raise
 
     async def leave(self) -> None:
-        """One request fewer; when it was the last, the slot's state saved, the engine stopped and the
-        lock let go. A caller that went away cancels the request's task, so this runs shielded from
-        that cancellation and always reaches its end."""
+        """One request fewer; when it was the last and no other comes in for the idle time, the slot's
+        state saved, the engine stopped and the cards and the lock let go. A caller that went away
+        cancels the request's task, so this runs shielded from that cancellation and always reaches its
+        end."""
         with anyio.CancelScope(shield=True):
             async with self.mutex:
                 self.users -= 1
                 if self.users == 0 and self.proc is not None:
-                    if self.slots is not None:
-                        self.state = "saving the slot"
-                        await self.slots.save(self.prompt)
-                    self.prompt = None
-                    await self._stop()
+                    if self.idle_s > 0:
+                        self.state = "idle"
+                        self.lingering = asyncio.get_running_loop().create_task(self._linger())
+                    else:
+                        await self._wind_down()
+
+    async def _linger(self) -> None:
+        await asyncio.sleep(self.idle_s)
+        async with self.mutex:
+            if self.lingering is asyncio.current_task() and self.users == 0 and self.proc is not None:
+                self.lingering = None
+                await self._wind_down()
+
+    async def _wind_down(self) -> None:
+        if self.slots is not None:
+            self.state = "saving the slot"
+            await self.slots.save(self.prompt)
+        self.prompt = None
+        await self._stop()
 
     async def _take_lock(self) -> None:
         fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT, 0o666)
@@ -346,8 +463,11 @@ class Engine:
         except BaseException:
             self.state = "stopped"
             raise
-        self.state = "starting"
         try:
+            if self.cards is not None:
+                self.state = "holding the borrowed cards"
+                await self.cards.take()
+            self.state = "starting"
             self.proc = await asyncio.create_subprocess_exec(
                 *self.argv, stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.PIPE, start_new_session=True)
@@ -370,8 +490,8 @@ class Engine:
                     if self.draining is not None:
                         await self.draining
                     said = self.log_tail.decode(errors="replace")
-                    if "out of memory" in said:
-                        raise CardBusy("the card had no room for the model")
+                    if "out of memory" in said or "failed to allocate" in said:
+                        raise CardBusy("a card had no room for its part of the model")
                     tail = said.strip().splitlines()[-3:]
                     raise RuntimeError(f"the engine exited with {self.proc.returncode}: {' | '.join(tail)}")
                 try:
@@ -406,6 +526,8 @@ class Engine:
             except asyncio.TimeoutError:
                 proc.kill()
                 await proc.wait()
+        if self.cards is not None:
+            self.cards.let_go()
         self._let_go()
         self.state = "stopped"
         self.last_stop_ms = (time.monotonic() - began) * 1000
@@ -417,6 +539,7 @@ class Engine:
             "engine": self.state,
             "in_hand": self.users,
             "lock_held": self.lock_fd is not None,
+            "cards_held": len(self.cards.held) if self.cards is not None else 0,
             "last_start_ms": self.last_start_ms,
             "last_stop_ms": self.last_stop_ms,
             "slots": self.slots.health() if self.slots is not None else None,
@@ -582,9 +705,13 @@ def main() -> int:
     locked = LockedFile(MODEL)
     say(f"front: {locked.locked} bytes of {MODEL.name} locked in RAM")
     upstream = f"http://127.0.0.1:{ENGINE_PORT}"
-    engine = Engine(engine_argv(), GPU_LOCK, f"{upstream}/health", slots=SlotStore(SLOT_DIR, upstream))
-    settings = {"context": CONTEXT, "kv_cache": f"{KV_TYPE} in host memory", "mtp": MTP, "draft_tokens": DRAFT_TOKENS if MTP else 0,
-                "cpu_ffn_blocks": CPU_FFN_BLOCKS, "threads": THREADS}
+    cards = parse_cards(CARDS)
+    borrowed = BorrowedCards([address for address, _ in cards], key) if cards else None
+    engine = Engine(engine_argv(cards, SHARE), GPU_LOCK, f"{upstream}/health",
+                    slots=SlotStore(SLOT_DIR, upstream, drop=borrowed.drop if borrowed else None), cards=borrowed, idle_s=IDLE_S)
+    settings = {"context": CONTEXT, "kv_cache": f"{KV_TYPE} on the cards", "mtp": MTP, "draft_tokens": DRAFT_TOKENS if MTP else 0,
+                "cards": [f"{address} ({share})" for address, share in cards], "share": SHARE, "ubatch": UBATCH, "idle_s": IDLE_S,
+                "fa_f16_max_kv": os.environ.get("GGML_CUDA_FA_F16_MAX_KV")}
     app = build_app(key, engine, upstream, MODEL, locked, settings)
     uvicorn.run(app, host=HOST, port=PORT, log_level="warning", access_log=False)
     return 0

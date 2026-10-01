@@ -1,0 +1,448 @@
+diff --git a/ggml/include/ggml-rpc.h b/ggml/include/ggml-rpc.h
+--- a/ggml/include/ggml-rpc.h
++++ b/ggml/include/ggml-rpc.h
+@@ -30,6 +30,14 @@
+ GGML_BACKEND_API ggml_backend_reg_t ggml_backend_rpc_reg(void);
+ GGML_BACKEND_API ggml_backend_reg_t ggml_backend_rpc_add_server(const char * endpoint);
+ 
++// A tensor range on an RPC buffer saved to, or loaded from, a file of the given name on its server's
++// own disk (GGML_RPC_STATE_DIR there); false where the tensor is not on an RPC buffer. Both are queued,
++// and ggml_backend_rpc_state_finish waits for every one and says whether all of them succeeded.
++GGML_BACKEND_API bool ggml_backend_rpc_tensor_state_save(const struct ggml_tensor * tensor, size_t offset, size_t size, const char * name);
++GGML_BACKEND_API bool ggml_backend_rpc_tensor_state_load(struct ggml_tensor * tensor, size_t offset, size_t size, const char * name);
++GGML_BACKEND_API bool ggml_backend_rpc_state_finish(void);
++GGML_BACKEND_API const char * ggml_backend_rpc_tensor_endpoint(const struct ggml_tensor * tensor);
++
+ #ifdef  __cplusplus
+ }
+ #endif
+diff --git a/ggml/src/ggml-rpc/ggml-rpc.cpp b/ggml/src/ggml-rpc/ggml-rpc.cpp
+--- a/ggml/src/ggml-rpc/ggml-rpc.cpp
++++ b/ggml/src/ggml-rpc/ggml-rpc.cpp
+@@ -77,6 +77,8 @@
+     RPC_CMD_DEVICE_COUNT,
+     RPC_CMD_GRAPH_RECOMPUTE,
+     RPC_CMD_MEMSET_TENSOR,
++    RPC_CMD_STATE_SAVE,
++    RPC_CMD_STATE_LOAD,
+     RPC_CMD_NONE,
+     RPC_CMD_COUNT,
+ };
+@@ -182,6 +184,19 @@
+     uint64_t size;
+ };
+ 
++// A range of a tensor written to, or read from, a file on the server's own disk, under the folder
++// GGML_RPC_STATE_DIR names there. Only the command crosses the network.
++struct rpc_msg_state_req {
++    rpc_tensor tensor;
++    uint64_t offset;
++    uint64_t size;
++    char name[128];
++};
++
++struct rpc_msg_state_rsp {
++    uint8_t result;
++};
++
+ struct rpc_msg_copy_tensor_req {
+     rpc_tensor src;
+     rpc_tensor dst;
+@@ -749,6 +764,72 @@
+     ctx->dispatcher->send(RPC_CMD_GET_TENSOR, request, sizeof(*request), data, size);
+ }
+ 
++// Slot state kept where it lies: a save or a load of a tensor range on an RPC buffer is queued to that
++// buffer's server and runs there, every server at once, until ggml_backend_rpc_state_finish waits for
++// all of them and says whether each one did its part.
++struct rpc_state_pending {
++    std::shared_ptr<rpc_dispatcher>    dispatcher;
++    std::shared_ptr<rpc_msg_state_rsp> response;
++};
++
++static std::mutex rpc_state_mutex;
++static std::vector<rpc_state_pending> rpc_state_pendings;
++
++static bool ggml_backend_rpc_state_op(enum rpc_cmd cmd, const ggml_tensor * tensor, size_t offset, size_t size, const char * name) {
++    if (tensor == nullptr || tensor->buffer == nullptr || !ggml_backend_buffer_is_rpc(tensor->buffer) ||
++            name == nullptr || strlen(name) == 0 || strlen(name) >= sizeof(rpc_msg_state_req::name)) {
++        return false;
++    }
++    ggml_backend_rpc_buffer_context * ctx = (ggml_backend_rpc_buffer_context *)tensor->buffer->context;
++    auto request = std::make_shared<rpc_msg_state_req>();
++    memset(request.get(), 0, sizeof(*request));
++    request->tensor = serialize_tensor(tensor);
++    request->offset = offset;
++    request->size   = size;
++    snprintf(request->name, sizeof(request->name), "%s", name);
++    auto response = std::make_shared<rpc_msg_state_rsp>();
++    response->result = 0;
++    ctx->dispatcher->send_async(cmd, request, sizeof(*request), response.get(), sizeof(*response));
++    std::lock_guard<std::mutex> lock(rpc_state_mutex);
++    rpc_state_pendings.push_back({ctx->dispatcher, response});
++    return true;
++}
++
++extern "C" bool ggml_backend_rpc_tensor_state_save(const ggml_tensor * tensor, size_t offset, size_t size, const char * name) {
++    return ggml_backend_rpc_state_op(RPC_CMD_STATE_SAVE, tensor, offset, size, name);
++}
++
++extern "C" bool ggml_backend_rpc_tensor_state_load(ggml_tensor * tensor, size_t offset, size_t size, const char * name) {
++    return ggml_backend_rpc_state_op(RPC_CMD_STATE_LOAD, tensor, offset, size, name);
++}
++
++extern "C" bool ggml_backend_rpc_state_finish(void) {
++    std::vector<rpc_state_pending> pendings;
++    {
++        std::lock_guard<std::mutex> lock(rpc_state_mutex);
++        pendings.swap(rpc_state_pendings);
++    }
++    std::vector<std::shared_ptr<rpc_dispatcher>> waited;
++    bool ok = true;
++    for (const auto & pending : pendings) {
++        if (std::find(waited.begin(), waited.end(), pending.dispatcher) == waited.end()) {
++            pending.dispatcher->synchronize();
++            waited.push_back(pending.dispatcher);
++        }
++        ok = ok && pending.response->result == 1;
++    }
++    return ok;
++}
++
++// The server a tensor's buffer lives on, or NULL where it is not an RPC buffer.
++extern "C" const char * ggml_backend_rpc_tensor_endpoint(const ggml_tensor * tensor) {
++    if (tensor == nullptr || tensor->buffer == nullptr || !ggml_backend_buffer_is_rpc(tensor->buffer)) {
++        return nullptr;
++    }
++    ggml_backend_rpc_buffer_type_context * buft_ctx = (ggml_backend_rpc_buffer_type_context *)tensor->buffer->buft->context;
++    return buft_ctx->endpoint.c_str();
++}
++
+ static bool ggml_backend_rpc_buffer_cpy_tensor(ggml_backend_buffer_t buffer, const ggml_tensor * src, ggml_tensor * dst) {
+     if (ggml_backend_buffer_is_rpc(src->buffer)) {
+         // check if src and dst are on the same server
+@@ -1169,6 +1250,7 @@
+     bool set_tensor(const std::vector<uint8_t> & input);
+     bool set_tensor_hash(const rpc_msg_set_tensor_hash_req & request, rpc_msg_set_tensor_hash_rsp & response);
+     bool get_tensor(const rpc_msg_get_tensor_req & request, std::vector<uint8_t> & response);
++    void state_op(bool save, const rpc_msg_state_req & request, rpc_msg_state_rsp & response);
+     bool copy_tensor(const rpc_msg_copy_tensor_req & request, rpc_msg_copy_tensor_rsp & response);
+     bool graph_compute(const std::vector<uint8_t> & input);
+     bool graph_recompute(const rpc_msg_graph_recompute_req & request);
+@@ -1612,6 +1694,86 @@
+     return true;
+ }
+ 
++void rpc_server::state_op(bool save, const rpc_msg_state_req & request, rpc_msg_state_rsp & response) {
++    response.result = 0;
++    const char * dir = getenv("GGML_RPC_STATE_DIR");
++    const std::string name(request.name, strnlen(request.name, sizeof(request.name)));
++    if (dir == nullptr || name.empty() || name[0] == '.' || name.find('/') != std::string::npos) {
++        GGML_LOG_ERROR("[%s] no state folder, or a name that is not a plain file name\n", __func__);
++        return;
++    }
++    struct ggml_init_params params {
++        /*.mem_size   =*/ ggml_tensor_overhead(),
++        /*.mem_buffer =*/ NULL,
++        /*.no_alloc   =*/ true,
++    };
++    ggml_context_ptr ctx_ptr { ggml_init(params) };
++    GGML_ASSERT(ctx_ptr != nullptr);
++    ggml_tensor * tensor = deserialize_tensor(ctx_ptr.get(), &request.tensor);
++    if (tensor == nullptr || tensor->buffer == nullptr) {
++        GGML_LOG_ERROR("[%s] error deserializing tensor\n", __func__);
++        return;
++    }
++    {
++        const size_t p0 = (size_t) ggml_backend_buffer_get_base(tensor->buffer);
++        const size_t p1 = p0 + ggml_backend_buffer_get_size(tensor->buffer);
++        if (request.tensor.data + request.offset < p0 || request.tensor.data + request.offset >= p1 ||
++                request.size > (p1 - request.tensor.data - request.offset)) {
++            GGML_LOG_ERROR("[%s] tensor region out of buffer bounds\n", __func__);
++            return;
++        }
++    }
++    const fs::path path = fs::path(dir) / name;
++    const size_t chunk = 64u*1024*1024;
++    std::vector<uint8_t> data(std::min<size_t>(chunk, request.size));
++    if (save) {
++        const fs::path part = fs::path(dir) / (name + ".part");
++        FILE * f = fopen(part.c_str(), "wb");
++        if (f == nullptr) {
++            GGML_LOG_ERROR("[%s] cannot write %s\n", __func__, part.c_str());
++            return;
++        }
++        bool written = true;
++        for (size_t done = 0; done < request.size && written; done += chunk) {
++            const size_t n = std::min(chunk, (size_t) request.size - done);
++            ggml_backend_tensor_get(tensor, data.data(), request.offset + done, n);
++            written = fwrite(data.data(), 1, n, f) == n;
++        }
++        written = fclose(f) == 0 && written;
++        std::error_code ec;
++        if (!written || (fs::rename(part, path, ec), ec)) {
++            fs::remove(part, ec);
++            GGML_LOG_ERROR("[%s] writing %s failed\n", __func__, path.c_str());
++            return;
++        }
++    } else {
++        std::error_code ec;
++        const auto bytes = fs::file_size(path, ec);
++        if (ec || bytes != request.size) {
++            GGML_LOG_ERROR("[%s] %s is missing or not %" PRIu64 " bytes\n", __func__, path.c_str(), request.size);
++            return;
++        }
++        FILE * f = fopen(path.c_str(), "rb");
++        if (f == nullptr) {
++            return;
++        }
++        bool read = true;
++        for (size_t done = 0; done < request.size && read; done += chunk) {
++            const size_t n = std::min(chunk, (size_t) request.size - done);
++            read = fread(data.data(), 1, n, f) == n;
++            if (read) {
++                ggml_backend_tensor_set(tensor, data.data(), request.offset + done, n);
++            }
++        }
++        fclose(f);
++        if (!read) {
++            GGML_LOG_ERROR("[%s] reading %s failed\n", __func__, path.c_str());
++            return;
++        }
++    }
++    response.result = 1;
++}
++
+ bool rpc_server::copy_tensor(const rpc_msg_copy_tensor_req & request, rpc_msg_copy_tensor_rsp & response) {
+     struct ggml_init_params params {
+         /*.mem_size   =*/ 2*ggml_tensor_overhead(),
+@@ -1971,6 +2133,19 @@
+                 }
+                 break;
+             }
++            case RPC_CMD_STATE_SAVE:
++            case RPC_CMD_STATE_LOAD: {
++                rpc_msg_state_req request;
++                if (!recv_msg(sock, &request, sizeof(request))) {
++                    return;
++                }
++                rpc_msg_state_rsp response;
++                server.state_op(cmd == RPC_CMD_STATE_SAVE, request, response);
++                if (!send_msg(sock, &response, sizeof(response))) {
++                    return;
++                }
++                break;
++            }
+             case RPC_CMD_MEMSET_TENSOR: {
+                 rpc_msg_memset_tensor_req request;
+                 if (!recv_msg(sock, &request, sizeof(request))) {
+@@ -2299,6 +2474,18 @@
+     if (std::strcmp(name, "ggml_backend_rpc_start_server") == 0) {
+         return (void *)ggml_backend_rpc_start_server;
+     }
++    if (std::strcmp(name, "ggml_backend_rpc_tensor_state_save") == 0) {
++        return (void *)ggml_backend_rpc_tensor_state_save;
++    }
++    if (std::strcmp(name, "ggml_backend_rpc_tensor_state_load") == 0) {
++        return (void *)ggml_backend_rpc_tensor_state_load;
++    }
++    if (std::strcmp(name, "ggml_backend_rpc_state_finish") == 0) {
++        return (void *)ggml_backend_rpc_state_finish;
++    }
++    if (std::strcmp(name, "ggml_backend_rpc_tensor_endpoint") == 0) {
++        return (void *)ggml_backend_rpc_tensor_endpoint;
++    }
+     return NULL;
+ 
+     GGML_UNUSED(reg);
+diff --git a/include/llama.h b/include/llama.h
+--- a/include/llama.h
++++ b/include/llama.h
+@@ -46,7 +46,7 @@
+ #define LLAMA_SESSION_VERSION 10
+ 
+ #define LLAMA_STATE_SEQ_MAGIC   LLAMA_FILE_MAGIC_GGSQ
+-#define LLAMA_STATE_SEQ_VERSION 3
++#define LLAMA_STATE_SEQ_VERSION 4
+ 
+ #ifdef __cplusplus
+ extern "C" {
+diff --git a/src/llama-context.cpp b/src/llama-context.cpp
+--- a/src/llama-context.cpp
++++ b/src/llama-context.cpp
+@@ -2760,9 +2760,46 @@
+     std::vector<read_info> rinfos;
+ };
+ 
++// A sequence's state saved in pieces: a range of a tensor on an RPC buffer is written by its server
++// to that server's own disk, and the file keeps only the piece's name, its server and its size; every
++// other range is written into the file itself. Each range is tagged with which it is.
++struct llama_rpc_state_api {
++    bool (*save)(const ggml_tensor *, size_t, size_t, const char *) = nullptr;
++    bool (*load)(ggml_tensor *, size_t, size_t, const char *) = nullptr;
++    bool (*finish)() = nullptr;
++    const char * (*endpoint)(const ggml_tensor *) = nullptr;
++};
++
++static const llama_rpc_state_api & llama_rpc_state() {
++    static const llama_rpc_state_api api = [] {
++        llama_rpc_state_api found;
++        ggml_backend_reg_t reg = ggml_backend_reg_by_name("RPC");
++        if (reg != nullptr) {
++            found.save     = (decltype(found.save))     ggml_backend_reg_get_proc_address(reg, "ggml_backend_rpc_tensor_state_save");
++            found.load     = (decltype(found.load))     ggml_backend_reg_get_proc_address(reg, "ggml_backend_rpc_tensor_state_load");
++            found.finish   = (decltype(found.finish))   ggml_backend_reg_get_proc_address(reg, "ggml_backend_rpc_state_finish");
++            found.endpoint = (decltype(found.endpoint)) ggml_backend_reg_get_proc_address(reg, "ggml_backend_rpc_tensor_endpoint");
++        }
++        if (found.save == nullptr || found.load == nullptr || found.finish == nullptr || found.endpoint == nullptr) {
++            found = llama_rpc_state_api();
++        }
++        return found;
++    }();
++    return api;
++}
++
++static const uint8_t LLAMA_STATE_RANGE_INLINE = 0;
++static const uint8_t LLAMA_STATE_RANGE_PIECE  = 1;
++
++// Waits for every piece queued since the last call; true where there were none.
++static bool llama_rpc_state_finish() {
++    const auto & api = llama_rpc_state();
++    return api.finish == nullptr || api.finish();
++}
++
+ class llama_io_write_file : public llama_io_write_i {
+ public:
+-    llama_io_write_file(llama_file * f) : file(f) {}
++    llama_io_write_file(llama_file * f, std::string pieces = "") : file(f), pieces(std::move(pieces)) {}
+ 
+     void write(const void * src, size_t size) override {
+         file->write_raw(src, size);
+@@ -2770,6 +2807,22 @@
+     }
+ 
+     void write_tensor(ggml_tensor * tensor, size_t offset, size_t size) override {
++        if (!pieces.empty()) {
++            const auto & api = llama_rpc_state();
++            const char * endpoint = api.endpoint != nullptr ? api.endpoint(tensor) : nullptr;
++            if (endpoint != nullptr) {
++                const std::string name = pieces + "." + std::to_string(n_pieces++);
++                if (api.save(tensor, offset, size, name.c_str())) {
++                    write(&LLAMA_STATE_RANGE_PIECE, sizeof(LLAMA_STATE_RANGE_PIECE));
++                    write_string(name);
++                    write_string(endpoint);
++                    const uint64_t piece_size = size;
++                    write(&piece_size, sizeof(piece_size));
++                    return;
++                }
++            }
++            write(&LLAMA_STATE_RANGE_INLINE, sizeof(LLAMA_STATE_RANGE_INLINE));
++        }
+         temp_buffer.resize(size);
+         ggml_backend_tensor_get(tensor, temp_buffer.data(), offset, size);
+         write(temp_buffer.data(), temp_buffer.size());
+@@ -2781,13 +2834,15 @@
+ 
+ private:
+     llama_file * file;
++    std::string pieces;
++    size_t n_pieces = 0;
+     size_t size_written = 0;
+     std::vector<uint8_t> temp_buffer;
+ };
+ 
+ class llama_io_read_file : public llama_io_read_i {
+ public:
+-    llama_io_read_file(llama_file * f) : file(f) {}
++    llama_io_read_file(llama_file * f, bool pieces = false) : file(f), pieces(pieces) {}
+ 
+     void read(void * dst, size_t size) override {
+         file->read_raw(dst, size);
+@@ -2795,6 +2850,30 @@
+     }
+ 
+     void read_tensor(ggml_tensor * tensor, size_t offset, size_t size) override {
++        if (pieces) {
++            uint8_t kind = LLAMA_STATE_RANGE_INLINE;
++            read(&kind, sizeof(kind));
++            if (kind == LLAMA_STATE_RANGE_PIECE) {
++                std::string name;
++                std::string endpoint;
++                uint64_t piece_size = 0;
++                read_string(name);
++                read_string(endpoint);
++                read(&piece_size, sizeof(piece_size));
++                const auto & api = llama_rpc_state();
++                const char * here = api.endpoint != nullptr ? api.endpoint(tensor) : nullptr;
++                if (piece_size != size || here == nullptr || endpoint != here) {
++                    throw std::runtime_error("the piece " + name + " was saved on " + endpoint + ", where this tensor does not lie");
++                }
++                if (!api.load(tensor, offset, size, name.c_str())) {
++                    throw std::runtime_error("the piece " + name + " could not be asked for");
++                }
++                return;
++            }
++            if (kind != LLAMA_STATE_RANGE_INLINE) {
++                throw std::runtime_error("unknown range kind in sequence state file");
++            }
++        }
+         temp_buffer.resize(size);
+         read(temp_buffer.data(), size);
+         ggml_backend_tensor_set(tensor, temp_buffer.data(), offset, size);
+@@ -2806,6 +2885,7 @@
+ 
+ private:
+     llama_file * file;
++    bool pieces;
+     size_t size_read = 0;
+     std::vector<uint8_t> temp_buffer;
+ };
+@@ -3323,10 +3403,19 @@
+     // restore the context state
+     {
+         const size_t state_size = file.size() - file.tell();
+-        llama_io_read_file io(&file);
+-        const size_t nread = state_seq_read_data(io, seq_id, 0);
+-        if (!nread) {
++        llama_io_read_file io(&file, true);
++        size_t nread = 0;
++        try {
++            nread = state_seq_read_data(io, seq_id, 0);
++        } catch (const std::exception & err) {
++            LLAMA_LOG_ERROR("%s: %s\n", __func__, err.what());
++        }
++        const bool pieces_loaded = llama_rpc_state_finish();
++        if (!nread || !pieces_loaded) {
+             LLAMA_LOG_ERROR("%s: failed to restore sequence state\n", __func__);
++            if (memory != nullptr) {
++                memory->seq_rm(seq_id, -1, -1);
++            }
+             return 0;
+         }
+         GGML_ASSERT(nread <= state_size);
+@@ -3346,13 +3435,23 @@
+     file.write_u32((uint32_t) n_token_count);
+     file.write_raw(tokens, sizeof(llama_token) * n_token_count);
+ 
+-    // save the context state using stream saving
+-    llama_io_write_file io(&file);
++    // save the context state using stream saving, the ranges on RPC buffers as pieces named after the
++    // file and kept by their own servers
++    const std::string path(filepath);
++    llama_io_write_file io(&file, path.substr(path.find_last_of('/') + 1));
+     state_seq_write_data(io, seq_id, 0);
+ 
+     const size_t res = file.tell();
+     GGML_ASSERT(res == sizeof(uint32_t) * 3 + sizeof(llama_token) * n_token_count + io.n_bytes());
+ 
++    if (!llama_rpc_state_finish()) {
++        // the file's magic cleared, so nothing takes it for a saved state
++        LLAMA_LOG_ERROR("%s: a piece of the sequence state was not saved\n", __func__);
++        file.seek(0, SEEK_SET);
++        file.write_u32(0);
++        return 0;
++    }
++
+     return res;
+ }
+ 

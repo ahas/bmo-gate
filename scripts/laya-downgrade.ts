@@ -112,8 +112,8 @@ const roadName = (lastOf(reading, "--road") ?? "n5") as SynthRoad;
 const wantedNodes = allOf(reading, "--node");
 
 // Each road gives the judges a batch is handed to, one batch in hand a judge. The account roads are
-// one judge; the n5 road is one a text-model node that answers its health, so the batches spread
-// over n2 to n5. Its builder is loaded only when a road is actually driven, so a dry count needs
+// one judge; the n5 road is one an answering text-model node whose health answers, so the batches
+// spread over every such node. Its builder is loaded only when a road is actually driven, so a dry count needs
 // nothing standing on the nodes.
 interface Judges { judges: Array<{ name: string; road: JudgeRoad }>; model: string; effort: string }
 

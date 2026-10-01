@@ -1,8 +1,10 @@
-"""The n5 front's contract against a stand-in engine it starts and stops itself:
+"""The head's front's contract against a stand-in engine it starts and stops itself, and a card holder
+with a stand-in rpc-server:
 uv run --no-project --with httpx --with starlette --with uvicorn python3 -m unittest n5-llm/test_front.py"""
 
 from __future__ import annotations
 
+import asyncio
 import fcntl
 import http.client
 import json
@@ -22,7 +24,8 @@ import uvicorn
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from front import Engine, SlotStore, build_app, held_tokens
+from card import Card
+from front import BorrowedCards, Engine, SlotStore, build_app, held_tokens
 
 KEY = "front-key-5c1d8e"
 
@@ -111,8 +114,56 @@ def free_port() -> int:
         return probe.getsockname()[1]
 
 
+# The rpc-server as a borrowed card's holder sees it: a port that accepts once it stands.
+RPC_STAND_IN = r"""
+import socket, sys
+server = socket.socket()
+server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+server.bind(("127.0.0.1", int(sys.argv[1])))
+server.listen()
+while True:
+    server.accept()
+"""
+
+
+class BorrowedCard:
+    """card.py's holder serving on the loopback in a thread of its own, with a stand-in rpc-server."""
+
+    def __init__(self, root: Path) -> None:
+        self.lock = root / "card.lock"
+        self.pieces = root / "pieces"
+        self.pieces.mkdir()
+        self.port = free_port()
+        self.rpc_port = free_port()
+        self.card = Card(KEY, "127.0.0.1", self.lock, [sys.executable, "-c", RPC_STAND_IN, str(self.rpc_port)], self.pieces,
+                         lock_wait_s=0.2, start_wait_s=10, rpc_port=self.rpc_port)
+        self.loop = asyncio.new_event_loop()
+        self.server = self.loop.run_until_complete(asyncio.start_server(self.card.serve, "127.0.0.1", self.port))
+        self.thread = threading.Thread(target=self.loop.run_forever, daemon=True)
+        self.thread.start()
+
+    def rpc_stands(self) -> bool:
+        try:
+            socket.create_connection(("127.0.0.1", self.rpc_port), timeout=0.5).close()
+            return True
+        except OSError:
+            return False
+
+    def close(self) -> None:
+        # A hold the front let go of at its shutdown is wound down, its rpc-server with it, before the
+        # loop goes.
+        deadline = time.monotonic() + 10
+        while self.card.held and time.monotonic() < deadline:
+            time.sleep(0.02)
+        self.loop.call_soon_threadsafe(self.server.close)
+        self.loop.call_soon_threadsafe(self.loop.stop)
+        self.thread.join(10)
+
+
 class FrontTest(unittest.TestCase):
     mode = "ok"
+    idle_s = 0.0
+    borrows = False
 
     def setUp(self) -> None:
         self.dir = Path(tempfile.mkdtemp(prefix="n5-front-"))
@@ -126,8 +177,10 @@ class FrontTest(unittest.TestCase):
         engine_port = free_port()
         upstream = f"http://127.0.0.1:{engine_port}"
         argv = [sys.executable, "-c", STAND_IN, str(engine_port), str(self.starts), self.mode, str(self.slots), str(self.loads)]
+        self.card = BorrowedCard(self.dir) if self.borrows else None
+        cards = BorrowedCards(["127.0.0.1"], KEY, hold_wait_s=5, port=self.card.port) if self.card else None
         self.engine = Engine(argv, self.lock, f"{upstream}/health", lock_wait_s=0.2, start_wait_s=10,
-                             slots=SlotStore(self.slots, upstream))
+                             slots=SlotStore(self.slots, upstream, drop=cards.drop if cards else None), cards=cards, idle_s=self.idle_s)
         model = self.dir / "model.gguf"
         model.write_bytes(b"GGUF")
         app = build_app(KEY, self.engine, f"http://127.0.0.1:{engine_port}", model, None, {"context": 4096})
@@ -143,6 +196,8 @@ class FrontTest(unittest.TestCase):
         # The front's shutdown stops the engine; one it left standing is taken down here all the same.
         if self.engine.proc is not None and self.engine.proc.returncode is None:
             self.engine.proc.kill()
+        if self.card is not None:
+            self.card.close()
 
     def until(self, condition, seconds: float = 10.0) -> None:
         deadline = time.monotonic() + seconds
@@ -169,8 +224,8 @@ class FrontTest(unittest.TestCase):
     def started(self) -> int:
         return len(self.starts.read_text().splitlines())
 
-    def lock_is_free(self) -> bool:
-        fd = os.open(self.lock, os.O_RDWR | os.O_CREAT)
+    def lock_is_free(self, lock: Path | None = None) -> bool:
+        fd = os.open(lock or self.lock, os.O_RDWR | os.O_CREAT)
         try:
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             return True
@@ -293,13 +348,72 @@ class TheSlot(FrontTest):
         self.assertEqual(self.saved(), sorted([rendered(self.first)[:-3], rendered(other)[:-3]]))
 
 
+class TheIdleMinute(FrontTest):
+    idle_s = 0.4
+
+    def test_a_request_within_it_is_answered_on_the_same_engine_and_after_it_the_engine_goes(self) -> None:
+        self.assertEqual(self.call("/v1/chat/completions", {"messages": [{"role": "user", "content": "하나"}]})[0], 200)
+        self.assertEqual(self.health()["engine"], "idle")
+        self.assertFalse(self.lock_is_free())
+        self.assertEqual(self.call("/v1/chat/completions", {"messages": [{"role": "user", "content": "둘"}]})[0], 200)
+        self.assertEqual(self.started(), 1)
+        self.until(lambda: self.health()["engine"] == "stopped")
+        self.assertTrue(self.lock_is_free())
+        self.assertEqual(len(list(self.slots.glob("*.bin"))), 1)
+
+
+class TheBorrowedCard(FrontTest):
+    borrows = True
+
+    def test_is_held_with_its_rpc_server_while_a_request_is_in_hand_and_let_go_after(self) -> None:
+        going = threading.Thread(target=self.call, args=("/v1/completions", {"prompt": "x", "delay": 0.5}))
+        going.start()
+        self.until(lambda: self.health()["engine"] == "running")
+        self.assertEqual(self.health()["cards_held"], 1)
+        self.assertTrue(self.card.rpc_stands())
+        self.assertFalse(self.lock_is_free(self.card.lock))
+        going.join()
+        self.until(lambda: not self.card.card.held)
+        self.assertFalse(self.card.rpc_stands())
+        self.assertTrue(self.lock_is_free(self.card.lock))
+        self.assertTrue(self.lock_is_free())
+
+    def test_whose_lock_is_held_elsewhere_is_a_busy_card_and_the_engine_never_starts(self) -> None:
+        fd = os.open(self.card.lock, os.O_RDWR | os.O_CREAT)
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        try:
+            status, body = self.call("/v1/chat/completions", {"messages": []})
+        finally:
+            os.close(fd)
+        self.assertEqual(status, 503)
+        self.assertIn("the card on 127.0.0.1", json.loads(body)["error"]["message"])
+        self.assertEqual(self.started(), 0)
+        self.assertTrue(self.lock_is_free())
+
+    def test_drops_the_pieces_of_the_files_a_save_removes(self) -> None:
+        first = [{"role": "user", "content": "상자 12는?"}]
+        self.call("/v1/chat/completions", {"messages": first})
+        [saved] = [file.name for file in self.slots.glob("*.bin")]
+        for number in (0, 1):
+            (self.card.pieces / f"{saved}.{number}").write_bytes(b"piece")
+        (self.card.pieces / "other.bin.0").write_bytes(b"piece")
+        self.call("/v1/chat/completions", {"messages": [*first, {"role": "assistant", "content": "40개"}, {"role": "user", "content": "13은?"}]})
+        self.assertEqual(sorted(piece.name for piece in self.card.pieces.iterdir()), ["other.bin.0"])
+
+    def test_refuses_a_hold_without_the_key(self) -> None:
+        with socket.create_connection(("127.0.0.1", self.card.port), timeout=5) as connection:
+            connection.sendall(b"HOLD wrong\n")
+            self.assertEqual(connection.makefile().readline().strip(), "REFUSED")
+        self.assertFalse(self.card.rpc_stands())
+
+
 class ACardWithoutRoom(FrontTest):
     mode = "oom"
 
     def test_is_a_busy_card_and_the_lock_is_let_go(self) -> None:
         status, body = self.call("/v1/chat/completions", {"messages": []})
         self.assertEqual(status, 503)
-        self.assertEqual(json.loads(body)["error"]["message"], "card busy: the card had no room for the model")
+        self.assertEqual(json.loads(body)["error"]["message"], "card busy: a card had no room for its part of the model")
         health = self.health()
         self.assertEqual((health["engine"], health["in_hand"], health["lock_held"]), ("stopped", 0, False))
         self.assertTrue(self.lock_is_free())

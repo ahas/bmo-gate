@@ -178,24 +178,18 @@ describe("the judging road", () => {
 
 describe("the nodes a pass spreads over", () => {
   test("keeps the nodes whose health answers and names why the rest were left out", async () => {
-    const probe: N5Fetch = async (input) => {
-      const url = String(input);
-
-      if (url.includes("18020")) {
-        return new Response("ok");
-      }
-
-      if (url.includes("18021")) {
-        return new Response("busy", { status: 503 });
-      }
-
+    const answering: N5Fetch = async () => new Response("ok");
+    const busy: N5Fetch = async () => new Response("busy", { status: 503 });
+    const down: N5Fetch = async () => {
       throw new Error("connection refused");
     };
 
-    const { ready, dropped } = await readyTextNodes(["n5", "n2", "n3"], probe);
-
-    expect(ready).toEqual(["n5"]);
-    expect(dropped).toEqual([["n2", "health 503"], ["n3", "connection refused"]]);
+    expect(await readyTextNodes(["n5", "n2"], answering)).toEqual({
+      ready: ["n5"],
+      dropped: [["n2", "n2 는 답하는 텍스트 모델 노드가 아닙니다 (n5)."]],
+    });
+    expect((await readyTextNodes(["n5"], busy)).dropped).toEqual([["n5", "health 503"]]);
+    expect((await readyTextNodes(["n5"], down)).dropped).toEqual([["n5", "connection refused"]]);
   });
 });
 

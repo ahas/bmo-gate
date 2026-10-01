@@ -12,7 +12,7 @@ that asks it and the configuration of which gate asks (BMO's `docs/laya.md`).
 - **The card:** n6 is an RTX 4070 with 12,282 MiB (11.99 GiB), driver 595.58.03 (CUDA 13.2), on an
   i9-9900KF with 62 GiB of RAM and Ubuntu on kernel 5.15. The card is shared: Laya, BMO's voice and
   its songs each put their model on it only while they use it, under one lock (「The shared card
-  lock」). Nothing is trained there.
+  lock」), and the text model's engine borrows a part of it while it runs. Nothing is trained there.
 - **The account** is `labuser`. Everything the service is made of stands in it, under `~/bmo-laya`,
   `~/bmo-llm` and `~/.config/bmo-llm`, and none of it asks for sudo.
 
@@ -65,8 +65,14 @@ take turns by one lock.
     and try its checkpoints, since it answers nothing before that anyway.
   - The voice and the songs choose for themselves whether they wait, and how long, in their own
     documents.
-- **What a holder may assume:** nothing else runs on the card while it holds the lock, so it may use
-  the whole card less the other services' contexts.
+- **What a holder may assume:** no other service that follows the lock runs on the card while it
+  holds the lock, so it may use the whole card less the other services' contexts and the text
+  model's share.
+- **The text model's share stands outside the lock.** While its engine runs, n6's card holds one of
+  its parts, about 3.9 GB beside the other services' contexts, taken without the lock, since a hold
+  of it would refuse every Laya call (`docs/n5-llm.md`, 「The cards it borrows」). It is sized to leave
+  about 7.9 GB free: room for Laya's checkpoint and decision, and the 7 GB the voice asks for before
+  a line.
 
 ## The front
 
@@ -174,7 +180,7 @@ units this repository runs on main-host:
   - **The door's list** is `$BMO_DATA_DIR/env/tunnel-door.keys` on main-host: one key file's path to
     a line, each a service's own key, which that service's installer adds. The bridge reads the list
     and every key file in it for each connection, and a key file that is missing or not `0600` admits
-    nothing. The door carries this service and the text model on n5 (`docs/n5-llm.md`), each dialling
+    nothing. The door carries this service and the text model's head on n5 (`docs/n5-llm.md`), each dialling
     with its own key and each allowed its own listen on main-host.
 - **The main-host end** is one entry in the account's `authorized_keys` for n6's tunnel key, which
   is an ed25519 key made on n6 with no passphrase and kept at `0600`. The entry allows nothing but

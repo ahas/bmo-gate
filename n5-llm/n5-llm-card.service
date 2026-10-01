@@ -1,0 +1,18 @@
+[Unit]
+Description=A card the text model's engine borrows over the inner network (docs/n5-llm.md in the bmo-gate repository)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/n5-llm
+# LLM_KEY (the head's service key), CARD_ADDRESS, CARD_LOCK and GGML_CUDA_FA_F16_MAX_KV come from here.
+EnvironmentFile=%h/.config/n5-llm/env
+# The rpc-server is this process's child, started for a hold and stopped when it ends; it goes down
+# with the unit.
+ExecStart=%h/n5-llm/.venv/bin/python %h/n5-llm/card.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

@@ -141,7 +141,8 @@ picked up rather than begun again.
    - **The node's card lock is held through every use.** The training, a resume and the calibration
      each take the node's shared card lock (`docs/llm-server.md`, 「The shared card lock」) before
      anything goes on the card and hold it until the process ends, waiting for it where another
-     service has it — the text model answering a request, a voice line. The free memory reading
+     service has it — the text model's engine, which holds the lock of every one of n2 to n5 while it
+     runs and for its idle minute after, or a voice line. The free memory reading
      alone cannot stop a service that follows the lock from putting its model on the card after the
      gate has started. A launch waiting for the lock says so in its log, and that wait is a run that
      does not move too.
