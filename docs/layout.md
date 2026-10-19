@@ -9,7 +9,7 @@ its own, so a change to one never builds or tests the others.
 | Folder | What it holds |
 |---|---|
 | `src/` | The root package: the version, the service binary and the unit command, built on the crates |
-| `crates/` | The Rust crates the root package is built from: the store, the codes, the clients of the other units, the policy, the words, the markup, the gates and the reference selection, the Laya relay |
+| `crates/` | The Rust crates the root package is built from: the store, the codes, the clients of the other units, the policy, the words, the markup, the gates and the reference selection, the service's routes and watches, the Laya relay |
 | `prompts/` | What each gate is told, a folder a gate, the questions Laya is asked, and the words the sanitiser's pre-filter matches in the rooms' own language: the one folder Korean stands in |
 | `runtime/` | What serves Laya on its nodes: the decision server and the front around it, each a Python project of its own |
 | `training/` | What makes Laya's checkpoints: the dataset and training tooling, a Bun project of its own, and the Python training scripts |

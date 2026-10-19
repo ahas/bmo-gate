@@ -278,22 +278,44 @@ pub async fn laya_fallback(runs: &Runs, stage: &str) -> Result<Option<String>, G
   }
 }
 
-/// The gates the last health check of the Laya server named a checkpoint for: its model line, each gate and its
+/// Each gate a health check's model line names a checkpoint for, with its checkpoint's folder: each gate and its
 /// folder joined by `=`, a comma between them.
+pub fn checkpoint_folders(model: &str) -> Vec<(String, String)> {
+  model
+    .split(',')
+    .filter_map(|pair| {
+      let (gate, folder) = pair.split_once('=')?;
+      let (gate, folder) = (gate.trim(), folder.trim());
+
+      (!gate.is_empty() && !folder.is_empty()).then(|| (gate.to_owned(), folder.to_owned()))
+    })
+    .collect()
+}
+
+/// The gates the last health check of the Laya server named a checkpoint for.
 pub async fn checkpoints(db: &DatabaseConnection) -> Result<Vec<String>, DbErr> {
   let model = laya_health::Entity::find().one(db).await?.and_then(|row| row.model).unwrap_or_default();
 
-  Ok(
-    model
-      .split(',')
-      .filter_map(|pair| {
-        let (gate, folder) = pair.split_once('=')?;
-        let (gate, folder) = (gate.trim(), folder.trim());
+  Ok(checkpoint_folders(&model).into_iter().map(|(gate, _)| gate).collect())
+}
 
-        (!gate.is_empty() && !folder.is_empty()).then(|| gate.to_owned())
-      })
-      .collect(),
-  )
+/// Why a gate could not run in a mode, or none where it could: a mode other than off for a gate with no probe,
+/// asymmetric for one whose probe names no safe verdict, and a deciding mode for one the last health check named no
+/// checkpoint for among `checkpoints`.
+pub fn mode_refused(profile: &Profile, mode: &str, checkpoints: &[String]) -> Option<Code> {
+  if mode == "off" {
+    return None;
+  }
+
+  if !profile.laya_probe() {
+    return Some(Code::NoProbe);
+  }
+
+  if mode == "asymmetric" && !profile.laya_safe {
+    return Some(Code::NoSafeVerdict);
+  }
+
+  (decides(mode) && !checkpoints.contains(&profile.key)).then_some(Code::NoCheckpoint)
 }
 
 /// A whole number a field holds, as JSON gives it.
@@ -399,23 +421,17 @@ pub async fn change(runs: &Runs, key: &str, body: &Value, at: i64) -> Result<(),
     .unwrap_or_else(|| profile.laya_mode.clone().unwrap_or_else(|| "off".into()));
 
   // A mode chosen now is taken only where the gate can run in it.
-  if mode.is_some() && resulting != "off" {
-    if !profile.laya_probe() {
-      return Err(Refusal::mode(Code::NoProbe, fill_marks(words::NO_QUESTION, &[("key", key)])));
-    }
+  if mode.is_some()
+    && let Some(code) =
+      mode_refused(profile, &resulting, &checkpoints(db).await.map_err(Refusal::database)?)
+  {
+    let error = match code {
+      Code::NoProbe => fill_marks(words::NO_QUESTION, &[("key", key)]),
+      Code::NoSafeVerdict => fill_marks(words::NO_SAFETY, &[("key", key)]),
+      _ => fill_marks(words::NO_CHECKPOINT, &[("mode", &resulting), ("key", key)]),
+    };
 
-    if resulting == "asymmetric" && !profile.laya_safe {
-      return Err(Refusal::mode(Code::NoSafeVerdict, fill_marks(words::NO_SAFETY, &[("key", key)])));
-    }
-
-    if decides(&resulting)
-      && !checkpoints(db).await.map_err(Refusal::database)?.iter().any(|gate| gate == key)
-    {
-      return Err(Refusal::mode(
-        Code::NoCheckpoint,
-        fill_marks(words::NO_CHECKPOINT, &[("mode", &resulting), ("key", key)]),
-      ));
-    }
+    return Err(Refusal::mode(code, error));
   }
 
   if decides(&resulting) && chosen_tau.is_none() {

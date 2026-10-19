@@ -98,15 +98,16 @@ pub fn elapsed_ms(since: Instant) -> i64 {
   since.elapsed().as_millis() as i64
 }
 
-/// One road a run walked: the gate, what it judged, the provider and model, how it ended, how long it held the
-/// run, what it spent, the round and the run it belongs to.
+/// One road a run walked: the gate, what it judged, the provider and model, how it ended — an outcome's word, the
+/// gate's own or the agency's for a turn it carried — how long it held the run, what it spent, the round and the
+/// run it belongs to.
 pub struct Road<'a> {
   pub stage: &'a str,
   pub chat_id: Option<i64>,
   pub message_id: Option<i64>,
   pub provider: &'a str,
   pub model: &'a str,
-  pub outcome: Outcome,
+  pub outcome: &'a str,
   pub ms: i64,
   pub spent: &'a Spent,
   pub round: Option<&'a str>,
@@ -124,7 +125,7 @@ pub async fn road(db: &DatabaseConnection, road: &Road<'_>) {
     message_id: Set(road.message_id),
     provider: Set(road.provider.to_owned()),
     model: Set(road.model.to_owned()),
-    outcome: Set(road.outcome.word().to_owned()),
+    outcome: Set(road.outcome.to_owned()),
     ms: Set(road.ms),
     created_at: Set(now()),
     input_tokens: Set(road.spent.input_tokens),

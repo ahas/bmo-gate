@@ -52,7 +52,7 @@ pub struct QuestionTally {
 
 /// One gate's figures at one τ.
 #[derive(Clone, Debug, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 pub struct AgreementAt {
   pub tau: f64,
   /// The share of pairs Laya would settle at this τ, and how often it agrees with the LLM on them.
@@ -66,7 +66,7 @@ pub struct AgreementAt {
 
 /// What a gate's figures are counted over.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 pub enum Unit {
   Pair,
   Question,
@@ -74,7 +74,7 @@ pub enum Unit {
 
 /// One gate's agreement between Laya and its LLM.
 #[derive(Clone, Debug, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 pub struct Agreement {
   pub stage: String,
   pub unit: Unit,

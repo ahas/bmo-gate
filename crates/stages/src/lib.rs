@@ -14,6 +14,7 @@ pub mod ordered;
 pub mod output;
 pub mod records;
 pub mod sanitizer;
+pub mod sheets;
 pub mod sql;
 pub mod translator;
 

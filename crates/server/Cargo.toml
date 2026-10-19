@@ -1,0 +1,23 @@
+[package]
+name = "gate-server"
+description = "The gate's service: every route the boundary document states, the watches it keeps going, and the settings it reads at start."
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+axum.workspace = true
+futures-util.workspace = true
+gate-codes.workspace = true
+gate-policy.workspace = true
+gate-ports.workspace = true
+gate-reference.workspace = true
+gate-runs.workspace = true
+gate-stages.workspace = true
+gate-store.workspace = true
+sea-orm.workspace = true
+sea-orm-migration.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+toml.workspace = true

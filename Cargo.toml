@@ -2,7 +2,7 @@
 # as a member as it stands. The root package also holds the checks that span the repository and every test of
 # the repository in `tests/`, the Python and Bun suites among them, which a Cargo test of their own runs.
 [workspace]
-members = ["crates/codes", "crates/markup", "crates/policy", "crates/ports", "crates/reference", "crates/runs", "crates/stages", "crates/store", "crates/words"]
+members = ["crates/codes", "crates/markup", "crates/policy", "crates/ports", "crates/reference", "crates/runs", "crates/server", "crates/stages", "crates/store", "crates/words"]
 resolver = "3"
 
 [workspace.package]
@@ -21,6 +21,7 @@ gate-policy = { path = "crates/policy" }
 gate-ports = { path = "crates/ports" }
 gate-reference = { path = "crates/reference" }
 gate-runs = { path = "crates/runs" }
+gate-server = { path = "crates/server" }
 gate-stages = { path = "crates/stages" }
 gate-store = { path = "crates/store" }
 gate-words = { path = "crates/words" }
@@ -50,6 +51,13 @@ edition.workspace = true
 publish = false
 
 [dependencies]
+gate-server.workspace = true
+tokio.workspace = true
+
+# The service binary, the server crate standing at the settings file its first argument names.
+[[bin]]
+name = "gate-server"
+path = "src/bin/gate-server.rs"
 
 [dev-dependencies]
 axum.workspace = true
@@ -60,11 +68,14 @@ gate-policy.workspace = true
 gate-ports.workspace = true
 gate-reference.workspace = true
 gate-runs.workspace = true
+gate-server.workspace = true
 gate-stages.workspace = true
 gate-store.workspace = true
 gate-words.workspace = true
 # The README's folder table is read as markdown.
 pulldown-cmark.workspace = true
+# The callers the service's contract tests speak as.
+reqwest.workspace = true
 sea-orm.workspace = true
 sea-orm-migration.workspace = true
 serde.workspace = true
@@ -103,3 +114,9 @@ path = "tests/stages/main.rs"
 [[test]]
 name = "reference"
 path = "tests/reference/main.rs"
+
+# The service's contract tests, one binary driving every route with its callers' bodies over a scratch database and
+# stand-in units.
+[[test]]
+name = "server"
+path = "tests/server/main.rs"

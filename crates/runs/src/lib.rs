@@ -349,7 +349,7 @@ impl Runs {
         message_id: run.request.message_id,
         provider: &run.route.provider,
         model,
-        outcome,
+        outcome: outcome.word(),
         ms,
         spent,
         round: run.request.round.as_deref(),

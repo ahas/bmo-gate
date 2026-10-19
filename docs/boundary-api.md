@@ -16,21 +16,23 @@ first, is the gate's own service, reached through the gate's own relay.
 The service reads one TOML file at start and holds it for its life: the release's own `settings.toml`, which
 each release links to the data root's `env/gate.toml`. It names:
 
-| Setting | What it is |
+| Key | What it is |
 |---|---|
-| listen address and token | where the service answers, and the bearer token every caller presents |
-| database | the address of the gate's own database, holding the tables under 「What the gate owns」 and nothing else |
-| data root | where the gate's runtime data lives: Laya's checkpoints, datasets and run output, and the gate's run files |
-| `[agency]`, `[brain]`, `[receiver]`, `[job]` | each unit's base address and the token it is called with |
-| `[arbiter]` | the card master's base address |
-| `[gateway]` | the agency's model gateway: its address, and the name of the key file under the data root's `env/` |
-| `[laya]` | the address of the gate's own Laya relay, and the name of its token file under the data root's `env/` |
-| the chat agent | the registration name whose gate options stand for the deployment, and which a companion's are copied from |
-| a thrown-away session's folder | the folder a gate run's thrown-away session is started in |
-| `[records]` | the folders the session summariser reads a closed session's record from: Claude Code's configuration folders, searched in order, and Codex's sessions folder |
-| `[shipped]` | the folder the shipped pieces' bodies are read under — the system's reference documents and the lore, as the deployment places them — a row's path read relative to it |
-| the owner's room | the room a row the gate raises reports to |
-| `[reading]` | what the translator's checks read a text by: the words the English test reads past — the names of people and agents and the marks a note's strands open with — and the file the owner's banned words are read from, where the deployment keeps one |
+| `listen` | the address the service answers at |
+| `address` | the base address the service is reached at, which it hands the agency for its hook |
+| `token_file` | the name of the file under the data root's `env/` holding the bearer token every caller presents |
+| `database` | the address of the gate's own database, holding the tables under 「What the gate owns」 and nothing else |
+| `data_root` | where the gate's runtime data lives: Laya's checkpoints, datasets and run output, and the gate's run files |
+| `chat_agent` | the registration name whose gate options stand for the deployment, and which a companion's are copied from |
+| `session_folder` | the folder a gate run's thrown-away session is started in |
+| `owner_room` | the room a row the gate raises reports to |
+| `[agency]`, `[brain]`, `[receiver]`, `[job]` | each unit's `address`, and the `token_file` under `env/` holding the token it is called with |
+| `[arbiter]` | the card master's `address` |
+| `[gateway]` | the agency's model gateway: its `address`, and the `key_file` under `env/` |
+| `[laya]` | the gate's own Laya relay, where one stands: its `address`, and the `token_file` under `env/` |
+| `[records]` | where the session summariser reads a closed session's record: `claude`, Claude Code's configuration folders searched in order, and `codex`, Codex's sessions folder |
+| `[shipped]` | `folder`, under which the shipped pieces' bodies are read — the system's reference documents and the lore, as the deployment places them — a row's path read relative to it |
+| `[reading]` | what the translator's checks read a text by: `set_aside`, the words the English test reads past — the names of people and agents and the marks a note's strands open with — and `wording`, the file the owner's banned words are read from, where the deployment keeps one |
 
 No address, port, host, path or name of a deployment is written in the code; every one is read from here.
 
@@ -51,8 +53,9 @@ says:
   64-bit integer. Times are Unix seconds unless a route says otherwise.
 - **No sentence a person reads goes out of the gate.** Every answer is data, codes and their fields, and an
   English sentence only where an error needs one. A screen's words are the console's language pack.
-- **The refusal body** is exactly two keys: `error`, one English sentence naming why, and `code`, a stable code
-  a caller decides on. The codes are `docs/codes.md`.
+- **The refusal body** is two keys: `error`, one English sentence naming why, and `code`, a stable code a caller
+  decides on. The one third key is `reason` beside `laya_mode_refused`, the code of the mode refusal it is. The
+  codes are `docs/codes.md`.
 
 | Status | When |
 |---|---|
@@ -192,7 +195,7 @@ are Unix seconds.
 | `GET /gates` | | `gates`: each gate in the gate order, its `key`, its `part` (`pre`, `post` or `apart`), its `step`, its `condition` or null, and its profile: `switchable`, `laya_probe`, `default_laya_mode` and `answer_tokens` |
 | `GET /options/{key}` | | `timeout_ms`, `laya_mode`, `laya_tau`, `laya_probe`, `switchable`, `enabled`, `laya_fallback`, `effective` (`thinking`, `answer_tokens`, `timeout_ms`, `laya_mode`, `laya_tau`) and `defaults` |
 | `POST /options/{key}` | any of `timeout_ms`, `laya_mode`, `laya_tau`, `enabled`, `laya_fallback`; a Laya field sent null goes back to the default | `key`, `options`: the gate's route as a run reads it (`provider`, `model`, `laya`, `timeout_ms`, `set_at`) |
-| `GET /rooms/{chat}/judgements?before=&limit=` | | `judgements`, newest first, each `id`, `chat`, `message`, `stage`, `verdict`, `detail`, `created_at`, `ms`, `round`, `roads` (each `id`, `provider`, `model`, `outcome`, `ms`, `tokens`) and `offers` (each gate's `stage`, `held`, `asked`, `kept`, `capped`, `rules`); and `has_more` |
+| `GET /rooms/{chat}/judgements?before=&limit=` | | `judgements`, newest first, each `id`, `chat`, `message`, `stage`, `verdict`, `detail`, `created_at`, `ms`, `round`, `roads` (each `id`, `provider`, `model`, `outcome`, `ms`, `tokens`: `input_tokens`, `output_tokens`, `cache_read_tokens` and `cache_write_tokens`, or null where the road kept none) and `offers` (each gate's `stage`, `held`, `asked`, `kept`: how many each rule kept, `item`, `keyword` and `person`, `capped`, and `rules`, the rules a candidate could be kept by, or null where it could be kept by all); and `has_more` |
 | `POST /trials` | `stage`, `prompt`, `user` | the trial: `id`, `stage`, `user`, `prompt`, `answer` or null, `ms`, `created_at` |
 | `GET /trials/{stage}?limit=` | | `trials`, oldest first, each as above |
 | `GET /laya` | | `health` (`state`, `model`, `device`, `vram_bytes`, `load_ms`, `versions`, `address`, `check_ms`, `checked_at`, `answered_at`), `gates` (each `stage`, `mode`, `tau`, `agreement` or null, `checkpoint` or null, `refused`: each mode the gate may not run in, with its code), `modes` and `taus` |
@@ -205,7 +208,13 @@ are Unix seconds.
 - **A gate's options** are its wait, its switch where its profile lets it be switched off, its Laya mode, τ and
   fallback LLM (`docs/laya.md`). What it thinks and how much it may answer are its tier's on its road, and a
   change naming either is refused `own_llm`.
-- **A trial** puts one prompt to one gate as a turn would, records no judgement, and keeps the trial.
+- **A trial** puts one prompt to one gate as a turn would, records no judgement, and keeps the trial. A prompt is
+  at most a million characters.
+- **A page** of judgements or trials is a hundred where `limit` names none, and five hundred at most; `before` is
+  the `id` the next page starts below.
+- **A judgement's roads** are its stage's road records of the same round, or of the same message where either names
+  no round, that fall within the time the judgement took, give or take five seconds; each road goes to one judgement.
+  Its `offers` are the offers record of its round.
 - **A translation of a document** is queued part by part; each part is kept once it comes back with its
   structure kept, asked once more where it lost it, and kept as failed where it lost it twice.
 

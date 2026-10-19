@@ -175,10 +175,12 @@ dependencies = [
  "gate-ports",
  "gate-reference",
  "gate-runs",
+ "gate-server",
  "gate-stages",
  "gate-store",
  "gate-words",
  "pulldown-cmark",
+ "reqwest",
  "sea-orm",
  "sea-orm-migration",
  "serde",
@@ -601,6 +603,27 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+]
+
+[[package]]
+name = "gate-server"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "futures-util",
+ "gate-codes",
+ "gate-policy",
+ "gate-ports",
+ "gate-reference",
+ "gate-runs",
+ "gate-stages",
+ "gate-store",
+ "sea-orm",
+ "sea-orm-migration",
+ "serde",
+ "serde_json",
+ "tokio",
+ "toml",
 ]
 
 [[package]]
