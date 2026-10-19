@@ -1,0 +1,8 @@
+[package]
+name = "gate-words"
+description = "The English the gate answers and prints in: its refusals' sentences beside their codes, the translator's failures, and what each of its nouns prints."
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]

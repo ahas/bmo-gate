@@ -1,0 +1,29 @@
+# The questions Laya is asked (docs/laya.md), worded as its checkpoints were trained on them: a question worded
+# otherwise is one no checkpoint has learnt, so a change here is a change of what Laya is trained on.
+
+# The one yes/no the fold asks over a message's state: yes is FOLD, no is OPEN.
+fold = "이 메시지는 채팅방에 접어서(펼치기 인용으로 감싸서) 보내야 하는가?"
+
+# Each reference gate's question over one candidate, and the word the candidate is named by in it.
+[gates.system-documents]
+question = "이 대화에 답하려면 이 참고 문서가 필요한가?"
+subject = "문서"
+
+[gates.room-rules]
+question = "이 대화에 답하려면 이 방 규칙이 필요한가?"
+subject = "규칙"
+
+[gates.library-knowledge]
+question = "이 대화에 답하려면 이 지식 문서가 필요한가?"
+subject = "문서"
+
+[gates.people-search]
+question = "이 대화에 답하려면 이 인물 기록이 필요한가?"
+subject = "기록"
+
+# The situation-rule matcher's two questions over one rule, and how the rule is named in them (`{slug}` and
+# `{rule}`, its condition and action as one phrase).
+[situation]
+applies = "이 규칙의 조건이 지금 상황에 맞는가?"
+spent = "이 규칙은 이제 안 써도 되는가?"
+about = "규칙 {slug}: {rule}"

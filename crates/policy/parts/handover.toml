@@ -1,0 +1,77 @@
+# What passes from a closed session to the one that replaces it (docs/boundary-api.md, the session-summary gate):
+# how much of the old conversation the summariser reads, what it is asked, how long its summary may be, and the
+# note the next run is handed.
+
+# How much of an old conversation the summariser is shown, in UTF-16 units: the tail is what a session is in
+# the middle of.
+transcript_tail_chars = 40000
+
+# How long the carried summary may be, in UTF-16 units: it rides in every turn of the new session.
+summary_char_cap = 1200
+
+# The line the transcript rides under in what the summariser is asked.
+summary_heading = "CONVERSATION (the tail of the session being replaced):"
+
+# What a room's own speaker is named in a transcript, beside the agent's own name; the summariser's chat
+# instructions name the room by the same word.
+room_speaker = "Room"
+
+# The two blocks of a round's prompt that are the conversation, by the line each opens on and the line it
+# closes on; everything around them is scaffolding the receiver wrote.
+[[conversation]]
+open = "New messages ("
+close = "END OF NEW MESSAGES"
+
+[[conversation]]
+open = "Quiet instruction from the system ("
+close = "END OF QUIET INSTRUCTION"
+
+# The notes a room's session is handed: the summary under its heading, or the word that nothing was
+# recovered.
+[chat]
+carried = [
+  "Quiet instruction from the system: your previous session was closed and this is a new one.",
+  "Below is what that session was in the middle of, written by another agent that read its record. Take it as your own memory of this room's recent conversation. It is a summary, so it is thinner than what you would remember — where it is silent, you simply do not recall, and you say so plainly rather than inventing.",
+  "Who the people here are does not come from this: that reaches you through the reference material attached to each round, as always.",
+  "Nothing about this needs saying in the room: output exactly <<SKIP>>.",
+  "",
+  "WHAT YOU WERE IN THE MIDDLE OF:",
+]
+lost = [
+  "Quiet instruction from the system: your previous session was closed and this is a new one.",
+  "What that session was in the middle of could not be recovered, so you remember none of this room's recent conversation. If someone refers to something you cannot place, say plainly that you have lost the thread and ask.",
+  "Nothing about this needs saying in the room: output exactly <<SKIP>>.",
+]
+
+# The same notes as a job worker is handed them: the fact is the room's, and the note ends by pointing at
+# the job the rest of the prompt states.
+[worker]
+carried = [
+  "Quiet instruction from the system: your previous session was closed and this is a new one.",
+  "Below is what that session was in the middle of, written by another agent that read its record. Take it as your own memory of the jobs you have been running. It is a summary, so it is thinner than what you would remember — where it is silent, you simply do not recall, and you say so plainly rather than inventing.",
+  "This is no new task and it cancels nothing. The job written out below is the one to carry on with, and you do it and report on it in full, exactly as you would have without this note.",
+  "",
+  "WHAT YOU WERE IN THE MIDDLE OF:",
+]
+lost = [
+  "Quiet instruction from the system: your previous session was closed and this is a new one.",
+  "What that session was in the middle of could not be recovered, so you remember nothing of the jobs before this one. Where the job below refers to work you cannot place, read it out of the checkout and its records rather than inventing it, and say in your report what you could not recover.",
+  "This is no new task and it cancels nothing. The job written out below is the one to carry on with, and you do it and report on it in full, exactly as you would have without this note.",
+]
+
+# The notes a job worker's session is handed when it opens on another model while the session it leaves is
+# set aside on its own model, to be resumed on a return while its cache is warm: the summary is of that
+# session, which is kept rather than closed.
+[switch]
+carried = [
+  "Quiet instruction from the system: this turn runs on another model than your previous session, so this session is a new one. That session is set aside on its own model, not closed.",
+  "Below is what that session was in the middle of, written by another agent that read its record. Take it as your own memory of the jobs you have been running. It is a summary, so it is thinner than what you would remember — where it is silent, you simply do not recall, and you say so plainly rather than inventing.",
+  "This is no new task and it cancels nothing. The job written out below is the one to carry on with, and you do it and report on it in full, exactly as you would have without this note.",
+  "",
+  "WHAT YOU WERE IN THE MIDDLE OF:",
+]
+lost = [
+  "Quiet instruction from the system: this turn runs on another model than your previous session, so this session is a new one. That session is set aside on its own model, not closed.",
+  "What that session was in the middle of could not be recovered, so you remember nothing of the jobs before this one. Where the job below refers to work you cannot place, read it out of the checkout and its records rather than inventing it, and say in your report what you could not recover.",
+  "This is no new task and it cancels nothing. The job written out below is the one to carry on with, and you do it and report on it in full, exactly as you would have without this note.",
+]

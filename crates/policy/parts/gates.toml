@@ -1,0 +1,37 @@
+# The gates and where each stands against a chat turn (docs/gates.md, 「The gate order」). Every gate stands here
+# and the list of gates is read from it, so a gate cannot be added without a place; each has its profile in
+# gate-profiles.toml. What each gate runs on is its route, which the agency resolves for its work key.
+#
+# A turn part is a list of steps in the order a turn passes them; a step holds the places of the gates the turn
+# starts together and waits on together. A place names its gate, and the one condition its step runs under where
+# it runs in some turns only.
+
+# The off-turn part: the gates that run outside any chat turn, in the order the console lists them.
+apart = ["people-standing", "document-seek", "translator", "voice-polish", "voice-reading"]
+
+# The pre-gate part: the gates that run before the reply is written.
+
+[[pre]]
+places = [{ key = "session-summary", condition = "fresh-session" }]
+
+# The three gates that pick a turn's reference, one library each, are marked as such
+# (docs/reference-selection.md): every roster that lists a gate reads the three of them from these marks.
+[[pre]]
+places = [
+  { key = "system-documents", reference = true },
+  { key = "room-rules", reference = true },
+  { key = "library-knowledge", reference = true },
+  { key = "people-search" },
+  { key = "situation-rules" },
+]
+
+[[pre]]
+places = [{ key = "sanitizer" }]
+
+# The post-gate part: the gates that run after the reply is written, before it reaches the room.
+
+[[post]]
+places = [{ key = "sanitizer" }]
+
+[[post]]
+places = [{ key = "output-format", condition = "folding-dialect" }]

@@ -1,0 +1,13 @@
+[package]
+name = "gate-markup"
+description = "The text the gate reads and checks: markdown as a Telegram room reads it, the structure check, the dash and wording nets, the English test, and the small readings the records share."
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+gate-policy.workspace = true
+pulldown-cmark.workspace = true
+regex.workspace = true
+unicode-segmentation.workspace = true
+url.workspace = true

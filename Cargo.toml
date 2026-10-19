@@ -2,7 +2,7 @@
 # as a member as it stands. The root package also holds the checks that span the repository and every test of
 # the repository in `tests/`, the Python and Bun suites among them, which a Cargo test of their own runs.
 [workspace]
-members = ["crates/codes", "crates/ports", "crates/store"]
+members = ["crates/codes", "crates/markup", "crates/policy", "crates/ports", "crates/store", "crates/words"]
 resolver = "3"
 
 [workspace.package]
@@ -15,8 +15,14 @@ async-trait = "0.1.92"
 axum = { version = "0.8.4", default-features = false, features = ["http1", "json", "query", "tokio"] }
 futures-util = "0.3.34"
 gate-codes = { path = "crates/codes" }
+gate-markup = { path = "crates/markup" }
+gate-policy = { path = "crates/policy" }
 gate-ports = { path = "crates/ports" }
 gate-store = { path = "crates/store" }
+gate-words = { path = "crates/words" }
+# Markdown read as CommonMark reads it, where the gate reads it as a general format.
+pulldown-cmark = { version = "0.13.0", default-features = false }
+regex = "1.11.1"
 reqwest = { version = "0.13.5", default-features = false, features = ["json", "query", "stream"] }
 sea-orm = { version = "1.1.17", default-features = false, features = ["macros", "runtime-tokio-rustls", "sqlx-postgres"] }
 sea-orm-migration = { version = "1.1.17", default-features = false, features = ["runtime-tokio-rustls", "sqlx-postgres"] }
@@ -25,6 +31,9 @@ serde_json = "1.0.140"
 sqlx = { version = "0.8.6", default-features = false, features = ["postgres", "runtime-tokio"] }
 sse-stream = "0.2.6"
 tokio = { version = "1.47.0", features = ["macros", "rt", "rt-multi-thread", "net", "time", "signal", "io-util", "process"] }
+toml = { version = "0.8.23", default-features = false, features = ["parse"] }
+unicode-segmentation = "1.12.0"
+url = "2.5.8"
 
 [package]
 name = "bmo-gate"
@@ -39,17 +48,20 @@ publish = false
 axum.workspace = true
 futures-util.workspace = true
 gate-codes.workspace = true
+gate-markup.workspace = true
+gate-policy.workspace = true
 gate-ports.workspace = true
 gate-store.workspace = true
+gate-words.workspace = true
 # The README's folder table is read as markdown.
-pulldown-cmark = { version = "0.13.0", default-features = false }
+pulldown-cmark.workspace = true
 sea-orm.workspace = true
 sea-orm-migration.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sqlx.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
-toml = { version = "0.8.23", default-features = false, features = ["parse"] }
+toml.workspace = true
 
 # The store's tests, one binary over a scratch database of each test's own.
 [[test]]
@@ -60,3 +72,8 @@ path = "tests/store/main.rs"
 [[test]]
 name = "ports"
 path = "tests/ports/main.rs"
+
+# The markup crate's tests, one binary, a module per module of the crate.
+[[test]]
+name = "markup"
+path = "tests/markup/main.rs"

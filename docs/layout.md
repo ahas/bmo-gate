@@ -9,7 +9,8 @@ its own, so a change to one never builds or tests the others.
 | Folder | What it holds |
 |---|---|
 | `src/` | The root package: the version, the service binary and the unit command, built on the crates |
-| `crates/` | The Rust crates the root package is built from: the store, the clients of the other units, the gates and the reference selection, the Laya relay |
+| `crates/` | The Rust crates the root package is built from: the store, the codes, the clients of the other units, the policy, the words, the markup, the gates and the reference selection, the Laya relay |
+| `prompts/` | What each gate is told, a folder a gate, and the questions Laya is asked: the one folder Korean stands in, since it is worded as the models read it |
 | `runtime/` | What serves Laya on its nodes: the decision server and the front around it, each a Python project of its own |
 | `training/` | What makes Laya's checkpoints: the dataset and training tooling, a Bun project of its own, and the Python training scripts |
 | `weights/` | The declarations of Laya's weights: each service's card declaration and where the checkpoints are found. The weights themselves are runtime data and never stand in the repository |
@@ -29,5 +30,7 @@ stands, and no other.
 - **Tests live in `tests/`,** never beside the code they test. A Rust test is a Cargo test of the root package;
   a Bun project's tests stand under `tests/` in a folder named for the project; a Python suite stands under
   `tests/python/` and is run by a Cargo test of its own.
+- **Korean stands only in `prompts/`.** A gate's instructions and Laya's questions are worded as the models
+  read them; every other file is English, and Korean a test feeds the code is written by its unicode escapes.
 - **No weights, datasets or run output in git.** They are runtime data under the data root the settings name;
   the repository holds only the declarations that say where they are read from.

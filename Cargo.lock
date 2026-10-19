@@ -170,8 +170,11 @@ dependencies = [
  "axum",
  "futures-util",
  "gate-codes",
+ "gate-markup",
+ "gate-policy",
  "gate-ports",
  "gate-store",
+ "gate-words",
  "pulldown-cmark",
  "sea-orm",
  "sea-orm-migration",
@@ -530,6 +533,25 @@ name = "gate-codes"
 version = "0.1.0"
 
 [[package]]
+name = "gate-markup"
+version = "0.1.0"
+dependencies = [
+ "gate-policy",
+ "pulldown-cmark",
+ "regex",
+ "unicode-segmentation",
+ "url",
+]
+
+[[package]]
+name = "gate-policy"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "toml",
+]
+
+[[package]]
 name = "gate-ports"
 version = "0.1.0"
 dependencies = [
@@ -551,6 +573,10 @@ dependencies = [
  "sea-orm-migration",
  "sqlx",
 ]
+
+[[package]]
+name = "gate-words"
+version = "0.1.0"
 
 [[package]]
 name = "generic-array"
@@ -2110,6 +2136,12 @@ name = "unicode-properties"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7df058c713841ad818f1dc5d3fd88063241cc61f49f5fbea4b951e8cf5a8d71d"
+
+[[package]]
+name = "unicode-segmentation"
+version = "1.13.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6f5d3c3b1bf09027a88a6bc961fc00497d651009560b5463668dc81b0fa87a8"
 
 [[package]]
 name = "unicode-xid"

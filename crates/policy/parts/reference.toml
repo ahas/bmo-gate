@@ -1,0 +1,63 @@
+# The gates that pick a turn's reference out of an index (docs/reference-selection.md): each reference gate in the
+# order its picks stand in a prompt — what it may attach, how long its pieces hold when the turn is over its
+# total, when the bot's own lines alone ask it, and whether it reads the message the turn follows on from — and
+# the person-book search beside them, with how the road writes down what a turn's gate decided. The question
+# Laya asks of each gate's candidates stands with Laya's other questions, in `prompts/laya/questions.toml`.
+
+# What a turn may carry on these gates' word together, in characters, and how much of the message a turn follows
+# on from a gate reads.
+turn_budget_chars = 30000
+answered_chars = 300
+
+# When the bot's own lines alone ask a gate: "never"; "own turn", on a turn they open but not in a push; or "own
+# turn, named items", on such a turn over what the item rule alone keeps.
+
+[[gates]]
+stage = "system-documents"
+budget = 24000
+hold = 2
+bot_lines_alone = "never"
+reads_answered = false
+
+[[gates]]
+stage = "room-rules"
+budget = 12000
+hold = 3
+bot_lines_alone = "own turn"
+reads_answered = true
+
+[[gates]]
+stage = "library-knowledge"
+budget = 12000
+hold = 1
+bot_lines_alone = "own turn"
+reads_answered = true
+
+# The person-book search: the most pieces it takes, which its instructions are told as their selection cap, and
+# what they may come to, in the order it ranks them.
+[people]
+stage = "people-search"
+cap = 4
+budget = 18000
+bot_lines_alone = "own turn, named items"
+reads_answered = true
+
+# The situation-rule matcher: what it may attach in one turn, and how a decision on Laya where neither Laya nor
+# its fallback gave one is written down.
+[situation]
+budget = 12000
+nothing_matched = "Laya gave no verdict ({failure}), so it went with no rule matched."
+
+# How long a standing sheet attached on every turn of its speaker may be, in characters: a person's common sheet
+# and a room's sheet of them. A sheet over its ceiling is passed over.
+[sheets]
+common_ceiling = 8000
+room_ceiling = 6000
+
+# How a decision on Laya is written down where Laya gave none (`{failure}` is Laya's failure), and the verdict
+# and detail a gate on for a turn leaves where nothing was left to ask it about.
+[decided]
+by_fallback = "Laya gave no verdict ({failure}), so the fallback LLM decided."
+nothing_attached = "Laya gave no verdict ({failure}), so it went with nothing attached."
+no_candidates = "SKIP: no candidates"
+no_candidates_detail = "On, but this turn had no candidates to ask it about, so it was not asked."

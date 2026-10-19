@@ -44,6 +44,7 @@ codes are written in kebab-case.
 | Code | When |
 |---|---|
 | `no_probe` | the gate declares no Laya probe |
+| `no_safe_verdict` | an asymmetric mode for a gate whose probe names no safe verdict |
 | `no_checkpoint` | the Laya server named no checkpoint for the gate in its latest health check |
 | `needs_tau` | a deciding mode with no τ to stand on |
 

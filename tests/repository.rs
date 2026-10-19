@@ -1,6 +1,7 @@
 //! Checks that span the repository: what its manifests may depend on, its layout and manifests, its one
-//! version, the testbed's declaration, where tests stand, and what no tracked file may hold (Hangul past the
-//! ledger, home paths, private network addresses, and the names a list kept outside the repository gives).
+//! version, the testbed's declaration, where tests stand, and what no tracked file may hold (Hangul outside the
+//! prompts past the ledger, home paths, private network addresses, and the names a list kept outside the
+//! repository gives).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -65,6 +66,10 @@ const TESTBED_TABLES: [&str; 8] =
 
 /// The ledger of Korean lines each file may hold.
 const LEDGER: &str = "korean-ledger.json";
+
+/// The folder Korean stands in: what the gates are told and the questions Laya is asked, worded as the models
+/// read them. Every other file is held to the ledger.
+const PROMPTS: &str = "prompts/";
 
 /// The variable naming the file of names no tracked file may hold: agents', people's and machines'. No
 /// repository keeps such a list, so it is read from outside the checkout.
@@ -466,10 +471,11 @@ fn a_test_is_told_by_its_name_and_its_attributes() {
 }
 
 #[test]
-fn no_file_holds_more_hangul_than_the_ledger_allows() {
+fn no_file_outside_the_prompts_holds_more_hangul_than_the_ledger_allows() {
   let ledger = ledger();
   let found: Vec<String> = tracked_texts()
     .into_iter()
+    .filter(|(path, _)| !path.starts_with(PROMPTS))
     .filter_map(|(path, text)| {
       let held = hangul_lines(&text);
       let allowed = ledger.get(&path).copied().unwrap_or(0);

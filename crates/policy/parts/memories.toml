@@ -1,0 +1,20 @@
+# What an agent holds in a room as a turn reads it (docs/reference-selection.md): how much the room's standing
+# rows may carry, in characters, and the lines the standing entry is written in.
+
+budget_chars = 12000
+
+# The standing entry: its opening (`{count}` rows, `{items}` the word for them), what a session does with it
+# (`{chat}` the room), the line a state adds, each row's line and its parts, and the line on rows too long to
+# carry.
+[entry]
+opening = "Your memories for this room: {count} open {items} you are holding here — promises you made, things you said you would check, follow-ups handed to you, and the state of anything under way here."
+item_one = "item"
+item_many = "items"
+quiet = "This is your own quiet memory. Do not recite it, and do not bring an item up unless someone asks about it; act on it when its time comes."
+check_off = "Once an item is kept, or dropped by the person it was for, check it off: memory_done with chat {chat}, memory <id> and text '<how it ended>'."
+state = "A state goes on from where it stands: as it moves, rewrite it with memory_update, memory <id> and action '<where it stands now>'; once it ends, is called off or has plainly stopped, release it with memory_done."
+line = "- #{id} {type} · written {written} KST{moved}{for}{from}: {action}"
+moved = " · moved {at} KST"
+for_user = " · for user {user}"
+from_item = " · left open by item #{item}"
+more = "- … {count} more open, too long to carry this turn: memory_list with chat {chat}"

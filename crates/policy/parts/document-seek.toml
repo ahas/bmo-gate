@@ -1,0 +1,3 @@
+# The document seeker over the documents viewer's index (docs/boundary-api.md, the document-seek gate): the most
+# entries it picks for one question, which its instructions are told as their selection cap.
+cap = 5

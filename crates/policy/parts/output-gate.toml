@@ -1,0 +1,26 @@
+# The output gate's lines (docs/output-gate.md): the reason the structure check gives for each fault it finds in a
+# piece of markup, the line a case ends on where the message went plain, and how a decision Laya or the gate's
+# model did not make is written down. A case and a judgement read the same whichever caller wrote them.
+
+# The line a case ends on where no candidate was left and the message went as its plain text.
+went_plain = "Sent as its plain text."
+
+# The structure check's reason for each fault: `{character}` is the character the escaping missed, `{tag}` the
+# tag at fault, `{open}` the tag still open where another closed, `{inside}` the tag it may not stand in.
+[faults]
+unescaped = "Structure check: a {character} outside any tag is not escaped."
+unsupported = "Structure check: an unsupported <{tag}> tag is used."
+unclosed = "Structure check: a <{tag}> tag is never closed."
+unopened = "Structure check: a </{tag}> tag closes what was never opened."
+crossed = "Structure check: a </{tag}> tag closes while <{open}> is still open."
+nested = "Structure check: a <{tag}> tag stands inside a <{inside}> tag."
+
+# How a fold decision is written down: by Laya; on Laya, by its fallback LLM or the gate's default where Laya
+# gave none (`{failure}` Laya's failure, `{answer}` the fallback's answer); on an LLM, the default where the
+# model gave no answer or one that did not read. `{verdict}` is the default, FOLD or OPEN.
+[decided]
+by_laya = "Laya"
+by_fallback = "Laya gave no verdict ({failure}), so the fallback LLM decided: {answer}"
+laya_default = "Laya gave no verdict ({failure}), so it went as the default {verdict}."
+no_answer = "No answer came, so it went as the default {verdict}."
+unreadable = "The answer did not read, so it went as the default {verdict}."

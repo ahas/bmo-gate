@@ -25,6 +25,7 @@ pub enum Code {
   LayaTauOutOfRange,
   LayaFallbackUnknown,
   NoProbe,
+  NoSafeVerdict,
   NoCheckpoint,
   NeedsTau,
   DocumentUnknown,
@@ -34,7 +35,7 @@ pub enum Code {
 
 impl Code {
   /// Every code, in the order `docs/codes.md` lists them.
-  pub const ALL: [Code; 26] = [
+  pub const ALL: [Code; 27] = [
     Code::BodyNotJson,
     Code::FieldWrong,
     Code::Unauthorized,
@@ -56,6 +57,7 @@ impl Code {
     Code::LayaTauOutOfRange,
     Code::LayaFallbackUnknown,
     Code::NoProbe,
+    Code::NoSafeVerdict,
     Code::NoCheckpoint,
     Code::NeedsTau,
     Code::DocumentUnknown,
@@ -87,6 +89,7 @@ impl Code {
       Code::LayaTauOutOfRange => "laya_tau_out_of_range",
       Code::LayaFallbackUnknown => "laya_fallback_unknown",
       Code::NoProbe => "no_probe",
+      Code::NoSafeVerdict => "no_safe_verdict",
       Code::NoCheckpoint => "no_checkpoint",
       Code::NeedsTau => "needs_tau",
       Code::DocumentUnknown => "document_unknown",
@@ -122,6 +125,7 @@ impl Code {
       | Code::AlwaysOn
       | Code::LayaModeRefused
       | Code::NoProbe
+      | Code::NoSafeVerdict
       | Code::NoCheckpoint
       | Code::NeedsTau => 409,
       Code::Database | Code::Failed => 500,
