@@ -456,8 +456,6 @@ Statements here that a sibling's document does not yet match, each for that sibl
   receiver reads, and it is to send false for a room whose tone reads no lore.
 - **bmo-job serves no route for a row another unit raises;** the gate makes `POST /todos/raised` as written
   above, and bmo-job refuses it until it adds the route.
-- **The receiver writes the attach itself,** into a table it does not hold, where its answer is sent; its gate
-  port is to call `POST /judgements/attached` instead.
 - **The web unit's console** shows the gates' screen, Laya and the gate order as unavailable; its server routes
   are to hand the gates' screen to `client/` and call the console's routes above.
 - **The voice unit serves no reading of a line's script:** the evaluation set's voice members read an item as the
