@@ -93,7 +93,7 @@ pub struct Line {
 }
 
 /// One gate run's turn into its thrown-away session: the material as the prompt, the gate's instructions as
-/// the whole system prompt, a fresh session, and the run's name and work key.
+/// the whole system prompt, whether the run thinks, a fresh session, and the run's name and work key.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct GateTurn {
   pub session: String,
@@ -106,6 +106,7 @@ pub struct GateTurn {
   #[serde(skip_serializing_if = "Option::is_none")]
   pub chat: Option<i64>,
   pub system: String,
+  pub thinking: bool,
 }
 
 /// What a turn's line went out on.

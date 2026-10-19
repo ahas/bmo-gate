@@ -160,3 +160,39 @@ fn marks_are_filled_at_once_and_an_unnamed_one_stays() {
   assert_eq!(fill_marks("{a} {b} {c}", &[("a", "{b}"), ("b", "2")]), "{b} 2 {c}");
   assert_eq!(fill_marks("{ x} {", &[("x", "y")]), "{ x} {");
 }
+
+#[test]
+fn every_instruction_file_under_the_prompts_is_compiled_in_and_marks_fill() {
+  use gate_policy::prompts::{FILES, instructions, read, render};
+
+  let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("prompts");
+  let mut found = vec![];
+  let mut folders = vec![root.clone()];
+
+  while let Some(folder) = folders.pop() {
+    for entry in std::fs::read_dir(&folder).unwrap().flatten() {
+      let path = entry.path();
+
+      if path.is_dir() {
+        folders.push(path);
+      } else if path.extension().is_some_and(|extension| extension == "md") {
+        found.push(path.strip_prefix(&root).unwrap().to_string_lossy().into_owned());
+      }
+    }
+  }
+
+  found.sort();
+
+  let listed: Vec<&str> = FILES.iter().map(|(path, _)| *path).collect();
+
+  assert_eq!(found, listed);
+  assert!(instructions("sanitizer").is_some_and(|text| text == text.trim()));
+  assert_eq!(read("no-such/file.md"), None);
+  assert_eq!(render("{{a}} {{b}} {{ c}} {{", &[("a", "{{b}}"), ("b", "2")]), "{{b}} 2 {{ c}} {{");
+}
+
+#[test]
+fn every_gate_names_its_tier() {
+  assert!(PROFILES.profile.iter().all(|one| !one.tier.is_empty()));
+  assert_eq!(PROFILES.of("translator").map(|one| one.tier.as_str()), Some("Reliable"));
+}

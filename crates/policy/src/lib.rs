@@ -13,6 +13,7 @@ pub mod laya;
 pub mod memories;
 pub mod output_gate;
 pub mod profiles;
+pub mod prompts;
 pub mod reference;
 
 /// A line of the policy with each `{name}` it holds filled in, every one at once so a value that itself

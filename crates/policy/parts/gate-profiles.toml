@@ -1,6 +1,7 @@
 # Each gate's profile (docs/gates.md, docs/laya.md): one for every gate of the gate order and for nothing else. A
 # profile's values are defaults only: an owner's explicit choice is a row of the gate options table and survives
-# a later change here. A profile may name:
+# a later change here. A profile names its tier, the gate's word for its work, which the agency maps to a
+# provider's model and effort for each run. It may also name:
 # - laya_mode: its Laya mode where the owner chose none (docs/laya.md, 「Mode and τ per gate」); a gate without
 #   one has no probe;
 # - laya_road: Laya may be its provider, since its probe reads every verdict it gives;
@@ -17,11 +18,13 @@
 
 [[profile]]
 key = "session-summary"
+tier = "Simple"
 sampling = { temperature = 0.3, top_p = 0.8, top_k = 20, min_p = 0 }
 holds_no_session = true
 
 [[profile]]
 key = "system-documents"
+tier = "Simple"
 sampling = { temperature = 0.1, top_p = 0.8, top_k = 20, min_p = 0 }
 laya_mode = "shadow"
 laya_road = true
@@ -29,6 +32,7 @@ laya_each = true
 
 [[profile]]
 key = "room-rules"
+tier = "Simple"
 sampling = { temperature = 0.1, top_p = 0.8, top_k = 20, min_p = 0 }
 laya_mode = "shadow"
 laya_road = true
@@ -36,6 +40,7 @@ laya_each = true
 
 [[profile]]
 key = "library-knowledge"
+tier = "Simple"
 sampling = { temperature = 0.1, top_p = 0.8, top_k = 20, min_p = 0 }
 laya_mode = "shadow"
 laya_road = true
@@ -43,6 +48,7 @@ laya_each = true
 
 [[profile]]
 key = "people-search"
+tier = "Simple"
 sampling = { temperature = 0.1, top_p = 0.8, top_k = 20, min_p = 0 }
 laya_mode = "shadow"
 laya_road = true
@@ -50,44 +56,52 @@ laya_each = true
 
 [[profile]]
 key = "situation-rules"
+tier = "Simple"
 sampling = { temperature = 0.1, top_p = 0.8, top_k = 20, min_p = 0 }
 laya_mode = "shadow"
 laya_road = true
 
 [[profile]]
 key = "sanitizer"
+tier = "Simple"
 sampling = { temperature = 0.1, top_p = 0.8, top_k = 20, min_p = 0 }
 laya_mode = "off"
 laya_safe = true
 
 [[profile]]
 key = "output-format"
+tier = "Simple"
 sampling = { temperature = 0.1, top_p = 0.8, top_k = 20, min_p = 0 }
 laya_mode = "shadow"
 laya_road = true
 
 [[profile]]
 key = "people-standing"
+tier = "Simple"
 sampling = { temperature = 0.3, top_p = 0.8, top_k = 20, min_p = 0 }
 answer_tokens = 8192
 pool = 4
 
 [[profile]]
 key = "document-seek"
+tier = "Simple"
 sampling = { temperature = 0.1, top_p = 0.8, top_k = 20, min_p = 0 }
 
 [[profile]]
 key = "translator"
+tier = "Reliable"
 sampling = { temperature = 0.3, top_p = 0.8, top_k = 20, min_p = 0 }
 answer_tokens = 2048
 pool = 4
 
 [[profile]]
 key = "voice-polish"
+tier = "Reliable"
 sampling = { temperature = 0.5, top_p = 0.8, top_k = 20, min_p = 0 }
 answer_tokens = 8192
 switchable = true
 
 [[profile]]
 key = "voice-reading"
+tier = "Reliable"
 sampling = { temperature = 0.3, top_p = 0.8, top_k = 20, min_p = 0 }

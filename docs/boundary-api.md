@@ -26,6 +26,8 @@ each release links to the data root's `env/gate.toml`. It names:
 | `[gateway]` | the agency's model gateway: its address, and the name of the key file under the data root's `env/` |
 | `[laya]` | the address of the gate's own Laya relay, and the name of its token file under the data root's `env/` |
 | the chat agent | the registration name whose gate options stand for the deployment, and which a companion's are copied from |
+| a thrown-away session's folder | the folder a gate run's thrown-away session is started in |
+| `[records]` | the folders the session summariser reads a closed session's record from: Claude Code's configuration folders, searched in order, and Codex's sessions folder |
 
 No address, port, host, path or name of a deployment is written in the code; every one is read from here.
 
@@ -252,8 +254,8 @@ In the agency's conventions (its `docs/api.md`): camelCase, the agency's control
 | a gate's route | `GET /fallback` | the run mode the gate's work key stands on, Laya among the modes |
 | a mapping | `POST /routes/resolve` | `workKey`, `provider?`, `tier`: the `provider`, `model`, `effort` and `answerTokens` a gate run goes out on |
 | a stand-in | `GET /stand-in?agent=` | whether a stand-in answers while Claude Code's road is closed |
-| a session | `POST /session/start` | `agent`, `scope` `{kind: apart, provider, model, cwd, todo: null, role: null}`: one thrown-away session for one gate run on Claude Code or Codex |
-| a turn | `POST /session/turn` | `session`, `prompt`, and the work parts: `provider`, `model`, `mapping`, `resume` `{kind: fresh}`, `name`, `work_key`, `chat`, and `system`, the gate's whole system prompt |
+| a session | `POST /session/start` | `agent`, `scope` `{kind: apart, provider, model, cwd, todo: null, role: null}`: one thrown-away session for one gate run on a provider's program |
+| a turn | `POST /session/turn` | `session`, `prompt`, and the work parts: `provider`, `model`, `mapping`, `resume` `{kind: fresh}`, `name`, `work_key`, `chat`, `system`, the gate's whole system prompt, and `thinking`, whether the run thinks |
 | a run stopped | `POST /runs/stop` | a run of the gate's somebody stopped |
 | the events | `GET /events?kinds=road-walked` | the road each conversational turn walked, which the gate writes into its road records |
 | a hook registered | `POST /hooks` | `point` `session-summariser`, `url`, `token` |
@@ -297,11 +299,16 @@ Gate runs are the gate's own: the agency starts none and holds no gate's line. A
 ask and nothing behind it (the agency's `docs/own-llm.md`, 「A gate has one road」):
 
 - **The road** is the gate's work key's run mode where it names a provider that is on, else the first provider
-  on in the provider order; the mapping comes from `POST /routes/resolve` at the gate's tier.
-- **Claude Code and Codex** are a thrown-away agency session each run: started apart on the provider and model,
-  sent one turn with the gate's instructions as its whole system prompt, a fresh session, and no tools. The gate
-  knows no pane, no terminal and no backend.
-- **OpenRouter and the registry's provider** are one request through the agency's model gateway.
+  on in the provider order; the mapping comes from `POST /routes/resolve` at the tier the gate's profile names.
+  A run its caller puts on another provider or on one registration goes there alone.
+- **A provider whose program carries the run** — Claude Code, Codex, OpenRouter, every provider the agency
+  does not mark `registered` — is a thrown-away agency session each run: started apart on the provider and
+  model, sent one turn with the gate's instructions as its whole system prompt, a fresh session, no tools, and
+  thinking as the run asks. The gate knows no pane, no terminal and no backend.
+- **A provider whose models are registrations** is one request through the agency's model gateway, on the
+  registration the mapping names. A request the gateway refuses as past the registration's window is cut by
+  its caller where the caller can cut it, each part asked on its own, and is the gate having no answer
+  otherwise.
 - **Laya** is one call to the relay. A gate whose provider is Laya asks its fallback LLM once where Laya gave no
   verdict, on that LLM's own road.
 - **What a run walked** is written into the gate's road records, and what it spent is the agency's `usage-spent`.
@@ -374,8 +381,12 @@ patch.
 
 Statements here that a sibling's document does not yet match, each for that sibling to take up:
 
-- **The agency's thrown-away session** carries no part for a whole system prompt; the gate sends `system` with
-  the turn's work parts, for the agency to deliver as the program's whole system prompt.
+- **The agency's thrown-away session** carries no part for a whole system prompt or for thinking off; the gate
+  sends `system` and `thinking` with the turn's work parts, for the agency to deliver as the program's whole
+  system prompt and its thinking.
+- **The agency's session summariser hook** hands a Claude Code or Codex session by its id alone, with no
+  `transcript`; the summariser reads the session's record from the folders its `[records]` settings name, on
+  the machine both run on, until the agency hands the transcript itself.
 - **The agency's `GET /fallback`** does not state, in its document, the fields of a work key's run mode the gate
   reads.
 - **The agency keeps copies of gate-owned files:** the gate order (its `policy/gates.toml` and the policy crate's

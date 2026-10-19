@@ -1,0 +1,19 @@
+[package]
+name = "gate-runs"
+description = "A gate's run on its one road: the road read through the agency, the run carried as a thrown-away session or one gateway request, the pool it stands in, its records, the gate options and the session summariser."
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+futures-util.workspace = true
+gate-codes.workspace = true
+gate-markup.workspace = true
+gate-policy.workspace = true
+gate-ports.workspace = true
+gate-store.workspace = true
+gate-words.workspace = true
+sea-orm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true

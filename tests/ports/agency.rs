@@ -135,6 +135,7 @@ async fn a_gate_run_is_a_session_apart_and_one_fresh_turn_carrying_the_whole_sys
     work_key: "room-rules".into(),
     chat: Some(7),
     system: "the gate's instructions".into(),
+    thinking: false,
   };
   let ended = agency.turn(&turn).await.unwrap();
 
@@ -150,7 +151,7 @@ async fn a_gate_run_is_a_session_apart_and_one_fresh_turn_carrying_the_whole_sys
     json!({
       "session": "s-1", "prompt": "the material", "provider": "claude-code", "model": "a-model",
       "mapping": { "model": "a-model", "effort": "low", "tier": "Light" }, "name": "gate:room-rules:1",
-      "work_key": "room-rules", "chat": 7, "system": "the gate's instructions", "resume": { "kind": "fresh" }
+      "work_key": "room-rules", "chat": 7, "system": "the gate's instructions", "thinking": false, "resume": { "kind": "fresh" }
     })
   );
 }

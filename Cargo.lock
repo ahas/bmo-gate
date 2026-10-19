@@ -173,6 +173,7 @@ dependencies = [
  "gate-markup",
  "gate-policy",
  "gate-ports",
+ "gate-runs",
  "gate-store",
  "gate-words",
  "pulldown-cmark",
@@ -561,6 +562,23 @@ dependencies = [
  "serde",
  "serde_json",
  "sse-stream",
+ "tokio",
+]
+
+[[package]]
+name = "gate-runs"
+version = "0.1.0"
+dependencies = [
+ "futures-util",
+ "gate-codes",
+ "gate-markup",
+ "gate-policy",
+ "gate-ports",
+ "gate-store",
+ "gate-words",
+ "sea-orm",
+ "serde",
+ "serde_json",
  "tokio",
 ]
 

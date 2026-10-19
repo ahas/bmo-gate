@@ -9,12 +9,12 @@
 - A gate runs on its one road (the agency's `docs/own-llm.md`, 「A gate has one road」), and what reaches a
   model on each road is `docs/boundary-api.md`, 「How a gate run reaches a model」.
 - One gate's runs take turns: the next run of a gate waits until its previous one has returned, so two runs
-  of the same gate never stand at the road together while different gates do. A gate whose road is Claude
-  Code takes as many runs at once as its pool's bound (「How many runs stand at once」 below). A caller that
-  bounds how many of its own requests are out at once marks each request to stand beside the gate's other
-  runs instead, and the bound is then the caller's alone — the translator, which keeps three parts out at a
-  time (the web unit's `docs/documents-viewer.md`), and the person-book summariser, which keeps four of one
-  sheet's groups out at a time (the brain's `docs/people-book.md`, 「Finishing the book」).
+  of the same gate never stand at the road together while different gates do. A gate whose road is a
+  provider's program takes as many runs at once as its pool's bound (「How many runs stand at once」 below). A
+  caller that bounds how many of its own requests are out at once marks each request to stand beside the
+  gate's other runs instead, and the bound is then the caller's alone — the translator, which keeps three parts
+  out at a time (the web unit's `docs/documents-viewer.md`), and the person-book summariser, which keeps four of
+  one sheet's groups out at a time (the brain's `docs/people-book.md`, 「Finishing the book」).
 - A gate whose caller has a way of its own without it declares so in its profile, and only such a gate may
   be switched off for the whole deployment: its switch is its row of the gate options table (the agency's
   `docs/own-llm.md`, 「Per-gate time limit」), and a gate switched off is never asked. Apart from that, each
@@ -34,16 +34,18 @@
   `docs/own-llm.md`, 「A gate has one road」). What each one is asked is in its own document: the output gate
   in `docs/output-gate.md`, the reference gates in `docs/reference-selection.md`.
 
-## A gate on Claude Code
+## A gate on a provider's program
 
-- **Each judgement is one thrown-away agency session:** started apart on the provider and the model the
-  gate's tier maps to there, sent one turn with the gate's instructions as its whole system prompt, a fresh
-  session, no tool, no MCP server and thinking off where the request asks (the agency's
-  `docs/launch-lines.md`, 「Gate runs」). The gate knows no pane, no program and no backend.
-- **The instructions are named by their content,** so a run never answers on instructions it was not asked
-  with.
+- **Each judgement on Claude Code, Codex or OpenRouter is one thrown-away agency session:** started apart on
+  the provider and the model the gate's tier maps to there, sent one turn with the gate's instructions as its
+  whole system prompt, a fresh session, no tool, no MCP server and thinking off where the request asks (the
+  agency's `docs/launch-lines.md`, 「Gate runs」). The gate knows no pane, no program and no backend, and a gate
+  run keeps no session from one judgement to the next.
 - **A login that fails** is the agency's login walk's failure, and the next login the gate's key is offered
   takes the judgement.
+- **A judgement on a registered model** is one request through the agency's model gateway, answered room as the
+  gate's tier names it, never less than the gate's own floor (`docs/boundary-api.md`, 「How a gate run reaches a
+  model」).
 
 ### How many runs stand at once
 
@@ -60,8 +62,10 @@
 
 ### What a judgement records
 
-- The same as on every road: the gate's run log — its start, its prompt and its end — and the road's row with
-  how long the judgement took from the call to its answer. What the run spent is the agency's `usage-spent`.
+- The same as on every road: a line on the service's log as the run starts and as it ends, naming the gate, the
+  road and how it ended, never the material it was asked about; and the road's row with how long the judgement
+  took from the call to its answer and the tokens the road reported. What the run spent is the agency's
+  `usage-spent`.
 
 ## The gate order
 
