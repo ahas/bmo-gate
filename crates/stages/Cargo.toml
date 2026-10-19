@@ -1,0 +1,25 @@
+[package]
+name = "gate-stages"
+description = "The gates themselves: Laya and its probes, the sanitiser, the output gate, the translator and the document translation, the record reading into the owner's language, the document seeker, Laya's health and its agreement."
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+futures-util.workspace = true
+gate-markup.workspace = true
+gate-policy.workspace = true
+gate-runs.workspace = true
+gate-store.workspace = true
+gate-words.workspace = true
+indexmap.workspace = true
+# A worker's record put into the owner's language is checked by its lists and its prose a block at a time, as
+# mdast reads them: pulldown-cmark's events carry no paragraph inside a tight list's item.
+markdown.workspace = true
+regex.workspace = true
+reqwest.workspace = true
+sea-orm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tokio.workspace = true

@@ -1,6 +1,6 @@
-//! Small readings of a text the gate's records and reports share: a count grouped by thousands, the months a
-//! piece's days span, a markdown text's fenced code blocks and its prose, and the mark a text not translated yet
-//! stands under. Markdown is read here as CommonMark reads it.
+//! Small readings of a text the gate's records and reports share: a count grouped by thousands, a number to so many
+//! places, the months a piece's days span, a markdown text's fenced code blocks and its prose, and the mark a text
+//! not translated yet stands under. Markdown is read here as CommonMark reads it.
 
 use pulldown_cmark::{CodeBlockKind, Event, Parser, Tag, TagEnd};
 
@@ -21,6 +21,41 @@ pub fn count_text(value: usize) -> String {
   }
 
   grouped
+}
+
+/// A number written with `places` digits after the point, rounded on the number's exact value, a half going
+/// up and away from nought, where the formatter's own rounding takes a half to the even digit.
+pub fn fixed(value: f64, places: usize) -> String {
+  // A double's exact decimal expansion never runs past this many digits after the point.
+  let exact = format!("{:.1100}", value.abs());
+  let (whole, fraction) = exact.split_once('.').unwrap_or((&exact, ""));
+  let mut digits: Vec<u8> = format!("{whole}{}", &fraction[..places]).into_bytes();
+
+  if fraction.as_bytes()[places] >= b'5' {
+    let mut at = digits.len();
+
+    loop {
+      if at == 0 {
+        digits.insert(0, b'1');
+        break;
+      }
+
+      at -= 1;
+
+      if digits[at] == b'9' {
+        digits[at] = b'0';
+      } else {
+        digits[at] += 1;
+        break;
+      }
+    }
+  }
+
+  let digits = String::from_utf8(digits).unwrap_or_default();
+  let (whole, fraction) = digits.split_at(digits.len() - places);
+  let sign = if value < 0.0 { "-" } else { "" };
+
+  if places == 0 { format!("{sign}{whole}") } else { format!("{sign}{whole}.{fraction}") }
 }
 
 /// The months a piece's days span, as an index line shows them: one `YYYY-MM`, or `from~to`.

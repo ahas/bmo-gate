@@ -25,7 +25,7 @@ Every other unit is reached through standard APIs alone, and of other repositori
 |---|---|
 | `crates/` | The Rust crates the root package is built from: the store, the codes, the ports to the other units, the policy, the words and the markup |
 | `docs/` | The documents, which come before the code: start with `docs/layout.md` |
-| `prompts/` | What each gate is told and the questions Laya is asked, the one folder Korean stands in |
+| `prompts/` | What each gate is told, the questions Laya is asked and the sanitiser's trigger words, the one folder Korean stands in |
 | `src/` | The root package |
 | `tests/` | Every test of the repository |
 

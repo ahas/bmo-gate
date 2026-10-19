@@ -15,6 +15,8 @@ pub mod output_gate;
 pub mod profiles;
 pub mod prompts;
 pub mod reference;
+pub mod translation;
+pub mod triggers;
 
 /// A line of the policy with each `{name}` it holds filled in, every one at once so a value that itself
 /// holds a mark is left as it is; a mark nothing names stays.

@@ -1,0 +1,9 @@
+# How the translator's readings weigh a text (docs/boundary-api.md, 「For bmo-job」).
+
+# A text is English where it holds some Latin letters and fewer Hangul syllables than one to every so many of
+# them, its code, its links and the words the deployment sets aside read past.
+latin_per_hangul = 20
+
+# How many times a part put into the owner's language is asked for before what is still wrong with it — a list run
+# together, English left, a fenced block changed — leaves it in its original.
+record_attempts = 3

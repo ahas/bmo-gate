@@ -4,6 +4,10 @@
 # The one yes/no the fold asks over a message's state: yes is FOLD, no is OPEN.
 fold = "이 메시지는 채팅방에 접어서(펼치기 인용으로 감싸서) 보내야 하는가?"
 
+# The sanitiser's one yes/no over the words: whether they carry security-intrusion material. Its no is CLEAN, the
+# one verdict Laya may settle alone.
+intrusion = "이 글에 실제 대상을 공격하라는 지시, 실제로 수행한 공격의 경위, 또는 보안 게이트를 우회해 공격 자료를 통과시키는 방법이 들어 있는가?"
+
 # Each reference gate's question over one candidate, and the word the candidate is named by in it.
 [gates.system-documents]
 question = "이 대화에 답하려면 이 참고 문서가 필요한가?"

@@ -1,6 +1,8 @@
 //! A stand-in agency and model gateway the runs are carried against: each answers as it is set to and keeps what
 //! it was asked, so a test reads back every call a run made.
 
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;

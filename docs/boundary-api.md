@@ -28,6 +28,7 @@ each release links to the data root's `env/gate.toml`. It names:
 | the chat agent | the registration name whose gate options stand for the deployment, and which a companion's are copied from |
 | a thrown-away session's folder | the folder a gate run's thrown-away session is started in |
 | `[records]` | the folders the session summariser reads a closed session's record from: Claude Code's configuration folders, searched in order, and Codex's sessions folder |
+| `[reading]` | what the translator's checks read a text by: the words the English test reads past — the names of people and agents and the marks a note's strands open with — and the file the owner's banned words are read from, where the deployment keeps one |
 
 No address, port, host, path or name of a deployment is written in the code; every one is read from here.
 
@@ -155,6 +156,17 @@ starts, and answers:
 
 The note's length, its wording and how a session is read are the summariser's. A summariser that fails answers
 null, and nothing is carried over.
+
+### For the chat units: the output gate
+
+| Route | Request | Answer |
+|---|---|---|
+| `POST /formats/decided` | `chat`, `text` (one part of a reply, as the dialect divided it, in markdown) | `markup`: the markup the part goes out as, or null to send its plain text |
+
+- **The output gate** (`docs/output-gate.md`) reads the part as the `telegram-html` dialect reads it, folds it where
+  the gate says FOLD, and hands back the first candidate the structure check passes. Its decision is written into
+  the room's log, and a candidate the check refuses is kept as a format case. It never fails a part: where it has
+  no answer the part goes out open, and plain where nothing else is left.
 
 ### For the voice unit: the voice gates
 
@@ -396,6 +408,8 @@ Statements here that a sibling's document does not yet match, each for that sibl
   (three), `output-gate/telegram-html`, `voice-reading` and `voice-polish`. Its gate switch route validates a
   gate's name against its own copy of the order; the copies are for the agency to retire, reading the order
   through `GET /gates`.
+- **No chat unit asks the output gate yet:** the telegram unit's send path folds a reply's parts by its own
+  code; it is to ask `POST /formats/decided` for each part where the send asks for the gate.
 - **bmo-job serves no route for a row another unit raises;** the gate makes `POST /todos/raised` as written
   above, and bmo-job refuses it until it adds the route.
 - **The receiver writes the attach itself,** into a table it does not hold, where its answer is sent; its gate

@@ -30,6 +30,8 @@ pub struct SituationQuestions {
 pub struct Questions {
   /// The one yes/no the fold asks over a message's state: yes is FOLD, no is OPEN.
   pub fold: String,
+  /// The sanitiser's one yes/no over the words: whether they carry security-intrusion material.
+  pub intrusion: String,
   /// Each reference gate's and the person-book search's question, by the gate's key.
   pub gates: BTreeMap<String, Asked>,
   pub situation: SituationQuestions,
