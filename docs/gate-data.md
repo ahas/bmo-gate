@@ -410,7 +410,8 @@ A gate stopped on one road is taken up on another without rebuilding what the fi
 
 ## The sanitiser gate's own build
 
-**Its code is not carried in this repository** (「Not carried」); what follows is the build it is carried to.
+**Its code is not carried in this repository, and nor is a unit that runs it** (「Not carried」); what follows is
+the build it is carried to.
 
 One gate is not written by the roster driver at all. Its rows are wall-to-wall attack material, and
 a model asked to write whole rows for it is either turned back at the account level or graded against
@@ -564,7 +565,8 @@ hand, or left out for good.
 - **The sanitiser gate's own build** (「The sanitiser gate's own build」): its generator, the generator's
   test, and its script `scripts/laya-sanitize.ts`. They hold the harm categories and what the model is told
   to write for each, the meta-descriptions of the two categories no model writes, and the over-refusal and
-  attack-word lists.
+  attack-word lists. No unit in `deploy/` builds the gate either, as the downgrade harvest has none: the
+  roster driver turns the gate back, so a unit asking the driver for it could only fail.
 - **The downgrade harvest** (「The downgrade harvest」): its module, the module's test, and its script
   `scripts/laya-downgrade.ts`. They sort the passages a downgrade window holds by the same attack vocabulary.
   Its unit `bmo-gate-downgrade` and the timer that resumes it are not in `deploy/` either, so no deployment
@@ -637,7 +639,7 @@ Everything a run makes stands under one folder named for the run.
 - **The merge refuses to stitch two different runs together.** Rows asked, batch size and split
   shares must agree across the per-gate metas, or there is no single dataset to make — those are the
   shape every gate was cut to. The road, the model and the effort are not among them: they belong to
-  a gate, and one run builds sanitiser on the local-model road while the other nine ride codex on purpose. Every
+  a gate, and a gate built apart may ride another road while the others ride codex on purpose. Every
   road any gate was written on is gathered onto the merged meta, so a dataset built across roads says
   so plainly rather than reading as though the first gate's road wrote all of it.
 - **Nothing in the merged folder marks it as a rehearsal**, so the training driver reads it as the

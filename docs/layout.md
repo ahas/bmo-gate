@@ -84,8 +84,9 @@ The testbed deploys the repository as `testbed.toml` declares it (the testbed's 
 - **The units are `deploy/`'s,** each saying how the deployment keeps it:
   - `bmo-gate-server.service`, the service, is the one the deployment waits on, through `bmo-gate health`;
   - `bmo-laya-relay.service`, the relay, is restarted where its binary changed;
-  - `bmo-gate.service`, `bmo-gate-sanitizer.service`, `bmo-gate-judge.service` and `bmo-gate-train.service`, the
-    writing runs, the judging run and a training pass, are linked and started by hand.
+  - `bmo-gate.service`, `bmo-gate-judge.service` and `bmo-gate-train.service`, the writing run, the judging run
+    and a training pass, are linked and started by hand. No unit builds the sanitiser gate's rows or runs the
+    downgrade harvest: their code is not carried (`docs/gate-data.md`, 「Not carried」).
   Each tooling unit runs in the release's `training/tooling/`, under the data root `BMO_DATA_DIR` names.
 - **The Python services stand on the nodes, not here.** The decision server, the front and the tunnel run on each
   node the Laya service's placement names, their units under `runtime/front/` put there by the installer from the

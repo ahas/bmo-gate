@@ -13,9 +13,8 @@ Type=oneshot
 WorkingDirectory=%h/.local/share/bmo-gate/deploy/training/tooling
 Environment=BMO_DATA_DIR=%h/.local/share/bmo/data
 Environment=PATH=%h/.bun/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
-# The sanitiser gate is left out: it rides the local-model road in a unit of its own, because codex refuses its
-# attack rows at the account level. Both units write gates under the one run folder, so the gate
-# one of them writes is the gate the other is told to leave alone.
+# The sanitiser gate is left out: it is built apart, by a harvest this repository does not carry, and the
+# roster driver turns it back.
 #
 # Always resumed, never overwritten: the unit is restarted by a crash, a failure or a reboot, and
 # every one of those must take up at the batch after the last one frozen. An overwrite here would
