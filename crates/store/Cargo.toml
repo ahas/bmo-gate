@@ -1,0 +1,12 @@
+[package]
+name = "gate-store"
+description = "The gate's store: its tables, their migrations and their entities."
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+async-trait.workspace = true
+sea-orm.workspace = true
+sea-orm-migration.workspace = true
+sqlx.workspace = true

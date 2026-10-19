@@ -9,6 +9,9 @@ name = "bmo-gate"
 [test]
 languages = ["cargo", "bun"]
 
+# The store's tests make their own scratch databases on the suite's server, so no template is named.
+[test.database]
+
 [check]
 # The sweeps that read the tree before anything runs: Korean in the code, the README's folder table and the
 # dependencies the manifests name. The ledger is the Korean allowed per code file; it allows none.
