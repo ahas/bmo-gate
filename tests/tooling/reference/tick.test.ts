@@ -1,0 +1,195 @@
+import { describe, expect, test } from "bun:test";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { scratchDir } from "../scratch";
+import { labelKey, readLabels } from "../../../training/tooling/src/reference/labels";
+import { gateDataFile, gatesFolder, instructionTurnsFile, labelsFile, referenceTick } from "../../../training/tooling/src/reference/tick";
+
+import type { JudgeRoad } from "../../../training/tooling/src/gate-judge";
+import type { InputsAsk, LiveTurn } from "../../../training/tooling/src/reference/live-inputs";
+import type { ReferenceTurn } from "../../../training/tooling/src/reference/turns";
+import type { TickOptions } from "../../../training/tooling/src/reference/tick";
+import { useToolingSettings } from "../settings";
+
+useToolingSettings();
+
+const root = scratchDir("bmo-reference-tick-");
+let made = 0;
+
+function folder(): string {
+  made += 1;
+  const where = join(root, `case-${made}`);
+
+  mkdirSync(where, { recursive: true });
+
+  return where;
+}
+
+const turns: ReferenceTurn[] = [3, 2, 1].map((id) => ({
+  key: `-7:${id}`, chatId: -7, messageIds: [id], at: id, source: "run", attached: new Set(["quiet"]), reply: `\uB2F5 ${id}`, recorded: [],
+}));
+
+// the gate's inputs: every turn offers the room's two rules, and what the gate has to say of each is the same.
+function inputs(asked: InputsAsk[][]): (asks: readonly InputsAsk[]) => LiveTurn[] {
+  return (asks) => {
+    asked.push([...asks]);
+
+    return asks.map((ask) => ({
+      chatId: ask.chatId,
+      messageIds: ask.messageIds,
+      missing: false,
+      gates: [{
+        gate: "room-rules", held: 2, capped: 0,
+        candidates: [{ slug: "quiet", about: "\uBC24\uC5D0\uB294 \uC870\uC6A9\uD788" }, { slug: "photos", about: "\uC0AC\uC9C4" }],
+        request: {
+          state: `\uC0AC\uB78C (id 50000005): \uB9D0 ${ask.messageIds[0]}`,
+          questions: {
+            quiet: { type: "noul", instructions: "\uC774 \uB300\uD654\uC5D0 \uB2F5\uD558\uB824\uBA74 \uC774 \uBC29 \uADDC\uCE59\uC774 \uD544\uC694\uD55C\uAC00? \uADDC\uCE59 quiet: \uBC24\uC5D0\uB294 \uC870\uC6A9\uD788" },
+            photos: { type: "noul", instructions: "\uC774 \uB300\uD654\uC5D0 \uB2F5\uD558\uB824\uBA74 \uC774 \uBC29 \uADDC\uCE59\uC774 \uD544\uC694\uD55C\uAC00? \uADDC\uCE59 photos: \uC0AC\uC9C4" },
+          },
+        },
+      }],
+      pieces: (ask.bodies?.["room-rules"] ?? []).map((slug) => ({ gate: "room-rules" as const, slug, about: "\uBC24\uC5D0\uB294 \uC870\uC6A9\uD788", body: "# \uC870\uC6A9\uD788" })),
+    }));
+  };
+}
+
+// A judge that answers every piece it is shown: the attached one used, the others not needed.
+const judge: JudgeRoad = async (_system, prompt) => {
+  const items = prompt.split("\n").slice(1).map((line) => JSON.parse(line) as { id: string; attached: { key: string }[]; offered: { key: string }[] });
+
+  return {
+    text: JSON.stringify(items.map((item) => ({
+      id: item.id,
+      labels: Object.fromEntries([...item.attached.map((one) => [one.key, "used"]), ...item.offered.map((one) => [one.key, "not-needed"])]),
+    }))),
+    sessionId: null,
+    tokens: { inputTokens: 10, outputTokens: 5, cacheReadTokens: 0, cacheWriteTokens: 0 },
+  };
+};
+
+function options(where: string, asked: InputsAsk[][], changes: Partial<TickOptions> = {}): TickOptions {
+  return {
+    root: where,
+    built: { turns, skipped: { noReply: 0, noMessage: 0, noText: 0 } },
+    inputs: inputs(asked),
+    road: judge,
+    judged: 2,
+    atOnce: 1,
+    messages: (turn) => [`\uC0AC\uB78C (id 1): \uB9D0 ${turn.messageIds[0]}`],
+    leaveText: (text) => text,
+    leaveRequest: (request) => request,
+    laya: null,
+    gateVersion: "bmo-gate 0.1.0",
+    snapshot: { takenAt: "2026-09-25T00:00:00.000Z" },
+    importFrom: null,
+    now: () => new Date("2026-09-25T00:00:00Z"),
+    ...changes,
+  };
+}
+
+describe("referenceTick", () => {
+  test("judges the newest turns within its bound, and makes a row only of a turn whose every candidate has a label", async () => {
+    const where = folder();
+    const asked: InputsAsk[][] = [];
+    const report = await referenceTick(options(where, asked));
+    const data = JSON.parse(readFileSync(join(where, gatesFolder, "room-rules", gateDataFile), "utf8")) as { rows: { train: number; calibration: number; test: number }; waiting: number; yes: number };
+
+    expect(report.judgedTurns).toBe(2);
+    expect(asked[1]!.map((ask) => ask.messageIds[0])).toEqual([3, 2]);
+    expect(asked[1]![0]!.bodies!["room-rules"]).toEqual(["quiet"]);
+    expect(readLabels(join(where, labelsFile)).get(labelKey("-7:3", "room-rules", "quiet"))!.word).toBe("used");
+    expect(data.rows.train + data.rows.calibration + data.rows.test).toBe(2);
+    expect([data.waiting, data.yes]).toEqual([1, 2]);
+    expect(report.gateVersion).toBe("bmo-gate 0.1.0");
+    expect(JSON.parse(readFileSync(join(where, "ticks.jsonl"), "utf8")).snapshot).toEqual({ takenAt: "2026-09-25T00:00:00.000Z" });
+  });
+
+  test("every frozen batch says which judge answered it", async () => {
+    const where = folder();
+
+    await referenceTick(options(where, [], { judge: "claude claude-sonnet-5 high tester@example.com" }));
+
+    expect(JSON.parse(readFileSync(join(where, "judged", "00000.json"), "utf8")).judge).toBe("claude claude-sonnet-5 high tester@example.com");
+  });
+
+  test("the next pass judges only what is still missing, and puts the gates in place whole", async () => {
+    const where = folder();
+
+    await referenceTick(options(where, []));
+
+    const asked: InputsAsk[][] = [];
+    const report = await referenceTick(options(where, asked));
+
+    expect(report.judgedTurns).toBe(1);
+    expect(asked[1]!.map((ask) => ask.messageIds[0])).toEqual([1]);
+    expect(existsSync(join(where, `${gatesFolder}.partial`))).toBe(false);
+    expect(existsSync(join(where, `${gatesFolder}.old`))).toBe(false);
+    expect(report.gates.find((one) => one.gate === "room-rules")!.waiting).toBe(0);
+  });
+
+  test("a failed batch ends the judging, and the batches after it are never sent", async () => {
+    let sent = 0;
+    const spent: JudgeRoad = async () => {
+      sent += 1;
+      throw new Error("You've hit your limit");
+    };
+    // Twenty turns are three batches of at most eight.
+    const many: ReferenceTurn[] = Array.from({ length: 20 }, (_, index) => ({ ...turns[0]!, key: `-7:${index + 10}`, messageIds: [index + 10] }));
+    const report = await referenceTick(options(folder(), [], {
+      road: spent, judged: 20, built: { turns: many, skipped: { noReply: 0, noMessage: 0, noText: 0 } },
+    }));
+
+    expect([sent, report.calls, report.failedBatches, report.judgedTurns]).toEqual([1, 0, 1, 0]);
+  });
+
+  test("takes the first judging's labels in once, where the run has none", async () => {
+    const where = folder();
+    const first = join(where, "use-turns.jsonl");
+
+    writeFileSync(first, `${JSON.stringify({ id: "-7:3", candidates: [{ gate: "room-rules", slug: "quiet", attached: true, label: "unused" }] })}\n`);
+
+    const report = await referenceTick(options(where, [], { importFrom: first, road: null }));
+
+    expect(report.imported).toBe(1);
+    expect(report.figures.find((one) => one.gate === "room-rules")!.unused).toBe(1);
+  });
+
+  test("a turn the bot's instructions opened is asked over them, and kept once the archive lets it go", async () => {
+    const where = folder();
+    const opened: ReferenceTurn = {
+      key: "chat:-7:9:1", chatId: -7, messageIds: [], at: 10, source: "instructions", attached: new Set(), reply: "<<SKIP>>", recorded: [], instructions: "[\uBC30\uD3EC \uC54C\uB9BC]",
+    };
+    const first: InputsAsk[][] = [];
+    const later: InputsAsk[][] = [];
+
+    await referenceTick(options(where, first, { road: null, built: { turns: [opened, ...turns], skipped: { noReply: 0, noMessage: 0, noText: 0 } } }));
+    await referenceTick(options(where, later, { road: null, built: { turns: [opened, ...turns], skipped: { noReply: 0, noMessage: 0, noText: 0 } } }));
+
+    const report = await referenceTick(options(where, later, { road: null }));
+
+    expect(first[0]![0]).toEqual({ chatId: -7, messageIds: [], instructions: "[\uBC30\uD3EC \uC54C\uB9BC]" });
+    expect(later[1]![0]).toEqual({ chatId: -7, messageIds: [], instructions: "[\uBC30\uD3EC \uC54C\uB9BC]" });
+    expect(report.turns).toBe(4);
+    expect(readFileSync(join(where, instructionTurnsFile), "utf8").trim().split("\n")).toHaveLength(1);
+
+    const held = await referenceTick(options(where, [], { sources: ["instructions"], judged: 5 }));
+
+    expect(held.judgedTurns).toBe(1);
+    expect(readLabels(join(where, labelsFile)).has(labelKey("chat:-7:9:1", "room-rules", "quiet"))).toBe(true);
+    expect(readLabels(join(where, labelsFile)).has(labelKey("-7:3", "room-rules", "quiet"))).toBe(false);
+  });
+
+  test("asks Laya again only where the checkpoint or the input moved", async () => {
+    const where = folder();
+    let calls = 0;
+    const laya = { served: new Map([["room-rules", "checkpoints/room-rules/r/step-000001"]]), ask: async () => { calls += 1; return { quiet: 0.9, photos: 0.1 }; } };
+
+    await referenceTick(options(where, [], { laya }));
+    const again = await referenceTick(options(where, [], { laya, road: null }));
+
+    expect(calls).toBe(3);
+    expect([again.layaAsked, again.layaReused]).toEqual([0, 3]);
+  });
+});

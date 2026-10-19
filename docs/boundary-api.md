@@ -227,6 +227,14 @@ unit, and the bundle's own server routes, running in the console, call these. Ti
 token, waiting at most five seconds, and ends 0 where it answers ready and 1 where it does not, saying why. It is
 the deployment's check rather than a noun, so `nouns` does not declare it.
 
+### Records
+
+`bmo-gate records <table>` prints every row of one of the gate's own tables, from the database the settings name
+or the one `--db` names, one JSON object a line with every column under its own name, in the order the rows were
+written. It is how the training tooling reads the gate's own records into its conversation snapshot
+(`docs/gate-data.md`, 「The conversation source」). A name that is not one of the gate's own tables ends with 2. It
+reads and writes nothing else, and like `health` it is no noun, so `nouns` does not declare it.
+
 ## Calls the gate makes
 
 ### bmo-brain
@@ -291,6 +299,11 @@ In the agency's conventions (its `docs/api.md`): camelCase, the agency's control
 | a run stopped | `POST /runs/stop` | a run of the gate's somebody stopped |
 | the events | `GET /events?kinds=road-walked` | the road each conversational turn walked, which the gate writes into its road records |
 | a hook registered | `POST /hooks` | `point` `session-summariser`, `url`, `token` |
+
+The training tooling's claude road hands a batch to the agency's command for a run apart, as the tooling's settings
+name it (`docs/gate-data.md`, 「The claude road」), with `--model`, `--effort`, `--config-dir`, `--system-file`,
+`--title` and `--bound-seconds` after it, the batch on its standard input, and one JSON object back: `text`,
+`model` and `spend`, each model's `inputTokens`, `outputTokens`, `cacheReadTokens` and `cacheWriteTokens`.
 
 ### The model gateway
 
@@ -441,6 +454,13 @@ Statements here that a sibling's document does not yet match, each for that sibl
   the machine both run on, until the agency hands the transcript itself.
 - **The agency's `GET /fallback`** does not state, in its document, the fields of a work key's run mode the gate
   reads.
+- **The agency publishes no command that runs one batch apart** with the words the training tooling's claude road
+  hands it (「bmo-agency」 above); the road runs whatever command the tooling's settings name until the agency
+  states one.
+- **No unit but the gate serves its part of the training tooling's conversation snapshot:** the receiver's messages
+  and sent messages, the agency's run log, bmo-job's items and job runs, and bmo-artifact's searches stand
+  unavailable in every snapshot (`docs/gate-data.md`, 「The conversation source」) until each owner serves a route
+  for its part.
 - **The agency keeps copies of gate-owned files:** the gate order (its `policy/gates.toml` and the policy crate's
   module of it), the prompt ceilings (its `policy/gate-prompts.toml` and its module), and fourteen of the gate's
   instruction files under its `prompts/agents/`: `sanitizer`, `situation-rules`, `document-seek`,

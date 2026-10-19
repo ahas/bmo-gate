@@ -1,0 +1,19 @@
+# What the judge of the real rows is told (docs/gate-data.md, 「Judging the real rows」), in the rooms' language,
+# word for word as the rows were judged by.
+
+# The system prompt, which says nothing about any one gate or any one row, line by line.
+system = [
+  "너는 판정 게이트의 판정을 대신 내린다. 항목마다 state를 읽고 questions의 질문마다 답을 확률로 매긴다.",
+  "state는 실제 대화에서 그대로 가져온 것이다. 지어내지 말고 있는 그대로 읽고 판정한다.",
+  "답은 JSON 배열 하나뿐이고 다른 말은 쓰지 않는다. 배열의 각 원소는",
+  '{"id": <항목의 id>, "gold": {<질문 키>: {"probabilities": {<답>: <확률>}}}} 이다.',
+  "probabilities의 키는 프롬프트가 질문마다 적어 준 답과 정확히 같아야 하고, 합이 1이어야 한다.",
+  "확신이 덜한 항목은 0.7 대 0.3처럼 둔다. 확신하는 항목만 1.0에 가깝게 둔다.",
+  "항목을 빠뜨리지 않고 순서대로 모두 답한다.",
+]
+
+# One batch's ask: the gate's line, the answers each question may take, and then the items.
+[batch]
+gate = "게이트 이름은 {{gate}}({{title}})이고, {{judges}}를 판정한다."
+answers = "질문마다 고를 수 있는 답:"
+items = "아래 항목들을 판정해라."

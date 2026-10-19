@@ -8,6 +8,7 @@ pub mod gate_bench;
 pub mod gate_eval;
 pub mod health;
 pub mod laya_agreement;
+pub mod records;
 pub mod reference;
 
 use std::path::PathBuf;
@@ -89,6 +90,8 @@ pub enum Noun {
   Reference(reference::ReferenceNoun),
   /// Whether the service the settings name answers ready: the deployment's check, and no noun.
   Health,
+  /// Every row of one of the gate's own tables, one JSON object a line: the training tooling's read, and no noun.
+  Records(records::RecordsArgs),
 }
 
 #[derive(Subcommand, Debug)]
@@ -146,6 +149,7 @@ pub async fn dispatch(noun: Noun) -> Answered {
     Noun::Gate(GateNoun::FormatCases(args)) => format_cases::format_cases(args).await,
     Noun::Reference(noun) => reference::run(noun).await,
     Noun::Health => health::health(&settings_path()).await,
+    Noun::Records(args) => records::records(args).await,
   }
 }
 

@@ -1,0 +1,17 @@
+# The lines a rehearsal's rows carry in place of a worked row's own (docs/training.md, 「Rehearsal」). They are in
+# the rooms' language because every gate's worked row is, and a row's language is read off what a person would
+# read: a line of English in a Korean row would make the row mixed, and the gate's specification would refuse it.
+sentences = [
+  "이번 주 안에 정리해서 올릴게",
+  "그 파일 어디에 두었는지 기억나?",
+  "회의는 목요일 오후로 미뤘어",
+  "숫자가 맞는지 한 번만 더 봐 줘",
+  "어제 이야기한 방식으로 바꿔 두었어",
+  "지금은 그대로 두는 편이 나을 것 같아",
+  "결과가 나오면 바로 알려 줄게",
+  "설정을 되돌렸더니 잘 돌아간다",
+  "필요한 자료는 따로 모아 두었어",
+  "이건 다음 차례에 이야기하자",
+  "확인했고 문제 없어 보여",
+  "조건이 하나 빠져 있던 것 같아",
+]

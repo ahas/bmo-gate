@@ -1,0 +1,402 @@
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { refuseOverwrite, splitFiles } from "./laya-frozen";
+import { rehearsalMetaFile } from "./laya-rehearsal";
+import { addTokens, languageFile, metaFile, noTokens, progressFile, readProgress, readWholeBatches, roadsOf, splitsOf } from "./laya-synth-run";
+import { gateFolder, gatesFolderName } from "./roots";
+
+import type { DatasetRow, DatasetSplit } from "./laya-dataset";
+import type { LanguageBucket } from "./laya-synth";
+import type { SynthMeta, TokenTally } from "./laya-synth-run";
+
+// The gates into the one dataset (docs/gate-data.md 「A run folder」). Each gate freezes its own
+// three splits because each gate is its own generation; the training driver reads one folder and
+// cuts it by each row's own gate, so the splits it needs are every gate's rows together.
+//
+// Nothing here rewrites a row. A row frozen by its gate is the row that lands in the dataset, and
+// the merge only decides which folders go in and whether they belong to one another.
+
+export interface MergeOptions {
+  // The run's folder, which is where the gates' own folders stand.
+  root: string;
+  // Where the merged dataset goes.
+  into: string;
+  // The gates to merge, or null for every gate that has frozen something.
+  gates: readonly string[] | null;
+  overwrite: boolean;
+  // Whether a gate still being judged goes in with the batches it has frozen so far. Without it
+  // only a finished gate goes in, and a gate still being written is refused.
+  growing?: boolean;
+}
+
+export interface MergeReport {
+  folder: string;
+  meta: SynthMeta;
+  gates: string[];
+  rows: Record<DatasetSplit, number>;
+  // Row ids that stood in two folders at once. The ids carry their gate, so this is zero unless
+  // two folders are claiming the same rows, which is worth saying out loud rather than folding
+  // into a gate's own duplicate count — that one means the model wrote a row twice, and the bar
+  // for repeats is read off it.
+  duplicates: number;
+  // Each gate's own rows in each split and whether the gate had finished, so a cut taken while the
+  // judging goes on says how far each gate had got.
+  parts: MergedPart[];
+}
+
+export interface MergedPart {
+  gate: string;
+  rows: Record<DatasetSplit, number>;
+  finished: boolean;
+  // When the gate's writing began. A gate started over is a new series of rows, and this is what
+  // tells two cuts of the same gate apart as belonging to one series or not.
+  started: string;
+  // How many questions carry the gate's rarer answer, across every split. A question counts toward
+  // the answer its gold gives at three to one or more, so a contested gold counts toward neither.
+  rarer: number;
+}
+
+// What a gate's frozen folder holds, as the merge reads it.
+interface GatePart {
+  gate: string;
+  folder: string;
+  meta: SynthMeta;
+  rows: Record<DatasetSplit, DatasetRow[]>;
+  languages: Map<string, LanguageBucket>;
+  finished: boolean;
+}
+
+function readLines(path: string): string[] {
+  return existsSync(path) ? readFileSync(path, "utf8").split("\n").filter((line) => line.trim() !== "") : [];
+}
+
+// Every gate that has frozen something under a run, in the order the folder names sort. Used when
+// nothing named which gates to merge, so a run merges what it actually wrote.
+export function frozenGatesUnder(root: string): string[] {
+  const gates = join(root, gatesFolderName);
+
+  if (!existsSync(gates)) {
+    return [];
+  }
+
+  return readdirSync(gates).sort().filter((gate) => existsSync(join(gates, gate, splitFiles.train)));
+}
+
+// Every gate whose writing has begun under a run, finished or not, which is what a growing cut reads
+// when nothing named the gates.
+export function growingGatesUnder(root: string): string[] {
+  const gates = join(root, gatesFolderName);
+
+  if (!existsSync(gates)) {
+    return [];
+  }
+
+  return readdirSync(gates).sort().filter((gate) => existsSync(join(gates, gate, progressFile)));
+}
+
+// Why a gate's folder may not hand a row on, or null where it may.
+function refuseRow(gate: string, where: string, row: DatasetRow & { rehearsal?: boolean }): string | null {
+  // A rehearsal row travels with its own mark, and one of them anywhere in a dataset is enough for
+  // the training driver to read the whole thing as a rehearsal.
+  if (row.rehearsal === true) {
+    return `${gate}: ${where} holds rehearsal rows.`;
+  }
+
+  if (row.gate !== gate) {
+    return `${gate}: ${where} holds a row of the ${row.gate} gate.`;
+  }
+
+  return null;
+}
+
+function readFinished(folder: string, gate: string, meta: string): GatePart | string {
+  const rows = { train: [], calibration: [], test: [] } as Record<DatasetSplit, DatasetRow[]>;
+
+  for (const [split, name] of Object.entries(splitFiles) as [DatasetSplit, string][]) {
+    for (const line of readLines(join(folder, name))) {
+      const row = JSON.parse(line) as DatasetRow & { rehearsal?: boolean };
+      const refusal = refuseRow(gate, name, row);
+
+      if (refusal !== null) {
+        return refusal;
+      }
+
+      rows[split].push(row);
+    }
+  }
+
+  const languages = new Map<string, LanguageBucket>();
+
+  for (const line of readLines(join(folder, languageFile))) {
+    const said = JSON.parse(line) as { id: string; language: LanguageBucket };
+
+    languages.set(said.id, said.language);
+  }
+
+  return { gate, folder, meta: JSON.parse(readFileSync(meta, "utf8")) as SynthMeta, rows, languages, finished: true };
+}
+
+// A gate read off its whole batches rather than off its split files. The judging writes the split
+// files in place when a gate finishes, so a reader beside it could catch one half-written; a batch
+// is renamed into place whole, and the splits are made of nothing else. So a growing cut reads
+// every gate this way, finished or not, and never writes into the gate's folder.
+function readBatches(folder: string, gate: string, finished: boolean): GatePart | string {
+  const progress = readProgress(folder);
+
+  if (progress === null) {
+    return `${gate}: no judging was ever started in ${folder}.`;
+  }
+
+  const whole = readWholeBatches(folder, gate);
+
+  for (const one of whole.rows) {
+    const refusal = refuseRow(gate, "a batch", one.row);
+
+    if (refusal !== null) {
+      return refusal;
+    }
+  }
+
+  const made = splitsOf(whole.rows, progress);
+
+  return {
+    gate,
+    folder,
+    meta: made.meta,
+    rows: made.splits,
+    languages: new Map(made.languages.map((one) => [one.id, one.language])),
+    finished,
+  };
+}
+
+function readPart(root: string, gate: string, growing: boolean): GatePart | string {
+  const folder = gateFolder(root, gate);
+  const meta = join(folder, metaFile);
+
+  if (existsSync(join(folder, rehearsalMetaFile))) {
+    return `${gate}: rehearsal data, which cannot be merged with real data.`;
+  }
+
+  if (growing) {
+    return readBatches(folder, gate, existsSync(meta));
+  }
+
+  if (!existsSync(meta)) {
+    return `${gate}: ${folder} holds no frozen data. Give --growing to merge a gate still being judged as far as it has come.`;
+  }
+
+  return readFinished(folder, gate, meta);
+}
+
+// The fields that say the parts belong to one run. A dataset stitched from two runs is not one
+// dataset — its figures are the average of two different things and belong to neither — so the
+// parts must agree on every one of these before they are put together.
+//
+// The road, the model and the effort are not among them: a gate carries its own, and one run may
+// build different gates on different roads on purpose. Sanitizer is written on the local-model road while the
+// other nine ride codex, because codex refuses sanitizer's attack rows at the account level; the
+// gates still merge into one dataset, since what makes them one run is the row count, the batch
+// size and the split shares they were all cut to, not the model that wrote each one. What road
+// wrote what is kept — every part's roads are gathered onto the merged meta — rather than enforced.
+const runWide = ["rowsAsked", "batchSize"] as const;
+
+function refuseDisagreement(parts: readonly GatePart[]): string | null {
+  const first = parts[0]!;
+
+  for (const part of parts.slice(1)) {
+    for (const field of runWide) {
+      if (part.meta[field] !== first.meta[field]) {
+        return `${part.gate} has ${field} ${String(part.meta[field])} and ${first.gate} has ${String(first.meta[field])}. Data of different runs is not merged into one.`;
+      }
+    }
+
+    for (const share of ["calibration", "test"] as const) {
+      if (part.meta.shares[share] !== first.meta.shares[share]) {
+        return `${part.gate} has a ${share} share of ${part.meta.shares[share]} and ${first.gate} has ${first.meta.shares[share]}. Data of different runs is not merged into one.`;
+      }
+    }
+  }
+
+  return null;
+}
+
+function readParts(root: string, gates: readonly string[] | null, growing: boolean): GatePart[] | string {
+  const wanted = gates ?? (growing ? growingGatesUnder(root) : frozenGatesUnder(root));
+
+  if (wanted.length === 0) {
+    return growing ? `No gate under ${root} has started judging.` : `No gate under ${root} is frozen.`;
+  }
+
+  const parts: GatePart[] = [];
+
+  for (const gate of wanted) {
+    const part = readPart(root, gate, growing);
+
+    if (typeof part === "string") {
+      return part;
+    }
+
+    parts.push(part);
+  }
+
+  return refuseDisagreement(parts) ?? parts;
+}
+
+const leaning = 0.75;
+
+// How many questions carry the rarer answer among these rows, a question counting toward the answer
+// its gold gives at three to one or more.
+export function rarerOf(rows: readonly DatasetRow[]): number {
+  const answered = new Map<string, number>();
+
+  for (const row of rows) {
+    for (const gold of Object.values(JSON.parse(row.gold) as Record<string, { probabilities?: Record<string, number> }>)) {
+      const [answer, share] = Object.entries(gold.probabilities ?? {}).reduce<[string, number]>(
+        (best, one) => one[1] > best[1] ? one : best, ["", 0]);
+
+      if (share >= leaning) {
+        answered.set(answer, (answered.get(answer) ?? 0) + 1);
+      }
+    }
+  }
+
+  return answered.size < 2 ? 0 : Math.min(...answered.values());
+}
+
+function countsOf(part: GatePart): MergedPart {
+  return {
+    gate: part.gate,
+    rows: { train: part.rows.train.length, calibration: part.rows.calibration.length, test: part.rows.test.length },
+    finished: part.finished,
+    started: part.meta.started,
+    rarer: rarerOf([...part.rows.train, ...part.rows.calibration, ...part.rows.test]),
+  };
+}
+
+// How far every gate under a run has got, read the way a growing cut reads it and writing nothing,
+// so what to cut can be decided before anything is cut.
+export function growingCounts(root: string): MergedPart[] | string {
+  const parts = readParts(root, null, true);
+
+  return typeof parts === "string" ? parts : parts.map(countsOf);
+}
+
+// The merge, or the refusal to make one. Every refusal is a sentence saying what is wrong, because
+// a merge that goes ahead on parts that do not belong together produces a dataset nobody can tell
+// is wrong by looking at it.
+export function mergeGates(options: MergeOptions): MergeReport | string {
+  const parts =readParts(options.root, options.gates, options.growing === true);
+
+  if (typeof parts === "string") {
+    return parts;
+  }
+
+  const refusal = refuseOverwrite(options.into, options.overwrite);
+
+  if (refusal !== null) {
+    return refusal;
+  }
+
+  const seen = new Set<string>();
+  const kept = { train: [], calibration: [], test: [] } as Record<DatasetSplit, DatasetRow[]>;
+  const languages: string[] = [];
+  let duplicates = 0;
+
+  for (const part of parts) {
+    for (const split of Object.keys(splitFiles) as DatasetSplit[]) {
+      for (const row of part.rows[split]) {
+        if (seen.has(row.id)) {
+          duplicates += 1;
+
+          continue;
+        }
+
+        seen.add(row.id);
+        kept[split].push(row);
+
+        const language = part.languages.get(row.id);
+
+        if (language !== undefined) {
+          languages.push(JSON.stringify({ id: row.id, language }));
+        }
+      }
+    }
+  }
+
+  const first = parts[0]!;
+  const meta: SynthMeta = {
+    model: first.meta.model,
+    effort: first.meta.effort,
+    road: first.meta.road,
+    // Every road any gate was written on, so a dataset built across roads says so plainly rather
+    // than reading as though the first gate's road wrote all of it.
+    roads: [...new Set(parts.flatMap((part) => roadsOf(part.meta)))].sort(),
+    sessionHeld: parts.every((part) => part.meta.sessionHeld),
+    cacheReused: parts.every((part) => part.meta.cacheReused),
+    written: new Date().toISOString(),
+    // The run began when the first of its gates began, whichever gate that was.
+    started: parts.map((part) => part.meta.started).sort()[0]!,
+    rowsAsked: first.meta.rowsAsked,
+    batchSize: first.meta.batchSize,
+    shares: first.meta.shares,
+    gates: parts.flatMap((part) => part.meta.gates),
+    tokens: parts.reduce<TokenTally>((all, part) => addTokens(all, part.meta.tokens), noTokens),
+  };
+
+  mkdirSync(options.into, { recursive: true });
+
+  for (const [split, name] of Object.entries(splitFiles) as [DatasetSplit, string][]) {
+    const lines = kept[split].map((row) => JSON.stringify(row));
+
+    writeFileSync(join(options.into, name), lines.length === 0 ? "" : `${lines.join("\n")}\n`);
+  }
+
+  writeFileSync(join(options.into, languageFile), languages.length === 0 ? "" : `${languages.join("\n")}\n`);
+  writeFileSync(join(options.into, metaFile), `${JSON.stringify(meta, null, 2)}\n`);
+
+  return {
+    folder: options.into,
+    meta,
+    gates: parts.map((part) => part.gate),
+    rows: { train: kept.train.length, calibration: kept.calibration.length, test: kept.test.length },
+    duplicates,
+    parts: parts.map(countsOf),
+  };
+}
+
+// Whether the training driver could cut a gate out of this folder. It wants each of the three
+// splits to hold at least one row of that gate and refuses the gate outright otherwise, so a
+// dataset short in any one of them is a dataset that trains nine gates and names the tenth as a
+// fault. Said here as a reading rather than found out by a training run failing.
+export function gatesTrainingWouldRefuse(folder: string, gates: readonly string[]): string[] {
+  const holds = new Map<string, Set<DatasetSplit>>();
+
+  for (const [split, name] of Object.entries(splitFiles) as [DatasetSplit, string][]) {
+    for (const line of readLines(join(folder, name))) {
+      const row = JSON.parse(line) as DatasetRow;
+
+      (holds.get(row.gate) ?? holds.set(row.gate, new Set()).get(row.gate)!).add(split);
+    }
+  }
+
+  return gates.filter((gate) => (holds.get(gate)?.size ?? 0) < Object.keys(splitFiles).length);
+}
+
+// Whether the folder would be read as a rehearsal rather than as the real data. The mark travels
+// two ways — a meta file of its own, and a mark on the rows themselves — so both are looked for.
+export function readsAsRehearsal(folder: string): boolean {
+  if (existsSync(join(folder, rehearsalMetaFile))) {
+    return true;
+  }
+
+  for (const name of Object.values(splitFiles)) {
+    const lines = readLines(join(folder, name));
+
+    if (lines.length > 0) {
+      return (JSON.parse(lines[0]!) as { rehearsal?: boolean }).rehearsal === true;
+    }
+  }
+
+  return false;
+}

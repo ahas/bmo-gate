@@ -44,6 +44,14 @@ ever holds a lock a service waits on.
   their last.
 - **A snapshot says what it is.** Beside it stand the sources it was read from, when, and its size. A pass
   of the reference data records its snapshot's time with its figures.
+- **What a snapshot holds, and from whom.** One file of the parts the tooling reads, each in the columns
+  it reads: the rooms' messages and what was sent of them (bmo-receiver's), the chat agent's run log
+  (bmo-agency's, holding that agent's runs alone), the items and the job runs (bmo-job's), the searches
+  with the document each answered (bmo-artifact's), and the gate's own judgements, Laya verdicts and
+  reference verdicts. The gate's own are read through its unit command, `bmo-gate records <table>`
+  (`docs/boundary-api.md`, 「Records」), run as the tooling's settings name it (`gate_command`). The other
+  owners serve no route for their parts yet, so those parts stand empty and the snapshot names each as
+  unavailable, which every run says as it starts.
 - **The snapshot is the only conversation this tooling reads.** It is written once as it is taken and
   never written again.
 - **The gate's own command that builds the reference gates' inputs reads the units as they stand**
@@ -283,7 +291,9 @@ softened to slip by; the road is changed instead.
 
 The second road is the local-model road, a qwen model the deployment runs itself. It is not claude, which
 a road for writing rows avoids, and it writes the same attack rows without flinching. It is reached as one
-HTTPS request per batch against a small MCP service, at the address the tooling's settings name.
+HTTPS request per batch against a small MCP service, at the address the tooling's settings name (`local_mcp_url`,
+with its model list at `local_models_url`, the model it serves as `local_model`, and its key in the file
+`local_key_file` names under the runtime data root's `env/`).
 
 - **One request, one batch, no thread.** The road holds no session and reads no cache: every batch
   carries the gate's whole fixed prefix afresh and the answer comes back as text. So a gate on this
@@ -304,10 +314,11 @@ HTTPS request per batch against a small MCP service, at the address the tooling'
 
 ## The text model road
 
-The other home model codex cannot make write is the text model, the general text model, reached through
-The operations machine's tunnel door as one OpenAI-compatible front (the text model engine's own documents). It is uncensored, so it
-writes the sanitiser gate's attack material without flinching, and it is the road that gate's own
-generator drives (「The sanitiser gate's own build」).
+The other home model codex cannot make write is the text model, the general text model the deployment
+runs itself, reached as one OpenAI-compatible front at the base address the tooling's settings name
+(`text_base_url`; the engine and its front are the text model engine's own repository's). It is
+uncensored, so it writes the sanitiser gate's attack material without flinching, and it is the road
+that gate's own generator drives (「The sanitiser gate's own build」).
 
 - **One chat completion, one batch, no thread.** The road holds no session and reads no cache: every
   batch carries the gate's whole fixed prefix afresh as a system message and the answer comes back as
@@ -315,15 +326,15 @@ generator drives (「The sanitiser gate's own build」).
 - **The sanitiser harvest streams.** Where the sanitiser generator drives this road, the completion is
   asked to hand its text back token by token so the sentences it writes can be watched as they land in
   the run's live file; the usage rides the final chunk so a streamed harvest still tallies its tokens.
-- **The road writes on the model the placement serves.** At the start of every run it reads the engine's
-  placement and the model it names, out of the agency's model catalogue where it names an entry
-  (the text model engine's own documents, 「The placement」), and takes the name the front lists that file under: the
-  file's name without `.gguf`. A placement pointed at another model is followed by the next run with
-  nothing else changed. That name labels the run's batches and is the `model` of every request.
-- **The front serves one model and the road checks it once**, against the name the placement gave,
+  The streaming reader is the harvest's own and is not carried with the road (「Not carried」).
+- **The road writes on the model the settings name.** At the start of every run it reads `text_model`,
+  the name the front lists its model under. A front moved to another model is followed by the next run
+  with that setting changed and nothing else. That name labels the run's batches and is the `model` of
+  every request.
+- **The front serves one model and the road checks it once**, against the name the settings gave,
   so a front still serving another model, or one swapped out from under it, cannot label another
-  model's rows as this one's: the run stops at its first batch, naming both. A placement that
-  cannot be read, or an entry the catalogue does not give, stops the run before it asks anything.
+  model's rows as this one's: the run stops at its first batch, naming both. Settings that do not name
+  the model stop the run before it asks anything.
 - **The model is asked not to think before it answers**, since a batch wants the whole answer slot
   for its work.
 - **A busy card is waited on, not counted as a failure.** The front's engine borrows cards Laya's
@@ -333,8 +344,8 @@ generator drives (「The sanitiser gate's own build」).
   left off.
 - **The road reports tokens over a house card**, so a gate on it tallies fresh input and output
   tokens while the tokens stand in for a price that does not exist.
-- **The key** is the front's own service key, in the token file the tooling's settings name under the
-  runtime data root's `env/`, read only when its permission is exactly `0600`.
+- **The key** is the front's own service key, in the token file the tooling's settings name as
+  `text_key_file` under the runtime data root's `env/`, read only when its permission is exactly `0600`.
 
 ## The claude road
 
@@ -342,8 +353,8 @@ A judging pass, or a writing run that tops up a gate's rarer answer (「Invented
 Claude Code instead of codex, for the stretch the codex account is shut. Both ride it the same way,
 and everything below holds for a writing batch as for a judging one.
 
-- **One login, pinned.** The road rides the Claude account whose credentials stand in the login
-  directory the tooling's settings name, and no other. It names that directory outright as the program's configuration
+- **One login, pinned.** The road rides the Claude account the tooling's settings name as
+  `claude_account`, whose credentials stand in the login directory they name as `claude_login`, and no other. It names that directory outright as the program's configuration
   directory and strips every variable that could carry another login in beside it (a login token,
   an API key), so the login the job itself runs under never leaks into a batch. Before the first
   batch it reads the account that directory is logged into and refuses to start where it is not
@@ -357,8 +368,9 @@ and everything below holds for a writing batch as for a judging one.
   failed batch: it stops the gate, the frozen batches stand, and the gate is taken up on the same
   road once the limit has reset. Nothing here knows of the other logins, so nothing can fall over
   to one.
-- **Each batch is a run apart through the agency's command.** The road hands the batch to `bmo claude
-  batch`, which runs it as every run apart runs (the agency's `docs/agents.md`, 「Runs apart」): the
+- **Each batch is a run apart through the agency's command.** The road hands the batch to the agency's batch
+  command, the words the tooling's settings name as `claude_batch_command` with the road's own flags after them,
+  which runs it as every run apart runs (the agency's `docs/agents.md`, 「Runs apart」): the
   interactive Claude Code program in a place of its own, opened for the batch and closed with it, its
   answer and what it spent read off the program's record.
 - **The tier**: model `claude-sonnet-5`, effort `high`, named on every call, with no fallback model.
@@ -397,6 +409,8 @@ A gate stopped on one road is taken up on another without rebuilding what the fi
   road wrote it, so the audit and the merge read a two-road gate as one gate's data.
 
 ## The sanitiser gate's own build
+
+**Its code is not carried in this repository** (「Not carried」); what follows is the build it is carried to.
 
 One gate is not written by the roster driver at all. Its rows are wall-to-wall attack material, and
 a model asked to write whole rows for it is either turned back at the account level or graded against
@@ -446,6 +460,9 @@ of the roster driver's default so its data is never made two ways at once.
 
 ## The downgrade harvest
 
+**Its code is not carried in this repository either, and nor are its unit and timer** (「Not carried」); what
+follows is the harvest it is carried to.
+
 The sanitiser's own build makes its harmful rows by construction. Its second source is the opposite:
 real material the gate already missed, gathered from the account safeguard's own reactions. When the
 safeguard reads a session's context and balks, it puts the run on a lesser model — a downgrade — and
@@ -465,9 +482,9 @@ or that it was dangerous at all.
 - **Every past downgrade is gathered and new ones accrue.** The harvest reads a snapshot of the
   conversation source from its first line to its last, so it reaches every downgrade the traces still
   hold; run again over a newer snapshot, it reaches the ones since. It is run again on its own: the
-  standing harvest run `downgrade` is resumed every six hours over a fresh snapshot by the unit
-  `bmo-gate-downgrade` and its
-  timer, so each pass judges only the passages the downgrades since have added and the ones a past
+  standing harvest run `downgrade` is resumed every six hours over a fresh snapshot by a unit and a timer
+  of its own, which `deploy/` holds once the harvest is carried, so each pass judges only the passages the
+  downgrades since have added and the ones a past
   pass left unread, and freezes them into the same folder. A pass with nothing new judges nothing and
   holds no card. It stops at the data: taking the folder into a training pass stays a separate step.
 - **The input is the text the model was actually handed.** What the safeguard read is the session's
@@ -538,6 +555,26 @@ the account for anything it already settled.
 - **A busy card stops a batch, not the run.** The judging road waits out a busy card and asks again a
   bounded number of times; a batch that still fails is left for a later round or counted unread, and
   the batches already frozen stand. A passage the judge never read is counted, never taken for clean.
+
+## Not carried
+
+Six of the tooling's files stand outside this repository until the owner decides how they move: carried by
+hand, or left out for good.
+
+- **The sanitiser gate's own build** (「The sanitiser gate's own build」): its generator, the generator's
+  test, and its script `scripts/laya-sanitize.ts`. They hold the harm categories and what the model is told
+  to write for each, the meta-descriptions of the two categories no model writes, and the over-refusal and
+  attack-word lists.
+- **The downgrade harvest** (「The downgrade harvest」): its module, the module's test, and its script
+  `scripts/laya-downgrade.ts`. They sort the passages a downgrade window holds by the same attack vocabulary.
+  Its unit `bmo-gate-downgrade` and the timer that resumes it are not in `deploy/` either, so no deployment
+  enables a run that cannot start.
+- **Why.** That material is not reproduced by an automated build, so a person carries it or it stays out.
+- **What stands without them.** The sanitiser gate's specification — its question, its answer balance and
+  its worked row — is the gate technician's, carried with the rest of the gates, and the roster driver turns
+  the gate back as built by a harvest this repository does not carry. Nothing carried imports the six. The
+  text model road's streaming reader and the conversation reads only the downgrade harvest made (its
+  notices, the models launched and answered, the texts the sanitiser passed) went with them.
 
 ## A run
 
@@ -838,8 +875,8 @@ flowchart TB
 - `bun scripts/laya-real.ts` — count what the rooms hold for each gate in a fresh snapshot, and, given a
   run name, write each gate's unjudged rows into that run's folders. With no run name it counts and writes
   nothing, which is how a build starts: the count is what says which gates can be trained now and
-  which are still short. It needs the owner's and the chat agent's own numbers, from the environment or
-  from `--owner` and `--agent`.
+  which are still short. It needs the owner's and the chat agent's own numbers, from the tooling's settings
+  (`owner_id`, `agent_id`) or from `--owner` and `--agent`; `--snapshot` reads a kept snapshot instead of taking one.
 - `bun scripts/laya-judge.ts` — judge those rows on a road, freezing each batch as it lands and
   writing the three splits when a gate is done. A batch is bounded two ways, `--batch` in rows and
   `--answers` in the answers those rows ask for, and the tighter of the two settles it. `--resume`
@@ -858,10 +895,7 @@ flowchart TB
   the gates still being judged as well, each cut at the whole batches it has frozen so far, and
   writes nothing into any gate's folder; it is the same cut a training pass reads a judging run by
   (`docs/training.md`, 「Where the data comes from」).
-- `bun scripts/laya-downgrade.ts` — the downgrade harvest: with no run name it counts the downgrades
-  and the passages it would judge; given one, it judges them and freezes a sanitiser gate folder.
-  `--resume` skips what the folder already holds and `--freeze-only` settles the folder without
-  judging. The standing run is resumed by the unit `bmo-gate-downgrade`, never by a session.
+
 - `bun scripts/laya-audit.ts` — the figures per gate, and the verdict against the bars.
 - `bun scripts/laya-ledger.ts` — the ledger for a run.
 

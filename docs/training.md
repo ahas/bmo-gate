@@ -30,6 +30,17 @@ record. This document adds no mechanism to either.
 - **`tunnel_url`, `tunnel_login` and `tunnel_host`** are the tunnel's public name, the login on the operations
   machine and the name its host key is pinned under, which the Laya service's installer writes into each node's
   environment file (`docs/llm-server.md`, 「The tunnel」 and 「Installing and updating」).
+- **`agent_name` and `owner_name`** are the chat agent's and the owner's names, which fill the `{{agent}}` and
+  `{{owner}}` marks of the words the tooling hands a model (`prompts/tooling/`); **`agent_id` and `owner_id`** are
+  their account numbers, by which a real row tells the chat agent's own lines and the owner's room
+  (`docs/gate-data.md`, 「The real rows」).
+- **`gate_command`** is the gate's own unit command as a list of words, which the tooling runs for the gate's records
+  and the reference gates' inputs (`docs/gate-data.md`, 「The conversation source」; `docs/reference-data.md`,
+  「The input」).
+- **The roads' keys** (`docs/gate-data.md`, 「The roads」): `claude_batch_command`, `claude_login` and
+  `claude_account` for the claude road; `local_mcp_url`, `local_models_url`, `local_model` and `local_key_file` for
+  the local-model road; `text_base_url`, `text_model` and `text_key_file` for the text model road. A key file is
+  named by its name under the data root's `env/`.
 - **A key a command needs and the file does not give** stops the command with a message naming the key and the
   file; no key falls back to a value of the tooling's own.
 

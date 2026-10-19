@@ -57,6 +57,26 @@ export function settingText(key: string, path: string = settingsPath()): string 
   return value;
 }
 
+/** A key that is one whole number the command needs, such as an account's number. */
+export function settingNumber(key: string, path: string = settingsPath()): number {
+  const value = readSettings(path)[key];
+
+  if (value === undefined) {
+    throw new SettingsRefused(`${path} gives no ${key}, which this command needs`);
+  }
+  if (typeof value !== "number" && typeof value !== "bigint") {
+    throw new SettingsRefused(`${key} in ${path} is not a whole number`);
+  }
+
+  const number = Number(value);
+
+  if (!Number.isSafeInteger(number)) {
+    throw new SettingsRefused(`${key} in ${path} is not a whole number`);
+  }
+
+  return number;
+}
+
 /** A key that is a list of words the command needs, such as a command line. */
 export function settingWords(key: string, path: string = settingsPath()): string[] {
   const value = readSettings(path)[key];

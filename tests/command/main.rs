@@ -1,5 +1,5 @@
-//! The unit command's tests: the nouns it declares and the words it reads, its health check against a stand-in service, the format cases and the Laya agreement
-//! read off a scratch database, the replay bench against a stand-in gateway, the evaluation set's members,
+//! The unit command's tests: the nouns it declares and the words it reads, its health check against a stand-in service, the format cases, the Laya agreement
+//! and the gate's records read off a scratch database, the replay bench against a stand-in gateway, the evaluation set's members,
 //! generation on a scripted Codex and scoring on a registration, and the reference road's benches against a
 //! stand-in brain and receiver, each over a data root of the test's own.
 
@@ -17,6 +17,7 @@ mod health;
 mod laya_agreement;
 mod members;
 mod nouns;
+mod records;
 mod reference;
 
 use std::path::PathBuf;
