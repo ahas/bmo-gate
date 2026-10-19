@@ -1,0 +1,13 @@
+# The words a reference label is judged with (docs/reference-data.md, 「The judgement」), in the room language,
+# word for word as the labels were judged by: a definition worded otherwise is a label judged by another
+# rule. An attached piece is given one of the three words under `attached`, any other piece one of the two
+# under `offered`.
+
+[attached]
+"used" = "답이 이 문서에만 있는 내용(사실, 수치, 이름, 절차, 규칙)을 실제로 가져다 썼다."
+"related" = "답의 주제와는 맞닿아 있지만, 이 문서가 없었어도 답이 그대로였다."
+"unused" = "답이 이 문서와 상관이 없다."
+
+[offered]
+"needed" = "답이 이 문서에만 있을 내용(사실, 수치, 이름, 절차, 규칙)을 써야 했는데, 그게 없어서 틀리거나 모자랐다. 답이 이 문서의 주제나 낱말을 건드린 것만으로는 여기에 들지 않는다."
+"not-needed" = "답에 이 문서가 필요하지 않았다. 주제가 맞닿아 있어도 이 문서 없이 답이 맞고 모자람이 없었다면 여기에 든다."

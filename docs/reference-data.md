@@ -136,7 +136,7 @@ with its one login and tier (`docs/gate-data.md`, 「The claude road」).
 - **An attached piece is answered with one of three words.** A piece is attached where the turn run's
   context lines or the reference record say it reached the prompt. Each word's definition stands in the
   judge's instructions in the room language, word for word as the labels were judged by, in the reference
-  data's judge data, and the code's prompt carries them unchanged. In English they say:
+  data's judge data, `prompts/tooling/reference-judge.toml`, and the code's prompt carries them unchanged. In English they say:
   - `used` — the answer actually took up content found only in this document: a fact, a figure, a name,
     a procedure or a rule;
   - `related` — the document touches the answer's subject, but the answer would have been the same

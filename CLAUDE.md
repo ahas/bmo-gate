@@ -30,7 +30,8 @@ These rules hold every change to this repository.
   and branch names, with one exception below. The gate answers in English sentences and snake_case codes;
   words a person reads in another language are a console's language pack.
 - `prompts/` is the one folder Korean stands in: what the gates are told, the questions Laya is asked and
-  the briefs the evaluation set's items are written from, worded as the models read them, and the words the
+  the briefs the evaluation set's items are written from, the words the training tooling's judges are given
+  (`prompts/tooling/`), worded as the models read them, and the words the
   sanitiser's pre-filter matches, as the rooms write them. Nothing else holds Korean: the repository test holds every file outside
   `prompts/`, and the testbed's `korean` check every code file, to `korean-ledger.json`, which allows none.
   Korean a test feeds the code is written by its unicode escapes.
