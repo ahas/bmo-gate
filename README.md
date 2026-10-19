@@ -30,6 +30,7 @@ Every other unit is reached through standard APIs alone, and of other repositori
 | `runtime/` | What serves Laya on its nodes: the decision server, its card turn client and the front, each a Python project of its own |
 | `src/` | The root package: the version, the `gate-server` and `laya-relay` binaries and the `bmo-gate` unit command |
 | `tests/` | Every test of the repository |
+| `training/` | What makes Laya's checkpoints: the dataset and training tooling, a Bun project of its own, and the node scripts the training runs |
 
 ## Checking a change
 

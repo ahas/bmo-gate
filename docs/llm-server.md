@@ -381,7 +381,8 @@ order, it:
    `~/bmo-laya` itself, and links `~/bmo-laya/checkpoints` to it.
 4. Builds the node's environment file — the key, the node's own listen as `TUNNEL_LISTEN`, the tunnel's public
    name as `TUNNEL_URL`, the login on the operations machine as `TUNNEL_LOGIN` and the name its host key is pinned
-   under as `TUNNEL_HOST`, its
+   under as `TUNNEL_HOST`, the three as the tooling's settings name them (`docs/training.md`, 「The tooling and
+   its settings」), its
    `cardModels` as `LAYA_CARD_MODELS` where the placement gives one, on a desktop's machine
    `LAYA_HOST_COPY=mapped` and `LAYA_CARD_KEEP_FREE_MIB=2048`, and the entry's `hostCopy` as
    `LAYA_HOST_COPY` where it gives one — in a private `0600` file, carries it

@@ -311,6 +311,15 @@ node, and the front to the decision server behind it.
 | the units' description | `PUT /descriptions/{service}` (the card master) | `units`: what the Laya service says of its units on a card |
 | a card turn | `POST /turns`, `GET /turns/{ticket}`, `DELETE /turns/{ticket}` (the node arbiter, on the node's loopback) | the Laya server's and the training's hold on the card, asked by the gate's own turn client on the node, `runtime/laya-server/turn.py` |
 
+### bmo-node
+
+The training tooling and the Laya service's installer reach a node by its registered name through the node unit's
+command, as the tooling's settings name it (`docs/training.md`, 「The tooling and its settings」): `node --target
+<node>` prints the node's connection as JSON (the node unit's `docs/nodes.md`, 「Registering and changing a
+node」), its connection type with an ssh node's address, port, account, key path and shell, or a hub node's agent,
+hub and token file, and its role. No credential is in it. A hub node is then driven through the node console the
+settings name, an ssh node by a batch login.
+
 ### bmo-job
 
 | Call | Route | Body | Answer |

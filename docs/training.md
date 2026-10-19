@@ -12,6 +12,27 @@ record. This document adds no mechanism to either.
   decide on.
 - **Nothing here is put in service** (「What training never touches」).
 
+## The tooling and its settings
+
+- **The tooling is the Bun project in `training/tooling/`,** and every `bun scripts/…` command here and in
+  `docs/gate-data.md` runs in that folder. Its tests stand under `tests/tooling/`.
+- **Its settings are one TOML file:** the one `BMO_GATE_TOOLING_SETTINGS` names, else `tooling.toml` in the
+  tooling's folder, which a deployment links from the data root's `env/` and git never holds. It is read by Bun's
+  own TOML reading. A missing file is no settings at all; one that is not TOML stops the command, naming the file.
+- **`data_root`** is the runtime data root everything here reads and writes under. `BMO_DATA_DIR` names it ahead
+  of the file, as the units set it; with neither, a command that needs it stops and says so.
+- **`node_command`** is the node unit's command as a list of words, its configuration flag among them, which
+  `node --target <node>` is put after to read one node's connection (the node unit's `docs/nodes.md`,
+  「Registering and changing a node」).
+- **`node_console`** is the program a console node is driven through, run by bun: `exec -a <agent> <command>`
+  runs a command, `upload <local> <remote> -a <agent>` carries a file to the node and `download <remote> <local>
+  -a <agent>` brings one back.
+- **`tunnel_url`, `tunnel_login` and `tunnel_host`** are the tunnel's public name, the login on the operations
+  machine and the name its host key is pinned under, which the Laya service's installer writes into each node's
+  environment file (`docs/llm-server.md`, 「The tunnel」 and 「Installing and updating」).
+- **A key a command needs and the file does not give** stops the command with a message naming the key and the
+  file; no key falls back to a value of the tooling's own.
+
 ## Where the data comes from
 
 A training pass reads its gates from one **source**. A source knows its own gates and answers the
@@ -151,7 +172,9 @@ The driver asks those four and never which kind of source it is talking to.
 - **`bun scripts/laya-nodes.ts` stands the environment up**, and `--check` reads the nodes and
   installs nothing — it does put the probe script across where a node has none, that being how a node
   is read at all. It asks each node what it carries, puts across only the files that differ from this
-  checkout, builds or refreshes the venv from the pinned project file, and prints the nodes side by
+  checkout — the training scripts and node scripts of `training/laya/`, and the predictor, the
+  measures, the project file, the venv's setup and the card turn client of `runtime/laya-server/` —
+  builds or refreshes the venv from the pinned project file, and prints the nodes side by
   side — GPU, free VRAM, CUDA, python, the installed package versions, free disk, and what is on the
   card.
   - **It installs into the account alone:** no sudo, no system package, and nothing written to the
