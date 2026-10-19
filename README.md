@@ -23,10 +23,10 @@ Every other unit is reached through standard APIs alone, and of other repositori
 
 | Folder | What it holds |
 |---|---|
-| `crates/` | The Rust crates the root package is built from: the store, the codes, the ports to the other units, the policy, the words, the markup, the gate runs, the gates, the reference road and the service's routes |
+| `crates/` | The Rust crates the root package is built from: the store, the codes, the ports to the other units, the policy, the words, the markup, the gate runs, the gates, the reference road, the service's routes and the unit command's nouns |
 | `docs/` | The documents, which come before the code: start with `docs/layout.md` |
-| `prompts/` | What each gate is told, the questions Laya is asked and the sanitiser's trigger words, the one folder Korean stands in |
-| `src/` | The root package: the version and the `gate-server` binary |
+| `prompts/` | What each gate is told, the questions Laya is asked, the evaluation set's briefs and the sanitiser's trigger words, the one folder Korean stands in |
+| `src/` | The root package: the version, the `gate-server` binary and the `bmo-gate` unit command |
 | `tests/` | Every test of the repository |
 
 ## Checking a change

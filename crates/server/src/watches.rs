@@ -1,7 +1,7 @@
 //! What the service keeps going beside its routes: the agency's `road-walked` events written into the road records,
 //! the session summariser's hook registered again every few minutes so an agency started since finds it, Laya's
-//! health asked once a minute and told to the screens where its state or model moved, and the attachments counted
-//! every hour.
+//! health asked once a minute and told to the screens where its state or model moved, the attachments counted
+//! every hour, and the bounded tables swept as the service starts and once a day after.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -10,7 +10,7 @@ use futures_util::StreamExt;
 use gate_ports::agency::RoadWalked;
 use gate_reference::attachments;
 use gate_runs::records::{self, Road, Spent, now};
-use gate_stages::laya_health;
+use gate_stages::{laya_health, retention};
 use sea_orm::DatabaseConnection;
 use serde_json::json;
 
@@ -26,6 +26,9 @@ const REGISTER_RETRY: Duration = Duration::from_secs(30);
 /// How often Laya's health is asked, and how often the attachments are counted.
 const HEALTH_EVERY: Duration = Duration::from_secs(60);
 const ATTACHMENTS_EVERY: Duration = Duration::from_secs(3_600);
+
+/// How often the bounded tables are swept.
+const SWEEP_EVERY: Duration = Duration::from_secs(24 * 3_600);
 
 /// The point the session summariser answers.
 pub const SUMMARISER: &str = "session-summariser";
@@ -130,10 +133,30 @@ async fn attachments(app: Arc<App>) {
   }
 }
 
+/// One sweep of the bounded tables, said where it took anything.
+pub async fn sweep_pass(db: &DatabaseConnection) {
+  match retention::sweep(db, now()).await {
+    Ok(swept) => {
+      for (table, gone) in swept.into_iter().filter(|(_, gone)| *gone > 0) {
+        println!("gate-server: swept {gone} rows of {table} past their bound");
+      }
+    }
+    Err(why) => eprintln!("gate-server: the bounded tables could not be swept: {why}"),
+  }
+}
+
+async fn sweeps(app: Arc<App>) {
+  loop {
+    sweep_pass(&app.stages.runs.db).await;
+    tokio::time::sleep(SWEEP_EVERY).await;
+  }
+}
+
 /// Every watch started beside the routes, the hook registered at `url`.
 pub fn start(app: Arc<App>, url: String) {
   tokio::spawn(road_walked(app.clone()));
   tokio::spawn(hook(app.clone(), url));
   tokio::spawn(health(app.clone()));
-  tokio::spawn(attachments(app));
+  tokio::spawn(attachments(app.clone()));
+  tokio::spawn(sweeps(app));
 }

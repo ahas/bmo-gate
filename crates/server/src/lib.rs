@@ -28,6 +28,7 @@ use gate_runs::{RecordFolders, Runs};
 use gate_stages::document_translation::Queue;
 use gate_stages::laya::Side;
 use gate_stages::{Reading, Stages};
+use sea_orm::DatabaseConnection;
 use sea_orm_migration::MigratorTrait;
 
 use crate::answer::Refused;
@@ -76,16 +77,16 @@ fn peer(address: &str, token: Option<String>) -> Result<Peer, Unread> {
   Peer::new(address, token).map_err(|why| Unread(why.to_string()))
 }
 
-/// The service as its settings make it: the store connected and migrated, every port, the gates and the road.
-pub async fn stand(settings: &Settings) -> Result<Arc<App>, Unread> {
-  let db = gate_store::connect(&settings.database, 16)
+/// The gate's database as its settings name it, holding so many connections, neither migrated nor checked.
+pub async fn database(settings: &Settings, connections: u32) -> Result<DatabaseConnection, Unread> {
+  gate_store::connect(&settings.database, connections)
     .await
-    .map_err(|why| Unread(format!("the database: {why}")))?;
+    .map_err(|why| Unread(format!("the database: {why}")))
+}
 
-  gate_store::migration::Migrator::up(&db, None)
-    .await
-    .map_err(|why| Unread(format!("the migration: {why}")))?;
-
+/// The gates as the settings make them over `db`: the runs on the agency and its gateway, Laya's side and the
+/// readings the translator's checks stand on.
+pub fn stages(settings: &Settings, db: DatabaseConnection) -> Result<Arc<Stages>, Unread> {
   let agency =
     Arc::new(HttpAgency::new(peer(&settings.agency.address, settings.unit_token(&settings.agency)?)?));
   let gateway = Arc::new(HttpGateway::new(
@@ -117,7 +118,19 @@ pub async fn stand(settings: &Settings) -> Result<Arc<App>, Unread> {
     set_aside: settings.reading.set_aside.clone(),
     wording: settings.reading.wording.clone(),
   };
-  let stages = Arc::new(Stages::new(runs, side, reading));
+
+  Ok(Arc::new(Stages::new(runs, side, reading)))
+}
+
+/// The service as its settings make it: the store connected and migrated, every port, the gates and the road.
+pub async fn stand(settings: &Settings) -> Result<Arc<App>, Unread> {
+  let db = database(settings, 16).await?;
+
+  gate_store::migration::Migrator::up(&db, None)
+    .await
+    .map_err(|why| Unread(format!("the migration: {why}")))?;
+
+  let stages = stages(settings, db)?;
   let reference = Arc::new(Reference {
     stages: stages.clone(),
     brain: Arc::new(HttpBrain::new(peer(&settings.brain.address, settings.unit_token(&settings.brain)?)?)),

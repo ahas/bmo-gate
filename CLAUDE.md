@@ -29,8 +29,9 @@ These rules hold every change to this repository.
 - Everything in this repository is English: code, comments, strings, tests, documents, commit messages
   and branch names, with one exception below. The gate answers in English sentences and snake_case codes;
   words a person reads in another language are a console's language pack.
-- `prompts/` is the one folder Korean stands in: what the gates are told and the questions Laya is asked,
-  worded as the models read them, and the words the sanitiser's pre-filter matches, as the rooms write them. Nothing else holds Korean: the repository test holds every file outside
+- `prompts/` is the one folder Korean stands in: what the gates are told, the questions Laya is asked and
+  the briefs the evaluation set's items are written from, worded as the models read them, and the words the
+  sanitiser's pre-filter matches, as the rooms write them. Nothing else holds Korean: the repository test holds every file outside
   `prompts/`, and the testbed's `korean` check every code file, to `korean-ledger.json`, which allows none.
   Korean a test feeds the code is written by its unicode escapes.
 - No personal data: no user names, home directories, machine names, domains, network addresses or names

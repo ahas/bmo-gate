@@ -344,7 +344,8 @@ ask and nothing behind it (the agency's `docs/own-llm.md`, 「A gate has one roa
 
 `gate_options`, `gate_roads`, `judgements`, `laya_health`, `laya_verdicts`, `reference_offers`,
 `reference_verdicts`, `sanitised_texts`, `document_translations`, `format_cases` and `web_gate_chats`, in its own
-database and its own migrations. Every row of `gate_options` names its agent.
+database and its own migrations. Every row of `gate_options` names its agent. A format case and a sanitiser's
+verdict are kept ninety days: the service sweeps both tables as it starts and once a day after.
 
 ### Its gates and their instructions
 
@@ -378,7 +379,8 @@ database and its own migrations. Every row of `gate_options` names its agent.
 ## The unit command
 
 `bmo-gate` is the gate's unit command (bmo-cli's `docs/boundary.md`, 「Unit commands」). Asked `nouns`, it
-declares its ten nouns, one a line:
+declares the nouns it carries, one a line. These are its ten nouns; the four `gate` nouns are carried, and the six
+`reference` nouns are not yet, so they are not declared:
 
 | Noun | What it does |
 |---|---|
@@ -393,8 +395,16 @@ declares its ten nouns, one a line:
 | `reference roads` | compares the reference gates' roads |
 | `reference waste` | counts the reference attached and never used |
 
-Every noun prints English, and reaches the service and the other units only through the routes above. The
-service binary itself is `gate-server`, which is installed under no `bmo-` name.
+- **Every noun prints English** and ends with 0, with 1 where its work failed, and with 2 where the words it was
+  given are wrong; `--help` prints a noun's whole usage.
+- **It reads the settings the service reads** (「Configuration」): the file `BMO_GATE_SETTINGS` names, else
+  `settings.toml` in the folder it runs in. A noun that reads nothing but its own files under the data root
+  reads only the data root from them.
+- **It is the gate's own,** so it reads the gate's database and data root as the service does, and reaches the
+  other units only through the routes above. A noun that reads another unit's records whose owner serves no
+  route for them says so and reads nothing in their place.
+
+The service binary itself is `gate-server`, which is installed under no `bmo-` name.
 
 ## Versioning
 
@@ -433,3 +443,10 @@ Statements here that a sibling's document does not yet match, each for that sibl
   port is to call `POST /judgements/attached` instead.
 - **The web unit's console** shows the gates' screen, Laya and the gate order as unavailable; its server routes
   are to hand the gates' screen to `client/` and call the console's routes above.
+- **The voice unit serves no reading of a line's script:** the evaluation set's voice members read an item as the
+  voice runner makes a line's script, its spans and its polishing view, which are the voice unit's rules, so
+  `voice-polish` and `voice-reading` have no member until the voice unit serves that reading
+  (`docs/gate-eval.md`, 「The members」).
+- **The receiver serves no route for a room's messages:** the output gate's replay bench makes its set out of the
+  chat agent's latest answers, and says the source is unavailable until the receiver serves them
+  (`docs/output-gate.md`, 「The replay bench」).

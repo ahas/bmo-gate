@@ -18,6 +18,7 @@ mod markdown;
 mod markdown_shape;
 mod output;
 mod records;
+mod retention;
 mod sanitizer;
 mod translator;
 

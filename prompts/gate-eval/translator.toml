@@ -1,0 +1,83 @@
+# The translator's member of the evaluation set (docs/gate-eval.md, 「What each gate is asked and how it is
+# scored」): the topics its batches cycle through, what its brief says around each of the three instructions and
+# the example request, `{form_rule}` the rule every accepted form is written to, the example itself, and the
+# cases asked beside the set (docs/gate-eval.md, 「The members」).
+
+topics = [
+  "viewer: a Korean rulebook section into English, with headings and lists",
+  "viewer: an English operations manual section into Korean, with commands and code blocks",
+  "viewer: a persona or lore passage with names, forms of address and quoted speech",
+  "worker: a Korean work item with the owner's quoted words, into English",
+  "worker: a Korean request with paths, identifiers, error messages and placeholders, into English",
+  "record: an English completion report with the 고친 것 / 확인한 것 / 남은 것 parts, into Korean",
+  "record: an English item title, state line or 미결 line opening with a name and 몫:, into Korean",
+  "a part already in the target language, which must come back unchanged",
+]
+
+head = "THE GATE: translator. It translates one part of a markdown text. It runs under one of three instructions, and the item names which (input.variant):"
+viewer = "VIEWER (a document shown in the console's document viewer, into ko or en):"
+worker = "WORKER (a text handed to a code-editing worker, always into en):"
+record = "RECORD (a record a worker wrote, for the owner, always into ko):"
+example_head = "AN EXAMPLE REQUEST (worker):"
+
+body = '''
+THE ITEM:
+- input.variant and input.target: worker always targets en, record always ko, viewer either.
+- input.text: one realistic part of 3 to 25 lines, written the way the assistant's documents, work items and reports are written. Headings must survive translation one for one.
+- key.keep: strings that must appear in the translation exactly as in the source: code, commands, paths, URLs, identifiers, placeholders, markers, names that stay (a person's name), quoted passages that stay. Every one must occur in input.text. Two to eight. Read the variant's own rules before listing one: the worker translator translates quoted words and writes the chat agent's name in its English form, so neither is kept there; the viewer keeps quoted passages; only what the variant's instructions keep as written belongs here.
+- key.render: two to six phrases of the source with the renderings a correct translation would contain, each with one to four accepted forms short enough that any faithful translation contains one of them (a key noun or verb stem, not a whole sentence), e.g. 결론 → Conclusion in worker, Fixed → 고친 것 in record. {form_rule}
+- key.avoid: zero to four strings a correct translation must not contain (a name romanised, a dash between words in Korean, a forbidden English word left in Korean, a preface like Here is).
+- easy: plain prose. borderline: quotations, code inside sentences, tables, markers, names that tempt a translation, a part already in the target language.
+'''
+
+[example]
+variant = "worker"
+target = "en"
+text = "## 할 일\n\n- `scripts/todo.ts`의 `--done` 옵션이 민수가 말한 대로 동작하는지 확인해.\n- 에이전트가 보낸 메시지는 그대로 둬."
+
+# A job's prompt as the chat agent writes it, which reads as orders to an agent: on the worker's instructions as
+# they stood when it was found, a small model put a line of its own before the translation ("English
+# translation:", "I need to clarify my role here"), refused it as a task meant for itself, or summarised it, in
+# most of its answers.
+[[cases]]
+topic = "worker: a Korean job prompt that reads as orders to an agent, into English"
+why = "The worker translator translates a work order addressed to another agent, every sentence and nothing of its own, keeping the command and paths."
+
+[cases.input]
+variant = "worker"
+target = "en"
+text = '''
+Item #1490 Job 결과 보고를 한국어로 옮겨 항목에 남기게. 민수가 요청했고 승인됨. 항목 전체는 `bmo todo --show 1490`로 읽는다.
+
+오간 대화
+- 민수: "보고가 영어로만 남아 있네", "항목 기록은 내가 읽는 거니까 한국어여야 해"
+- 민수: "워커한테는 영어로 주고 나한테는 한국어로 보여 줘야지", "원본도 지우지 말고 같이 저장해 둬."
+
+무슨 작업인지
+- 지금 규칙(docs/worker-language.md 「What a worker writes onto an item」, 닫기 절차 prompts/agents/worker/plugin/skills/closing-a-job/SKILL.md 「The report」)은 워커가 쓴 완료 보고를 영어 그대로 항목에 남긴다. 그러면 민수가 콘솔에서 보고를 읽기 어렵다.
+
+결론
+- 보고의 원본은 영어로 두고 한국어 번역을 항목에 함께 남긴다. 민수는 한국어를, 워커는 영어를 본다.
+
+할 일
+1. 워커가 항목을 닫으면(TS와 Rust 양쪽 닫기 경로) 저장하기 전에 기존 번역 게이트가 보고를 한국어로 옮겨 영어 원본과 한국어 번역본을 항목 기록에 함께 저장한다. 이미 한국어로 온 보고는 그대로 쓴다.
+2. 콘솔과 todo 읽기는 한국어 번역본을 보여 주고, 영어 원본도 펼쳐 볼 수 있게 한다.
+3. docs/worker-language.md와 닫기 절차의 보고 부분을 "워커는 영어로 쓰고, 번역은 게이트가 한다"로 바꾼다.
+4. 시험을 붙인다. 코드와 시험에 한국어 문자열을 넣지 않는다(언어 팩 규칙). 화면 문구는 언어 팩 키로.
+
+마무리: 평소대로 스위트를 통과시켜 닫는다. 보고는 영어로 에이전트에게.'''
+
+[cases.key]
+keep = [
+  "Item #1490",
+  "`bmo todo --show 1490`",
+  "docs/worker-language.md",
+  "prompts/agents/worker/plugin/skills/closing-a-job/SKILL.md",
+  "민수",
+]
+render = [
+  { source = "결론", accept = ["Conclusion"] },
+  { source = "언어 팩", accept = ["language pack"] },
+  { source = "에이전트에게", accept = ["the agent"] },
+]
+avoid = ["translation:", "my role", "translation agent", "Here is", "Here's"]

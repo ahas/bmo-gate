@@ -160,9 +160,11 @@ conversion.
 - **Where:** the gate's `format_cases` table; one line is one structure-check failure.
 - **What a line holds:** when, which answer in which room, which candidate failed and why (folded = 1,
   unfolded = 2), and the target message's full markdown original and that candidate.
-- **Reading it:** `bmo gate format-cases`; `--show <id>` shows one case uncut. It prints English.
-- **Retention:** lines older than ninety days are swept. Converter work reads the last few weeks of
-  failures, and the full messages are most of a line's bulk.
+- **Reading it:** `bmo gate format-cases` prints the newest cases, twenty unless `--limit <n>` names another number, each
+  message and candidate cut to its first 1,500 characters; `--show <id>` shows one case uncut. It prints
+  English.
+- **Retention:** lines older than ninety days are swept, as the service starts and once a day after. Converter
+  work reads the last few weeks of failures, and the full messages are most of a line's bulk.
 - **Nobody is told:** neither the room nor the owner.
 
 ### Other failures
@@ -199,6 +201,34 @@ conversion.
   - **Nothing else is loaded.** A gate run carries no tools, skills or slash commands, MCP servers, or
     settings and instruction files from any work tree or the user configuration, and keeps no session.
 
+
+## The replay bench
+
+`bmo gate bench` measures the gate's road on the chat agent's own answers, so a change to the gate or its road
+is put in numbers on the same pinned set before and after.
+
+- **The set is pinned once:** `make-set` takes the chat agent's latest answers, thirty in the owner's room and
+  twenty in group rooms unless `--owner-answers` and `--room-answers` say otherwise, from the conversation
+  source (`docs/gate-data.md`, 「The conversation source」). The receiver serves no route for a room's messages
+  yet, so `make-set` says the source is unavailable and pins nothing. A set stands under the data root's
+  `gate-bench` folder as `bench-set.json`: when it was made, and each answer's room, message, room kind and
+  text.
+- **A run replays it under a label:** `run --label <name> --registration <name>` cuts each answer into the
+  parts its dialect sends, and asks the gate about each part that can be folded, one call at a time and never
+  two at once, with the gate's own instructions and request. Each call goes straight to the registration
+  through the agency's model gateway, with thinking off, the gate's sampling, and the wait `--share-ms` names
+  (45 seconds unless named; `profile` is the gate's own wait for the chat agent). A road that does not answer
+  is recorded as it failed, never walked on.
+- **Two ceilings are compared side by side:** `--answer-tokens` names the answer's ceiling, 4,096 unless named;
+  two joined by a comma ask every call at each in turn, the order alternating call by call, so a queue that
+  moves over minutes lands on both alike. `--offset` and `--limit` take a stretch of the set.
+- **What a call records,** one line in `bench-<label>.jsonl` beside the set: the answer and the gate, the
+  ceiling, the milliseconds, how it ended, the first line of the answer, and the answer's size in estimated
+  tokens with whether it stood at the ceiling.
+- **The summary,** `summary --label <name>`, is one table line per ceiling: calls, answered, the median and
+  90th-percentile milliseconds of the answered ones, the longest, timeouts, other failures, the 90th-percentile
+  and largest answer sizes and how many stood at the ceiling. It is printed and written beside the run as
+  `bench-<label>.md`.
 
 ## Record
 

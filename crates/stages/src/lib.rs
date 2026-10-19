@@ -13,6 +13,7 @@ pub mod markdown_shape;
 pub mod ordered;
 pub mod output;
 pub mod records;
+pub mod retention;
 pub mod sanitizer;
 pub mod sheets;
 pub mod sql;

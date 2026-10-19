@@ -10,7 +10,11 @@
   the request from it: the gate's system prompt and the prompt its caller writes. What the gate
   answers is read by the reader its caller uses.
 - **The gates it covers** are the off-turn gates and the session summariser: `document-seek`,
-  `people-standing`, `session-summary`, `translator`, `voice-polish` and `voice-reading`.
+  `people-standing`, `session-summary` and `translator`.
+- **The two voice gates have no member here.** An item of `voice-polish` or `voice-reading` is read through
+  the line's script as the voice runner makes it — the markup unfolded into a script, the figures said by
+  rule, the spans the reading gate is asked about and the view the polishing gate is shown — and those rules
+  are the voice unit's. Their members come back once the voice unit serves that reading.
 - **The sanitizer has no set here.** Its questions would be security-intrusion material: orders to
   attack, accounts of attacks carried out and recipes for slipping attack material past a safety
   gate. The Codex account refuses to write that material, and the set is not made by working around
@@ -29,8 +33,9 @@
   - the request the gate's code builds from an item;
   - the score of an answer against the item's key.
 - **A member is its own file and the words beside it:** what its brief says around the gate's real
-  prompts, its topics and its example input stand in a data file next to its code, which holds no
-  Korean of its own.
+  prompts, its topics, its example input and its cases stand in a data file of its own in the gate's
+  `prompts/gate-eval/` folder, since they are worded for the model that writes the items, and its code
+  holds no Korean of its own. The rule every brief gives for an accepted form stands there too.
 - **A member may carry cases of its own,** beside the items Codex writes: an input the gate answered
   wrongly in use, rewritten by hand with nothing of a room in it so that it still draws the same
   wrong answer, with its key. They stand in the member's data file, are read by the member's own
@@ -38,9 +43,8 @@
   limit; their ids carry the word `case`.
 - **The folder is the list.** Each member registers itself with the tool, so a gate is added by
   adding its files and naming the module in the folder, and no list outside the folder changes.
-- **The two voice gates' members read their line as the voice runner makes it:** the markup unfolded
-  into a script, the figures said by rule, the spans the reading gate is asked about and the view
-  the polishing gate is shown, each read by the same rules the voice runner reads them by.
+- **A member reads its gate's prompts as the gate's run does:** the gate's own instructions as the gate
+  holds them, and a rulebook through the agency's `GET /rulebooks`.
 
 ## What each gate is asked and how it is scored
 
@@ -48,10 +52,10 @@
   whole library) and a question. The key is the slugs that answer it, or `none`. Passes where the
   gate's first pick is one of the key's slugs, or where it answers `none` for a `none` key; for a
   branch index it must also name exactly three branches.
-- **people-standing** — the pieces of one part of one person's book. The key is the facts the sheet
-  must carry and the strings it must not. Passes where the sheet clears the summariser's own
-  check (length, the other part's sections, no day the pieces do not name) and carries every fact
-  and none of the forbidden strings.
+- **people-standing** — the pieces of one part of one person's book, under the paths and the ceiling the
+  brain hands the summariser for that part. The key is the facts the sheet must carry and the strings it
+  must not. Passes where the sheet clears the summariser's own check (length, the other part's sections,
+  no day the pieces do not name) and carries every fact and none of the forbidden strings.
 - **session-summary** — the tail of a room session or a worker session, built into the transcript
   by the gate's own code. The key is the facts the note must carry, the strings it must not, or `none`
   for a tail with nothing to carry. Passes where the note keeps to its 1,200 characters and meets the
@@ -60,12 +64,6 @@
   viewer's, a worker's text into English, a worker's record into Korean). The key is the strings
   that must come through unchanged, the phrases with the renderings accepted for them and strings
   that must not appear. Passes where the translator's own structure check holds and the key is met.
-- **voice-polish** — a script made for speaking. The key is the content that must survive and
-  strings that must not appear. Passes where the polishing gate's own fault check finds nothing
-  and the key is met on the rewrite with the code its placeholders stand for put back.
-- **voice-reading** — one Korean line with roman words and figures, after the voice rules have said the
-  standing figures. The key is the accepted readings of every span those rules mark. Passes where
-  every span is read as one of its accepted readings, spaces aside.
 - **Every member's score is a pass and a share:** the share of the key's checks the answer met, so a
   gate that misses one fact in ten is told apart from one that misses all of them.
 - **Literal matching is the whole of the scoring.** A fact is matched by any of its accepted
@@ -129,13 +127,13 @@
 
 - `bmo gate eval start [--set <name>] [--per-gate <n>] [--batch <n>] [--gate <gate>]…` — starts the
   generation as the transient user unit `bmo-gate-eval`, which outlives whoever started it, run by
-  the binary the command was run with, in the folder it was run in.
+  the binary the command was run with, in the folder it was run in, on the settings file it read.
 - `bmo gate eval generate [...]` — the same generation in the foreground; the unit runs this.
 - `bmo gate eval status [--set <name>]` — per gate: kept, asked, refused, dropped, left, and
   its state.
 - `bmo gate eval score --road claude|registered [--registration <name>] [--set <name>] [--gate <gate>]… [--limit <n>]`
   — asks the gates and writes the scores; `--limit` takes that many items of each gate, spread evenly
   over its set.
-- `bmo gate eval report [--set <name>]` — the last score of each gate on each road, side by
-  side.
+- `bmo gate eval report [--set <name>]` — the last score of each gate on each road and model, side by
+  side: a registration is a road of its own.
 - `journalctl --user -u bmo-gate-eval` is the unit's own log.
