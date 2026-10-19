@@ -1,0 +1,163 @@
+# Gates
+
+## What a gate is
+
+- A gate is a model-only run of the gate's: one prompt in, one text out, no shell, no tool and no session of
+  its own. Which work keys are gates is declared once, in the gate order of the gate's own policy
+  (`docs/layout.md`), and every list of gates — the console's tables, the route views, the Laya views — is
+  read from it through `GET /gates` (`docs/boundary-api.md`).
+- A gate runs on its one road (the agency's `docs/own-llm.md`, 「A gate has one road」), and what reaches a
+  model on each road is `docs/boundary-api.md`, 「How a gate run reaches a model」.
+- One gate's runs take turns: the next run of a gate waits until its previous one has returned, so two runs
+  of the same gate never stand at the road together while different gates do. A gate whose road is Claude
+  Code takes as many runs at once as its pool's bound (「How many runs stand at once」 below). A caller that
+  bounds how many of its own requests are out at once marks each request to stand beside the gate's other
+  runs instead, and the bound is then the caller's alone — the translator, which keeps three parts out at a
+  time (the web unit's `docs/documents-viewer.md`), and the person-book summariser, which keeps four of one
+  sheet's groups out at a time (the brain's `docs/people-book.md`, 「Finishing the book」).
+- A gate whose caller has a way of its own without it declares so in its profile, and only such a gate may
+  be switched off for the whole deployment: its switch is its row of the gate options table (the agency's
+  `docs/own-llm.md`, 「Per-gate time limit」), and a gate switched off is never asked. Apart from that, each
+  agent answering in a room has a switch of its own for every gate its turns pass (「Each agent's own
+  gates」 below).
+- A gate's options are kept for each designated agent: a row of the gate options table per gate and agent,
+  read for the agent whose turn the gate runs in. A companion's rows are copied from the chat agent's when
+  it stands (`POST /options/copied`, the agency's `docs/agent-ownership.md`).
+  - The turn's agent travels with the work: a companion's turn asks its reference selection as that
+    agent's turn, and every gate asked from inside reads that agent's row. A gate asked outside any agent's
+    turn reads the chat agent's.
+- The session summariser runs at the place the gate order gives it and is called like a gate, but it is a
+  recollector, not a gate: the agent menu and the catalogue group it with the digest and the person-book
+  writer (the agency's `docs/agent-ownership.md`, 「The recollectors」). The agency asks it through its
+  `session-summariser` hook (`docs/boundary-api.md`).
+- What each gate runs on is its route, kept with every other work key's by the agency (the agency's
+  `docs/own-llm.md`, 「A gate has one road」). What each one is asked is in its own document: the output gate
+  in `docs/output-gate.md`, the reference gates in `docs/reference-selection.md`.
+
+## A gate on Claude Code
+
+- **Each judgement is one thrown-away agency session:** started apart on the provider and the model the
+  gate's tier maps to there, sent one turn with the gate's instructions as its whole system prompt, a fresh
+  session, no tool, no MCP server and thinking off where the request asks (the agency's
+  `docs/launch-lines.md`, 「Gate runs」). The gate knows no pane, no program and no backend.
+- **The instructions are named by their content,** so a run never answers on instructions it was not asked
+  with.
+- **A login that fails** is the agency's login walk's failure, and the next login the gate's key is offered
+  takes the judgement.
+
+### How many runs stand at once
+
+- **A gate stands no more runs at once than its pool's bound:** the default in the gate's `gate-pool`
+  policy, three, or the bound the gate's own profile names. The translator and the person-book summariser,
+  whose callers keep several parts out at once, name four.
+- **No run free:** while every place of a full pool is taken, the judgement waits for one to come free until
+  the gate's own wait (its gate options row) runs out. The gate then has no answer, its road records
+  `timeout`, and its caller's own way without it stands (the agency's `docs/own-llm.md`, 「A gate that did
+  not answer is a gate with no answer」).
+- **The wait bounds the judgement too.** What is left of the gate's wait once its run has started bounds the
+  turn. A turn past it is stopped, and the gate has no answer; where nothing is left, the judgement is not
+  sent.
+
+### What a judgement records
+
+- The same as on every road: the gate's run log — its start, its prompt and its end — and the road's row with
+  how long the judgement took from the call to its answer. What the run spent is the agency's `usage-spent`.
+
+## The gate order
+
+- **The gate order** is where each gate stands against a chat turn. It is declared once, beside the list of
+  gates, and the list of gates is derived from it, so a gate cannot exist without a place.
+- The gate order has three parts:
+  - **the pre-gate** — the gates that run before the chat agent writes its reply;
+  - **the post-gate** — the gates that run after the reply is written, before it reaches the room;
+  - **off-turn** — the gates that run outside any chat turn.
+- A part is a list of steps in the order a turn passes them. A step holds one gate, or several gates the turn
+  starts together and waits on together.
+- A step may carry a condition: it runs only in the turns the condition names.
+- A gate that runs in both the pre-gate and the post-gate part stands in each, at the step where it does that
+  part's work. A gate never stands twice within one part, and an off-turn gate stands in neither of the other
+  two. A gate another gate calls on for its own answer — the session summary is cleaned by the sanitizer
+  before it is carried over — belongs to the calling gate's step and gives the called gate no place of its
+  own there.
+- The gate order is checked against the turn by tests that drive a turn and record the order the gates are
+  called in, so a turn that moves a gate fails its tests until the gate order moves with it.
+
+### The pre-gate
+
+1. `session-summary` — only when the turn replaces the chat agent's session, and the summary of the session
+   being let go is written before the new one is asked anything. It stands at the head of the turn, before
+   every other gate.
+2. Together, in one step: the three reference gates (`system-documents`, `room-rules`,
+   `library-knowledge`), `people-search` and `situation-rules`. The turn starts all five at once and builds
+   the prompt when the last one answers (`POST /reference/selected`). They read the turn's messages and its
+   quiet instructions as they were written, and they stand in every turn of the chat agent's, whatever
+   brought it (the receiver's `docs/bmo-window.md`).
+3. `sanitizer` — cleans everything the prompt carries once the reference is chosen: the work handed back to
+   the session, every reference entry the step picked, and every formatted message (`POST /sanitised`).
+
+### The post-gate
+
+1. `sanitizer` — one pass over the whole outgoing text. The same outgoing clean then replaces, in code and
+   with no agent, a dash left between words (the agency's `prompts/rules/plain-writing.md`): a colon after a
+   name, commas around an aside (brackets where it holds commas of its own), a range between digits. Code
+   blocks and spans, quoted lines, words in double quotes, web addresses and a dash standing alone in a table
+   cell keep theirs.
+2. `output-format` — only in a room whose dialect folds (bmo-chat's `docs/protocol.md`): it decides the fold
+   for each part of the reply, one part after another. A room whose dialect does not fold sends the plain
+   text and never reaches this step.
+
+### Off-turn
+
+- `people-standing` — writes a person's standing sheet in the digest batch (`POST /sheets/judge`).
+- `document-seek` — picks the document or heading that answers a question asked in the console's document
+  viewer (`POST /documents/sought`).
+- `translator` — translates a document the console's document viewer shows, what reaches a job worker into
+  English, and what a worker writes onto an item into the owner's language (bmo-job's
+  `docs/worker-language.md`).
+- `voice-polish` — rephrases the script of a line's full reading for the ear, before its names and the
+  reading gate; the one gate the owner may switch off (the voice unit's documents).
+- `voice-reading` — writes the roman words and figures of a line the way the room language's voice says
+  them, before a briefing is spoken.
+- The sanitizer and the output gate also run on a message the chat agent sends to a room outside any turn.
+  That does not give either a place in this part: each stands where it runs within a turn.
+
+## Each agent's own gates
+
+- **Every agent that answers in a room passes the gates its own turn passes,** and the turn declares which:
+  the chat agent's turn the pre-gate and post-gate parts of the gate order above, a companion's turn the
+  gates that pick its reference and the outgoing sanitizer (the agency's `docs/companions.md`). An agent
+  that answers in no room has none.
+- **Each such agent has a switch of its own for each of those gates,** kept by the agency under the agent
+  and the gate, which the receiver hands the gate as a turn's `off`. A gate is on for an agent until it is
+  switched off there, so an agent added later starts with every gate of its turn on, and its deployment may
+  start it with some off.
+- **A gate standing in both parts is one switch,** as on the console's tables: the sanitizer switched off for
+  an agent is off before its answer and after it.
+- **A gate switched off for an agent is never asked in that agent's turns:** no run, no judgement and no
+  tokens under it. Another agent's turn in the same room passes it as its own switch says. The turn goes on
+  without it:
+  - a reference gate, `people-search` or `situation-rules` adds nothing to the turn's reference;
+  - `session-summary` lets the replaced session go with no summary carried over;
+  - the sanitizer leaves the text as it was written, and the code's own dash replacement of the outgoing
+    clean still runs;
+  - `output-format` leaves the fold to the code, as on a send that asks no gate.
+- **A gate on for the turn with nothing to ask about is not asked either, but says so** (「What a turn
+  records」).
+- **What no agent's turn carries is not switched here:** the off-turn gates, and the sanitizer and the output
+  gate on a message the chat agent sends outside any turn.
+- **Where the switches are turned:** the console's agent management screen and the agent's own settings,
+  through the agency's `POST /agent-gate` (the agency's `docs/api.md`).
+
+## What a turn records
+
+- **Every gate a turn asks leaves its judgement** under the message it was asked for, which the console shows
+  as the turn's verdict chip (`GET /rooms/{chat}/judgements`).
+- **A reference gate, `people-search` or `situation-rules` that is on for the turn but has no candidate left
+  once the code has narrowed them** — a room with no rulebook, an agent with no knowledge of its own, a turn
+  no situation rule of the room is open for — is not asked, and leaves the judgement `SKIP: no candidates` in
+  its place, so the chip shows every gate the turn had on and why one stood aside. A reference gate and
+  `people-search` leave beside it their row of the offers record, asked about none, which is how many
+  candidates the narrowing started from and by which rules it narrowed (`docs/reference-selection.md`,
+  「What the code narrows before a gate is asked」).
+- **A gate switched off, or one the turn does not ask by its own declaration** (a turn of the chat agent's
+  own lines alone for a gate that never reads them, a turn with no text), leaves nothing.

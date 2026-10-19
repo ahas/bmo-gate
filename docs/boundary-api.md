@@ -184,7 +184,7 @@ are Unix seconds.
 | `POST /documents/translations` | `document`, `version`, `target`, `parts`, `wanted` (each `part` and `text`) | 202 with `taken`, the parts queued |
 | `GET /documents/translations/state?document=&target=` | | `pending`, `failure` (`reason`, `provider`, `model`) or null |
 | `GET /documents/translations/parts?document=&version=&target=` | | `parts`, each `part`, `text` and `failed` |
-| `GET /events` | | a server-sent event stream: `judgement` (a judgement as `POST /judgements` wrote it) and `document-translation` (`document`, `detail`) |
+| `GET /events` | | a server-sent event stream: `judgement` (a judgement as `POST /judgements` wrote it), `document-translation` (`document`, `detail`) and `laya` (Laya's health state or model moved) |
 
 - **A gate's options** are its wait, its switch where its profile lets it be switched off, its Laya mode, τ and
   fallback LLM (`docs/laya.md`). What it thinks and how much it may answer are its tier's on its road, and a
