@@ -173,6 +173,7 @@ dependencies = [
  "gate-markup",
  "gate-policy",
  "gate-ports",
+ "gate-reference",
  "gate-runs",
  "gate-stages",
  "gate-store",
@@ -563,6 +564,25 @@ dependencies = [
  "serde",
  "serde_json",
  "sse-stream",
+ "tokio",
+]
+
+[[package]]
+name = "gate-reference"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "futures-util",
+ "gate-markup",
+ "gate-policy",
+ "gate-ports",
+ "gate-runs",
+ "gate-stages",
+ "gate-words",
+ "regex",
+ "sea-orm",
+ "serde",
+ "serde_json",
  "tokio",
 ]
 

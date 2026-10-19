@@ -108,8 +108,8 @@ flowchart TB
 - **The standing sheets of everyone who spoke this turn** — a person's common sheet and this room's
   sheet of them — attach for the same reason, and a sheet over its ceiling is passed over
   (the brain's `docs/people-book.md`). A one-to-one with the chat agent keeps no room sheet, so there the common sheet stands
-  alone, and no room piece is offered there either (the brain's `docs/people-book.md`, 「Two parts」). They are the turn's agent's own, read in its brain folder; an agent whose
-  folder the process does not know is given none, never the chat agent's at the brain root.
+  alone, and no room piece is offered there either (the brain's `docs/people-book.md`, 「Two parts」). They are the turn's agent's own, read through the brain's person-book read; an agent
+  keeping no long-term memory is given none, never the chat agent's.
 - **A user's own thread** attaches on every turn of their private room once the multi-user model
   is in force: what that user and the chat agent said to each other in the group rooms they are in over the
   last seven days, under the path `threads/user-<id>`, the newest kept under its ceiling (the

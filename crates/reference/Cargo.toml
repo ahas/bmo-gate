@@ -1,0 +1,21 @@
+[package]
+name = "gate-reference"
+description = "A turn's reference: the room's standing memories and sheets, what the three reference gates, the person-book search and the situation-rule matcher pick from the brain's rows, and the watch on what attaches."
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+chrono.workspace = true
+futures-util.workspace = true
+gate-markup.workspace = true
+gate-policy.workspace = true
+gate-ports.workspace = true
+gate-runs.workspace = true
+gate-stages.workspace = true
+gate-words.workspace = true
+regex.workspace = true
+sea-orm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true

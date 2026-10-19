@@ -4,10 +4,8 @@
 # the person-book search beside them, with how the road writes down what a turn's gate decided. The question
 # Laya asks of each gate's candidates stands with Laya's other questions, in `prompts/laya/questions.toml`.
 
-# What a turn may carry on these gates' word together, in characters, and how much of the message a turn follows
-# on from a gate reads.
+# What a turn may carry on these gates' word together, in characters.
 turn_budget_chars = 30000
-answered_chars = 300
 
 # When the bot's own lines alone ask a gate: "never"; "own turn", on a turn they open but not in a push; or "own
 # turn, named items", on such a turn over what the item rule alone keeps.
@@ -47,12 +45,6 @@ reads_answered = true
 [situation]
 budget = 12000
 nothing_matched = "Laya gave no verdict ({failure}), so it went with no rule matched."
-
-# How long a standing sheet attached on every turn of its speaker may be, in characters: a person's common sheet
-# and a room's sheet of them. A sheet over its ceiling is passed over.
-[sheets]
-common_ceiling = 8000
-room_ceiling = 6000
 
 # How a decision on Laya is written down where Laya gave none (`{failure}` is Laya's failure), and the verdict
 # and detail a gate on for a turn leaves where nothing was left to ask it about.

@@ -1,0 +1,227 @@
+//! A turn's reference on the road: the standing memories and sheets first, each gate's picks read through the
+//! library they stand in, what each gate was offered, judged and attached written down and the attached rows handed
+//! to the brain; a gate switched off asked nothing, a gate left no candidate saying so, a gate with no reading handing
+//! over its index, and the knowledge a piece of work is handed.
+
+use std::collections::HashSet;
+
+use gate_ports::brain::Sheet;
+use gate_reference::road::{Turn, select, select_knowledge};
+use gate_reference::{Entry, Source};
+
+use crate::fakes::{fragment, memory};
+use crate::{Ground, ground, offered_slugs};
+
+fn turn(off: &[&str]) -> Turn {
+  Turn {
+    chat_id: 7,
+    message_lines: vec!["Owner (id 5): how do deploys go?".into()],
+    message_id: Some(9),
+    speaker_ids: vec![5, 5],
+    situation: None,
+    holds: None,
+    round: Some("round-1".into()),
+    people_spoke: true,
+    answered: None,
+    off: off.iter().map(|gate| (*gate).to_owned()).collect(),
+    lore: false,
+    records: true,
+  }
+}
+
+// A gateway answering a picker yes for the slugs wanted, and the person-book search with the slugs it names.
+fn picking(
+  wanted: &'static [&'static str],
+) -> impl Fn(&gate_ports::gateway::Ask) -> Option<String> + Send + Sync {
+  move |ask| {
+    let slugs = offered_slugs(&ask.input);
+
+    if slugs.iter().any(|slug| slug.starts_with('c')) {
+      return Some(
+        slugs
+          .iter()
+          .filter(|slug| wanted.contains(&slug.as_str()))
+          .cloned()
+          .collect::<Vec<_>>()
+          .join("\n"),
+      );
+    }
+
+    Some(
+      slugs
+        .iter()
+        .map(|slug| format!("{slug}: {}", if wanted.contains(&slug.as_str()) { "yes" } else { "no" }))
+        .collect::<Vec<_>>()
+        .join("\n"),
+    )
+  }
+}
+
+fn furnish(ground: &Ground) {
+  let brain = &ground.brain;
+
+  brain.fragments.lock().unwrap().extend([
+    fragment("system-document", "structure", "the system's large structure", None, None),
+    fragment("room-rule", "greeting", "how this room greets", Some(7), None),
+    fragment("library-knowledge", "deploy-notes", "how a deploy goes", None, None),
+    fragment("library-knowledge", "kittens", "the office cat", None, None),
+    fragment("person-book", "c5-told", "what the owner told", None, Some(5)),
+  ]);
+  brain.documents.lock().unwrap().extend([
+    ("deploy-notes".to_owned(), "Deploys go through the testbed.".to_owned()),
+    ("greeting".to_owned(), "Greet in one line.".to_owned()),
+  ]);
+  brain
+    .pieces
+    .lock()
+    .unwrap()
+    .insert("c5-told".into(), ("The owner told the plan.".into(), 5));
+  brain.standing.lock().unwrap().push(memory(
+    41,
+    "promise",
+    "call-back",
+    "Call back once the deploy lands.",
+  ));
+  brain.sheets.lock().unwrap().push(Sheet {
+    person: 5,
+    part: "common".into(),
+    path: "people/5/sheet.md".into(),
+    text: "The owner.".into(),
+    version: "v".into(),
+  });
+  std::fs::create_dir_all(ground.shipped.join("system-document")).unwrap();
+  std::fs::write(ground.shipped.join("system-document/structure.md"), "  The structure.\n").unwrap();
+}
+
+fn paths(entries: &[Entry]) -> Vec<(&str, Source)> {
+  entries.iter().map(|entry| (entry.path.as_str(), entry.source)).collect()
+}
+
+#[tokio::test]
+async fn a_turns_reference_stands_its_memories_and_sheets_first_then_what_each_gate_picked() {
+  let ground = ground("turn", picking(&["structure", "greeting", "deploy-notes", "c5-told"])).await;
+
+  furnish(&ground);
+
+  let entries = select(&ground.reference, &turn(&[])).await.unwrap();
+
+  assert_eq!(
+    paths(&entries),
+    [
+      ("memories/7", Source::Memory),
+      ("people/5/sheet.md", Source::Person),
+      ("system-document/structure.md", Source::Document),
+      ("knowledge/greeting.md", Source::Rule),
+      ("knowledge/deploy-notes.md", Source::Knowledge),
+      ("people/5/c5-told.md", Source::Person),
+    ]
+  );
+  assert_eq!(entries[2].text, "The structure.");
+  assert!(entries[0].text.contains("- #41 promise"));
+
+  let hits: HashSet<String> =
+    ground.brain.hits.lock().unwrap().iter().map(|hit| hit.slug.clone()).collect();
+
+  assert_eq!(hits, ["structure", "greeting", "deploy-notes", "c5-told"].map(str::to_owned).into());
+
+  let scratch = &ground.scratch;
+
+  assert_eq!(
+    scratch
+      .count("SELECT count(*) FROM reference_offers WHERE round = 'round-1'", vec![])
+      .await,
+    4
+  );
+  assert_eq!(
+    scratch
+      .count("SELECT count(*) FROM judgements WHERE round = 'round-1' AND message_id = 9", vec![])
+      .await,
+    4
+  );
+  assert_eq!(
+    scratch
+      .texts("SELECT slug FROM reference_verdicts WHERE attached = 1 ORDER BY slug", vec![])
+      .await,
+    ["c5-told", "deploy-notes", "greeting", "structure"]
+  );
+  assert_eq!(
+    scratch
+      .texts("SELECT slug FROM reference_verdicts WHERE llm = 0 ORDER BY slug", vec![])
+      .await,
+    ["kittens"]
+  );
+  assert_eq!(
+    scratch.count("SELECT count(*) FROM gate_roads WHERE round = 'round-1'", vec![]).await,
+    4
+  );
+}
+
+#[tokio::test]
+async fn a_gate_switched_off_is_not_asked_and_a_gate_left_no_candidate_says_so() {
+  let ground = ground("off", picking(&["deploy-notes"])).await;
+
+  ground.brain.fragments.lock().unwrap().push(fragment(
+    "library-knowledge",
+    "deploy-notes",
+    "how a deploy goes",
+    None,
+    None,
+  ));
+  ground
+    .brain
+    .documents
+    .lock()
+    .unwrap()
+    .insert("deploy-notes".into(), "Deploys go through the testbed.".into());
+
+  let entries = select(&ground.reference, &turn(&["library-knowledge"])).await.unwrap();
+
+  assert!(entries.is_empty());
+  assert!(ground.gateway.asked.lock().unwrap().is_empty());
+  assert_eq!(
+    ground
+      .scratch
+      .texts("SELECT stage || ' ' || verdict FROM judgements ORDER BY stage", vec![])
+      .await,
+    [
+      "people-search SKIP: no candidates",
+      "room-rules SKIP: no candidates",
+      "system-documents SKIP: no candidates"
+    ]
+  );
+}
+
+#[tokio::test]
+async fn a_gate_with_no_reading_hands_over_its_index() {
+  let ground = ground("unread", |_| Some("I cannot tell.".into())).await;
+
+  ground.brain.fragments.lock().unwrap().push(fragment(
+    "library-knowledge",
+    "deploy-notes",
+    "how a deploy goes",
+    None,
+    None,
+  ));
+
+  let entries = select(&ground.reference, &turn(&[])).await.unwrap();
+
+  assert_eq!(paths(&entries), [("knowledge/index.md", Source::Knowledge)]);
+  assert_eq!(entries[0].text, "- deploy-notes \u{2014} how a deploy goes");
+  assert!(ground.brain.hits.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn a_piece_of_work_is_handed_the_knowledge_its_lines_call_for_and_nothing_is_written_down() {
+  let ground = ground("work", picking(&["deploy-notes"])).await;
+
+  furnish(&ground);
+
+  let entries =
+    select_knowledge(&ground.reference, "the-chat-agent", 7, &["Deploy the release.".into()]).await;
+
+  assert_eq!(paths(&entries), [("knowledge/deploy-notes.md", Source::Knowledge)]);
+  assert_eq!(ground.brain.hits.lock().unwrap().len(), 1);
+  assert_eq!(ground.scratch.count("SELECT count(*) FROM judgements", vec![]).await, 0);
+  assert_eq!(ground.scratch.count("SELECT count(*) FROM reference_offers", vec![]).await, 0);
+  assert!(select_knowledge(&ground.reference, "the-chat-agent", 7, &[]).await.is_empty());
+}

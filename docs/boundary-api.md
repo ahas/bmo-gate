@@ -28,6 +28,8 @@ each release links to the data root's `env/gate.toml`. It names:
 | the chat agent | the registration name whose gate options stand for the deployment, and which a companion's are copied from |
 | a thrown-away session's folder | the folder a gate run's thrown-away session is started in |
 | `[records]` | the folders the session summariser reads a closed session's record from: Claude Code's configuration folders, searched in order, and Codex's sessions folder |
+| `[shipped]` | the folder the shipped pieces' bodies are read under — the system's reference documents and the lore, as the deployment places them — a row's path read relative to it |
+| the owner's room | the room a row the gate raises reports to |
 | `[reading]` | what the translator's checks read a text by: the words the English test reads past — the names of people and agents and the marks a note's strands open with — and the file the owner's banned words are read from, where the deployment keeps one |
 
 No address, port, host, path or name of a deployment is written in the code; every one is read from here.
@@ -70,7 +72,7 @@ As the receiver's `docs/boundary-api.md` states them in 「The gate」, and its 
 
 | Route | Request | Answer |
 |---|---|---|
-| `POST /reference/selected` | `chat`, `message?`, `lines` (the room's recent messages in the room shape, each a string), `speakers` (the people whose words the turn answers), `situation?` (`agent`, `room`: `owner` or `group`, `events`: each `kind` and `item?`, `now`), `holds?` (names), `round?`, `people_spoke`, `answered?`, `off` (the gates switched off for the agent), `records` | `entries`: each `path`, `text`, `source` (`document`, `person`, `rule`, `situation`, `knowledge`, `memory`, `room` or `archive`) and `fragment?` |
+| `POST /reference/selected` | `chat`, `message?`, `lines` (the room's recent messages in the room shape, each a string), `speakers` (the people whose words the turn answers), `situation?` (`agent`, `room`: `owner` or `group`, `events`: each `kind` and `item?`, `now`), `holds?` (names), `round?`, `people_spoke`, `answered?`, `off` (the gates switched off for the agent), `lore?` (whether the room reads the lore, as its tone says; true where absent), `records` | `entries`: each `path`, `text`, `source` (`document`, `person`, `rule`, `situation`, `knowledge`, `memory`, `room` or `archive`) |
 | `POST /sanitised` | `text`, `label`, `chat?`, `message?` | `text`, `changed`; 409 `stopped` where its run was stopped |
 | `POST /judgements` | `chat`, `message?`, `stage`, `verdict`, `detail?`, `ms?`, `round?` | 204 |
 | `POST /judgements/attached` | `chat`, `message`, `since` | 204 |
@@ -299,11 +301,13 @@ node, and the front to the decision server behind it.
 
 | Call | Route | Body | Answer |
 |---|---|---|---|
-| a row raised | `POST /todos/raised` | `title`, `judgement`, `chat` | `id` |
+| a row raised | `POST /todos/raised` | `title`, `judgement`, `chat`, `key` | `id`, `raised` |
 
 The attachments watch raises a row where one reference piece attached on more than its share of a gate's turns
 over the last day and its latest half, so a job finds why; the owner's room hears of it through the receiver's
-owner notice.
+owner notice, code `attachment-alarm` with `row`, `title`, `stage`, `slug` and both shares. `key` names the piece:
+while the row last raised under it is neither done nor deleted, bmo-job answers that row's `id` with `raised` false
+and raises nothing.
 
 ## How a gate run reaches a model
 
@@ -410,6 +414,10 @@ Statements here that a sibling's document does not yet match, each for that sibl
   through `GET /gates`.
 - **No chat unit asks the output gate yet:** the telegram unit's send path folds a reply's parts by its own
   code; it is to ask `POST /formats/decided` for each part where the send asks for the gate.
+- **The brain's knowledge read** answers the knowledge chunks a room may be offered; the gate reads a picked
+  room-rule chunk's body through it as well, for the brain to take the room's room-rule chunks there.
+- **The receiver sends no `lore`** with a turn's reference; a room's tone is in its persona file, which the
+  receiver reads, and it is to send false for a room whose tone reads no lore.
 - **bmo-job serves no route for a row another unit raises;** the gate makes `POST /todos/raised` as written
   above, and bmo-job refuses it until it adds the route.
 - **The receiver writes the attach itself,** into a table it does not hold, where its answer is sent; its gate

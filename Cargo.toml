@@ -2,7 +2,7 @@
 # as a member as it stands. The root package also holds the checks that span the repository and every test of
 # the repository in `tests/`, the Python and Bun suites among them, which a Cargo test of their own runs.
 [workspace]
-members = ["crates/codes", "crates/markup", "crates/policy", "crates/ports", "crates/runs", "crates/stages", "crates/store", "crates/words"]
+members = ["crates/codes", "crates/markup", "crates/policy", "crates/ports", "crates/reference", "crates/runs", "crates/stages", "crates/store", "crates/words"]
 resolver = "3"
 
 [workspace.package]
@@ -13,11 +13,13 @@ edition = "2024"
 async-trait = "0.1.92"
 # The stand-in units the ports' tests answer from.
 axum = { version = "0.8.4", default-features = false, features = ["http1", "json", "query", "tokio"] }
+chrono = { version = "0.4.41", default-features = false, features = ["std"] }
 futures-util = "0.3.34"
 gate-codes = { path = "crates/codes" }
 gate-markup = { path = "crates/markup" }
 gate-policy = { path = "crates/policy" }
 gate-ports = { path = "crates/ports" }
+gate-reference = { path = "crates/reference" }
 gate-runs = { path = "crates/runs" }
 gate-stages = { path = "crates/stages" }
 gate-store = { path = "crates/store" }
@@ -56,6 +58,7 @@ gate-codes.workspace = true
 gate-markup.workspace = true
 gate-policy.workspace = true
 gate-ports.workspace = true
+gate-reference.workspace = true
 gate-runs.workspace = true
 gate-stages.workspace = true
 gate-store.workspace = true
@@ -94,3 +97,9 @@ path = "tests/runs/main.rs"
 [[test]]
 name = "stages"
 path = "tests/stages/main.rs"
+
+# The reference road's tests, one binary over a scratch database and stand-in brain, receiver, bmo-job, agency and
+# gateway.
+[[test]]
+name = "reference"
+path = "tests/reference/main.rs"

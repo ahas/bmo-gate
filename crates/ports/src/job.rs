@@ -7,10 +7,25 @@ use serde::{Deserialize, Serialize};
 
 use crate::http::{Answer, Caller, Peer};
 
+/// A row the gate asked for: its number, and whether it was raised now or stands open from an earlier ask under
+/// the same key.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+pub struct Raised {
+  pub id: i64,
+  pub raised: bool,
+}
+
 /// Every call the gate makes on bmo-job.
 pub trait Job: Send + Sync {
-  /// A row raised on the gate's judgement, in the room it reports to; the row's number.
-  fn raise<'a>(&'a self, title: &'a str, judgement: &'a str, chat: i64) -> BoxFuture<'a, Answer<i64>>;
+  /// A row raised on the gate's judgement, in the room it reports to, under the key that names what it is about;
+  /// the row last raised under the key where that one still stands open.
+  fn raise<'a>(
+    &'a self,
+    title: &'a str,
+    judgement: &'a str,
+    chat: i64,
+    key: &'a str,
+  ) -> BoxFuture<'a, Answer<Raised>>;
 }
 
 /// bmo-job over HTTP.
@@ -32,17 +47,19 @@ struct Raise<'a> {
   title: &'a str,
   judgement: &'a str,
   chat: i64,
-}
-
-#[derive(Deserialize)]
-struct Raised {
-  id: i64,
+  key: &'a str,
 }
 
 impl Job for HttpJob {
-  fn raise<'a>(&'a self, title: &'a str, judgement: &'a str, chat: i64) -> BoxFuture<'a, Answer<i64>> {
+  fn raise<'a>(
+    &'a self,
+    title: &'a str,
+    judgement: &'a str,
+    chat: i64,
+    key: &'a str,
+  ) -> BoxFuture<'a, Answer<Raised>> {
     Box::pin(async move {
-      let raised: Raised = self
+      self
         .caller
         .post(
           "row raised",
@@ -51,11 +68,10 @@ impl Job for HttpJob {
             title,
             judgement,
             chat,
+            key,
           },
         )
-        .await?;
-
-      Ok(raised.id)
+        .await
     })
   }
 }
