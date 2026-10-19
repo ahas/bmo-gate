@@ -1,0 +1,11 @@
+{
+  // The bundle's tests read its code by relative path and run under Bun, so they take the app's config with
+  // Bun's types beside it.
+  "extends": "../../client/.nuxt/tsconfig.app.json",
+  "compilerOptions": {
+    "types": ["bun"],
+    "typeRoots": ["../../client/node_modules/@types"]
+  },
+  "include": ["./**/*", "../../client/.nuxt/nuxt.d.ts", "../../client/host/server.d.ts"],
+  "exclude": []
+}

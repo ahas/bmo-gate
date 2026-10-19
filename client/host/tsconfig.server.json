@@ -1,0 +1,6 @@
+{
+  // The server routes read with the host's sign-in declared, standing outside server/ for the same reason the
+  // components' declarations stand outside app/.
+  "extends": "../.nuxt/tsconfig.server.json",
+  "include": ["../.nuxt/types/nitro-nuxt.d.ts", "../.nuxt/types/nitro.d.ts", "../server/**/*", "../shared/**/*", "./server.d.ts"]
+}

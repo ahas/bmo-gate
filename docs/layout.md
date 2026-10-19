@@ -35,6 +35,40 @@ stands, and no other.
 - **No weights, datasets or run output in git.** They are runtime data under the data root the settings name;
   the repository holds only the declarations that say where they are read from.
 
+## The console plugin bundle
+
+`client/` is the gates' screen as the web unit's console takes it: a Bun project of its own, its manifest, its
+lockfile and its Nuxt configuration one level below the root, and its tests under `tests/client/`.
+
+- **A Nuxt layer on bmo-ui.** It extends bmo-ui and adds the gate trial page, `/gates/<gate>`, its domain modules
+  and three server routes. A host extends it the way it extends bmo-ui. bmo-ui is a peer at the one version the
+  bundle is built against; for the bundle's own install a packed copy under `client/vendor/` is a development
+  dependency, and bmo-ui's patch stands under `client/patches/`.
+- **Its own files by relative path.** In a host `~`, `@` and `#shared` are the host's folders, so no file of the
+  bundle reaches another through them, and bmo-ui's modules are imported by the package's path.
+- **The page** puts a prompt to one gate as a turn would and lists the gate's trials, oldest first, each with who
+  asked, the answer and how long it took. Beside the gate's name stand its Laya mode and how often Laya agrees
+  with it, and the button that opens the gate's settings. Every word is a key of the host's language pack: the
+  `gates.*` keys, `common.action.copy`, `common.error.copy_failed` and `common.label.seconds`. A gate's name is
+  the key `gates.label.<gate>` with its hyphens as underscores, and the gate's own name where the pack holds no
+  such key; a Laya mode is `gates.laya_mode.<mode>`, the mode's own word where the pack has none.
+- **The server routes** call the gate (「For the console」 in `docs/boundary-api.md`) at the address and with the
+  token the host's runtime configuration gives under `gate`, from `NUXT_GATE_ADDRESS` and `NUXT_GATE_TOKEN`:
+  - `POST /api/gate` with `stage` and `prompt` puts a trial, the signed-in user's name as `user`;
+  - `GET /api/gate/<gate>?limit=` reads the gate's trials;
+  - `GET /api/laya` reads Laya's health and each gate's mode and agreement.
+  Each refuses a request with no signed-in user, and hands a refusal of the gate's on with its status, its code
+  and its sentence. Their own codes are `question_empty` (a trial asking nothing), `no_gate_address` (the host
+  names no gate), `gate_unreachable` (the gate did not answer) and `gate_refused` (a refusal with no code). The
+  page shows a refusal as the pack's `gates.error.<code>` where the pack has it, and its own fallback otherwise.
+- **What the host owes,** beside what bmo-ui asks of it:
+  - its i18n module and a language pack answering the keys above;
+  - its sign-in, as `nuxt-auth-utils`'s `requireUserSession`, which the server routes call;
+  - the components the page stands on: the console's title bar pieces `DeployMark`, `TodoOpenButton` and
+    `UsageMeters`, its markdown text `MarkdownText`, and the gate's settings dialog `GateSettingsDialog`, the
+    gate's row of the agents screen's gate table.
+  `client/host/` declares each by what the page and the routes hand it, so the bundle's typecheck holds them to it.
+
 ## The deployment
 
 The testbed deploys the repository as `testbed.toml` declares it (the testbed's `docs/declaration.md` and

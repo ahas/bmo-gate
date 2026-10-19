@@ -8,6 +8,8 @@ name = "bmo-gate"
 # `tests/`, so one `cargo test` gathers them with the rest.
 [test]
 languages = ["cargo", "bun"]
+# The two Bun projects' packages, which their checks and the bundle's types stand on.
+setup = ["cd training/tooling && bun install --frozen-lockfile", "cd client && bun install --frozen-lockfile"]
 
 # The store's tests make their own scratch databases on the suite's server, so no template is named.
 [test.database]

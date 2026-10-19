@@ -187,8 +187,8 @@ null, and nothing is carried over.
 
 ### For the console
 
-The console's plugin bundle (`client/`) is served by the web unit, whose server routes call these. Times here
-are Unix seconds.
+The console's plugin bundle (`client/`, `docs/layout.md`, 「The console plugin bundle」) is served by the web
+unit, and the bundle's own server routes, running in the console, call these. Times here are Unix seconds.
 
 | Route | Request | Answer |
 |---|---|---|

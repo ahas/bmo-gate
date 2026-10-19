@@ -5,3 +5,5 @@ __pycache__/
 .venv/
 # The training tooling's settings, which a deployment links from the data root.
 /training/tooling/tooling.toml
+# The typecheck's build record, wherever a project of its writes one.
+*.tsbuildinfo

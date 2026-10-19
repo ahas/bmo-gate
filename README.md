@@ -23,6 +23,7 @@ Every other unit is reached through standard APIs alone, and of other repositori
 
 | Folder | What it holds |
 |---|---|
+| `client/` | The console plugin bundle: the gates' trial page and its server routes, a Nuxt layer on bmo-ui and a Bun project of its own |
 | `crates/` | The Rust crates the root package is built from: the store, the codes, the ports to the other units, the policy, the words, the markup, the gate runs, the gates, the reference road, the service's routes, the unit command's nouns and the Laya relay |
 | `deploy/` | The service units and the timer the testbed's deployment keeps on the operations machine |
 | `docs/` | The documents, which come before the code: start with `docs/layout.md` |
