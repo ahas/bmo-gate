@@ -23,7 +23,7 @@ Every other unit is reached through standard APIs alone, and of other repositori
 
 | Folder | What it holds |
 |---|---|
-| `crates/` | The Rust crates the root package is built from: the store |
+| `crates/` | The Rust crates the root package is built from: the store, the codes and the ports to the other units |
 | `docs/` | The documents, which come before the code: start with `docs/layout.md` |
 | `src/` | The root package |
 | `tests/` | Every test of the repository |

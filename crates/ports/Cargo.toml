@@ -1,0 +1,16 @@
+[package]
+name = "gate-ports"
+description = "The gate's ports: every call it makes on another unit, each unit's as a trait and an HTTP client."
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+futures-util.workspace = true
+gate-codes.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+# The agency's event stream is server-sent events, read by a maintained reader rather than by hand.
+sse-stream.workspace = true
+tokio.workspace = true
