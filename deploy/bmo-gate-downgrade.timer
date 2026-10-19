@@ -1,0 +1,14 @@
+[Unit]
+Description=bmo-gate-downgrade: the downgrade harvest resumed every six hours
+
+[Timer]
+# Six hours after the last pass ended, so a pass waiting out a busy card is never stacked on.
+OnActiveSec=1min
+OnBootSec=30min
+OnUnitInactiveSec=6h
+Persistent=false
+
+[Install]
+WantedBy=timers.target
+# Linked, enabled and started by every deployment, with the service of its own name beside it.
+X-BMO-Deploy=timer

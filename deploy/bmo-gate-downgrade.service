@@ -1,0 +1,16 @@
+[Unit]
+Description=bmo-gate-downgrade: one pass of the downgrade harvest into the sanitiser gate's data
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/.local/share/bmo-gate/deploy/training/tooling
+Environment=BMO_DATA_DIR=%h/.local/share/bmo/data
+Environment=PATH=%h/.bun/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+# One pass of the standing harvest: every downgrade in a fresh conversation snapshot, the passages the folder
+# already holds skipped, the rest judged on the text model road and frozen into the same folder. It only
+# gathers; taking the folder into a training pass is a separate step (docs/gate-data.md, 「The downgrade
+# harvest」). Its timer starts it, so it carries no mark of its own.
+ExecStart=%h/.bun/bin/bun scripts/laya-downgrade.ts --run downgrade --resume
+TimeoutStartSec=infinity

@@ -1,4 +1,4 @@
-//! The unit command's tests: the nouns it declares and the words it reads, the format cases and the Laya agreement
+//! The unit command's tests: the nouns it declares and the words it reads, its health check against a stand-in service, the format cases and the Laya agreement
 //! read off a scratch database, the replay bench against a stand-in gateway, the evaluation set's members,
 //! generation on a scripted Codex and scoring on a registration, and the reference road's benches against a
 //! stand-in brain and receiver, each over a data root of the test's own.
@@ -13,6 +13,7 @@ mod units;
 mod bench;
 mod eval;
 mod format_cases;
+mod health;
 mod laya_agreement;
 mod members;
 mod nouns;

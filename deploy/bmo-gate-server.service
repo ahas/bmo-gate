@@ -1,0 +1,22 @@
+[Unit]
+Description=bmo-gate: the gate stage of a turn (docs/boundary-api.md in the gate's repository)
+After=network-online.target
+Wants=network-online.target
+# Without its settings the service has no listen address, database or token, so the unit does not start where the
+# deployment wrote none (docs/boundary-api.md, 「Configuration」).
+ConditionPathExists=%h/.local/share/bmo/data/env/gate.toml
+
+[Service]
+# The service runs out of the deploy tree, whose bin/ holds it and whose settings.toml links to the data root's
+# env/gate.toml.
+Type=simple
+WorkingDirectory=%h/.local/share/bmo-gate/deploy
+ExecStart=%h/.local/share/bmo-gate/deploy/bin/gate-server %h/.local/share/bmo-gate/deploy/settings.toml
+Restart=always
+RestartSec=2
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target
+# The repository's one service: stopped, restarted and watched by every deployment, which waits on its health.
+X-BMO-Deploy=bot

@@ -24,7 +24,7 @@ Every other unit is reached through standard APIs alone, and of other repositori
 | Folder | What it holds |
 |---|---|
 | `crates/` | The Rust crates the root package is built from: the store, the codes, the ports to the other units, the policy, the words, the markup, the gate runs, the gates, the reference road, the service's routes, the unit command's nouns and the Laya relay |
-| `deploy/` | The service units the testbed's deployment keeps |
+| `deploy/` | The service units and the timer the testbed's deployment keeps on the operations machine |
 | `docs/` | The documents, which come before the code: start with `docs/layout.md` |
 | `prompts/` | What each gate is told, the questions Laya is asked, the evaluation set's briefs, the training tooling's judge words and the sanitiser's trigger words, the one folder Korean stands in |
 | `runtime/` | What serves Laya on its nodes: the decision server, its card turn client and the front, each a Python project of its own |

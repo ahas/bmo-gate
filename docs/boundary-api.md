@@ -223,6 +223,10 @@ are Unix seconds.
 `GET /health` answers `version` (the service's version), `ready` (its database and its settings stand) and
 `laya` (the relay's last answer: `up`, `down` or `off`).
 
+`bmo-gate health` asks the service the settings name (「The unit command」), at its `address` with its own
+token, waiting at most five seconds, and ends 0 where it answers ready and 1 where it does not, saying why. It is
+the deployment's check rather than a noun, so `nouns` does not declare it.
+
 ## Calls the gate makes
 
 ### bmo-brain

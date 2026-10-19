@@ -1,0 +1,20 @@
+[Unit]
+Description=bmo-gate-train: one training pass over the judging run, started when the owner asks
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/.local/share/bmo-gate/deploy/training/tooling
+Environment=BMO_DATA_DIR=%h/.local/share/bmo/data
+Environment=PATH=%h/.bun/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+# One pass over the judging run, started by hand only when the owner asks and never by a timer: every gate
+# cut at its whole batches, the ones with a quarter new rows since their last point trained on the
+# training nodes, and a point a gate appended to the curve. A pass with nothing to train, or no training
+# node left, says so and ends (docs/training.md, 「A pass」).
+ExecStart=%h/.bun/bin/bun scripts/laya-train.ts judging:real-1
+TimeoutStartSec=infinity
+
+[Install]
+# Started by hand, never by the deployment, which links it and nothing more.
+X-BMO-Deploy=link

@@ -34,3 +34,29 @@ lane = "wide"
 [[check.step]]
 id = "fmt"
 command = "cargo fmt --all --check"
+
+[build]
+# The service, the unit command and the Laya relay, into the release's bin/.
+binaries = ["gate-server", "bmo-gate", "laya-relay"]
+
+# The gate's own deploy tree and the shared data root its settings, its runtime data and the tooling's settings
+# stand under (docs/layout.md, 「The deployment」). The Python services stand on the nodes the Laya service's
+# placement names, put there by its installer from the release, so no unit of theirs is installed here: the
+# units are deploy/'s alone, never runtime/front/'s.
+[deploy]
+root = "~/.local/share/bmo-gate"
+link = "deploy"
+data_root = "~/.local/share/bmo/data"
+env_links = [
+  { link = "settings.toml", target = "env/gate.toml" },
+  { link = "training/tooling/tooling.toml", target = "env/gate-tooling.toml" },
+]
+units = ["deploy/*.service", "deploy/*.timer"]
+# Answers 0 once the service the deployed settings name answers ready (docs/boundary-api.md, 「Health」).
+health = "cd ~/.local/share/bmo-gate/deploy && bin/bmo-gate health"
+
+# The training tooling's packages, which a release's tooling units run on.
+[[deploy.step]]
+id = "tooling-packages"
+phase = "before-flip"
+command = "cd training/tooling && bun install --frozen-lockfile"

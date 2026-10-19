@@ -34,3 +34,28 @@ stands, and no other.
   the words the training tooling's judges are given, under `prompts/tooling/`, are worded as the models read them, and the sanitiser's trigger words as the rooms write them; every other file is English, and Korean a test feeds the code is written by its unicode escapes.
 - **No weights, datasets or run output in git.** They are runtime data under the data root the settings name;
   the repository holds only the declarations that say where they are read from.
+
+## The deployment
+
+The testbed deploys the repository as `testbed.toml` declares it (the testbed's `docs/declaration.md` and
+`docs/deploy.md`).
+
+- **The deploy tree is the gate's own,** `~/.local/share/bmo-gate/deploy`, a release of the whole commit with the
+  three binaries in its `bin/`: `gate-server`, `bmo-gate` and `laya-relay`. The runtime data root is the shared
+  one, `~/.local/share/bmo/data`.
+- **Two files each release links to the data root's `env/`:** its `settings.toml`, the service's settings
+  (`docs/boundary-api.md`, 「Configuration」), to `env/gate.toml`, and the training tooling's
+  `training/tooling/tooling.toml` (`docs/training.md`, 「The tooling and its settings」) to `env/gate-tooling.toml`.
+  The tooling's packages are installed into the release before it is put live.
+- **The units are `deploy/`'s,** each saying how the deployment keeps it:
+  - `bmo-gate-server.service`, the service, is the one the deployment waits on, through `bmo-gate health`;
+  - `bmo-laya-relay.service`, the relay, is restarted where its binary changed;
+  - `bmo-gate-downgrade.timer` resumes the downgrade harvest every six hours, its service beside it;
+  - `bmo-gate.service`, `bmo-gate-sanitizer.service`, `bmo-gate-judge.service` and `bmo-gate-train.service`, the
+    writing runs, the judging run and a training pass, are linked and started by hand.
+  Each tooling unit runs in the release's `training/tooling/`, under the data root `BMO_DATA_DIR` names.
+- **The Python services stand on the nodes, not here.** The decision server, the front and the tunnel run on each
+  node the Laya service's placement names, their units under `runtime/front/` put there by the installer from the
+  release (`docs/llm-server.md`, 「Installing and updating」); the training scripts are put across by the training
+  tooling (`docs/training.md`, 「The nodes」). The deployment installs none of them on the operations machine.
+

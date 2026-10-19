@@ -22,6 +22,7 @@ indexmap.workspace = true
 # Each member of the evaluation set registers itself, so the folder is the list.
 inventory.workspace = true
 regex.workspace = true
+reqwest.workspace = true
 sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true

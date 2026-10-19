@@ -6,6 +6,7 @@ pub mod ceiling;
 pub mod format_cases;
 pub mod gate_bench;
 pub mod gate_eval;
+pub mod health;
 pub mod laya_agreement;
 pub mod reference;
 
@@ -86,6 +87,8 @@ pub enum Noun {
   /// The reference road's benches.
   #[command(subcommand)]
   Reference(reference::ReferenceNoun),
+  /// Whether the service the settings name answers ready: the deployment's check, and no noun.
+  Health,
 }
 
 #[derive(Subcommand, Debug)]
@@ -142,6 +145,7 @@ pub async fn dispatch(noun: Noun) -> Answered {
     Noun::Gate(GateNoun::LayaAgreement(args)) => laya_agreement::laya_agreement(args).await,
     Noun::Gate(GateNoun::FormatCases(args)) => format_cases::format_cases(args).await,
     Noun::Reference(noun) => reference::run(noun).await,
+    Noun::Health => health::health(&settings_path()).await,
   }
 }
 
