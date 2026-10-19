@@ -259,7 +259,12 @@ The receiver's routes 「For the brain」, in the same conventions, which the ga
 | owner spoke | `/rooms/owner-spoke` | `chatId`, `person`, `before`, `seconds` | `owner`, `spoke` |
 | display names | `/people/names` | `people` | `names`: `person`, `name` |
 | waits on a happening | `/promises/waits` | `text` | `waits` |
+| own number | `/rooms/own-number` | `agent`, `chatId` | `number`: the sender the agent's words stand under in the room, or null |
 | owner notice | `/owner/notice` | `code` and its fields | `ok` |
+
+The reference nouns of the unit command (「The unit command」) read a stored turn's message through the route the
+receiver serves bmo-job, in its snake_case: `GET /rooms/{chat}/messages/{message}`, answering `sender?`,
+`sender_name?`, `sent_at` and `text`, and 404 where the receiver keeps no such message.
 
 The owner notice tells the chat agent in the owner's room a fact the gate raised, as a code and its fields:
 `attachment-alarm` (`row`, `stage`, `piece`, `share`) where the attachments watch filed a row
@@ -379,8 +384,7 @@ verdict are kept ninety days: the service sweeps both tables as it starts and on
 ## The unit command
 
 `bmo-gate` is the gate's unit command (bmo-cli's `docs/boundary.md`, 「Unit commands」). Asked `nouns`, it
-declares the nouns it carries, one a line. These are its ten nouns; the four `gate` nouns are carried, and the six
-`reference` nouns are not yet, so they are not declared:
+declares the nouns it carries, one a line. These are its ten nouns:
 
 | Noun | What it does |
 |---|---|
@@ -447,6 +451,13 @@ Statements here that a sibling's document does not yet match, each for that sibl
   voice runner makes a line's script, its spans and its polishing view, which are the voice unit's rules, so
   `voice-polish` and `voice-reading` have no member until the voice unit serves that reading
   (`docs/gate-eval.md`, 「The members」).
-- **The receiver serves no route for a room's messages:** the output gate's replay bench makes its set out of the
-  chat agent's latest answers, and says the source is unavailable until the receiver serves them
+- **The receiver serves no route for a room's latest messages:** the output gate's replay bench makes its set out
+  of the chat agent's latest answers, and says the source is unavailable until the receiver serves them
   (`docs/output-gate.md`, 「The replay bench」).
+- **The receiver names bmo-job alone as the reader of a stored message:** the reference nouns read one through
+  the same route (「bmo-receiver」 above), for the receiver to name the gate beside bmo-job.
+- **No unit serves what the reference nouns read beyond that** (`docs/reference-selection.md`, 「What it picks and
+  what it costs, measured」): the agency lists no agent's runs out of its run log, so `reference compare` reads
+  the stored runs it is handed; the brain serves its rows and not its index files, so `reference roads` sets
+  the index files beside the rows for the shipped pieces alone; and no unit keeps the usage record, so `reference
+  waste` gives no size for a turn's own prompt.

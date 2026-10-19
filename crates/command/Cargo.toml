@@ -12,11 +12,13 @@ futures-util.workspace = true
 gate-markup.workspace = true
 gate-policy.workspace = true
 gate-ports.workspace = true
+gate-reference.workspace = true
 gate-runs.workspace = true
 gate-server.workspace = true
 gate-stages.workspace = true
 gate-store.workspace = true
 gate-words.workspace = true
+indexmap.workspace = true
 # Each member of the evaluation set registers itself, so the folder is the list.
 inventory.workspace = true
 regex.workspace = true

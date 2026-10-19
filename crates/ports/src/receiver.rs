@@ -1,11 +1,13 @@
 //! The receiver port (`docs/boundary-api.md`, 「bmo-receiver」): the room facts the gate reads, through the
-//! receiver's routes in the brain's family — camelCase bodies, every call a `POST` — and the owner notice the
-//! gate hands a fact to the chat agent by.
+//! receiver's routes in the brain's family — camelCase bodies, every call a `POST` — the owner notice the gate
+//! hands a fact to the chat agent by, and one stored message, read through the route the receiver serves bmo-job
+//! in its snake_case.
 
 use futures_util::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+use crate::PortError;
 use crate::http::{Answer, Caller, Peer};
 
 /// One room the receiver keeps: its chat, its title and the people that have stood as a sender in it.
@@ -30,6 +32,17 @@ pub struct Roads {
 pub struct OwnerSpoke {
   pub owner: bool,
   pub spoke: bool,
+}
+
+/// One message the receiver keeps: who sent it where it knows, the name it went under, when, and its words.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Message {
+  #[serde(default)]
+  pub sender: Option<i64>,
+  #[serde(default)]
+  pub sender_name: Option<String>,
+  pub sent_at: i64,
+  pub text: String,
 }
 
 /// A person's display name, or none.
@@ -64,6 +77,12 @@ pub trait Receiver: Send + Sync {
 
   /// Whether the text waits for something to happen first.
   fn waits<'a>(&'a self, text: &'a str) -> BoxFuture<'a, Answer<bool>>;
+
+  /// The sender the agent's own words stand under in the room, or none.
+  fn own_number<'a>(&'a self, agent: &'a str, chat: i64) -> BoxFuture<'a, Answer<Option<i64>>>;
+
+  /// One stored message, or none where the receiver keeps no such message.
+  fn message(&self, chat: i64, message: i64) -> BoxFuture<'_, Answer<Option<Message>>>;
 
   /// A fact handed to the chat agent in the owner's room, as a code and its fields.
   fn owner_notice<'a>(&'a self, code: &'a str, fields: &'a Map<String, Value>)
@@ -139,6 +158,18 @@ struct Text<'a> {
 #[derive(Deserialize)]
 struct Waits {
   waits: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AgentRoom<'a> {
+  agent: &'a str,
+  chat_id: i64,
+}
+
+#[derive(Deserialize)]
+struct Number {
+  number: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -221,6 +252,36 @@ impl Receiver for HttpReceiver {
         self.caller.post("waits on a happening", &["promises", "waits"], &Text { text }).await?;
 
       Ok(waits.waits)
+    })
+  }
+
+  fn own_number<'a>(&'a self, agent: &'a str, chat: i64) -> BoxFuture<'a, Answer<Option<i64>>> {
+    Box::pin(async move {
+      let number: Number = self
+        .caller
+        .post(
+          "own number",
+          &["rooms", "own-number"],
+          &AgentRoom {
+            agent,
+            chat_id: chat,
+          },
+        )
+        .await?;
+
+      Ok(number.number)
+    })
+  }
+
+  fn message(&self, chat: i64, message: i64) -> BoxFuture<'_, Answer<Option<Message>>> {
+    Box::pin(async move {
+      let (chat, message) = (chat.to_string(), message.to_string());
+
+      match self.caller.get("a message", &["rooms", &chat, "messages", &message], &[]).await {
+        Ok(found) => Ok(Some(found)),
+        Err(PortError::Refused { status: 404, .. }) => Ok(None),
+        Err(failure) => Err(failure),
+      }
     })
   }
 

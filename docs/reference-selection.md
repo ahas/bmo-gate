@@ -200,7 +200,8 @@ flowchart TB
     the `SKIP: no candidates` it leaves can say how many candidates there were before the narrowing and
     by which rules it narrowed: the console stands both on that verdict (the web unit's `docs/web.md`).
 - **Measured by** `bmo reference narrowing`, which puts stored turns through the
-  narrowing again against the table as it stands and counts what each gate would be asked about.
+  narrowing again against the table as it stands and counts what each gate would be asked about: each room's
+  latest messages the reference record holds verdicts on, each read through the receiver.
 - **Why the code and not the gate:** a gate reading every piece of a large book spends its time and
   its budget on pieces the turn has nothing to do with, and every candidate asked about costs Laya
   a question and the model a line of its index.
@@ -428,10 +429,12 @@ flowchart TB
   probe makes of them — the state and one question per candidate — with each candidate's index line
   beside it, and the instructions it read repeated back. A gate left nothing is left out, as it is
   not asked.
-- **It is the live road's own code.** The turn's lines are written by the same functions a turn run
-  writes them with, the message it follows on from is found through the receiver the way the road
-  finds it, its speakers are its senders but the chat agent, and the narrowing and the probes are
-  the ones every turn goes through, against the fragment table as it stands. A turn of the chat agent's own
+- **It is the live road's own code.** The turn's messages are read through the receiver, and its lines are
+  written by the same functions a turn run writes them with. The message it follows on from is the line the
+  input names as `answered` where it names one, as the receiver's envelope carries it on the live road; its
+  speakers are its senders but the chat agent, whose number in the room the receiver says; and the narrowing and
+  the probes are the ones every turn goes through, against the fragment table as it stands. A turn one of whose
+  messages the receiver does not keep is answered as missing. A turn of the chat agent's own
   lines alone asks only the gates that declare such a turn asks them, narrowed as they declare — the
   same declaration the live road reads (「What a turn's lines are」). A rewritten index line or a
   changed narrowing shows in the next replay without anything else being told.
@@ -442,7 +445,8 @@ flowchart TB
   narrows and asks. The work it read is repeated back.
 - **A piece asked for by gate and slug** comes back with its index line and its body, looked up in
   everything the room offers that gate rather than only in what the narrowing kept, since a piece
-  that attached on the turn may be one the narrowing leaves out today.
+  that attached on the turn may be one the narrowing leaves out today. Its body is read where the live road
+  reads it: a shipped piece under the shipped folder, any other through the brain.
 - **Nothing is asked of a model and nothing is written.** It is what the training tooling trains the four
   gates' Laya checkpoints on, so they learn the input the gates are handed rather than a copy of it
   (`docs/reference-data.md`).
@@ -503,27 +507,33 @@ flowchart TB
 ## What it picks and what it costs, measured
 
 `bmo reference compare` takes real stored turns, puts the same messages to the three gates, and sets what
-they answer beside what an earlier pick recorded on that very turn. The figures below are the commands'
-own runs.
+they answer beside what an earlier pick recorded on that very turn. The stored runs are the agency's run log's,
+which lists no agent's runs to another unit, so they are handed to it as a file, one run a line as the log kept
+it — its room, when it ended, its prompt and its answer — and each run is timed by the gate's own judgement
+record. The figures below are the commands' own runs.
 
 - **The front of a turn** is the wall clock of the three gates in parallel, which is what a turn waits
   for: 3.09 s in the middle and 4.05 s at the ninth tenth over 65 stored turns. A turn waits for the
   slowest of three small calls.
 - **The two roads offer the same turn the same thing.** `bmo reference roads` puts every
-  room stored turns come from, and every room the brain holds, through both: the
+  room the receiver keeps and every room the reference record names through both: the
   candidates each gate is offered out of the fragment rows, and the candidates the index files
-  themselves name. Over 7 rooms and 1,101 candidates the sets and the bodies they resolve to are
+  themselves name. The index files it reads are the shipped pieces' — the system documents' index and the
+  lore's, under the shipped folder; the brain's libraries are the brain's files, which it serves as rows alone,
+  so their gates are named unavailable and compared no further. Over 7 rooms and 1,101 candidates the sets and the bodies they resolve to are
   the same, and the one difference is an order — where several common person books stand in one
   gate's index, the rows put them in the person's order rather than in the order a directory
   happened to be read in.
 - **What attaches and what the answer used, per piece.** `bmo reference waste` sets every
   piece's attachments out of the verdict record beside the use judge's word on them (`docs/reference-data.md`): how often it was attached, how often the answer used it, the share it
-  was carried for nothing and the tokens that cost, with each gate's time. Over the record from
+  was carried for nothing and the tokens that cost, with each gate's time. A piece's size is its body as the
+  live road reads it now. A turn's own prompt is the usage record's, which no unit keeps, so it is said to be
+  unavailable. Over the record from
   2026-09-23 to 2026-09-24 (265 turns): 698 thousand tokens carried, 553 thousand of them not used;
   the structure document alone attached on 215 turns and used on 24.
 - **The same turns on today's road.** `bmo reference replay` puts judged turns through
-  the road again — the rows as they stand, the narrowing, the gates on their own routes — and sets
-  what attaches now beside what attached then. The road writes down nothing of what it offered,
+  the road again — each turn's message read through the receiver, the rows as they stand, the narrowing, the
+  gates on their own routes — and sets what attaches now beside what attached then. The road writes down nothing of what it offered,
   judged, attached or released on such a pass; the gates' own runs leave their log as any run does. On 100 judged turns the road as it stands attaches
   144 pieces where the record shows 290, the structure document on 22 turns where the record shows
   80, and about 1,450 tokens a turn on the gates' word where the record shows 2,600. The replay reads a piece's status as it is today, so a matter that has

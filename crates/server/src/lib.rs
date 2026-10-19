@@ -122,6 +122,20 @@ pub fn stages(settings: &Settings, db: DatabaseConnection) -> Result<Arc<Stages>
   Ok(Arc::new(Stages::new(runs, side, reading)))
 }
 
+/// The reference road as the settings make it over the gates: the brain and the receiver it reads, and the folder
+/// the shipped pieces' bodies are read under.
+pub fn reference(settings: &Settings, stages: Arc<Stages>) -> Result<Arc<Reference>, Unread> {
+  Ok(Arc::new(Reference {
+    stages,
+    brain: Arc::new(HttpBrain::new(peer(&settings.brain.address, settings.unit_token(&settings.brain)?)?)),
+    receiver: Arc::new(HttpReceiver::new(peer(
+      &settings.receiver.address,
+      settings.unit_token(&settings.receiver)?,
+    )?)),
+    shipped: settings.shipped.as_ref().map(|shipped| shipped.folder.clone()),
+  }))
+}
+
 /// The service as its settings make it: the store connected and migrated, every port, the gates and the road.
 pub async fn stand(settings: &Settings) -> Result<Arc<App>, Unread> {
   let db = database(settings, 16).await?;
@@ -131,15 +145,7 @@ pub async fn stand(settings: &Settings) -> Result<Arc<App>, Unread> {
     .map_err(|why| Unread(format!("the migration: {why}")))?;
 
   let stages = stages(settings, db)?;
-  let reference = Arc::new(Reference {
-    stages: stages.clone(),
-    brain: Arc::new(HttpBrain::new(peer(&settings.brain.address, settings.unit_token(&settings.brain)?)?)),
-    receiver: Arc::new(HttpReceiver::new(peer(
-      &settings.receiver.address,
-      settings.unit_token(&settings.receiver)?,
-    )?)),
-    shipped: settings.shipped.as_ref().map(|shipped| shipped.folder.clone()),
-  });
+  let reference = reference(settings, stages.clone())?;
   let token = settings
     .token(&settings.token_file)?
     .ok_or_else(|| Unread("the gate's token file is empty".into()))?;

@@ -483,11 +483,20 @@ fn fallback(chat_id: i64, libraries: &[Library], reason: &str) -> Vec<Entry> {
     .collect()
 }
 
-// The bodies of the slugs a picker took, each by the library it stands in: its path and its text, none for a slug
-// whose body could not be read.
-async fn bodies(
+/// Whose bodies are read: the agent the brain reads them for, the room, and the gate that asks, which a failure is
+/// said under.
+pub struct Reader<'a> {
+  pub agent: &'a str,
+  pub chat_id: i64,
+  pub stage: &'a str,
+}
+
+/// The bodies of some slugs, each by the library of `libraries` it stands in — a shipped piece under the shipped
+/// folder, any other through the brain — as its path and its text, none for a slug whose body could not be read.
+pub async fn read_bodies(
   reference: &Reference,
-  picker: &Picker,
+  reader: &Reader<'_>,
+  libraries: &[Library],
   slugs: &[String],
 ) -> HashMap<String, (String, String)> {
   let mut read: HashMap<String, (String, String)> = HashMap::new();
@@ -496,7 +505,7 @@ async fn bodies(
 
   for slug in slugs {
     let Some((library, row)) =
-      picker.libraries.iter().find_map(|library| library.row(slug).map(|row| (library, row)))
+      libraries.iter().find_map(|library| library.row(slug).map(|row| (library, row)))
     else {
       continue;
     };
@@ -519,7 +528,7 @@ async fn bodies(
     }
   }
 
-  let (agent, chat_id) = (picker.agent.as_str(), picker.chat_id);
+  let (agent, chat_id, stage) = (reader.agent, reader.chat_id, reader.stage);
 
   if !knowledge.is_empty() {
     match reference.brain.knowledge(agent, chat_id, &knowledge).await {
@@ -527,9 +536,9 @@ async fn bodies(
         read.extend(documents.into_iter().map(|document| (document.slug, (document.path, document.text))));
       }
       Ok(Read::Refused(refusal)) => {
-        eprintln!("reference: chat {chat_id} {} pieces were refused: {}", picker.stage, refusal.message)
+        eprintln!("reference: chat {chat_id} {stage} pieces were refused: {}", refusal.message)
       }
-      Err(why) => eprintln!("reference: chat {chat_id} {} pieces could not be read: {why}", picker.stage),
+      Err(why) => eprintln!("reference: chat {chat_id} {stage} pieces could not be read: {why}"),
     }
   }
 
@@ -539,9 +548,9 @@ async fn bodies(
         read.extend(book.pieces.into_iter().map(|piece| (piece.slug, (piece.path, piece.text))));
       }
       Ok(Read::Refused(refusal)) => {
-        eprintln!("reference: chat {chat_id} {} pieces were refused: {}", picker.stage, refusal.message)
+        eprintln!("reference: chat {chat_id} {stage} pieces were refused: {}", refusal.message)
       }
-      Err(why) => eprintln!("reference: chat {chat_id} {} pieces could not be read: {why}", picker.stage),
+      Err(why) => eprintln!("reference: chat {chat_id} {stage} pieces could not be read: {why}"),
     }
   }
 
@@ -728,7 +737,12 @@ pub async fn pick(reference: &Reference, picker: Picker) -> Result<Picked, GateE
   let mut wanted = vec![];
   let mut spent = 0;
   let taken = picker.cap.map_or(selection.slugs.len(), |cap| cap.min(selection.slugs.len()));
-  let read = bodies(reference, &picker, &selection.slugs[..taken]).await;
+  let reader = Reader {
+    agent: &picker.agent,
+    chat_id: picker.chat_id,
+    stage: &picker.stage,
+  };
+  let read = read_bodies(reference, &reader, &picker.libraries, &selection.slugs[..taken]).await;
 
   for slug in &selection.slugs[..taken] {
     let row = picker.libraries.iter().find_map(|library| library.row(slug));

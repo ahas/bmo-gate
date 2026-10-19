@@ -15,7 +15,7 @@ use gate_ports::brain::{
 use gate_ports::gateway::{Ask, Completion, Gateway};
 use gate_ports::http::Answer;
 use gate_ports::job::{Job, Raised};
-use gate_ports::receiver::{Name, OwnerSpoke, Receiver, Roads, RoomTitle};
+use gate_ports::receiver::{Message, Name, OwnerSpoke, Receiver, Roads, RoomTitle};
 use serde_json::{Map, Value};
 
 fn unoffered<T>(unit: &'static str, call: &'static str) -> Answer<T> {
@@ -238,16 +238,20 @@ impl Brain for FakeBrain {
   }
 }
 
-/// The stand-in receiver: the names it knows people by, and the owner notices it was handed.
+/// The stand-in receiver: the rooms it keeps, the names it knows people by, the messages it keeps by room and number,
+/// the chat agent's own number, and the owner notices it was handed.
 #[derive(Default)]
 pub struct FakeReceiver {
+  pub rooms: Mutex<Vec<RoomTitle>>,
   pub names: Mutex<HashMap<i64, String>>,
+  pub messages: Mutex<HashMap<(i64, i64), Message>>,
+  pub own: Mutex<Option<i64>>,
   pub notices: Mutex<Vec<(String, Map<String, Value>)>>,
 }
 
 impl Receiver for FakeReceiver {
   fn titles(&self) -> BoxFuture<'_, Answer<Vec<RoomTitle>>> {
-    Box::pin(async move { unoffered("bmo-receiver", "titles") })
+    Box::pin(async move { Ok(self.rooms.lock().unwrap().clone()) })
   }
 
   fn roads(&self, _chat: i64) -> BoxFuture<'_, Answer<Roads>> {
@@ -286,6 +290,14 @@ impl Receiver for FakeReceiver {
 
   fn waits<'a>(&'a self, _text: &'a str) -> BoxFuture<'a, Answer<bool>> {
     Box::pin(async move { unoffered("bmo-receiver", "waits") })
+  }
+
+  fn own_number<'a>(&'a self, _agent: &'a str, _chat: i64) -> BoxFuture<'a, Answer<Option<i64>>> {
+    Box::pin(async move { Ok(*self.own.lock().unwrap()) })
+  }
+
+  fn message(&self, chat: i64, message: i64) -> BoxFuture<'_, Answer<Option<Message>>> {
+    Box::pin(async move { Ok(self.messages.lock().unwrap().get(&(chat, message)).cloned()) })
   }
 
   fn owner_notice<'a>(

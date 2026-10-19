@@ -12,7 +12,21 @@ fn parsed(words: &[&str]) -> Result<Cli, clap::Error> {
 async fn nouns_are_declared_one_a_line_two_words_apart_by_a_space() {
   let lines = dispatch(parsed(&["nouns"]).unwrap().noun).await.unwrap();
 
-  assert_eq!(lines, ["gate eval", "gate bench", "gate laya-agreement", "gate format-cases"]);
+  assert_eq!(
+    lines,
+    [
+      "gate eval",
+      "gate bench",
+      "gate laya-agreement",
+      "gate format-cases",
+      "reference compare",
+      "reference inputs",
+      "reference narrowing",
+      "reference replay",
+      "reference roads",
+      "reference waste",
+    ]
+  );
   assert_eq!(lines, NOUNS);
 }
 
@@ -60,7 +74,7 @@ fn each_noun_reads_its_own_flags() {
 fn words_no_noun_carries_end_with_two() {
   for words in [
     &["gate", "nowhere"][..],
-    &["reference", "compare"],
+    &["reference", "nowhere"],
     &["gate", "format-cases", "--limit", "many"],
   ] {
     assert_eq!(parsed(words).unwrap_err().exit_code(), 2, "{words:?}");
@@ -74,6 +88,12 @@ async fn help_prints_a_noun_s_whole_usage_without_reading_any_settings() {
     (&["gate", "bench", "--help"], "usage: bmo gate bench"),
     (&["gate", "laya-agreement", "-h"], "usage: bmo gate laya-agreement"),
     (&["gate", "format-cases", "--help"], "usage: bmo gate format-cases"),
+    (&["reference", "compare", "--help"], "usage: bmo reference compare"),
+    (&["reference", "inputs", "-h"], "usage: bmo reference inputs"),
+    (&["reference", "narrowing", "--help"], "usage: bmo reference narrowing"),
+    (&["reference", "replay", "--help"], "usage: bmo reference replay"),
+    (&["reference", "roads", "--help"], "usage: bmo reference roads"),
+    (&["reference", "waste", "--help"], "usage: bmo reference waste"),
   ] {
     let lines = dispatch(parsed(words).unwrap().noun).await.unwrap();
 
@@ -94,4 +114,8 @@ async fn wrong_words_end_with_two_and_failed_work_with_one() {
   );
   assert_eq!(ended(unpinned).2, 1);
   assert_eq!(ended(Ok(vec!["a".into()])), (vec!["a".to_owned()], None, 0));
+
+  let unnamed = dispatch(parsed(&["reference", "compare"]).unwrap().noun).await;
+
+  assert!(matches!(unnamed, Err(Fault::Words(said)) if said.contains("needs --runs")));
 }

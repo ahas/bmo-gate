@@ -1,8 +1,8 @@
-//! The receiver port: each room fact's path and body, its answer read, and the owner notice's code carried
-//! beside its fields.
+//! The receiver port: each room fact's path and body, its answer read, the owner notice's code carried beside its
+//! fields, and a stored message read by its room and number, none where the receiver keeps none.
 
 use axum::http::Method;
-use gate_ports::receiver::{HttpReceiver, Name, OwnerSpoke, Receiver, Roads};
+use gate_ports::receiver::{HttpReceiver, Message, Name, OwnerSpoke, Receiver, Roads};
 use serde_json::{Map, json};
 
 use crate::peer;
@@ -92,4 +92,31 @@ async fn an_owner_notice_carries_its_code_beside_its_fields() {
     stub.one("/owner/notice").json(),
     json!({ "code": "attachment-alarm", "row": 41, "stage": "library-knowledge" })
   );
+}
+
+#[tokio::test]
+async fn a_stored_message_is_read_by_its_room_and_number_and_the_agent_s_own_number_asked() {
+  let stub = Stub::start().await;
+  let receiver = HttpReceiver::new(peer(&stub, "t"));
+
+  stub.answer(
+    Method::GET,
+    "/rooms/-7/messages/9",
+    200,
+    json!({ "sender": 5, "sender_name": "Someone", "sent_at": 1_700_000_000, "text": "hello" }),
+  );
+  stub.answer(Method::POST, "/rooms/own-number", 200, json!({ "number": 42 }));
+
+  assert_eq!(
+    receiver.message(-7, 9).await.unwrap(),
+    Some(Message {
+      sender: Some(5),
+      sender_name: Some("Someone".into()),
+      sent_at: 1_700_000_000,
+      text: "hello".into(),
+    })
+  );
+  assert_eq!(receiver.message(-7, 10).await.unwrap(), None);
+  assert_eq!(receiver.own_number("the-chat-agent", -7).await.unwrap(), Some(42));
+  assert_eq!(stub.one("/rooms/own-number").json(), json!({ "agent": "the-chat-agent", "chatId": -7 }));
 }
