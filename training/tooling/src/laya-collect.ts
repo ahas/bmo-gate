@@ -4,7 +4,8 @@ import { join } from "node:path";
 
 import { homeCommand, nodeCalls, parseHome, runFault } from "./node-calls";
 import { nodePath, notTrainingNodes } from "./laya-nodes";
-import { workbenchPath } from "./roots";
+import { dataPath } from "./roots";
+import { checkpointFolders } from "./weights";
 
 import type { NodeCalls, NodeRunner } from "./node-calls";
 
@@ -44,10 +45,11 @@ export interface CheckpointManifest {
   resumable: boolean;
 }
 
-/** Where collected checkpoints stand: the worker's workbench, which outlives a session and a job,
- * rather than a checkout's own ignored folder, which does not. */
-export function collectionRoot(worker = "worker"): string {
-  return join(workbenchPath(worker), "laya-checkpoints");
+/** Where collected checkpoints stand, as `weights/checkpoints.toml` declares it under the data root: a
+ * worker's workbench, which outlives a session and a job, rather than a checkout's own ignored folder,
+ * which does not. */
+export function collectionRoot(): string {
+  return dataPath(checkpointFolders().collection);
 }
 
 export function stepName(step: number): string {

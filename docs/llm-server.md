@@ -71,8 +71,8 @@ The gates hold the client that asks it and the configuration of which gate asks 
   account, so the units stand after a reboot with nobody logged in.
   - The installation: `~/bmo-laya` (the engine and its venv), `~/bmo-llm` (the front, the tunnel's
     dial and their venv), and the card arbiter's `~/bmo-card` (the arbiter's `docs/node-arbiter.md`).
-  - What outlives any installation: the checkpoints in `~/.local/share/bmo-laya/checkpoints`, which
-    `~/bmo-laya/checkpoints` links to; the engine's dumps of them in `~/.cache/bmo-laya/dumps` where
+  - What outlives any installation: the checkpoints in `~/.local/share/bmo-laya/checkpoints`, the store
+    `weights/checkpoints.toml` declares under `node_store`, which `~/bmo-laya/checkpoints` links to; the engine's dumps of them in `~/.cache/bmo-laya/dumps` where
     the node keeps its copies mapped; the settings and the key in `~/.config/bmo-llm` and
     `~/.config/bmo-laya`.
 
@@ -451,7 +451,8 @@ answers a gate with the same checkpoint.
 `card-master place laya --to <node>` on the operations machine moves the service (the arbiter's `docs/placement.md`,
 「Placing the services」): to a machine that has just been given a card, or away from one that lost
 it. The card master stands the node's arbiter and keeps the node's occupants; what is the Laya
-service's own is done by its adapter, `bun scripts/laya-adapter.ts`, declared in `weights/laya.card.toml`.
+service's own is done by its adapter, `bun scripts/laya-adapter.ts`, declared in `weights/laya.card.toml`
+and run from that folder as the tooling's `training/tooling/scripts/laya-adapter.ts`.
 
 ```mermaid
 flowchart TD

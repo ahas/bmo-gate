@@ -13,7 +13,7 @@ its own, so a change to one never builds or tests the others.
 | `prompts/` | What each gate is told, a folder a gate, the questions Laya is asked, the evaluation set's members' briefs, the words the training tooling's judges are given, and the words the sanitiser's pre-filter matches in the rooms' own language: the one folder Korean stands in |
 | `runtime/` | What serves Laya on its nodes: the decision server and the front around it, each a Python project of its own |
 | `training/` | What makes Laya's checkpoints: the dataset and training tooling, a Bun project of its own, and the Python training scripts |
-| `weights/` | The declarations of Laya's weights: each service's card declaration and where the checkpoints are found. The weights themselves are runtime data and never stand in the repository |
+| `weights/` | The declarations of Laya's weights: each service's card declaration, in the card master's own format, and where the checkpoints are found, `checkpoints.toml`. The weights themselves are runtime data and never stand in the repository |
 | `deploy/` | The service units and timers the testbed's deployment keeps |
 | `client/` | The console plugin bundle: the gates' screen, a Nuxt layer on the base UI library |
 | `docs/` | The documents, which come before the code |

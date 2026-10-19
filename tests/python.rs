@@ -1,6 +1,7 @@
-//! The Python suites of the Laya runtime under `tests/python/` (docs/layout.md, 「The rules the layout keeps」), run by
-//! this Cargo test so one `cargo test` runs every test of the repository: the decision server's and the shared
-//! waits' on the system's Python, which is all they need, and the front's on the packages its `pyproject.toml` pins,
+//! The Python suites of the Laya runtime and training under `tests/python/` (docs/layout.md, 「The rules the layout
+//! keeps」), run by this Cargo test so one `cargo test` runs every test of the repository: the decision server's, the
+//! training scripts' and the shared waits' on the system's Python, which is all they need — a test that needs torch
+//! skips itself where the interpreter has none — and the front's on the packages its `pyproject.toml` pins,
 //! through `uv`. Their output is shown where any fails.
 
 use std::process::Command;
@@ -32,6 +33,11 @@ fn system() -> Command {
 #[test]
 fn the_decision_servers_tests_pass() {
   suite(system(), "tests/python/laya-server");
+}
+
+#[test]
+fn the_training_scripts_tests_pass() {
+  suite(system(), "tests/python/training");
 }
 
 #[test]

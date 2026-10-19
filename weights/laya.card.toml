@@ -1,0 +1,8 @@
+# The Laya service as the card master places it (the arbiter's docs/placement.md, 「A service
+# declares itself」; docs/llm-server.md, 「Moving the service」). The adapter runs from this folder.
+service = "laya"
+card_mib = 7000
+priority = 60
+spread = "one"
+alone = false
+adapter = ["bun", "../training/tooling/scripts/laya-adapter.ts"]

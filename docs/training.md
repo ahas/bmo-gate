@@ -141,7 +141,8 @@ The driver asks those four and never which kind of source it is talking to.
   message naming the file and the shape it expects, and fall back to no node of their own choosing.
 - **Which nodes it names is the card master's to change** (the arbiter's `docs/placement.md`, 「Placing the
   services」), as the service `laya-train`, through its adapter, `bun scripts/laya-train-adapter.ts`,
-  declared in `laya-train.card.toml` beside its code, under `weights/`:
+  declared in `weights/laya-train.card.toml`, whose adapter runs from that folder and is the tooling's
+  `training/tooling/scripts/laya-train-adapter.ts`:
   - `install` adds the node to the placement where it is missing and stands the environment there as
     `laya-nodes.ts` does; it answers `running` once the node is ready to train;
   - `uninstall` takes the node out of the placement, its environment left where it stands;
@@ -340,7 +341,8 @@ picked up rather than begun again.
   carried back when the run is found dead, before it is carried on, and its final checkpoint when it
   finishes. Every rolling save is not carried back — a step checkpoint runs to some gigabytes and the
   tunnel would spend the run's own time on copies the next save makes stale.
-- **Where they are collected:** `workbench/worker/laya-checkpoints/` under the runtime data root, a
+- **Where they are collected:** `workbench/worker/laya-checkpoints/` under the runtime data root, as
+  `weights/checkpoints.toml` declares it under `collection`, a
   folder per gate, the run under it, and the step under that — `<gate>/<run>/step-000025`. The
   workbench outlives a session and a job, which a checkout's own ignored folder does not.
 - **It travels as one file.** A checkpoint is packed on the node into an uncompressed tar, brought

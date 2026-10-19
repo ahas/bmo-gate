@@ -6,6 +6,7 @@ import { reservedAgainst } from "./node-reach";
 import { installTunnelledService } from "./tunnel-install";
 import { countAt, listAt, nodeAt, objectAt, PlacementFault, textAt } from "./placement";
 import { dataPath } from "./roots";
+import { checkpointFolders } from "./weights";
 
 import type { Machine } from "./machine";
 import type { PlacementFile } from "./placement";
@@ -108,9 +109,10 @@ export const CONFIG_DIR = ".config/bmo-llm";
 export const ENGINE_DIR = "bmo-laya";
 export const GATES_SETTINGS = ".config/bmo-laya/env";
 
-/** Where the checkpoints stand on the node, outside the installation: the engine's folder links to it,
- * so a checkpoint's path under the engine's folder reads the same whichever holds it. */
-export const CHECKPOINT_STORE = ".local/share/bmo-laya/checkpoints";
+/** Where the checkpoints stand on the node, outside the installation, as `weights/checkpoints.toml`
+ * declares it: the engine's folder links to it, so a checkpoint's path under the engine's folder reads the
+ * same whichever holds it. */
+export const CHECKPOINT_STORE = checkpointFolders().nodeStore;
 export const CHECKPOINT_LINK = `${ENGINE_DIR}/checkpoints`;
 
 /** A watch of the card's, whose rules the card arbiter keeps, which must not run beside the engine: stopped

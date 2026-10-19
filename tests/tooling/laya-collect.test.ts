@@ -120,7 +120,7 @@ describe("where a collected checkpoint stands", () => {
   });
 
   test("the collection is under the workbench, which outlives a job", () => {
-    expect(collectionRoot("worker")).toContain("/workbench/worker/laya-checkpoints");
+    expect(collectionRoot()).toContain("/workbench/worker/laya-checkpoints");
   });
 });
 
