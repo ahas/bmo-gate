@@ -309,7 +309,7 @@ node, and the front to the decision server behind it.
 |---|---|---|
 | a placement | `POST /place`, `POST /remove` (the card master) | `service` (`laya` or `laya-train`) and `node`: moving the Laya service or its training to a node; the answer is the master's lines, the last `== done` or `== failed: <why>` |
 | the units' description | `PUT /descriptions/{service}` (the card master) | `units`: what the Laya service says of its units on a card |
-| a card turn | `POST /turns`, `GET /turns/{ticket}`, `DELETE /turns/{ticket}` (the node arbiter, on the node's loopback) | the Laya server's and the training's hold on the card, asked by the gate's own turn client on the node |
+| a card turn | `POST /turns`, `GET /turns/{ticket}`, `DELETE /turns/{ticket}` (the node arbiter, on the node's loopback) | the Laya server's and the training's hold on the card, asked by the gate's own turn client on the node, `runtime/laya-server/turn.py` |
 
 ### bmo-job
 

@@ -1,0 +1,16 @@
+[project]
+name = "bmo-laya-server"
+version = "0.1.0"
+description = "The Laya decision server, the engine of the Laya service (docs/laya-server.md)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  # Pinned exactly: the fine-tuning scripts use laya's own internals, which carry no promise across versions,
+  # and a checkpoint is answered the same on every node only on the same torch and transformers. Which CUDA
+  # build of torch a node gets is its driver's to decide, at setup (node-setup.sh).
+  "laya==0.3.5",
+  "torch==2.14.1",
+  "transformers==5.18.0",
+]
+[project.optional-dependencies]
+# Only for measuring finetune.py's 8-bit optimizer against the plain one; the server never imports it.
+savings = ["bitsandbytes>=0.45"]

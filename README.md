@@ -27,6 +27,7 @@ Every other unit is reached through standard APIs alone, and of other repositori
 | `deploy/` | The service units the testbed's deployment keeps |
 | `docs/` | The documents, which come before the code: start with `docs/layout.md` |
 | `prompts/` | What each gate is told, the questions Laya is asked, the evaluation set's briefs and the sanitiser's trigger words, the one folder Korean stands in |
+| `runtime/` | What serves Laya on its nodes: the decision server, its card turn client and the front, each a Python project of its own |
 | `src/` | The root package: the version, the `gate-server` and `laya-relay` binaries and the `bmo-gate` unit command |
 | `tests/` | Every test of the repository |
 

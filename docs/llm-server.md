@@ -310,8 +310,10 @@ beside it is the node unit's (「The tunnel」).
   - The ssh asks for one remote forward: the node's own listen on the operations machine, `TUNNEL_LISTEN` in
     the environment file as the placement names it, to the front's `127.0.0.1:8010`. It fails
     outright if the forward cannot be made, and sends keepalives.
-  - It checks the operations machine's host key against a pinned `~/.config/bmo-llm/known_hosts` under the name
-    the operations machine, never by trust on first use.
+  - It logs in as `TUNNEL_LOGIN`, the account and host on the operations machine, and checks the operations
+    machine's host key against a pinned `~/.config/bmo-llm/known_hosts` under `TUNNEL_HOST`, the name the key is
+    pinned under, never by trust on first use. No unit file names a host, an account or an address: every one is
+    the environment file's.
   - Only the front's port crosses; the engine's never leaves the node.
 - **The way in on the home side** is the service's own:
   - the tunnel's public name, a DNS record pointing at the home's public address, which reaches the
@@ -377,12 +379,14 @@ order, it:
    gate where there is none. An existing settings file is never overwritten. Makes the checkpoint
    store `~/.local/share/bmo-laya/checkpoints`, moves into it a checkpoint folder standing in
    `~/bmo-laya` itself, and links `~/bmo-laya/checkpoints` to it.
-4. Builds the node's environment file — the key, the node's own listen as `TUNNEL_LISTEN`, its
+4. Builds the node's environment file — the key, the node's own listen as `TUNNEL_LISTEN`, the tunnel's public
+   name as `TUNNEL_URL`, the login on the operations machine as `TUNNEL_LOGIN` and the name its host key is pinned
+   under as `TUNNEL_HOST`, its
    `cardModels` as `LAYA_CARD_MODELS` where the placement gives one, on a desktop's machine
    `LAYA_HOST_COPY=mapped` and `LAYA_CARD_KEEP_FREE_MIB=2048`, and the entry's `hostCopy` as
    `LAYA_HOST_COPY` where it gives one — in a private `0600` file, carries it
    across, then deletes the local copy. The key never rides a command line.
-5. Uploads the front's files from `runtime/front/` into `~/bmo-llm`, and the engine's — `server.py`,
+5. Uploads the front's files from `runtime/front/` into `~/bmo-llm`, and the engine's — `server.py`, `turn.py`,
    `bench.py`, `pyproject.toml` and `node-setup.sh` from `runtime/laya-server/` — into `~/bmo-laya`.
 6. Runs the node setup detached with `setsid nohup`, because a console hub stops a streamed command
    after five minutes, and waits for its last line: `LLM-SETUP-DONE ok`, or `LLM-SETUP-DONE failed:<step>`

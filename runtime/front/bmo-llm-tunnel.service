@@ -1,0 +1,20 @@
+[Unit]
+Description=The Laya service's reverse tunnel to the operations machine (docs/llm-server.md in the gate's repository)
+After=network-online.target bmo-llm-front.service
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/bmo-llm/env
+# One remote forward, the node's own listen on the operations machine's loopback (TUNNEL_LISTEN, from the
+# environment file) to the front's 8010, and nothing else. The ssh rides
+# inside a WebSocket to the tunnel's door, since this network lets only HTTPS out; ws-dial.py carries
+# it with LLM_KEY from the environment file as its bearer to TUNNEL_URL, the tunnel's public name. The ssh logs
+# in as TUNNEL_LOGIN, and the host key is checked against the pinned file under TUNNEL_HOST and never trusted
+# on first use; every host, account and address is the environment file's; a forward that cannot be made ends the
+# connection so the unit makes it again.
+ExecStart=/usr/bin/ssh -N -i %h/.config/bmo-llm/tunnel_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o UserKnownHostsFile=%h/.config/bmo-llm/known_hosts -o StrictHostKeyChecking=yes -o HostKeyAlias=${TUNNEL_HOST} "-oProxyCommand=%h/bmo-llm/.venv/bin/python %h/bmo-llm/ws-dial.py ${TUNNEL_URL}" -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -R ${TUNNEL_LISTEN}:127.0.0.1:8010 ${TUNNEL_LOGIN}
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

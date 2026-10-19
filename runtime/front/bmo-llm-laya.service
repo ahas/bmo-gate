@@ -1,0 +1,30 @@
+[Unit]
+Description=The Laya service's engine (docs/llm-server.md in the gate's repository)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/bmo-laya
+Environment=USE_TF=0
+Environment=LAYA_HOST=127.0.0.1
+Environment=LAYA_PORT=7431
+# The card is the service node's shared one: the engine uses it under the lock every service there takes, lets
+# as many gates' checkpoints onto it as the card takes, never more than this, while it holds it, and gives it
+# back as soon as its last decision in hand ends.
+Environment=LAYA_CARD_MODELS=8
+Environment=LAYA_GPU_LOCK=%h/.gpu.lock
+# Declared to the card arbiter, which on a node reserved for another service ends a holder of the lock
+# that names another (the arbiter's docs/node-arbiter.md).
+Environment=BMO_CARD_SERVICE=laya
+# The venv's own bin first, so any program torch runs is the venv's.
+Environment=PATH=%h/bmo-laya/.venv/bin:/usr/local/cuda/bin:/usr/local/bin:/usr/bin:/bin
+# LAYA_TOKEN comes from here; the key is never on the command line.
+EnvironmentFile=%h/.config/bmo-llm/env
+# LAYA_CHECKPOINTS, the one place a gate is given its checkpoint.
+EnvironmentFile=-%h/.config/bmo-laya/env
+ExecStart=%h/bmo-laya/.venv/bin/python %h/bmo-laya/server.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
