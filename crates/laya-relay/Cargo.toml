@@ -1,0 +1,15 @@
+[package]
+name = "laya-relay"
+description = "The Laya service's relay on the operations machine, handing each call to the placement's nodes in order."
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+axum.workspace = true
+futures-util.workspace = true
+http-body-util.workspace = true
+hyper.workspace = true
+hyper-util = { workspace = true, features = ["client-legacy", "http1"] }
+serde_json.workspace = true
+tokio.workspace = true

@@ -286,7 +286,8 @@ beside it is the node unit's (「The tunnel」).
 - **Changing the order** is the placement changed; the relay reads the file again when it changes,
   with no restart. A placement that turns unreadable is said once, and the order read before it
   stands.
-- **Its settings** are the unit's defaults: `LAYA_RELAY_LISTEN` moves the listen, and
+- **Its settings** are the unit's defaults. The data root the placement stands under is `BMO_DATA_DIR`, or
+  `--data-root`, which the unit sets; with neither it refuses to start. `LAYA_RELAY_LISTEN` moves the listen, and
   `LAYA_RELAY_NEXT_WAIT_MS`, `LAYA_RELAY_LAST_WAIT_MS`, `LAYA_RELAY_PROBE_EVERY_MS` and
   `LAYA_RELAY_PROBE_WAIT_MS` the four waits above, for a test that cannot spend seconds on each.
   A port of 0 is one the system chooses, named in the line the service prints as it starts listening; its contract test starts it so, and reads the port from that line.

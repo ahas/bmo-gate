@@ -1,0 +1,18 @@
+[Unit]
+Description=The Laya service's relay on the operations machine (docs/llm-server.md in the gate's repository)
+After=network-online.target
+
+[Service]
+Type=simple
+# The deployed tree's bin/ holds the relay; it reads the placement under the data root it is given.
+WorkingDirectory=%h/.local/share/bmo-gate/deploy
+ExecStart=%h/.local/share/bmo-gate/deploy/bin/laya-relay
+Environment=BMO_DATA_DIR=%h/.local/share/bmo/data
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+# Linked and enabled by every deployment, and restarted only where the deployment changed the binary
+# (the testbed's docs/deploy.md, 「The unit links」), so the Laya calls in hand are cut only by a new relay.
+X-BMO-Deploy=binary
