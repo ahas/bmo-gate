@@ -1,4 +1,4 @@
-//! The Python suites of the Laya runtime and training under `tests/python/` (docs/layout.md, 「The rules the layout
+//! The Python suites of the Laya runtime and training under `tests/laya/` (docs/layout.md, 「The rules the layout
 //! keeps」), run by this Cargo test so one `cargo test` runs every test of the repository: the decision server's, the
 //! training scripts' and the shared waits' on the system's Python, which is all they need — a test that needs torch
 //! skips itself where the interpreter has none — and the front's on the packages its `pyproject.toml` pins,
@@ -32,17 +32,17 @@ fn system() -> Command {
 
 #[test]
 fn the_decision_servers_tests_pass() {
-  suite(system(), "tests/python/laya-server");
+  suite(system(), "tests/laya/laya-server");
 }
 
 #[test]
 fn the_training_scripts_tests_pass() {
-  suite(system(), "tests/python/training");
+  suite(system(), "tests/laya/training");
 }
 
 #[test]
 fn the_shared_waits_tests_pass() {
-  suite(system(), "tests/python/support");
+  suite(system(), "tests/laya/support");
 }
 
 #[test]
@@ -55,7 +55,7 @@ fn the_fronts_tests_pass_on_its_pinned_packages() {
     uv.args(["--with", package]);
   }
 
-  suite(uv, "tests/python/front");
+  suite(uv, "tests/laya/front");
 }
 
 #[test]

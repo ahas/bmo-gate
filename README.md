@@ -23,6 +23,7 @@ Every other unit is reached through standard APIs alone, and of other repositori
 
 | Folder | What it holds |
 |---|---|
+| `.graph/` | The code dependency graph: one node per feature, with the files it is made of and what it reads, read and written by `bmo graph` |
 | `client/` | The console plugin bundle: the gates' trial page and its server routes, a Nuxt layer on bmo-ui and a Bun project of its own |
 | `crates/` | The Rust crates the root package is built from: the contract and its client, the store, the codes, the ports to the other units, the policy, the words, the markup, the gate runs, the gates, the reference road, the service's routes, the unit command's nouns and the Laya relay |
 | `deploy/` | The service units the testbed's deployment keeps on the operations machine |

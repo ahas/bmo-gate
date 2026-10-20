@@ -17,8 +17,8 @@
       "api/command",
       "laya/relay"
     ],
-    "base": "afc722fb5cb03e8c7df1d16f0c09d4abe6b6eff9",
-    "changed": 1792523128881
+    "base": "80cdb4bd5e0572eec90128ce8537ae50da638566",
+    "changed": 1792523284130
   },
   {
     "id": "service/retention",
