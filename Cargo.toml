@@ -115,6 +115,8 @@ laya-relay.workspace = true
 libc.workspace = true
 # The README's folder table is read as markdown.
 pulldown-cmark.workspace = true
+# The personal-data check reads a tracked file for the shapes a value takes.
+regex.workspace = true
 # The callers the service's contract tests speak as.
 reqwest.workspace = true
 sea-orm.workspace = true

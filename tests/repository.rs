@@ -1,12 +1,11 @@
 //! Checks that span the repository: what its manifests may depend on, its layout and manifests, its one
 //! version, the testbed's declaration, where tests stand, and what no tracked file may hold (Hangul outside the
-//! prompts past the ledger, home paths, private network addresses, and the names a list kept outside the
-//! repository gives).
+//! prompts past the ledger, and the names a list kept outside the repository gives). Personal data is held by
+//! its own check (`tests/personal_data.rs`).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::ErrorKind;
-use std::net::Ipv4Addr;
 use std::path::{Component, Path};
 use std::process::Command;
 
@@ -86,9 +85,6 @@ const HANGUL: [(u32, u32); 6] = [
   (0xD7B0, 0xD7FF),
   (0xFFA0, 0xFFDC),
 ];
-
-/// Path prefixes a home directory is written under.
-const HOME_PREFIXES: [&str; 2] = ["/home/", "/Users/"];
 
 fn metadata() -> Value {
   let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_owned());
@@ -221,32 +217,6 @@ fn names_list(names: &toml::Table, from: &str, key: &str) -> Vec<String> {
         .collect()
     })
     .unwrap_or_default()
-}
-
-/// An address in a range only a private network uses: the private ranges, and the shared range
-/// carrier-grade and overlay networks hand out.
-fn is_private_network(address: Ipv4Addr) -> bool {
-  let [first, second, ..] = address.octets();
-  address.is_private() || (first == 100 && second & 0b1100_0000 == 0b0100_0000)
-}
-
-fn private_addresses(text: &str) -> Vec<Ipv4Addr> {
-  text
-    .split(|character: char| !character.is_ascii_digit() && character != '.')
-    .filter_map(|run| run.trim_matches('.').parse::<Ipv4Addr>().ok())
-    .filter(|&address| is_private_network(address))
-    .collect()
-}
-
-fn holds_home_path(text: &str) -> bool {
-  HOME_PREFIXES.iter().any(|prefix| {
-    text.match_indices(prefix).any(|(start, found)| {
-      text[start + found.len()..]
-        .chars()
-        .next()
-        .is_some_and(|next| is_word_character(next) || next == '.')
-    })
-  })
 }
 
 /// Whether a file outside `tests/` is a test by its own name: a Bun or Node test file, or a Python one.
@@ -531,23 +501,4 @@ fn no_listed_names_in_tracked_files() {
     found.extend(held.map(|name| format!("{path}: {name}")));
   }
   assert!(found.is_empty(), "listed names in tracked files: {found:?}");
-}
-
-#[test]
-fn no_home_paths_in_tracked_files() {
-  let found: Vec<String> = tracked_texts()
-    .into_iter()
-    .filter(|(_, text)| holds_home_path(text))
-    .map(|(path, _)| path)
-    .collect();
-  assert!(found.is_empty(), "home paths in tracked files: {found:?}");
-}
-
-#[test]
-fn no_private_network_addresses_in_tracked_files() {
-  let mut found = Vec::new();
-  for (path, text) in tracked_texts() {
-    found.extend(private_addresses(&text).into_iter().map(|address| format!("{path}: {address}")));
-  }
-  assert!(found.is_empty(), "private network addresses in tracked files: {found:?}");
 }

@@ -2,12 +2,13 @@
   {
     "id": "service/deployment",
     "title": "The deployment",
-    "what": "The repository's deployment: the service units under deploy/, the testbed declaration, and the layout document that states the folders.",
+    "what": "The repository's deployment and its standing rules: the service units under deploy/, the testbed declaration, the layout document that states the folders, and the personal-data rule no file may break.",
     "files": [
       "deploy/",
       "testbed.toml",
       "README.md",
-      "docs/layout.md"
+      "docs/layout.md",
+      "PERSONAL-DATA.md"
     ],
     "symbols": [],
     "aliases": [],
@@ -16,8 +17,8 @@
       "api/command",
       "laya/relay"
     ],
-    "base": "549f8b64d9b3f357c3dff124477502dc6fc467d6",
-    "changed": 1792498974224
+    "base": "afc722fb5cb03e8c7df1d16f0c09d4abe6b6eff9",
+    "changed": 1792523128881
   },
   {
     "id": "service/retention",

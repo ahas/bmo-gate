@@ -63,7 +63,7 @@ describe("pseudonyms", () => {
 
 describe("scrubText", () => {
   test("takes out a key, which no gate has ever judged by", () => {
-    const said = scrubText("the key is sk-abcdefghijklmnop1234 now");
+    const said = scrubText("the key is sk-abcdefghijkl now");
 
     expect(said).toBe(`the key is ${placeholder("secret_key")} now`);
     expect(carriesSecret(said)).toBe(false);
@@ -71,7 +71,7 @@ describe("scrubText", () => {
 
   test("takes out a mail address and a phone number", () => {
     expect(scrubText("send it to nobody@example.com")).toBe(`send it to ${placeholder("mail")}`);
-    expect(scrubText("call 010-1234-5678 later")).toBe(`call ${placeholder("phone")} later`);
+    expect(scrubText("call 010-0000-0000 later")).toBe(`call ${placeholder("phone")} later`);
   });
 
   test("leaves a date alone, because a room is full of dates", () => {

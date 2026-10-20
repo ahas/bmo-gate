@@ -261,6 +261,7 @@ dependencies = [
  "laya-relay",
  "libc",
  "pulldown-cmark",
+ "regex",
  "reqwest",
  "sea-orm",
  "sea-orm-migration",

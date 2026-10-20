@@ -35,11 +35,14 @@ Every other unit is reached through standard APIs alone, and of other repositori
 | `training/` | What makes Laya's checkpoints: the dataset and training tooling, a Bun project of its own, and the training scripts and node scripts the training runs |
 | `weights/` | The declarations of Laya's weights: the card declarations of the service and its training, and where the checkpoints stand; never the weights themselves |
 
+`PERSONAL-DATA.md` states the personal data no file may hold: whose it is, what counts, where a value belongs
+instead, and the check that holds it.
+
 ## Checking a change
 
 - `cargo check --workspace --all-targets` — the static check.
 - `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D warnings` — the review.
-- `cargo test` — every test, the repository checks among them.
+- `cargo test` — every test, the repository checks among them, the personal-data check included.
 
 ## Version
 
