@@ -4,9 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { gateSeconds, roundUnit, roundUnitLine } from "../../../training/tooling/src/reference/round";
+import { scratchDir } from "../scratch";
 import { useToolingSettings } from "../settings";
 
-useToolingSettings();
+useToolingSettings({ data_root: scratchDir("bmo-round-data-") });
 
 test("the round starts as its own unit in the checkout given, carrying the jobs it spares", () => {
   const line = roundUnitLine({ run: "ref-1", spare: ["bmo-task-9"], asked: "2026-10-05T00:00:00.000Z", checkout: "/base/gate", bun: "/bin/bun" });

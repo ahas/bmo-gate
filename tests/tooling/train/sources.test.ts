@@ -11,7 +11,7 @@ import { folderSource, referenceSource, sourceOf, toppedUp } from "../../../trai
 import type { DatasetRow, DatasetSplit } from "../../../training/tooling/src/laya-dataset";
 import { useToolingSettings } from "../settings";
 
-useToolingSettings();
+useToolingSettings({ data_root: scratchDir("bmo-train-sources-data-") });
 
 const root = scratchDir("bmo-train-sources-");
 let made = 0;
