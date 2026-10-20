@@ -3,6 +3,7 @@ name = "gate-server"
 description = "The gate's service: every route the boundary document states, the watches it keeps going, and the settings it reads at start."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 publish = false
 
 [dependencies]

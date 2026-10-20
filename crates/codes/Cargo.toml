@@ -3,6 +3,7 @@ name = "gate-codes"
 description = "The gate's codes: every refusal it answers with, its status and its spelling in each wire family."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 publish = false
 
 [dependencies]

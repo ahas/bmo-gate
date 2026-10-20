@@ -3,6 +3,7 @@ name = "gate-store"
 description = "The gate's store: its tables, their migrations and their entities."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 publish = false
 
 [dependencies]

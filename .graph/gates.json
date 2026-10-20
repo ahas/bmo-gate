@@ -20,7 +20,7 @@
       "gates/stages",
       "policy/reference"
     ],
-    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "base": "549f8b64d9b3f357c3dff124477502dc6fc467d6",
     "changed": 1792498974316
   },
   {
@@ -46,7 +46,7 @@
       "store/database",
       "store/tables"
     ],
-    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "base": "549f8b64d9b3f357c3dff124477502dc6fc467d6",
     "changed": 1792498974311
   },
   {
@@ -66,7 +66,7 @@
       "markup/telegram",
       "policy/laya"
     ],
-    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "base": "549f8b64d9b3f357c3dff124477502dc6fc467d6",
     "changed": 1792498974301
   },
   {
@@ -93,7 +93,7 @@
       "runs/road",
       "policy/laya"
     ],
-    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "base": "549f8b64d9b3f357c3dff124477502dc6fc467d6",
     "changed": 1792498974293
   },
   {
@@ -114,7 +114,7 @@
       "store/database",
       "store/tables"
     ],
-    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "base": "549f8b64d9b3f357c3dff124477502dc6fc467d6",
     "changed": 1792498974298
   },
   {
@@ -135,7 +135,7 @@
       "gates/laya",
       "store/database"
     ],
-    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "base": "549f8b64d9b3f357c3dff124477502dc6fc467d6",
     "changed": 1792498974295
   },
   {
@@ -155,7 +155,7 @@
     ],
     "aliases": [],
     "needs": [],
-    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "base": "549f8b64d9b3f357c3dff124477502dc6fc467d6",
     "changed": 1792498974314
   },
   {
@@ -183,7 +183,7 @@
       "policy/output",
       "store/database"
     ],
-    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "base": "549f8b64d9b3f357c3dff124477502dc6fc467d6",
     "changed": 1792498974306
   },
   {
@@ -207,7 +207,7 @@
       "markup/writing",
       "policy/translation"
     ],
-    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "base": "549f8b64d9b3f357c3dff124477502dc6fc467d6",
     "changed": 1792498974321
   },
   {
@@ -231,7 +231,7 @@
       "gates/stages",
       "store/database"
     ],
-    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "base": "549f8b64d9b3f357c3dff124477502dc6fc467d6",
     "changed": 1792498974303
   },
   {
@@ -256,7 +256,7 @@
       "runs/road",
       "calls/agency"
     ],
-    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "base": "549f8b64d9b3f357c3dff124477502dc6fc467d6",
     "changed": 1792498974318
   },
   {
@@ -278,7 +278,7 @@
       "policy/translation",
       "markup/reading"
     ],
-    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "base": "549f8b64d9b3f357c3dff124477502dc6fc467d6",
     "changed": 1792498974290
   },
   {
@@ -305,7 +305,7 @@
       "markup/writing",
       "store/database"
     ],
-    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "base": "549f8b64d9b3f357c3dff124477502dc6fc467d6",
     "changed": 1792498974308
   }
 ]

@@ -1,6 +1,7 @@
 [project]
 name = "bmo-llm"
 version = "0.2.0"
+license = { text = "MIT" }
 description = "The Laya service's front on its node: MCP and an OpenAI-compatible API over the Laya engine (docs/llm-server.md)"
 requires-python = ">=3.12,<3.13"
 dependencies = [

@@ -3,6 +3,7 @@ name = "gate-command"
 description = "The gate's unit command, bmo-gate: the nouns it declares, and the evaluation set, the replay bench, the Laya agreement and the format cases it carries."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 publish = false
 
 [dependencies]

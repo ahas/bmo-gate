@@ -8,6 +8,7 @@ resolver = "3"
 [workspace.package]
 version = "0.1.0-rev.1"
 edition = "2024"
+license = "MIT"
 
 [workspace.dependencies]
 async-trait = "0.1.92"
@@ -64,6 +65,7 @@ name = "bmo-gate"
 description = "The gate stage of a turn: sanitising, reference selection, the output gate, the translator, and Laya, the decision filter, with its runtime, its training and its weights' declarations kept apart."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 publish = false
 
 [dependencies]

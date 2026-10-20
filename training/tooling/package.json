@@ -2,6 +2,7 @@
   "name": "bmo-gate-tooling",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "devDependencies": {
     "bun-types": "^1.4.0",

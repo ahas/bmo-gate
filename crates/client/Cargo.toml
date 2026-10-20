@@ -3,6 +3,7 @@ name = "bmo-gate-client"
 description = "The gate's contract in Rust: every body as a type, every route as a call, and the OpenAPI document generated from those types."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 publish = false
 
 [dependencies]

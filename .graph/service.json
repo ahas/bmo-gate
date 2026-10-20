@@ -16,7 +16,7 @@
       "api/command",
       "laya/relay"
     ],
-    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "base": "549f8b64d9b3f357c3dff124477502dc6fc467d6",
     "changed": 1792498974224
   },
   {
@@ -34,7 +34,7 @@
     "needs": [
       "store/database"
     ],
-    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "base": "549f8b64d9b3f357c3dff124477502dc6fc467d6",
     "changed": 1792498974222
   },
   {
@@ -56,7 +56,7 @@
       "gates/laya-health",
       "store/database"
     ],
-    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "base": "549f8b64d9b3f357c3dff124477502dc6fc467d6",
     "changed": 1792498974220
   }
 ]

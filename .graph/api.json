@@ -16,7 +16,7 @@
       "console/domain",
       "contract/client"
     ],
-    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "base": "549f8b64d9b3f357c3dff124477502dc6fc467d6",
     "changed": 1792498974217,
     "boundary": {
       "side": "exposes"
@@ -49,7 +49,7 @@
       "command/reference-benches",
       "command/ceiling"
     ],
-    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "base": "549f8b64d9b3f357c3dff124477502dc6fc467d6",
     "changed": 1792498974215,
     "boundary": {
       "side": "exposes"
@@ -68,7 +68,7 @@
     "needs": [
       "gates/stages"
     ],
-    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "base": "549f8b64d9b3f357c3dff124477502dc6fc467d6",
     "changed": 1792498974213,
     "boundary": {
       "side": "exposes"
@@ -119,7 +119,7 @@
       "runs/records",
       "calls/receiver"
     ],
-    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "base": "549f8b64d9b3f357c3dff124477502dc6fc467d6",
     "changed": 1792499018778,
     "boundary": {
       "side": "exposes"

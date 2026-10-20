@@ -3,6 +3,7 @@ name = "gate-ports"
 description = "The gate's ports: every call it makes on another unit, each unit's as a trait and an HTTP client."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 publish = false
 
 [dependencies]

@@ -44,3 +44,7 @@ Every other unit is reached through standard APIs alone, and of other repositori
 ## Version
 
 The version stands in `VERSION` and in the workspace manifest, which hold the same number.
+
+## License
+
+MIT. The licence text stands in `LICENSE`, and every manifest declares the same licence.

@@ -3,6 +3,7 @@ name = "gate-reference"
 description = "A turn's reference: the room's standing memories and sheets, what the three reference gates, the person-book search and the situation-rule matcher pick from the brain's rows, and the watch on what attaches."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 publish = false
 
 [dependencies]
