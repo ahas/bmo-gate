@@ -1,5 +1,5 @@
-//! bmo-receiver's calls, with the bodies its gate port sends: a turn's envelope for its reference, words through
-//! the sanitiser, a room's judgements written and a round's put under its answer, and a companion's options copied.
+//! A turn's reference, words through the sanitiser, a room's judgements written and a round's put under its
+//! answer, and a companion's options copied.
 
 use gate_runs::records::now;
 use reqwest::StatusCode;
@@ -17,13 +17,13 @@ async fn a_turn_is_handed_the_reference_its_envelope_calls_for() {
     .post(
       "/reference/selected",
       json!({
-        "chat": ROOM,
-        "message": 9,
+        "roomId": ROOM,
+        "messageId": 9,
         "lines": ["Owner (id 5): how do deploys go?"],
-        "speakers": [5],
+        "speakerIds": [5],
         "round": "round-1",
-        "people_spoke": true,
-        "off": [],
+        "peopleSpoke": true,
+        "offGates": [],
         "records": true,
       }),
     )
@@ -50,14 +50,14 @@ async fn a_turn_with_a_situation_and_holds_is_read_with_them() {
     .post(
       "/reference/selected",
       json!({
-        "chat": ROOM,
+        "roomId": ROOM,
         "lines": ["Owner (id 5): good morning"],
-        "speakers": [5],
-        "situation": { "agent": "the-chat-agent", "room": "owner", "events": [{ "kind": "morning" }, { "kind": "item-due", "item": 12 }], "now": 1_700_000_000 },
+        "speakerIds": [5],
+        "situation": { "agentName": "the-chat-agent", "roomKind": "owner", "events": [{ "kind": "morning" }, { "kind": "item-due", "itemId": 12 }], "nowAt": 1_700_000_000_000_i64 },
         "holds": ["quiet"],
-        "people_spoke": true,
+        "peopleSpoke": true,
         "answered": "Good morning.",
-        "off": ["library-knowledge"],
+        "offGates": ["library-knowledge"],
         "lore": false,
         "records": false,
       }),
@@ -75,7 +75,7 @@ async fn words_with_nothing_worth_judging_come_back_as_they_are() {
   let (status, body) = ground
     .post(
       "/sanitised",
-      json!({ "text": "Plain words about lunch.", "label": "a room's message", "chat": ROOM, "message": 9 }),
+      json!({ "text": "Plain words about lunch.", "label": "a room's message", "roomId": ROOM, "messageId": 9 }),
     )
     .await;
 
@@ -84,36 +84,43 @@ async fn words_with_nothing_worth_judging_come_back_as_they_are() {
 }
 
 #[tokio::test]
-async fn a_judgement_is_written_as_it_comes_and_told_to_the_screens() {
+async fn a_judgement_is_written_as_it_comes_and_told_to_the_stream() {
   let ground = ground("judgement", |_| None).await;
   let mut heard = ground.app.stages.events.subscribe();
   let (status, body) = ground
     .post(
       "/judgements",
-      json!({ "chat": ROOM, "message": 9, "stage": "chat", "verdict": "SKIP", "detail": "nothing to say", "ms": 1200, "round": "round-1" }),
+      json!({ "roomId": ROOM, "messageId": 9, "gateName": "chat", "verdict": "SKIP", "detail": "nothing to say", "ms": 1200, "round": "round-1" }),
     )
     .await;
 
-  assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
-  assert_eq!(body, Value::Null);
+  assert_eq!(status, StatusCode::CREATED, "{body}");
+  assert_eq!(body["roomId"], ROOM);
+  assert_eq!(body["gateName"], "chat");
 
   let event = heard.recv().await.unwrap();
 
-  assert_eq!(event.kind, "judgement");
+  assert_eq!(event.kind, "judgement.created");
   assert_eq!(
-    (&event.body["chat"], &event.body["stage"], &event.body["verdict"], &event.body["round"]),
+    (
+      &event.data["roomId"],
+      &event.data["gateName"],
+      &event.data["verdict"],
+      &event.data["round"]
+    ),
     (&json!(ROOM), &json!("chat"), &json!("SKIP"), &json!("round-1"))
   );
 
   let (status, _) = ground
-    .post("/judgements", json!({ "chat": ROOM, "stage": "chat", "verdict": "ANSWER" }))
+    .post("/judgements", json!({ "roomId": ROOM, "gateName": "chat", "verdict": "ANSWER" }))
     .await;
 
-  assert_eq!(status, StatusCode::NO_CONTENT);
+  assert_eq!(status, StatusCode::CREATED);
   assert_eq!(
     ground.scratch.count("SELECT count(*) FROM judgements WHERE chat_id = 7", vec![]).await,
     2
   );
+  assert_eq!(body.as_object().unwrap().get("roads"), Some(&Value::Array(vec![])));
 }
 
 #[tokio::test]
@@ -131,14 +138,17 @@ async fn the_attach_puts_a_rounds_judgements_under_the_message_that_answered_it(
 
   for verdict in ["RE-ASK", "ANSWER"] {
     let (status, _) = ground
-      .post("/judgements", json!({ "chat": ROOM, "stage": "chat", "verdict": verdict }))
+      .post("/judgements", json!({ "roomId": ROOM, "gateName": "chat", "verdict": verdict }))
       .await;
 
-    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert_eq!(status, StatusCode::CREATED);
   }
 
   let (status, body) = ground
-    .post("/judgements/attached", json!({ "chat": ROOM, "message": 12, "since": now() - 60 }))
+    .post(
+      "/judgements/attached",
+      json!({ "roomId": ROOM, "messageId": 12, "since": now() - 60_000 }),
+    )
     .await;
 
   assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
@@ -162,7 +172,10 @@ async fn the_attach_puts_a_rounds_judgements_under_the_message_that_answered_it(
 async fn a_companion_is_handed_the_chat_agents_options() {
   let ground = ground("copied", |_| None).await;
   let (status, body) = ground
-    .post("/options/copied", json!({ "agent": "a-companion", "from": "the-chat-agent" }))
+    .post(
+      "/options/copied",
+      json!({ "agentName": "a-companion", "fromAgentName": "the-chat-agent" }),
+    )
     .await;
 
   assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
@@ -179,7 +192,7 @@ async fn a_companion_is_handed_the_chat_agents_options() {
   assert_eq!(copied, standing);
 
   let (status, _) = ground
-    .post("/options/copied", json!({ "agent": "another", "from": "nobody-at-all" }))
+    .post("/options/copied", json!({ "agentName": "another", "fromAgentName": "nobody-at-all" }))
     .await;
 
   assert_eq!(status, StatusCode::NO_CONTENT);

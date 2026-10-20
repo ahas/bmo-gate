@@ -1,46 +1,36 @@
-import { FetchError } from "ofetch";
+import { gateClient } from "bmo-gate-client";
+
+import type { paths } from "bmo-gate-client";
 
 import type { H3Event } from "h3";
+import type { Client } from "openapi-fetch";
 
-import type { GateRefusal } from "../../shared/gate";
+// One call to the gate (`docs/layout.md`, 「The console plugin bundle」) through the client generated from its
+// OpenAPI document, at the address and with the token the host's runtime configuration gives under `gate`, read
+// for each call.
 
-// One call to the gate (`docs/layout.md`, 「The console plugin bundle」): at the address and with the token the
-// host's runtime configuration gives under `gate`, read for each call. A refusal of the gate's is handed on with
-// its status and its code, the English sentence as its message; a gate that does not answer is a 502.
-export async function askGate<T>(
-  event: H3Event,
-  path: string,
-  options: { method?: "GET" | "POST"; body?: Record<string, unknown>; query?: Record<string, string> } = {}
-): Promise<T> {
+export function gateOf(event: H3Event): Client<paths> {
   const { gate } = useRuntimeConfig(event) as unknown as { gate: { address: string; token: string } };
 
   if (gate.address === "") {
-    throw createError({ statusCode: 503, message: "the console names no gate", data: { code: "no_gate_address" } });
+    throw createError({ statusCode: 503, message: "the console names no gate", data: { code: "no-gate-address" } });
   }
 
-  try {
-    // The gate is another service, so its answer is the shape its boundary states rather than one of this
-    // server's own routes.
-    const answer: unknown = await $fetch(path, {
-      baseURL: gate.address,
-      method: options.method ?? "GET",
-      body: options.body,
-      query: options.query,
-      headers: { authorization: `Bearer ${gate.token}` }
-    });
+  return gateClient(gate.address, gate.token);
+}
 
-    return answer as T;
-  } catch (cause) {
-    if (cause instanceof FetchError && cause.statusCode !== undefined) {
-      const refusal = cause.data as Partial<GateRefusal> | undefined;
+/** A refusal of the gate's, handed on with its status, its code and its sentence. */
+export function refused(status: number, answer: { code?: string; error?: string } | undefined): never {
+  throw createError({
+    statusCode: status,
+    message: typeof answer?.error === "string" ? answer.error : `the gate answered ${status}`,
+    data: { code: typeof answer?.code === "string" ? answer.code : "gate-refused" }
+  });
+}
 
-      throw createError({
-        statusCode: cause.statusCode,
-        message: typeof refusal?.error === "string" ? refusal.error : `the gate answered ${cause.statusCode}`,
-        data: { code: typeof refusal?.code === "string" ? refusal.code : "gate_refused" }
-      });
-    }
+/** A gate that did not answer at all. */
+export function unreachable(cause: unknown): never {
+  const message = cause instanceof Error ? cause.message : "the gate does not answer";
 
-    throw createError({ statusCode: 502, message: "the gate does not answer", data: { code: "gate_unreachable" } });
-  }
+  throw createError({ statusCode: 502, message, data: { code: "gate-unreachable" } });
 }

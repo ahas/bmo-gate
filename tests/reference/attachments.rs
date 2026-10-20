@@ -3,13 +3,13 @@
 
 use gate_ports::job::Raised;
 use gate_reference::attachments::{
-  ALARM_MINIMUM, Alarm, AttachRow, RECENT_SECONDS, Share, alarms, judgement, pass, row_title, shares,
+  ALARM_MINIMUM, Alarm, AttachRow, RECENT_MS, Share, alarms, judgement, pass, row_title, shares,
 };
 
 use crate::fakes::FakeJob;
 use crate::ground;
 
-const NOW: i64 = 1_800_000_000;
+const NOW: i64 = 1_800_000_000_000;
 
 /// A gate asked on so many turns, attaching a piece on the first few of them. The turns stand a
 /// minute apart and the last of them at `latest`; `first` is the message number the first is given.
@@ -17,7 +17,7 @@ fn turns(stage: &str, asked: i64, pieces: &[(&str, i64)], first: i64, latest: i6
   let mut rows = Vec::new();
 
   for turn in 0..asked {
-    let at = latest - (asked - 1 - turn) * 60;
+    let at = latest - (asked - 1 - turn) * 60_000;
     let row = |slug: &str, attached: bool| AttachRow {
       stage: stage.to_owned(),
       chat_id: -1,
@@ -82,7 +82,7 @@ fn a_piece_past_the_line_on_a_gate_asked_often_enough_is_an_alarm_and_nothing_be
 // the piece has already come down on the turns after it.
 #[test]
 fn a_piece_past_the_line_over_the_day_but_not_over_its_latest_half_is_left() {
-  let before = turns("system-documents", 30, &[("structure", 30)], 0, NOW - RECENT_SECONDS - 3_600);
+  let before = turns("system-documents", 30, &[("structure", 30)], 0, NOW - RECENT_MS - 3_600_000);
 
   assert!(
     alarms(

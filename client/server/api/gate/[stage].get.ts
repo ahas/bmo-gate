@@ -1,4 +1,4 @@
-import { askGate } from "../../utils/gate";
+import { gateOf, refused, unreachable } from "../../utils/gate";
 
 import type { Trial } from "../../../shared/gate";
 
@@ -6,10 +6,26 @@ import type { Trial } from "../../../shared/gate";
 export default defineEventHandler(async (event): Promise<Trial[]> => {
   await requireUserSession(event);
 
-  const stage = getRouterParam(event, "stage") ?? "";
+  const gateName = getRouterParam(event, "stage") ?? "";
   const limit = getQuery(event).limit;
-  const query: Record<string, string> = typeof limit === "string" && /^\d+$/.test(limit) ? { limit } : {};
-  const answer = await askGate<{ trials: Trial[] }>(event, `/trials/${encodeURIComponent(stage)}`, { query });
+  const count = typeof limit === "string" && /^\d+$/.test(limit) ? Number(limit) : undefined;
+  const client = gateOf(event);
 
-  return answer.trials;
+  try {
+    const { data, error, response } = await client.GET("/trials", {
+      params: { query: { gateName, limit: count } }
+    });
+
+    if (error !== undefined) {
+      return refused(response.status, error);
+    }
+
+    return data?.items ?? [];
+  } catch (cause) {
+    if (cause instanceof Error && "statusCode" in cause) {
+      throw cause;
+    }
+
+    return unreachable(cause);
+  }
 });

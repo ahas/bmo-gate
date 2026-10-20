@@ -31,13 +31,10 @@ fn the_defaults_carry_the_gates_own_answer_room_and_mode() {
   assert_eq!(defaults(of("room-rules")).answer_tokens, options::DEFAULT_ANSWER_TOKENS);
 }
 
-/// A refusal's code and the mode refusal's beside it.
-type Refused = (Code, Option<Code>);
+type Refused = Code;
 
 fn refused(result: Result<(), Refusal>) -> Refused {
-  let refusal = result.unwrap_err();
-
-  (refusal.code, refusal.reason)
+  result.unwrap_err().code
 }
 
 #[tokio::test]
@@ -49,29 +46,21 @@ async fn a_change_is_refused_with_the_code_that_says_why() {
   agency.providers.lock().unwrap().push(provider("claude-code", false));
 
   let cases: [(&str, Value, Refused); 11] = [
-    ("no-such-gate", json!({ "timeout_ms": 5000 }), (Code::NoGate, None)),
-    ("room-rules", json!({ "thinking": true }), (Code::OwnLlm, None)),
-    ("room-rules", json!({}), (Code::NothingToChange, None)),
+    ("no-such-gate", json!({ "timeoutMs": 5000 }), Code::NoGate),
+    ("room-rules", json!({ "thinking": true }), Code::OwnLlm),
+    ("room-rules", json!({}), Code::NothingToChange),
     (
       "room-rules",
-      json!({ "laya_fallback": "a-provider-nobody-has" }),
-      (Code::LayaFallbackUnknown, None),
+      json!({ "layaFallback": "a-provider-nobody-has" }),
+      Code::LayaFallbackUnknown,
     ),
-    ("room-rules", json!({ "enabled": "yes" }), (Code::SwitchNotBoolean, None)),
-    ("room-rules", json!({ "enabled": false }), (Code::AlwaysOn, None)),
-    ("room-rules", json!({ "timeout_ms": 999 }), (Code::TimeoutOutOfRange, None)),
-    ("room-rules", json!({ "laya_mode": "loud" }), (Code::LayaModeUnknown, None)),
-    ("room-rules", json!({ "laya_tau": 1.5 }), (Code::LayaTauOutOfRange, None)),
-    (
-      "translator",
-      json!({ "laya_mode": "shadow" }),
-      (Code::LayaModeRefused, Some(Code::NoProbe)),
-    ),
-    (
-      "room-rules",
-      json!({ "laya_mode": "asymmetric", "laya_tau": 0.9 }),
-      (Code::LayaModeRefused, Some(Code::NoSafeVerdict)),
-    ),
+    ("room-rules", json!({ "enabled": "yes" }), Code::SwitchNotBoolean),
+    ("room-rules", json!({ "enabled": false }), Code::AlwaysOn),
+    ("room-rules", json!({ "timeoutMs": 999 }), Code::TimeoutOutOfRange),
+    ("room-rules", json!({ "layaMode": "loud" }), Code::LayaModeUnknown),
+    ("room-rules", json!({ "layaTau": 1.5 }), Code::LayaTauOutOfRange),
+    ("translator", json!({ "layaMode": "shadow" }), Code::NoProbe),
+    ("room-rules", json!({ "layaMode": "asymmetric", "layaTau": 0.9 }), Code::NoSafeVerdict),
   ];
 
   for (key, body, expected) in cases {
@@ -79,8 +68,8 @@ async fn a_change_is_refused_with_the_code_that_says_why() {
   }
 
   assert_eq!(
-    refused(change(&runs, "room-rules", &json!({ "laya_mode": "filter", "laya_tau": 0.9 }), at).await),
-    (Code::LayaModeRefused, Some(Code::NoCheckpoint))
+    refused(change(&runs, "room-rules", &json!({ "layaMode": "filter", "layaTau": 0.9 }), at).await),
+    Code::NoCheckpoint
   );
 
   scratch
@@ -92,11 +81,11 @@ async fn a_change_is_refused_with_the_code_that_says_why() {
     .unwrap();
 
   assert_eq!(
-    refused(change(&runs, "room-rules", &json!({ "laya_mode": "filter" }), at).await),
-    (Code::LayaModeRefused, Some(Code::NeedsTau))
+    refused(change(&runs, "room-rules", &json!({ "layaMode": "filter" }), at).await),
+    Code::NeedsTau
   );
   assert_eq!(options::checkpoints(scratch.db()).await.unwrap(), ["room-rules", "sanitizer"]);
-  change(&runs, "room-rules", &json!({ "laya_mode": "filter", "laya_tau": 0.9 }), at)
+  change(&runs, "room-rules", &json!({ "layaMode": "filter", "layaTau": 0.9 }), at)
     .await
     .unwrap();
   assert_eq!(scratch.count("SELECT count(*) FROM gate_options", vec![]).await, 1);
@@ -114,7 +103,7 @@ async fn each_field_is_written_on_its_own_for_the_chat_agent_and_read_back_by_th
     .unwrap()
     .insert("registry".into(), mapping("registry", "a-registration", Some("thinking"), Some(4000)));
   wait(&runs, "voice-polish", 20_000).await;
-  change(&runs, "voice-polish", &json!({ "enabled": false, "laya_fallback": "none" }), 9)
+  change(&runs, "voice-polish", &json!({ "enabled": false, "layaFallback": "none" }), 9)
     .await
     .unwrap();
 

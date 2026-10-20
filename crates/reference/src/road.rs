@@ -474,7 +474,7 @@ async fn narrowed(
       text,
       speakers,
       names: owner_names(reference, &rows).await,
-      recent_since: Some(narrow::recent_since_of(now() * 1000)),
+      recent_since: Some(narrow::recent_since_of(now())),
       rules: rules.clone(),
     },
   );

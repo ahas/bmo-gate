@@ -1,5 +1,5 @@
-//! The gate's codes: each spelled in both wire families and read back, and `docs/codes.md` naming the very
-//! codes the crate holds, no more and no fewer.
+//! The gate's codes: each read back from its word, and `docs/codes.md` naming the very codes the crate holds,
+//! no more and no fewer.
 
 use std::collections::BTreeSet;
 
@@ -7,13 +7,12 @@ use gate_codes::Code;
 use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
 
 #[test]
-fn every_code_reads_back_from_either_spelling() {
+fn every_code_reads_back_from_its_word() {
   for code in Code::ALL {
     assert_eq!(Code::named(code.as_str()), Some(code));
-    assert_eq!(Code::named(&code.kebab()), Some(code));
     assert!((400..600).contains(&code.status()), "{code:?} goes out under {}", code.status());
   }
-  assert_eq!(Code::named("no_such_code"), None);
+  assert_eq!(Code::named("no-such-code"), None);
 }
 
 /// The code in the first cell of every body row of every table in the document.

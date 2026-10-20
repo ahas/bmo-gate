@@ -1,4 +1,4 @@
-import { askGate } from "../utils/gate";
+import { gateOf, refused, unreachable } from "../utils/gate";
 
 import type { LayaView } from "../../shared/gate";
 
@@ -7,5 +7,21 @@ import type { LayaView } from "../../shared/gate";
 export default defineEventHandler(async (event): Promise<LayaView> => {
   await requireUserSession(event);
 
-  return askGate<LayaView>(event, "/laya");
+  const client = gateOf(event);
+
+  try {
+    const { data, error, response } = await client.GET("/laya");
+
+    if (error !== undefined) {
+      return refused(response.status, error);
+    }
+
+    return data as LayaView;
+  } catch (cause) {
+    if (cause instanceof Error && "statusCode" in cause) {
+      throw cause;
+    }
+
+    return unreachable(cause);
+  }
 });

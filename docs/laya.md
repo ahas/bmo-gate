@@ -274,7 +274,7 @@ mode other than `off`.
 ## Mode and τ per gate
 
 - **Where they live:** the gate's row of the gate options table (`gate_options`), in the columns
-  `laya_mode` and `laya_tau`, beside its time limit (the agency's `docs/own-llm.md`, 「Per-gate time limit」). An empty
+  `layaMode` and `layaTau`, beside its time limit (the agency's `docs/own-llm.md`, 「Per-gate time limit」). An empty
   mode means the gate's profile default.
 - **The profile defaults:** `shadow` for the formatting gate on an LLM road, the three reference
   gates, the person-book search and the situation-rule matcher; `off` for the
@@ -298,7 +298,7 @@ mode other than `off`.
 - **Each field is written on its own:** a change of the time limit, the mode or τ leaves the other two
   as the row had them.
 - **Where they are chosen:** the gate's row in the gates tab of the agent management screen
-  (the web unit's `docs/web.md`), through `POST /options/{key}`; the gate writes the row, the console never
+  (the web unit's `docs/web.md`), through `POST /options/{gateName}`; the gate writes the row, the console never
   does.
 - **Who decides:** choosing τ for a gate and moving it from `shadow` to `filter` or `asymmetric` is
   the owner's decision, made after they have seen that gate's agreement numbers. No job and no agent makes that
@@ -328,12 +328,12 @@ mode other than `off`.
 - **What it keeps:** one row in the gate's `laya_health` table: the state — `up`, the failure
   kind, or `off` where no address is set and nothing is asked; no row at all reads as not yet checked —
   the model, the device, the VRAM, the load time and versions, the address it asked, how long the check
-  took, and when it was checked and when it last answered, in unix seconds. A failed check keeps what
+  took, and when it was checked and when it last answered, in epoch milliseconds. A failed check keeps what
   the server last said about itself.
 - **What the console reads** is that row and every gate's agreement, through `GET /laya`, with each probed
   gate's mode and τ read from its own row of the gate options; the node the address names is where the
   state leads (the web unit's `docs/web.md`).
-- **When the state or the model moves**, the gate puts `laya` into its event stream (`GET /events`), so an
+- **When the state or the model moves**, the gate puts `laya.changed` into its event stream (`GET /events`), so an
   open screen reads the row again.
 - **The node check is not involved.** A node's state says whether the machine is reached; Laya's state
   says whether this one service answers, and belongs to the module that uses it (the node unit's `docs/nodes.md`).

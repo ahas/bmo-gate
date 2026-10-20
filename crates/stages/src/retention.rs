@@ -6,20 +6,19 @@ use sea_orm::{DatabaseConnection, DbErr};
 
 use crate::sql::run;
 
-/// How long a format case is kept, in seconds.
-pub const FORMAT_CASES_SECONDS: i64 = 90 * 24 * 60 * 60;
+/// How long a format case is kept, in milliseconds.
+pub const FORMAT_CASES_MS: i64 = 90 * 24 * 60 * 60 * 1_000;
 
-/// How long a sanitiser's verdict is kept, in seconds.
-pub const SANITISED_SECONDS: i64 = 90 * 24 * 60 * 60;
+/// How long a sanitiser's verdict is kept, in milliseconds.
+pub const SANITISED_MS: i64 = 90 * 24 * 60 * 60 * 1_000;
 
-/// Every bounded table held to its bound at `now`, in Unix seconds: how many rows each gave up, by table.
+/// Every bounded table held to its bound at `now`, in epoch milliseconds: how many rows each gave up, by table.
 pub async fn sweep(db: &DatabaseConnection, now: i64) -> Result<Vec<(&'static str, u64)>, DbErr> {
   let mut swept = vec![];
 
-  for (table, column, kept) in [
-    ("format_cases", "at", FORMAT_CASES_SECONDS),
-    ("sanitised_texts", "judged_at", SANITISED_SECONDS),
-  ] {
+  for (table, column, kept) in
+    [("format_cases", "at", FORMAT_CASES_MS), ("sanitised_texts", "judged_at", SANITISED_MS)]
+  {
     let gone = run(
       db,
       &format!(r#"DELETE FROM "{table}" WHERE "{column}" < $1"#),

@@ -6,6 +6,7 @@ edition.workspace = true
 publish = false
 
 [dependencies]
+bmo-gate-client.workspace = true
 axum.workspace = true
 futures-util.workspace = true
 gate-codes.workspace = true

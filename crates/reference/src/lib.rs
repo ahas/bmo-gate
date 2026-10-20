@@ -36,6 +36,22 @@ pub enum Source {
   Archive,
 }
 
+impl Source {
+  /// The word the reference answer carries.
+  pub fn as_str(self) -> &'static str {
+    match self {
+      Self::Document => "document",
+      Self::Person => "person",
+      Self::Rule => "rule",
+      Self::Situation => "situation",
+      Self::Knowledge => "knowledge",
+      Self::Memory => "memory",
+      Self::Room => "room",
+      Self::Archive => "archive",
+    }
+  }
+}
+
 /// One piece a turn is handed: where it was read from, its text and what sort of thing it is; and, kept to the
 /// road, the fragment row it was offered from where it was offered from one.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]

@@ -33,12 +33,10 @@ pub const LAYA_MODES: [&str; 4] = ["off", "shadow", "filter", "asymmetric"];
 /// What a gate's fallback setting says where it asks no LLM at all.
 pub const NO_LAYA_FALLBACK: &str = "none";
 
-/// Why a change was not taken: its code, the code of the mode refusal beside it where it is one, and the
-/// sentence naming why.
+/// Why a change was not taken: its code and the sentence naming why.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Refusal {
   pub code: Code,
-  pub reason: Option<Code>,
   pub error: String,
 }
 
@@ -46,25 +44,21 @@ impl Refusal {
   fn of(code: Code, error: impl Into<String>) -> Self {
     Self {
       code,
-      reason: None,
       error: error.into(),
     }
   }
 
+  /// A mode the gate cannot run in: the reason's own code stands for the refusal.
   fn mode(reason: Code, error: impl Into<String>) -> Self {
-    Self {
-      code: Code::LayaModeRefused,
-      reason: Some(reason),
-      error: error.into(),
-    }
+    Self::of(reason, error)
   }
 
   fn database(why: DbErr) -> Self {
-    Self::of(Code::Database, why.to_string())
+    Self::of(Code::Failed, why.to_string())
   }
 
   fn unit(why: GateError) -> Self {
-    Self::of(Code::UnitFailed, why.to_string())
+    Self::of(Code::UpstreamFailed, why.to_string())
   }
 }
 
@@ -130,6 +124,7 @@ pub fn effective_mode(profile: &Profile, chosen: Option<&str>, tau: Option<f64>)
 
 /// What a gate asks for where its tier says nothing and its row names no Laya mode.
 #[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Defaults {
   pub thinking: bool,
   pub answer_tokens: i64,
@@ -166,6 +161,7 @@ pub fn answer_room(stage: &str, mapping: Option<&Mapping>) -> i64 {
 /// What a gate actually runs on: on a registered model what it asks that road for, the defaults otherwise; and
 /// its own row's wait, Laya mode and τ.
 #[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Effective {
   pub thinking: bool,
   pub answer_tokens: i64,
@@ -177,6 +173,7 @@ pub struct Effective {
 /// One gate's options as the screen reads them: what the owner chose, field by field, what the gate runs on,
 /// and the defaults a blank stands for.
 #[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct View {
   pub timeout_ms: Option<i64>,
   pub laya_mode: Option<String>,
@@ -224,6 +221,7 @@ pub async fn view(runs: &Runs, key: &str) -> Result<View, Refusal> {
 /// A gate's route as a run reads it: the provider its road begins on, the model its tier maps there, whether it
 /// stands on Laya, its wait and when its route was last set.
 #[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RouteView {
   pub provider: String,
   pub model: String,
@@ -332,12 +330,12 @@ pub async fn change(runs: &Runs, key: &str, body: &Value, at: i64) -> Result<(),
   let profile = profile(key)?;
   let sent = |field: &str| body.get(field);
 
-  if sent("thinking").is_some() || sent("answer_tokens").is_some() {
+  if sent("thinking").is_some() || sent("answerTokens").is_some() {
     return Err(Refusal::of(Code::OwnLlm, words::OWN_LLM));
   }
 
   let [timeout, mode, tau, enabled, fallback] =
-    ["timeout_ms", "laya_mode", "laya_tau", "enabled", "laya_fallback"].map(sent);
+    ["timeoutMs", "layaMode", "layaTau", "enabled", "layaFallback"].map(sent);
 
   if [timeout, mode, tau, enabled, fallback].iter().all(Option::is_none) {
     return Err(Refusal::of(Code::NothingToChange, words::NOTHING));

@@ -1,0 +1,17 @@
+[package]
+name = "bmo-gate-client"
+description = "The gate's contract in Rust: every body as a type, every route as a call, and the OpenAPI document generated from those types."
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+futures-util.workspace = true
+gate-codes.workspace = true
+reqwest = { workspace = true, features = ["rustls", "stream"] }
+schemars.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sse-stream.workspace = true
+thiserror.workspace = true
+url.workspace = true

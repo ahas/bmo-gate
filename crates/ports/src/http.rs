@@ -88,7 +88,7 @@ impl PortError {
   pub fn code(&self) -> Code {
     match self {
       PortError::NotAnAddress { .. } => Code::NotReady,
-      _ => Code::UnitFailed,
+      _ => Code::UpstreamFailed,
     }
   }
 

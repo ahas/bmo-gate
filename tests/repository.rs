@@ -15,8 +15,9 @@ use serde_json::Value;
 
 const ROOT: &str = env!("CARGO_MANIFEST_DIR");
 
-/// The only `bmo-*` packages a manifest here may depend on: the base libraries.
-const BASE_LIBRARIES: [&str; 3] = ["bmo-chat", "bmo-chat-client", "bmo-ui"];
+/// The only `bmo-*` packages a manifest here may depend on: the base libraries, and the gate's own contract
+/// package.
+const BASE_LIBRARIES: [&str; 4] = ["bmo-chat", "bmo-chat-client", "bmo-ui", "bmo-gate-client"];
 
 /// The testbed's test kit, which a Bun project may take as a dev-dependency beside the base libraries.
 const TEST_KIT: &str = "@bmo-testbed/testkit";

@@ -217,7 +217,7 @@ pub struct Verdict {
 // What the record keeps: the newest rows of each gate, none older than a year, swept every few thousand rows
 // written by this service.
 const KEEP_PER_STAGE: i64 = 100_000;
-const KEEP_SECONDS: i64 = 365 * 24 * 60 * 60;
+const KEEP_MS: i64 = 365 * 24 * 60 * 60 * 1_000;
 const SWEEP_EVERY: usize = 2_000;
 
 static SINCE_SWEEP: AtomicUsize = AtomicUsize::new(0);
@@ -262,7 +262,7 @@ pub async fn record_verdicts(db: &DatabaseConnection, rows: &[Verdict]) {
 
   if SINCE_SWEEP.fetch_add(rows.len(), Ordering::Relaxed) + rows.len() >= SWEEP_EVERY {
     SINCE_SWEEP.store(0, Ordering::Relaxed);
-    sweep(db, now - KEEP_SECONDS).await;
+    sweep(db, now - KEEP_MS).await;
   }
 }
 

@@ -67,8 +67,8 @@ async fn an_order_is_queued_each_part_written_and_told_to_the_screens() {
   for _ in 0..2 {
     let event = tokio::time::timeout(Duration::from_secs(10), heard.recv()).await.unwrap().unwrap();
 
-    assert_eq!(event.kind, "document-translation");
-    assert_eq!(event.body["document"], "docs/a.md");
+    assert_eq!(event.kind, "document-translation.changed");
+    assert_eq!(event.data["document"], "docs/a.md");
   }
 
   assert_eq!(queue.state("docs/a.md", "ko").pending, 0);

@@ -1,9 +1,9 @@
-import { askGate } from "../utils/gate";
+import { gateOf, refused, unreachable } from "../utils/gate";
 
 import type { Trial } from "../../shared/gate";
 
 interface Asked {
-  stage?: unknown;
+  gateName?: unknown;
   prompt?: unknown;
 }
 
@@ -13,16 +13,34 @@ interface Asked {
 export default defineEventHandler(async (event): Promise<Trial> => {
   const session = await requireUserSession(event);
   const asked = await readBody<Asked>(event);
-  const stage = typeof asked?.stage === "string" ? asked.stage : "";
+  const gateName = typeof asked?.gateName === "string" ? asked.gateName : "";
   const prompt = typeof asked?.prompt === "string" ? asked.prompt.trim() : "";
 
-  if (stage === "") {
-    throw createError({ statusCode: 400, message: "the trial names no gate", data: { code: "no_gate" } });
+  if (gateName === "") {
+    throw createError({ statusCode: 400, message: "the trial names no gate", data: { code: "no-gate" } });
   }
 
   if (prompt === "") {
-    throw createError({ statusCode: 400, message: "the trial asks nothing", data: { code: "question_empty" } });
+    throw createError({ statusCode: 400, message: "the trial asks nothing", data: { code: "question-empty" } });
   }
 
-  return askGate<Trial>(event, "/trials", { method: "POST", body: { stage, prompt, user: session.user.name } });
+  const client = gateOf(event);
+
+  try {
+    const { data, error, response } = await client.POST("/trials", {
+      body: { gateName, prompt, userName: session.user.name }
+    });
+
+    if (error !== undefined) {
+      return refused(response.status, error);
+    }
+
+    return data as Trial;
+  } catch (cause) {
+    if (cause instanceof Error && "statusCode" in cause) {
+      throw cause;
+    }
+
+    return unreachable(cause);
+  }
 });

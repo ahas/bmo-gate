@@ -1,17 +1,18 @@
 //! The gate's codes (`docs/codes.md`): every refusal the gate answers with, the status it goes out under, and
-//! how each wire family spells it. A caller decides on the code and never on the sentence beside it.
+//! the kebab-case word it is written as. A caller decides on the code and never on the sentence beside it.
 
 /// One code of the gate's.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Code {
-  BodyNotJson,
-  FieldWrong,
+  BadRequest,
   Unauthorized,
-  RouteAbsent,
-  NotReady,
-  Database,
+  NoRoute,
+  NotFound,
+  Conflict,
+  TooLarge,
   Failed,
-  UnitFailed,
+  UpstreamFailed,
+  NotReady,
   Stopped,
   NoGate,
   NoAnswer,
@@ -21,7 +22,6 @@ pub enum Code {
   SwitchNotBoolean,
   AlwaysOn,
   LayaModeUnknown,
-  LayaModeRefused,
   LayaTauOutOfRange,
   LayaFallbackUnknown,
   NoProbe,
@@ -30,20 +30,20 @@ pub enum Code {
   NeedsTau,
   DocumentUnknown,
   LanguageUnknown,
-  PromptTooLong,
 }
 
 impl Code {
   /// Every code, in the order `docs/codes.md` lists them.
-  pub const ALL: [Code; 27] = [
-    Code::BodyNotJson,
-    Code::FieldWrong,
+  pub const ALL: [Code; 26] = [
+    Code::BadRequest,
     Code::Unauthorized,
-    Code::RouteAbsent,
-    Code::NotReady,
-    Code::Database,
+    Code::NoRoute,
+    Code::NotFound,
+    Code::Conflict,
+    Code::TooLarge,
     Code::Failed,
-    Code::UnitFailed,
+    Code::UpstreamFailed,
+    Code::NotReady,
     Code::Stopped,
     Code::NoGate,
     Code::NoAnswer,
@@ -53,7 +53,6 @@ impl Code {
     Code::SwitchNotBoolean,
     Code::AlwaysOn,
     Code::LayaModeUnknown,
-    Code::LayaModeRefused,
     Code::LayaTauOutOfRange,
     Code::LayaFallbackUnknown,
     Code::NoProbe,
@@ -62,82 +61,69 @@ impl Code {
     Code::NeedsTau,
     Code::DocumentUnknown,
     Code::LanguageUnknown,
-    Code::PromptTooLong,
   ];
 
-  /// The code as the units' family spells it: snake_case.
+  /// The code as the wire spells it: kebab-case.
   pub fn as_str(self) -> &'static str {
     match self {
-      Code::BodyNotJson => "body_not_json",
-      Code::FieldWrong => "field_wrong",
+      Code::BadRequest => "bad-request",
       Code::Unauthorized => "unauthorized",
-      Code::RouteAbsent => "route_absent",
-      Code::NotReady => "not_ready",
-      Code::Database => "database",
+      Code::NoRoute => "no-route",
+      Code::NotFound => "not-found",
+      Code::Conflict => "conflict",
+      Code::TooLarge => "too-large",
       Code::Failed => "failed",
-      Code::UnitFailed => "unit_failed",
+      Code::UpstreamFailed => "upstream-failed",
+      Code::NotReady => "not-ready",
       Code::Stopped => "stopped",
-      Code::NoGate => "no_gate",
-      Code::NoAnswer => "no_answer",
-      Code::NothingToChange => "nothing_to_change",
-      Code::OwnLlm => "own_llm",
-      Code::TimeoutOutOfRange => "timeout_out_of_range",
-      Code::SwitchNotBoolean => "switch_not_boolean",
-      Code::AlwaysOn => "always_on",
-      Code::LayaModeUnknown => "laya_mode_unknown",
-      Code::LayaModeRefused => "laya_mode_refused",
-      Code::LayaTauOutOfRange => "laya_tau_out_of_range",
-      Code::LayaFallbackUnknown => "laya_fallback_unknown",
-      Code::NoProbe => "no_probe",
-      Code::NoSafeVerdict => "no_safe_verdict",
-      Code::NoCheckpoint => "no_checkpoint",
-      Code::NeedsTau => "needs_tau",
-      Code::DocumentUnknown => "document_unknown",
-      Code::LanguageUnknown => "language_unknown",
-      Code::PromptTooLong => "prompt_too_long",
+      Code::NoGate => "no-gate",
+      Code::NoAnswer => "no-answer",
+      Code::NothingToChange => "nothing-to-change",
+      Code::OwnLlm => "own-llm",
+      Code::TimeoutOutOfRange => "timeout-out-of-range",
+      Code::SwitchNotBoolean => "switch-not-boolean",
+      Code::AlwaysOn => "always-on",
+      Code::LayaModeUnknown => "laya-mode-unknown",
+      Code::LayaTauOutOfRange => "laya-tau-out-of-range",
+      Code::LayaFallbackUnknown => "laya-fallback-unknown",
+      Code::NoProbe => "no-probe",
+      Code::NoSafeVerdict => "no-safe-verdict",
+      Code::NoCheckpoint => "no-checkpoint",
+      Code::NeedsTau => "needs-tau",
+      Code::DocumentUnknown => "document-unknown",
+      Code::LanguageUnknown => "language-unknown",
     }
   }
 
-  /// The code as the brain's family spells it: kebab-case.
-  pub fn kebab(self) -> String {
-    self.as_str().replace('_', "-")
-  }
-
-  /// The status the code goes out under. A Laya mode refusal is no answer of its own: it rides beside
-  /// `laya_mode_refused`, and is answered under that one's status.
+  /// The status the code goes out under.
   pub fn status(self) -> u16 {
     match self {
-      Code::BodyNotJson
-      | Code::FieldWrong
-      | Code::NothingToChange
-      | Code::OwnLlm
+      Code::BadRequest | Code::NothingToChange => 400,
+      Code::Unauthorized => 401,
+      Code::NoRoute | Code::NotFound | Code::NoGate => 404,
+      Code::Conflict | Code::Stopped => 409,
+      Code::TooLarge => 413,
+      Code::OwnLlm
       | Code::TimeoutOutOfRange
       | Code::SwitchNotBoolean
+      | Code::AlwaysOn
       | Code::LayaModeUnknown
       | Code::LayaTauOutOfRange
       | Code::LayaFallbackUnknown
-      | Code::DocumentUnknown
-      | Code::LanguageUnknown
-      | Code::PromptTooLong => 400,
-      Code::Unauthorized => 401,
-      Code::RouteAbsent | Code::NoGate => 404,
-      Code::Stopped
-      | Code::AlwaysOn
-      | Code::LayaModeRefused
       | Code::NoProbe
       | Code::NoSafeVerdict
       | Code::NoCheckpoint
-      | Code::NeedsTau => 409,
-      Code::Database | Code::Failed => 500,
-      Code::UnitFailed | Code::NoAnswer => 502,
+      | Code::NeedsTau
+      | Code::DocumentUnknown
+      | Code::LanguageUnknown => 422,
+      Code::Failed => 500,
+      Code::UpstreamFailed | Code::NoAnswer => 502,
       Code::NotReady => 503,
     }
   }
 
-  /// The code a spelling of either family names, or none.
+  /// The code a word names, or none.
   pub fn named(spelled: &str) -> Option<Code> {
-    let snake = spelled.replace('-', "_");
-
-    Code::ALL.into_iter().find(|code| code.as_str() == snake)
+    Code::ALL.into_iter().find(|code| code.as_str() == spelled)
   }
 }

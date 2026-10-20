@@ -509,7 +509,7 @@ checkout, and refuses a folder already holding a frozen dataset.
 
 ## What training never touches
 
-- **A gate's `laya_mode` and `laya_tau` stay as they are.** Choosing τ and moving a gate off
+- **A gate's `layaMode` and `layaTau` stay as they are.** Choosing τ and moving a gate off
   `shadow` is the owner's decision, made after they have seen that gate's numbers (`docs/laya.md`,
 
   「Who decides」).

@@ -61,7 +61,7 @@ async fn bearer(State(app): State<Arc<App>>, request: Request, next: Next) -> Re
 }
 
 async fn absent() -> Refused {
-  Refused::new(Code::RouteAbsent, "no route answers this method and path")
+  Refused::new(Code::NoRoute, "no route answers this method and path")
 }
 
 /// Every route, behind the bearer check.

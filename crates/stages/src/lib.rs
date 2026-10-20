@@ -54,19 +54,22 @@ impl Reading {
   }
 }
 
-/// One event the gate tells its screens of: its kind and its body.
+/// One event the gate tells its readers of: its number, its kind, when it happened and the member it carries.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Event {
+  pub id: i64,
   pub kind: &'static str,
-  pub body: Value,
+  pub at: i64,
+  pub data: Value,
 }
 
-/// What every gate stands on: the runs, the Laya side, what a text is read by, and the events its screens hear.
+/// What every gate stands on: the runs, the Laya side, what a text is read by, and the events its readers hear.
 pub struct Stages {
   pub runs: Runs,
   pub laya: laya::Side,
   pub reading: Reading,
   pub events: broadcast::Sender<Event>,
+  next_event: std::sync::atomic::AtomicI64,
 }
 
 impl Stages {
@@ -78,11 +81,15 @@ impl Stages {
       laya,
       reading,
       events,
+      next_event: std::sync::atomic::AtomicI64::new(1),
     }
   }
 
-  /// An event told to every screen listening; none listening is no fault.
-  pub fn publish(&self, kind: &'static str, body: Value) {
-    let _ = self.events.send(Event { kind, body });
+  /// An event told to every reader listening; none listening is no fault.
+  pub fn publish(&self, kind: &'static str, data: Value) {
+    let id = self.next_event.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let at = gate_runs::records::now();
+
+    let _ = self.events.send(Event { id, kind, at, data });
   }
 }

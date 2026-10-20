@@ -66,7 +66,7 @@ async fn a_refusal_is_handed_on_with_its_status_code_and_sentence() {
       error: "the run was stopped".into()
     }
   );
-  assert_eq!(refused.code(), Code::UnitFailed);
+  assert_eq!(refused.code(), Code::UpstreamFailed);
   assert_eq!(refused.refused_with(), Some("stopped"));
 }
 

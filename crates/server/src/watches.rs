@@ -104,7 +104,9 @@ pub async fn health_pass(app: &App) {
 
   match laya_health::pass(db, &app.stages.laya, now()).await {
     Ok(true) => match laya_health::read(db).await {
-      Ok(health) => app.stages.publish("laya", json!({ "state": health.state, "model": health.model })),
+      Ok(health) => app
+        .stages
+        .publish("laya.changed", json!({ "state": health.state, "model": health.model })),
       Err(why) => eprintln!("gate-server: Laya's health could not be read back: {why}"),
     },
     Ok(false) => {}

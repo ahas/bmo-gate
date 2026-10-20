@@ -71,7 +71,7 @@
           <template v-for="trial in trials" :key="trial.id">
             <UChatMessage :id="`q${trial.id}`" role="user" side="right" variant="soft" :parts="[]">
               <template #header>
-                <span class="text-sm text-muted">{{ trial.user }} · {{ formatClock(trial.created_at) }}</span>
+                <span class="text-sm text-muted">{{ trial.userName }} · {{ formatClock(trial.createdAt / 1000) }}</span>
               </template>
 
               <template #content>
@@ -190,7 +190,7 @@ const settingsOpen = ref(false);
 // the gate; the mode is set only in the settings the line opens.
 const laya = ref<LayaView | null>(null);
 
-const layaGate = computed(() => laya.value?.gates.find((gate) => gate.stage === stage) ?? null);
+const layaGate = computed(() => laya.value?.gates.find((gate) => gate.gateName === stage) ?? null);
 
 // The title bar has little room, so the line is the mode and the figure; its name says what the figure is.
 const layaLine = computed<string>(() => {
@@ -241,7 +241,7 @@ async function ask(): Promise<void> {
   await scrollToBottom();
 
   try {
-    trials.value = [...trials.value, await $fetch<Trial>("/api/gate", { method: "POST", body: { stage, prompt } })];
+    trials.value = [...trials.value, await $fetch<Trial>("/api/gate", { method: "POST", body: { gateName: stage, prompt } })];
     input.value = "";
     await scrollToBottom();
   } catch (error) {

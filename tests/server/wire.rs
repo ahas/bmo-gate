@@ -1,5 +1,5 @@
-//! The wire every family shares: the bearer token, a route that is not there, a body that is not JSON or not as
-//! asked, the health, the event stream, the output gate a chat unit asks, and one run of a voice gate.
+//! The wire every route shares: the bearer token, a route that is not there, a body that is not JSON or not as
+//! asked, the health, the event stream, the output gate and one run of a gate.
 
 use futures_util::StreamExt;
 use reqwest::StatusCode;
@@ -30,9 +30,9 @@ async fn a_call_without_the_token_is_refused() {
 async fn a_route_that_is_not_there_is_refused() {
   let ground = ground("absent", |_| None).await;
 
-  for (status, body) in [ground.get("/nowhere").await, ground.get("/judgements").await] {
+  for (status, body) in [ground.get("/nowhere").await, ground.post("/health", json!({})).await] {
     assert_eq!(status, StatusCode::NOT_FOUND);
-    refused(&body, "route_absent");
+    refused(&body, "no-route");
   }
 }
 
@@ -50,12 +50,12 @@ async fn a_body_not_json_or_not_as_asked_is_refused() {
     .unwrap();
 
   assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-  refused(&response.json().await.unwrap(), "body_not_json");
+  refused(&response.json().await.unwrap(), "bad-request");
 
   let (status, body) = ground.post("/sanitised", json!({ "label": "a room's message" })).await;
 
   assert_eq!(status, StatusCode::BAD_REQUEST);
-  refused(&body, "field_wrong");
+  refused(&body, "bad-request");
 }
 
 #[tokio::test]
@@ -66,6 +66,7 @@ async fn the_health_says_the_version_the_database_and_laya() {
   assert_eq!(status, StatusCode::OK);
   assert_eq!(body["version"], gate_server::routes::health::bmo_version());
   assert_eq!(body["ready"], true);
+  assert_eq!(body["reason"], serde_json::Value::Null);
   assert!(["up", "down", "off"].contains(&body["laya"].as_str().unwrap()), "{body}");
 }
 
@@ -84,10 +85,10 @@ async fn the_event_stream_tells_of_a_judgement_written() {
 
   let mut stream = response.bytes_stream();
   let (status, _) = ground
-    .post("/judgements", json!({ "chat": ROOM, "stage": "chat", "verdict": "SKIP" }))
+    .post("/judgements", json!({ "roomId": ROOM, "gateName": "chat", "verdict": "SKIP" }))
     .await;
 
-  assert_eq!(status, StatusCode::NO_CONTENT);
+  assert_eq!(status, StatusCode::CREATED);
 
   let mut read = String::new();
 
@@ -101,7 +102,7 @@ async fn the_event_stream_tells_of_a_judgement_written() {
     read.push_str(&String::from_utf8_lossy(&chunk));
   }
 
-  assert!(read.contains("event: judgement"), "{read}");
+  assert!(read.contains("event: judgement.created"), "{read}");
   assert!(read.contains("\"verdict\":\"SKIP\""), "{read}");
 }
 
@@ -109,7 +110,7 @@ async fn the_event_stream_tells_of_a_judgement_written() {
 async fn a_part_of_a_reply_is_answered_with_the_markup_it_goes_out_as() {
   let ground = ground("formats", |_| None).await;
   let (status, body) = ground
-    .post("/formats/decided", json!({ "chat": ROOM, "text": "Plain words, **one** bold." }))
+    .post("/formats/decided", json!({ "roomId": ROOM, "text": "Plain words, **one** bold." }))
     .await;
 
   assert_eq!(status, StatusCode::OK, "{body}");
@@ -118,10 +119,10 @@ async fn a_part_of_a_reply_is_answered_with_the_markup_it_goes_out_as() {
 }
 
 #[tokio::test]
-async fn one_run_of_a_voice_gate_answers_on_its_road() {
+async fn one_run_of_a_gate_answers_on_its_road() {
   let ground = ground("voice", |ask| (!ask.system.is_empty()).then(|| "Read slowly.".into())).await;
   let (status, body) = ground
-    .post("/stages/voice-reading/runs", json!({ "prompt": "Read this aloud.", "chat": ROOM }))
+    .post("/stages/voice-reading/runs", json!({ "prompt": "Read this aloud.", "roomId": ROOM }))
     .await;
 
   assert_eq!(status, StatusCode::OK, "{body}");
@@ -132,11 +133,11 @@ async fn one_run_of_a_voice_gate_answers_on_its_road() {
     ground.post("/stages/no-such-gate/runs", json!({ "prompt": "Read this aloud." })).await;
 
   assert_eq!(status, StatusCode::NOT_FOUND);
-  refused(&body, "no_gate");
+  refused(&body, "no-gate");
 }
 
 #[tokio::test]
-async fn a_voice_gate_switched_off_answers_nothing_and_asks_no_road() {
+async fn a_gate_switched_off_answers_nothing_and_asks_no_road() {
   let ground = ground("voice-off", |_| Some("Read slowly.".into())).await;
   let (status, _) = ground.post("/options/voice-polish", json!({ "enabled": false })).await;
 

@@ -28,9 +28,9 @@ pub const ALARM_MINIMUM: usize = 20;
 
 // The window the shares are counted over, its latest part the share has to hold over as well, and how long a
 // piece raised is left alone after.
-pub const WINDOW_SECONDS: i64 = 24 * 60 * 60;
-pub const RECENT_SECONDS: i64 = WINDOW_SECONDS / 2;
-pub const QUIET_SECONDS: i64 = 24 * 60 * 60;
+pub const WINDOW_MS: i64 = 24 * 60 * 60 * 1_000;
+pub const RECENT_MS: i64 = WINDOW_MS / 2;
+pub const QUIET_MS: i64 = 24 * 60 * 60 * 1_000;
 
 /// The code the owner's room is told of a raised row under.
 pub const NOTICE: &str = "attachment-alarm";
@@ -119,7 +119,7 @@ pub fn shares(rows: &[AttachRow]) -> Vec<Share> {
 /// too. A fix goes live in the middle of a window, and a piece past the line only on the turns before
 /// it has already come down.
 pub fn alarms(rows: &[AttachRow], now: i64) -> Vec<Alarm> {
-  let late: Vec<AttachRow> = rows.iter().filter(|row| row.at >= now - RECENT_SECONDS).cloned().collect();
+  let late: Vec<AttachRow> = rows.iter().filter(|row| row.at >= now - RECENT_MS).cloned().collect();
   let recent = shares(&late);
 
   shares(rows)
@@ -241,14 +241,14 @@ pub async fn pass(
   file: &Path,
   now: i64,
 ) -> Result<Vec<i64>, Failed> {
-  let found = rows(&reference.stages.runs.db, now - WINDOW_SECONDS).await.map_err(Failed::Database)?;
+  let found = rows(&reference.stages.runs.db, now - WINDOW_MS).await.map_err(Failed::Database)?;
   let mut raised_before = raised_at(file);
   let mut raised = Vec::new();
 
   for alarm in alarms(&found, now) {
     let key = alarm.key();
 
-    if raised_before.get(&key).is_some_and(|last| now - last < QUIET_SECONDS) {
+    if raised_before.get(&key).is_some_and(|last| now - last < QUIET_MS) {
       continue;
     }
 

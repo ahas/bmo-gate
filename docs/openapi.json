@@ -1,0 +1,3141 @@
+{
+  "components": {
+    "responses": {
+      "Error": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorBody"
+            }
+          }
+        },
+        "description": "a refusal or failure, in the common error shape"
+      }
+    },
+    "schemas": {
+      "Agreement": {
+        "description": "How often Laya agrees with a gate's LLM.",
+        "properties": {
+          "agreement": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "byTau": {
+            "items": {
+              "$ref": "#/components/schemas/AgreementAt"
+            },
+            "type": "array"
+          },
+          "failures": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "gateName": {
+            "type": "string"
+          },
+          "pairs": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "settled": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "unit": {
+            "description": "`pair` or `question`: what the figures are counted over.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "gateName",
+          "unit",
+          "pairs",
+          "failures",
+          "agreement",
+          "byTau",
+          "settled"
+        ],
+        "type": "object"
+      },
+      "AgreementAt": {
+        "description": "One τ where a gate's agreement was counted.",
+        "properties": {
+          "agreement": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "coverage": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "safeAgreement": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "safeCount": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "tau": {
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": [
+          "tau",
+          "coverage",
+          "agreement",
+          "safeCount",
+          "safeAgreement"
+        ],
+        "type": "object"
+      },
+      "AttachJudgements": {
+        "additionalProperties": false,
+        "description": "A round's judgements put under the message that answered it.",
+        "properties": {
+          "messageId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "roomId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "since": {
+            "description": "The moment the round began, in epoch milliseconds: every judgement written at or after it is attached.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "roomId",
+          "messageId",
+          "since"
+        ],
+        "type": "object"
+      },
+      "DefaultOptions": {
+        "description": "The values a blank setting stands for.",
+        "properties": {
+          "answerTokens": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "layaMode": {
+            "type": "string"
+          },
+          "layaTau": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "thinking": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "thinking",
+          "answerTokens",
+          "layaMode",
+          "layaTau"
+        ],
+        "type": "object"
+      },
+      "DocumentPart": {
+        "description": "One part of a document's translation.",
+        "properties": {
+          "failed": {
+            "type": "boolean"
+          },
+          "part": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "part",
+          "text",
+          "failed"
+        ],
+        "type": "object"
+      },
+      "DocumentPartPage": {
+        "description": "One page of a list, and whether anything stands past its last member.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentPart"
+            },
+            "type": "array"
+          },
+          "more": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "more"
+        ],
+        "type": "object"
+      },
+      "DocumentSanitiseAsk": {
+        "additionalProperties": false,
+        "description": "A document the brain is about to keep.",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "text"
+        ],
+        "type": "object"
+      },
+      "DocumentSanitised": {
+        "description": "The text to keep of a document.",
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "type": "object"
+      },
+      "DocumentTranslationOrder": {
+        "additionalProperties": false,
+        "description": "A document's translation queued part by part.",
+        "properties": {
+          "document": {
+            "type": "string"
+          },
+          "partCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "target": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "wanted": {
+            "items": {
+              "$ref": "#/components/schemas/WantedPart"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "document",
+          "version",
+          "target",
+          "partCount",
+          "wanted"
+        ],
+        "type": "object"
+      },
+      "DocumentTranslationState": {
+        "description": "Where a document's translation into one language stands.",
+        "properties": {
+          "failure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TranslationFailure"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pending": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "pending",
+          "failure"
+        ],
+        "type": "object"
+      },
+      "EffectiveOptions": {
+        "description": "What a gate runs on beside its own options.",
+        "properties": {
+          "answerTokens": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "layaMode": {
+            "type": "string"
+          },
+          "layaTau": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "thinking": {
+            "type": "boolean"
+          },
+          "timeoutMs": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "thinking",
+          "answerTokens",
+          "timeoutMs",
+          "layaMode",
+          "layaTau"
+        ],
+        "type": "object"
+      },
+      "Entry": {
+        "description": "One piece a turn is handed.",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "source": {
+            "description": "`document`, `person`, `rule`, `situation`, `knowledge`, `memory`, `room` or `archive`.",
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "text",
+          "source"
+        ],
+        "type": "object"
+      },
+      "ErrorBody": {
+        "description": "A refusal or failure: a code for a machine and one English sentence for a person.",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "error"
+        ],
+        "type": "object"
+      },
+      "FormatAnswer": {
+        "description": "The markup the part goes out as, or none to send its plain text.",
+        "properties": {
+          "markup": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "markup"
+        ],
+        "type": "object"
+      },
+      "FormatAsk": {
+        "additionalProperties": false,
+        "description": "One part of a reply, in markdown.",
+        "properties": {
+          "roomId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "roomId",
+          "text"
+        ],
+        "type": "object"
+      },
+      "Gate": {
+        "description": "One gate of the gate order, and the profile it runs under.",
+        "properties": {
+          "answerTokens": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "condition": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "defaultLayaMode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "gateName": {
+            "type": "string"
+          },
+          "layaProbe": {
+            "type": "boolean"
+          },
+          "part": {
+            "description": "`pre`, `post` or `apart`: where the gate stands against a turn.",
+            "type": "string"
+          },
+          "step": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "switchable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "gateName",
+          "part",
+          "step",
+          "condition",
+          "switchable",
+          "layaProbe",
+          "defaultLayaMode",
+          "answerTokens"
+        ],
+        "type": "object"
+      },
+      "GateOptionChange": {
+        "additionalProperties": false,
+        "description": "A change of a gate's options: a field left out stays, a Laya field sent null goes back to the default.",
+        "properties": {
+          "answerTokens": {
+            "description": "Not a gate option: its tier's. A change naming it is refused `own-llm`.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "enabled": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "layaFallback": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "layaMode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "layaTau": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "thinking": {
+            "description": "Not a gate option: its tier's. A change naming it is refused `own-llm`.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "timeoutMs": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "GateOptions": {
+        "description": "One gate's options as it stands for the chat agent.",
+        "properties": {
+          "defaults": {
+            "$ref": "#/components/schemas/DefaultOptions"
+          },
+          "effective": {
+            "$ref": "#/components/schemas/EffectiveOptions"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "layaFallback": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "layaMode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "layaProbe": {
+            "type": "boolean"
+          },
+          "layaTau": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "switchable": {
+            "type": "boolean"
+          },
+          "timeoutMs": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "timeoutMs",
+          "layaMode",
+          "layaTau",
+          "layaProbe",
+          "switchable",
+          "enabled",
+          "layaFallback",
+          "effective",
+          "defaults"
+        ],
+        "type": "object"
+      },
+      "GateOptionsChanged": {
+        "description": "The options as a change left them.",
+        "properties": {
+          "gateName": {
+            "type": "string"
+          },
+          "options": {
+            "$ref": "#/components/schemas/GateRoute"
+          }
+        },
+        "required": [
+          "gateName",
+          "options"
+        ],
+        "type": "object"
+      },
+      "GatePage": {
+        "description": "One page of a list, and whether anything stands past its last member.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Gate"
+            },
+            "type": "array"
+          },
+          "more": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "more"
+        ],
+        "type": "object"
+      },
+      "GateRoute": {
+        "description": "The gate's route as a run reads it.",
+        "properties": {
+          "laya": {
+            "type": "boolean"
+          },
+          "model": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "setAt": {
+            "description": "Epoch milliseconds.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "timeoutMs": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "provider",
+          "model",
+          "laya",
+          "timeoutMs",
+          "setAt"
+        ],
+        "type": "object"
+      },
+      "Health": {
+        "description": "Readiness, version and Laya's last state.",
+        "properties": {
+          "laya": {
+            "description": "`up`, `down` or `off`.",
+            "type": "string"
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ready",
+          "reason",
+          "version",
+          "laya"
+        ],
+        "type": "object"
+      },
+      "HookAnswer": {
+        "description": "The agency's session-summariser hook as the gate answers it.",
+        "properties": {
+          "answer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "answer"
+        ],
+        "type": "object"
+      },
+      "HookAsk": {
+        "description": "The agency's session-summariser hook as it asks it.",
+        "properties": {
+          "ask": true,
+          "point": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "point"
+        ],
+        "type": "object"
+      },
+      "Judgement": {
+        "description": "A decision written into a room's log.",
+        "properties": {
+          "createdAt": {
+            "description": "Epoch milliseconds.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "gateName": {
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "messageId": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "ms": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "offers": {
+            "items": {
+              "$ref": "#/components/schemas/Offer"
+            },
+            "type": "array"
+          },
+          "roads": {
+            "items": {
+              "$ref": "#/components/schemas/Road"
+            },
+            "type": "array"
+          },
+          "roomId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "round": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "verdict": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "roomId",
+          "messageId",
+          "gateName",
+          "verdict",
+          "detail",
+          "createdAt",
+          "ms",
+          "round",
+          "roads",
+          "offers"
+        ],
+        "type": "object"
+      },
+      "JudgementPage": {
+        "description": "One page of a list, and whether anything stands past its last member.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Judgement"
+            },
+            "type": "array"
+          },
+          "more": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "more"
+        ],
+        "type": "object"
+      },
+      "KeepTranslation": {
+        "additionalProperties": false,
+        "description": "A translation to keep.",
+        "properties": {
+          "language": {
+            "type": "string"
+          },
+          "original": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "language",
+          "original",
+          "text"
+        ],
+        "type": "object"
+      },
+      "KeptCounts": {
+        "description": "What one reference gate kept, by the rule that kept it.",
+        "properties": {
+          "item": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "keyword": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "person": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item",
+          "keyword",
+          "person"
+        ],
+        "type": "object"
+      },
+      "KeptTranslation": {
+        "description": "One translation kept under its original and its language.",
+        "properties": {
+          "original": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "original",
+          "text"
+        ],
+        "type": "object"
+      },
+      "KeptTranslationPage": {
+        "description": "One page of a list, and whether anything stands past its last member.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/KeptTranslation"
+            },
+            "type": "array"
+          },
+          "more": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "more"
+        ],
+        "type": "object"
+      },
+      "KnowledgeAsk": {
+        "additionalProperties": false,
+        "description": "The knowledge a job's work calls for.",
+        "properties": {
+          "agentName": {
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "roomId": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "agentName",
+          "roomId",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "LayaGate": {
+        "description": "One probed gate as Laya's screen reads it.",
+        "properties": {
+          "agreement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Agreement"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "checkpoint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "gateName": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "refused": {
+            "items": {
+              "$ref": "#/components/schemas/ModeRefusal"
+            },
+            "type": "array"
+          },
+          "tau": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "gateName",
+          "mode",
+          "tau",
+          "agreement",
+          "checkpoint",
+          "refused"
+        ],
+        "type": "object"
+      },
+      "LayaHealth": {
+        "description": "The last health check of the Laya relay.",
+        "properties": {
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "answeredAt": {
+            "description": "Epoch milliseconds.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "checkMs": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "checkedAt": {
+            "description": "Epoch milliseconds.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "device": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "loadMs": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "type": "string"
+          },
+          "versions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "vramBytes": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "state",
+          "model",
+          "device",
+          "vramBytes",
+          "loadMs",
+          "versions",
+          "address",
+          "checkMs",
+          "checkedAt",
+          "answeredAt"
+        ],
+        "type": "object"
+      },
+      "LayaView": {
+        "description": "Laya as `GET /laya` answers it.",
+        "properties": {
+          "gates": {
+            "items": {
+              "$ref": "#/components/schemas/LayaGate"
+            },
+            "type": "array"
+          },
+          "health": {
+            "$ref": "#/components/schemas/LayaHealth"
+          },
+          "modes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "taus": {
+            "items": {
+              "format": "double",
+              "type": "number"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "health",
+          "gates",
+          "modes",
+          "taus"
+        ],
+        "type": "object"
+      },
+      "ModeRefusal": {
+        "description": "A Laya mode a gate may not run in, and the code that says why.",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "code"
+        ],
+        "type": "object"
+      },
+      "NewJudgement": {
+        "additionalProperties": false,
+        "description": "A judgement to write into a room's log.",
+        "properties": {
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "gateName": {
+            "type": "string"
+          },
+          "messageId": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "ms": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "roomId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "round": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "verdict": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "roomId",
+          "gateName",
+          "verdict"
+        ],
+        "type": "object"
+      },
+      "NewTrial": {
+        "additionalProperties": false,
+        "description": "One prompt put to one gate as a turn would put it.",
+        "properties": {
+          "gateName": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "userName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "gateName",
+          "prompt",
+          "userName"
+        ],
+        "type": "object"
+      },
+      "Offer": {
+        "description": "What a round's gates were offered.",
+        "properties": {
+          "asked": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "capped": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "gateName": {
+            "type": "string"
+          },
+          "held": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "kept": {
+            "$ref": "#/components/schemas/KeptCounts"
+          },
+          "rules": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "gateName",
+          "held",
+          "asked",
+          "kept",
+          "capped",
+          "rules"
+        ],
+        "type": "object"
+      },
+      "OptionsCopied": {
+        "description": "A companion's options copied from the chat agent's.",
+        "properties": {
+          "agentName": {
+            "type": "string"
+          },
+          "fromAgentName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "agentName",
+          "fromAgentName"
+        ],
+        "type": "object"
+      },
+      "Picks": {
+        "description": "The documents a question calls for.",
+        "properties": {
+          "picks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "picks"
+        ],
+        "type": "object"
+      },
+      "Piece": {
+        "description": "One piece of knowledge.",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "text"
+        ],
+        "type": "object"
+      },
+      "Pieces": {
+        "description": "The pieces picked.",
+        "properties": {
+          "pieces": {
+            "items": {
+              "$ref": "#/components/schemas/Piece"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "pieces"
+        ],
+        "type": "object"
+      },
+      "Reading": {
+        "description": "One original's reading.",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "whole": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "text",
+          "whole"
+        ],
+        "type": "object"
+      },
+      "Readings": {
+        "description": "The readings of a batch.",
+        "properties": {
+          "readings": {
+            "items": {
+              "$ref": "#/components/schemas/Reading"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "readings"
+        ],
+        "type": "object"
+      },
+      "ReferenceAnswer": {
+        "description": "A turn's reference.",
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/Entry"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "entries"
+        ],
+        "type": "object"
+      },
+      "ReferenceAsk": {
+        "description": "A turn's envelope, as the gate's reference road reads it.",
+        "properties": {
+          "answered": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "holds": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "lines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "lore": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "messageId": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "offGates": {
+            "default": [],
+            "description": "The gates switched off for the agent.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "peopleSpoke": {
+            "type": "boolean"
+          },
+          "records": {
+            "type": "boolean"
+          },
+          "roomId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "round": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "situation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Situation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "speakerIds": {
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "roomId",
+          "lines",
+          "speakerIds",
+          "peopleSpoke",
+          "offGates",
+          "records"
+        ],
+        "type": "object"
+      },
+      "Road": {
+        "description": "One road a gate run walked.",
+        "properties": {
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "model": {
+            "type": "string"
+          },
+          "ms": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "tokens": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Tokens"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "provider",
+          "model",
+          "outcome",
+          "ms",
+          "tokens"
+        ],
+        "type": "object"
+      },
+      "SanitiseAsk": {
+        "additionalProperties": false,
+        "description": "Words to sanitise.",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "messageId": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "roomId": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "label"
+        ],
+        "type": "object"
+      },
+      "Sanitised": {
+        "description": "Words as the sanitiser left them.",
+        "properties": {
+          "changed": {
+            "type": "boolean"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "changed"
+        ],
+        "type": "object"
+      },
+      "SeekAsk": {
+        "additionalProperties": false,
+        "description": "A question put to the document seeker over an index.",
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/SeekEntry"
+            },
+            "type": "array"
+          },
+          "question": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "question",
+          "entries"
+        ],
+        "type": "object"
+      },
+      "SeekEntry": {
+        "description": "One line of a document index.",
+        "properties": {
+          "group": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "line": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "line"
+        ],
+        "type": "object"
+      },
+      "SheetAnswer": {
+        "description": "The sheet that came, or none.",
+        "properties": {
+          "sheet": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "sheet"
+        ],
+        "type": "object"
+      },
+      "SheetAsk": {
+        "additionalProperties": false,
+        "description": "A sheet to judge.",
+        "properties": {
+          "agentName": {
+            "type": "string"
+          },
+          "ceiling": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "part": {
+            "description": "`common` or `room`.",
+            "type": "string"
+          },
+          "personId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "pieces": {
+            "items": {
+              "$ref": "#/components/schemas/SheetPiece"
+            },
+            "type": "array"
+          },
+          "registration": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "roomId": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "agentName",
+          "part",
+          "roomId",
+          "personId",
+          "pieces",
+          "ceiling",
+          "registration"
+        ],
+        "type": "object"
+      },
+      "SheetPiece": {
+        "description": "One piece a sheet is written from.",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "text"
+        ],
+        "type": "object"
+      },
+      "Situation": {
+        "description": "A turn's situation: the agent, the kind of room, the events and the moment.",
+        "properties": {
+          "agentName": {
+            "type": "string"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/SituationEvent"
+            },
+            "type": "array"
+          },
+          "nowAt": {
+            "description": "Epoch milliseconds.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "roomKind": {
+            "description": "`owner` or `group`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "agentName",
+          "roomKind",
+          "events",
+          "nowAt"
+        ],
+        "type": "object"
+      },
+      "SituationEvent": {
+        "description": "One event a turn's situation carries.",
+        "properties": {
+          "itemId": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "type": "object"
+      },
+      "StageRun": {
+        "description": "What a run of a gate answered.",
+        "properties": {
+          "answer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ms": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "answer",
+          "ms"
+        ],
+        "type": "object"
+      },
+      "StageRunAsk": {
+        "additionalProperties": false,
+        "description": "One run of one gate.",
+        "properties": {
+          "agentName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "alongside": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "messageId": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "roomId": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "system": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "thinking": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "prompt"
+        ],
+        "type": "object"
+      },
+      "Taken": {
+        "description": "The parts queued.",
+        "properties": {
+          "taken": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "taken"
+        ],
+        "type": "object"
+      },
+      "Tokens": {
+        "description": "The tokens a road reported.",
+        "properties": {
+          "cacheReadTokens": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "cacheWriteTokens": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "inputTokens": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "outputTokens": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "inputTokens",
+          "outputTokens",
+          "cacheReadTokens",
+          "cacheWriteTokens"
+        ],
+        "type": "object"
+      },
+      "TranslationAsk": {
+        "additionalProperties": false,
+        "description": "Originals to translate into one language.",
+        "properties": {
+          "language": {
+            "type": "string"
+          },
+          "originals": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "language",
+          "originals"
+        ],
+        "type": "object"
+      },
+      "TranslationFailure": {
+        "description": "Why a document's translation last stopped short.",
+        "properties": {
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "provider",
+          "model"
+        ],
+        "type": "object"
+      },
+      "Trial": {
+        "description": "A trial as it was kept.",
+        "properties": {
+          "answer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "description": "Epoch milliseconds.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "gateName": {
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "ms": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "userName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "gateName",
+          "userName",
+          "prompt",
+          "answer",
+          "ms",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "TrialPage": {
+        "description": "One page of a list, and whether anything stands past its last member.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Trial"
+            },
+            "type": "array"
+          },
+          "more": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "more"
+        ],
+        "type": "object"
+      },
+      "WantedPart": {
+        "description": "One part of a document to translate.",
+        "properties": {
+          "part": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "part",
+          "text"
+        ],
+        "type": "object"
+      },
+      "WorkKnowledgeAsk": {
+        "additionalProperties": false,
+        "description": "The knowledge a search's work calls for, for the chat agent.",
+        "properties": {
+          "lines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "roomId": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "roomId",
+          "lines"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "The gate stage of a turn: sanitising words on their way into a model's context, choosing the reference a turn is handed, checking an answer on its way out, translating, seeking documents, judging person-book sheets and reading voice lines. Every answer is data in the common wire format; a screen's words are the console's language pack.",
+    "title": "bmo-gate",
+    "version": "0.1.0-rev.1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/documents/sought": {
+      "post": {
+        "operationId": "documents_sought",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeekAsk"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Picks"
+                }
+              }
+            },
+            "description": "the slugs chosen"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "The documents a question calls for out of an index.",
+        "tags": [
+          "Documents"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "no-answer",
+          "failed",
+          "upstream-failed"
+        ]
+      }
+    },
+    "/documents/translations": {
+      "post": {
+        "operationId": "document_translation_add",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentTranslationOrder"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Taken"
+                }
+              }
+            },
+            "description": "the parts queued"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Queue a document's translation part by part.",
+        "tags": [
+          "Documents"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "document-unknown",
+          "language-unknown",
+          "failed"
+        ]
+      }
+    },
+    "/documents/translations/parts": {
+      "get": {
+        "operationId": "document_translation_parts",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "document",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "target",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentPartPage"
+                }
+              }
+            },
+            "description": "a page of its parts"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "A document's translated parts, in part order.",
+        "tags": [
+          "Documents"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "document-unknown",
+          "language-unknown",
+          "failed"
+        ]
+      }
+    },
+    "/documents/translations/state": {
+      "get": {
+        "operationId": "document_translation_state",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "document",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "target",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentTranslationState"
+                }
+              }
+            },
+            "description": "its state"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Where a document's translation into one language stands.",
+        "tags": [
+          "Documents"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "document-unknown",
+          "language-unknown",
+          "failed"
+        ]
+      }
+    },
+    "/events": {
+      "get": {
+        "operationId": "events",
+        "responses": {
+          "200": {
+            "description": "the event stream"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "The gate's one stream of events, as server-sent events.",
+        "tags": [
+          "Events"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "failed"
+        ]
+      }
+    },
+    "/formats/decided": {
+      "post": {
+        "operationId": "format_decided",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FormatAsk"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormatAnswer"
+                }
+              }
+            },
+            "description": "the markup, or none"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "The markup one part of a reply goes out as, or none for its plain text.",
+        "tags": [
+          "Formats"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "failed"
+        ]
+      }
+    },
+    "/gates": {
+      "get": {
+        "operationId": "gates",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatePage"
+                }
+              }
+            },
+            "description": "the gate order"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Every gate of the gate order, with the profile it runs under.",
+        "tags": [
+          "Gates"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "failed"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            },
+            "description": "the service's health"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Readiness, version and Laya's last state.",
+        "tags": [
+          "Health"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "failed",
+          "not-ready"
+        ]
+      }
+    },
+    "/hooks/session-summariser": {
+      "post": {
+        "operationId": "session_summariser",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HookAsk"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HookAnswer"
+                }
+              }
+            },
+            "description": "the note the next run is handed, or none"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "The agency's session-summariser point, asked with `{point, ask}` and answered `{answer}`.",
+        "tags": [
+          "Hooks"
+        ],
+        "x-codes": []
+      }
+    },
+    "/judgements": {
+      "get": {
+        "operationId": "judgements",
+        "parameters": [
+          {
+            "description": "The id the page starts below; the list is newest first.",
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "A judgement written at or after this moment, in epoch milliseconds.",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "gateName",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "roomId",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "A judgement written at or before this moment, in epoch milliseconds.",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JudgementPage"
+                }
+              }
+            },
+            "description": "a page of judgements"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "A room's judgements, newest first, each with its roads and what its round's gates were offered.",
+        "tags": [
+          "Judgements"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "failed"
+        ]
+      },
+      "post": {
+        "operationId": "judgement_add",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewJudgement"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Judgement"
+                }
+              }
+            },
+            "description": "the judgement as it was written"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Write one judgement into a room's log.",
+        "tags": [
+          "Judgements"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "failed"
+        ]
+      }
+    },
+    "/judgements/attached": {
+      "post": {
+        "operationId": "judgements_attached",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachJudgements"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "the judgements were attached"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Put a round's judgements under the message that answered it.",
+        "tags": [
+          "Judgements"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "failed"
+        ]
+      }
+    },
+    "/knowledge/selected": {
+      "post": {
+        "operationId": "knowledge_selected",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeAsk"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pieces"
+                }
+              }
+            },
+            "description": "the pieces picked"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Pick, from the agent's libraries, the pieces a piece of work's lines call for.",
+        "tags": [
+          "Knowledge"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "failed",
+          "upstream-failed"
+        ]
+      }
+    },
+    "/knowledge/work": {
+      "post": {
+        "operationId": "knowledge_work",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkKnowledgeAsk"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pieces"
+                }
+              }
+            },
+            "description": "the pieces picked"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "The same pick for the chat agent, for a search's work.",
+        "tags": [
+          "Knowledge"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "failed",
+          "upstream-failed"
+        ]
+      }
+    },
+    "/laya": {
+      "get": {
+        "operationId": "laya",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LayaView"
+                }
+              }
+            },
+            "description": "Laya as the gate reads it"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Laya's last health check, and each probed gate's mode, agreement and checkpoint.",
+        "tags": [
+          "Laya"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "failed"
+        ]
+      }
+    },
+    "/options/copied": {
+      "post": {
+        "operationId": "options_copied",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OptionsCopied"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "the rows were copied"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Copy the chat agent's rows for every gate under a companion's name.",
+        "tags": [
+          "Gates"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "failed"
+        ]
+      }
+    },
+    "/options/{gateName}": {
+      "get": {
+        "operationId": "gate_options",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "gateName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GateOptions"
+                }
+              }
+            },
+            "description": "the gate's options"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "One gate's options as it stands for the chat agent.",
+        "tags": [
+          "Gates"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "no-gate",
+          "failed",
+          "upstream-failed"
+        ]
+      },
+      "post": {
+        "operationId": "gate_options_change",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "gateName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GateOptionChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GateOptionsChanged"
+                }
+              }
+            },
+            "description": "the options as the change left them"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Change a gate's wait, switch, Laya mode, τ or fallback; a Laya field sent null goes back to the default.",
+        "tags": [
+          "Gates"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "no-gate",
+          "own-llm",
+          "nothing-to-change",
+          "timeout-out-of-range",
+          "switch-not-boolean",
+          "always-on",
+          "laya-mode-unknown",
+          "laya-tau-out-of-range",
+          "laya-fallback-unknown",
+          "no-probe",
+          "no-safe-verdict",
+          "no-checkpoint",
+          "needs-tau",
+          "failed",
+          "upstream-failed"
+        ]
+      }
+    },
+    "/reference/selected": {
+      "post": {
+        "operationId": "reference_selected",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReferenceAsk"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferenceAnswer"
+                }
+              }
+            },
+            "description": "the pieces the turn is handed"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "The pieces a turn is handed: the reference gates, the person-book search and the situation rules.",
+        "tags": [
+          "Reference"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "stopped",
+          "failed",
+          "upstream-failed"
+        ]
+      }
+    },
+    "/sanitised": {
+      "post": {
+        "operationId": "sanitised",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SanitiseAsk"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sanitised"
+                }
+              }
+            },
+            "description": "the words as the sanitiser left them"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Defuse the security-intrusion material in a text, leaving the rest as it was.",
+        "tags": [
+          "Sanitiser"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "stopped",
+          "failed",
+          "upstream-failed"
+        ]
+      }
+    },
+    "/sanitiser/documents": {
+      "post": {
+        "operationId": "sanitiser_document",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentSanitiseAsk"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentSanitised"
+                }
+              }
+            },
+            "description": "the text to keep"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Read a document an editor changed and answer the text to keep.",
+        "tags": [
+          "Sanitiser"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "stopped",
+          "failed",
+          "upstream-failed"
+        ]
+      }
+    },
+    "/sheets/judge": {
+      "post": {
+        "operationId": "sheet_judged",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SheetAsk"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SheetAnswer"
+                }
+              }
+            },
+            "description": "the sheet that came, or none"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Write one person's sheet of one part from the pieces handed in.",
+        "tags": [
+          "Sheets"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "stopped",
+          "failed",
+          "upstream-failed"
+        ]
+      }
+    },
+    "/stages/{gateName}/runs": {
+      "post": {
+        "operationId": "stage_run",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "gateName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StageRunAsk"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StageRun"
+                }
+              }
+            },
+            "description": "what the run answered"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "One run of one gate on its road, its instructions the gate's own where the caller names none.",
+        "tags": [
+          "Runs"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "no-gate",
+          "stopped",
+          "failed",
+          "upstream-failed"
+        ]
+      }
+    },
+    "/translations": {
+      "post": {
+        "operationId": "translations",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslationAsk"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Readings"
+                }
+              }
+            },
+            "description": "one reading for each original"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Translate originals into one language, in the order given, keeping each whole reading.",
+        "tags": [
+          "Translations"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "language-unknown",
+          "stopped",
+          "failed",
+          "upstream-failed"
+        ]
+      }
+    },
+    "/translations/kept": {
+      "get": {
+        "operationId": "translations_kept",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "language",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The originals, a comma between them.",
+            "in": "query",
+            "name": "originals",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeptTranslationPage"
+                }
+              }
+            },
+            "description": "the translations kept"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "The translations kept for the originals named, in one language, without asking the translator.",
+        "tags": [
+          "Translations"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "language-unknown",
+          "failed"
+        ]
+      },
+      "put": {
+        "operationId": "translation_keep",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeepTranslation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeptTranslation"
+                }
+              }
+            },
+            "description": "the translation kept"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Keep a reading of one original in one language, in place of any kept before.",
+        "tags": [
+          "Translations"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "language-unknown",
+          "failed"
+        ]
+      }
+    },
+    "/trials": {
+      "get": {
+        "operationId": "trials",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "gateName",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrialPage"
+                }
+              }
+            },
+            "description": "a page of trials"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "A gate's trials, oldest first.",
+        "tags": [
+          "Trials"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "no-gate",
+          "failed"
+        ]
+      },
+      "post": {
+        "operationId": "trial_add",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewTrial"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Trial"
+                }
+              }
+            },
+            "description": "the trial as it was kept"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Put one prompt to one gate as a turn would, keep the trial and answer it.",
+        "tags": [
+          "Trials"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "bad-request",
+          "no-gate",
+          "too-large",
+          "stopped",
+          "failed",
+          "upstream-failed"
+        ]
+      }
+    }
+  },
+  "security": [
+    {
+      "bearer": []
+    }
+  ],
+  "servers": [
+    {
+      "description": "the gate service",
+      "url": "/"
+    }
+  ],
+  "tags": [
+    "Health",
+    "Gates",
+    "Laya",
+    "Judgements",
+    "Reference",
+    "Sanitiser",
+    "Sheets",
+    "Translations",
+    "Knowledge",
+    "Runs",
+    "Formats",
+    "Trials",
+    "Documents",
+    "Events",
+    "Hooks"
+  ]
+}

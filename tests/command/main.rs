@@ -68,7 +68,7 @@ pub async fn ground(test: &str) -> Ground {
     .insert("registry".into(), mapping("registry", "a-registration", None, None));
 
   for profile in &PROFILES.profile {
-    gate_runs::options::change(&runs, &profile.key, &json!({ "timeout_ms": 30_000 }), 1)
+    gate_runs::options::change(&runs, &profile.key, &json!({ "timeoutMs": 30_000 }), 1)
       .await
       .unwrap();
   }
@@ -123,7 +123,7 @@ pub async fn road_ground(
     .insert("registry".into(), mapping("registry", "a-registration", None, None));
 
   for profile in &PROFILES.profile {
-    gate_runs::options::change(&runs, &profile.key, &json!({ "timeout_ms": 30_000 }), 1)
+    gate_runs::options::change(&runs, &profile.key, &json!({ "timeoutMs": 30_000 }), 1)
       .await
       .unwrap();
   }

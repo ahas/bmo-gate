@@ -155,7 +155,7 @@
 ## What a turn records
 
 - **Every gate a turn asks leaves its judgement** under the message it was asked for, which the console shows
-  as the turn's verdict chip (`GET /rooms/{chat}/judgements`).
+  as the turn's verdict chip (`GET /judgements?roomId=`).
 - **A reference gate, `people-search` or `situation-rules` that is on for the turn but has no candidate left
   once the code has narrowed them** — a room with no rulebook, an agent with no knowledge of its own, a turn
   no situation rule of the room is open for — is not asked, and leaves the judgement `SKIP: no candidates` in

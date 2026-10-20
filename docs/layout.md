@@ -9,12 +9,13 @@ its own, so a change to one never builds or tests the others.
 | Folder | What it holds |
 |---|---|
 | `src/` | The root package: the version, the service binary, the Laya relay's binary and the unit command, built on the crates |
-| `crates/` | The Rust crates the root package is built from: the store, the codes, the clients of the other units, the policy, the words, the markup, the gates and the reference selection, the service's routes and watches, the unit command's nouns, the Laya relay |
+| `crates/` | The Rust crates the root package is built from: the contract and its client, the store, the codes, the clients of the other units, the policy, the words, the markup, the gates and the reference selection, the service's routes and watches, the unit command's nouns, the Laya relay |
 | `prompts/` | What each gate is told, a folder a gate, the questions Laya is asked, the evaluation set's members' briefs, the words the training tooling hands its writers and judges and the stand-ins its rows carry, and the words the sanitiser's pre-filter matches in the rooms' own language: the one folder Korean stands in |
 | `runtime/` | What serves Laya on its nodes: the decision server and the front around it, each a Python project of its own |
 | `training/` | What makes Laya's checkpoints: the dataset and training tooling, a Bun project of its own, and the Python training scripts |
 | `weights/` | The declarations of Laya's weights: each service's card declaration, in the card master's own format, and where the checkpoints are found, `checkpoints.toml`. The weights themselves are runtime data and never stand in the repository |
 | `deploy/` | The service units the testbed's deployment keeps |
+| `package/` | The TypeScript client generated from `docs/openapi.json`, which the console bundle and any other TypeScript caller use |
 | `client/` | The console plugin bundle: the gates' screen, a Nuxt layer on the base UI library |
 | `docs/` | The documents, which come before the code |
 | `tests/` | Every test of the repository, whatever its language |
@@ -52,14 +53,15 @@ lockfile and its Nuxt configuration one level below the root, and its tests unde
   `gates.*` keys, `common.action.copy`, `common.error.copy_failed` and `common.label.seconds`. A gate's name is
   the key `gates.label.<gate>` with its hyphens as underscores, and the gate's own name where the pack holds no
   such key; a Laya mode is `gates.laya_mode.<mode>`, the mode's own word where the pack has none.
-- **The server routes** call the gate (「For the console」 in `docs/boundary-api.md`) at the address and with the
-  token the host's runtime configuration gives under `gate`, from `NUXT_GATE_ADDRESS` and `NUXT_GATE_TOKEN`:
-  - `POST /api/gate` with `stage` and `prompt` puts a trial, the signed-in user's name as `user`;
+- **The server routes** call the gate (`docs/api.md`) through the generated TypeScript client under `package/`,
+  at the address and with the token the host's runtime configuration gives under `gate`, from
+  `NUXT_GATE_ADDRESS` and `NUXT_GATE_TOKEN`:
+  - `POST /api/gate` with `gateName` and `prompt` puts a trial, the signed-in user's name as `userName`;
   - `GET /api/gate/<gate>?limit=` reads the gate's trials;
   - `GET /api/laya` reads Laya's health and each gate's mode and agreement.
   Each refuses a request with no signed-in user, and hands a refusal of the gate's on with its status, its code
-  and its sentence. Their own codes are `question_empty` (a trial asking nothing), `no_gate_address` (the host
-  names no gate), `gate_unreachable` (the gate did not answer) and `gate_refused` (a refusal with no code). The
+  and its sentence. Their own codes are `question-empty` (a trial asking nothing), `no-gate-address` (the host
+  names no gate), `gate-unreachable` (the gate did not answer) and `gate-refused` (a refusal with no code). The
   page shows a refusal as the pack's `gates.error.<code>` where the pack has it, and its own fallback otherwise.
 - **What the host owes,** beside what bmo-ui asks of it:
   - its i18n module and a language pack answering the keys above;

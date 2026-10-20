@@ -86,11 +86,11 @@ impl Spent {
   }
 }
 
-/// Now, in Unix seconds.
+/// Now, in epoch milliseconds.
 pub fn now() -> i64 {
   SystemTime::now()
     .duration_since(SystemTime::UNIX_EPOCH)
-    .map_or(0, |since| since.as_secs() as i64)
+    .map_or(0, |since| since.as_millis() as i64)
 }
 
 /// How long since a moment, in milliseconds.

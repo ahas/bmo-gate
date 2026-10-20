@@ -1,5 +1,5 @@
-//! bmo-job's and bmo-artifact's calls, with the bodies their gate clients send: kept translations read and kept,
-//! originals translated, words through the sanitiser, and the knowledge a piece of work is handed.
+//! Translations and knowledge: kept translations read and kept, originals translated, words through the
+//! sanitiser, and the knowledge a piece of work is handed.
 
 use reqwest::StatusCode;
 use serde_json::json;
@@ -12,11 +12,10 @@ const GREETING: &str = "\u{c548}\u{b155}\u{d558}\u{c138}\u{c694}";
 #[tokio::test]
 async fn a_kept_translation_is_read_back_and_never_asks_the_translator() {
   let ground = ground("kept", |_| None).await;
-  let read = json!({ "language": "en", "originals": [GREETING] });
-  let (status, body) = ground.post("/translations/kept/read", read.clone()).await;
+  let (status, body) = ground.get(&format!("/translations/kept?language=en&originals={GREETING}")).await;
 
   assert_eq!(status, StatusCode::OK);
-  assert_eq!(body, json!({ "kept": [] }));
+  assert_eq!(body, json!({ "items": [], "more": false }));
 
   let (status, body) = ground
     .put(
@@ -25,12 +24,13 @@ async fn a_kept_translation_is_read_back_and_never_asks_the_translator() {
     )
     .await;
 
-  assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
+  assert_eq!(status, StatusCode::OK, "{body}");
+  assert_eq!(body, json!({ "original": GREETING, "text": "Hello." }));
 
-  let (status, body) = ground.post("/translations/kept/read", read).await;
+  let (status, body) = ground.get(&format!("/translations/kept?language=en&originals={GREETING}")).await;
 
   assert_eq!(status, StatusCode::OK);
-  assert_eq!(body, json!({ "kept": [{ "original": GREETING, "text": "Hello." }] }));
+  assert_eq!(body, json!({ "items": [{ "original": GREETING, "text": "Hello." }], "more": false }));
   assert!(ground.gateway.asked.lock().unwrap().is_empty());
 }
 
@@ -59,20 +59,24 @@ async fn a_language_no_reader_takes_is_refused() {
 
   for (path, body) in [
     ("/translations", json!({ "language": "fr", "originals": ["Bonjour."] })),
-    ("/translations/kept/read", json!({ "language": "fr", "originals": [] })),
+    ("/translations/kept?language=fr&originals=", json!({})),
   ] {
-    let (status, body) = ground.post(path, body).await;
+    let (status, body) = if path.starts_with("/translations/kept") {
+      ground.get(path).await
+    } else {
+      ground.post(path, body).await
+    };
 
-    assert_eq!(status, StatusCode::BAD_REQUEST);
-    refused(&body, "language_unknown");
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+    refused(&body, "language-unknown");
   }
 
   let (status, body) = ground
     .put("/translations/kept", json!({ "language": "fr", "original": "a", "text": "b" }))
     .await;
 
-  assert_eq!(status, StatusCode::BAD_REQUEST);
-  refused(&body, "language_unknown");
+  assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+  refused(&body, "language-unknown");
 }
 
 #[tokio::test]
@@ -81,7 +85,7 @@ async fn a_workers_words_go_through_the_sanitiser_with_no_room() {
   let (status, body) = ground
     .post(
       "/sanitised",
-      json!({ "text": "The notes of the running turn.", "label": "a worker's notes", "chat": null }),
+      json!({ "text": "The notes of the running turn.", "label": "a worker's notes", "roomId": null }),
     )
     .await;
 
@@ -98,7 +102,7 @@ async fn a_jobs_work_is_handed_the_knowledge_its_lines_call_for() {
   let (status, body) = ground
     .post(
       "/knowledge/selected",
-      json!({ "agent": "the-chat-agent", "chat": ROOM, "lines": ["Deploy the release."] }),
+      json!({ "agentName": "the-chat-agent", "roomId": ROOM, "lines": ["Deploy the release."] }),
     )
     .await;
 
@@ -117,7 +121,7 @@ async fn a_searchs_work_is_handed_the_chat_agents_knowledge() {
   ground.furnish();
 
   let (status, body) = ground
-    .post("/knowledge/work", json!({ "chat_id": ROOM, "lines": ["How do deploys go?"] }))
+    .post("/knowledge/work", json!({ "roomId": ROOM, "lines": ["How do deploys go?"] }))
     .await;
 
   assert_eq!(status, StatusCode::OK, "{body}");
@@ -126,7 +130,7 @@ async fn a_searchs_work_is_handed_the_chat_agents_knowledge() {
     json!({ "pieces": [{ "path": "knowledge/deploy-notes.md", "text": "Deploys go through the testbed." }] })
   );
 
-  let (status, body) = ground.post("/knowledge/work", json!({ "chat_id": ROOM, "lines": [] })).await;
+  let (status, body) = ground.post("/knowledge/work", json!({ "roomId": ROOM, "lines": [] })).await;
 
   assert_eq!(status, StatusCode::OK);
   assert_eq!(body, json!({ "pieces": [] }));

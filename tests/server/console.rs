@@ -1,5 +1,5 @@
-//! The console's calls: the gate order, a gate's options read and changed, Laya beside the probed gates, a room's
-//! judgements with their roads and offers, trials, and the documents' seeker and translations.
+//! The gate order, a gate's options read and changed, Laya beside the probed gates, a room's judgements with
+//! their roads and offers, trials, and the documents' seeker and translations.
 
 use gate_runs::records::now;
 use reqwest::StatusCode;
@@ -14,17 +14,18 @@ async fn the_gate_order_is_served_with_each_gates_profile() {
 
   assert_eq!(status, StatusCode::OK);
 
-  let gates = body["gates"].as_array().unwrap();
-  let sanitizer = gates.iter().find(|gate| gate["key"] == "sanitizer").expect("the sanitizer");
+  let gates = body["items"].as_array().unwrap();
+  let sanitizer = gates.iter().find(|gate| gate["gateName"] == "sanitizer").expect("the sanitizer");
 
   assert!(["pre", "post", "apart"].contains(&sanitizer["part"].as_str().unwrap()));
   assert!(sanitizer["step"].is_u64());
-  assert_eq!(sanitizer["laya_probe"], true);
-  assert_eq!(sanitizer["default_laya_mode"], "off");
+  assert_eq!(sanitizer["layaProbe"], true);
+  assert_eq!(sanitizer["defaultLayaMode"], "off");
 
-  for key in ["condition", "switchable", "answer_tokens"] {
+  for key in ["condition", "switchable", "answerTokens"] {
     assert!(sanitizer.as_object().unwrap().contains_key(key), "{key}");
   }
+  assert_eq!(body["more"], false);
 }
 
 #[tokio::test]
@@ -33,38 +34,46 @@ async fn a_gates_options_are_read_and_changed() {
   let (status, body) = ground.get("/options/sanitizer").await;
 
   assert_eq!(status, StatusCode::OK, "{body}");
-  assert_eq!(body["timeout_ms"], 30_000);
-  assert!(body["effective"]["laya_mode"].is_string());
+  assert_eq!(body["timeoutMs"], 30_000);
+  assert!(body["effective"]["layaMode"].is_string());
 
-  let (status, body) = ground.post("/options/sanitizer", json!({ "timeout_ms": 20_000 })).await;
+  let (status, body) = ground.post("/options/sanitizer", json!({ "timeoutMs": 20_000 })).await;
 
   assert_eq!(status, StatusCode::OK, "{body}");
-  assert_eq!(body["key"], "sanitizer");
-  assert_eq!(body["options"]["timeout_ms"], 20_000);
+  assert_eq!(body["gateName"], "sanitizer");
+  assert_eq!(body["options"]["timeoutMs"], 20_000);
   assert_eq!(body["options"]["provider"], "registry");
+
+  ground.post("/options/sanitizer", json!({ "layaMode": "off" })).await;
+  let (status, body) = ground.post("/options/sanitizer", json!({ "layaMode": null })).await;
+
+  assert_eq!(status, StatusCode::OK, "{body}");
+  assert_eq!(body["gateName"], "sanitizer");
+
+  let (status, body) = ground.get("/options/sanitizer").await;
+
+  assert_eq!(status, StatusCode::OK);
+  assert_eq!(body["layaMode"], json!(null));
 
   let (status, body) = ground.post("/options/sanitizer", json!({ "thinking": true })).await;
 
-  assert_eq!(status, StatusCode::BAD_REQUEST);
-  refused(&body, "own_llm");
+  assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+  refused(&body, "own-llm");
 
   let (status, body) = ground.get("/options/no-such-gate").await;
 
   assert_eq!(status, StatusCode::NOT_FOUND);
-  refused(&body, "no_gate");
+  refused(&body, "no-gate");
 }
 
 #[tokio::test]
 async fn a_mode_the_gate_cannot_run_in_is_refused_with_its_reason() {
   let ground = ground("mode", |_| None).await;
-  let (status, body) = ground
-    .post("/options/sanitizer", json!({ "laya_mode": "filter", "laya_tau": 0.9 }))
-    .await;
+  let (status, body) =
+    ground.post("/options/sanitizer", json!({ "layaMode": "filter", "layaTau": 0.9 })).await;
 
-  assert_eq!(status, StatusCode::CONFLICT, "{body}");
-  assert_eq!(body["code"], "laya_mode_refused");
-  assert_eq!(body["reason"], "no_checkpoint");
-  assert!(body["error"].is_string());
+  assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+  refused(&body, "no-checkpoint");
 }
 
 #[tokio::test]
@@ -81,7 +90,7 @@ async fn laya_is_read_beside_every_probed_gate() {
     .as_array()
     .unwrap()
     .iter()
-    .find(|gate| gate["stage"] == "sanitizer")
+    .find(|gate| gate["gateName"] == "sanitizer")
     .cloned()
     .unwrap();
 
@@ -93,7 +102,7 @@ async fn laya_is_read_beside_every_probed_gate() {
       .as_array()
       .unwrap()
       .iter()
-      .any(|one| one["code"] == "no_checkpoint"),
+      .any(|one| one["code"] == "no-checkpoint"),
     "{sanitizer}"
   );
 }
@@ -121,7 +130,7 @@ async fn a_rooms_judgements_come_a_page_at_a_time_with_their_roads_and_offers() 
            ('sanitizer', 7, 9, 'registry', 'a-registration', 'answered', 1900, $1, 120, 8, 'round-1'),
            ('sanitizer', 7, 10, 'registry', 'a-registration', 'answered', 900, $1, NULL, NULL, 'round-2'),
            ('sanitizer', 7, 10, 'registry', 'a-registration', 'answered', 900, $2, NULL, NULL, 'round-2')"#,
-      vec![(at - 1).into(), (at - 600).into()],
+      vec![(at - 1_000).into(), (at - 600_000).into()],
     )
     .await
     .unwrap();
@@ -135,36 +144,36 @@ async fn a_rooms_judgements_come_a_page_at_a_time_with_their_roads_and_offers() 
     .await
     .unwrap();
 
-  let (status, body) = ground.get(&format!("/rooms/{ROOM}/judgements?limit=1")).await;
+  let (status, body) = ground.get(&format!("/judgements?roomId={ROOM}&limit=1")).await;
 
   assert_eq!(status, StatusCode::OK, "{body}");
-  assert_eq!(body["has_more"], true);
+  assert_eq!(body["more"], true);
 
-  let newest = &body["judgements"][0];
+  let newest = &body["items"][0];
 
-  assert_eq!((&newest["message"], &newest["round"]), (&json!(10), &json!("round-2")));
+  assert_eq!((&newest["messageId"], &newest["round"]), (&json!(10), &json!("round-2")));
   assert_eq!(newest["roads"].as_array().unwrap().len(), 1, "{newest}");
   assert_eq!(newest["roads"][0]["tokens"], json!(null));
   assert_eq!(newest["offers"], json!([]));
 
   let before = newest["id"].as_i64().unwrap();
-  let (status, body) = ground.get(&format!("/rooms/{ROOM}/judgements?before={before}")).await;
+  let (status, body) = ground.get(&format!("/judgements?roomId={ROOM}&before={before}")).await;
 
   assert_eq!(status, StatusCode::OK);
-  assert_eq!(body["has_more"], false);
+  assert_eq!(body["more"], false);
 
-  let older = &body["judgements"][0];
+  let older = &body["items"][0];
 
-  assert_eq!(older["roads"][0]["tokens"]["input_tokens"], 120);
+  assert_eq!(older["roads"][0]["tokens"]["inputTokens"], 120);
   assert_eq!(
     older["offers"],
-    json!([{ "stage": "library-knowledge", "held": 4, "asked": 2, "kept": { "item": 0, "keyword": 2, "person": 0 }, "capped": 0, "rules": ["keyword"] }])
+    json!([{ "gateName": "library-knowledge", "held": 4, "asked": 2, "kept": { "item": 0, "keyword": 2, "person": 0 }, "capped": 0, "rules": ["keyword"] }])
   );
 
-  let (status, body) = ground.get(&format!("/rooms/{ROOM}/judgements?limit=many")).await;
+  let (status, body) = ground.get(&format!("/judgements?roomId={ROOM}&limit=many")).await;
 
   assert_eq!(status, StatusCode::BAD_REQUEST);
-  refused(&body, "field_wrong");
+  refused(&body, "bad-request");
 }
 
 #[tokio::test]
@@ -173,37 +182,38 @@ async fn a_trial_is_kept_and_read_back() {
   let (status, body) = ground
     .post(
       "/trials",
-      json!({ "stage": "sanitizer", "prompt": "Plain words.", "user": "the-owner" }),
+      json!({ "gateName": "sanitizer", "prompt": "Plain words.", "userName": "the-owner" }),
     )
     .await;
 
-  assert_eq!(status, StatusCode::OK, "{body}");
+  assert_eq!(status, StatusCode::CREATED, "{body}");
   assert_eq!(
-    (&body["stage"], &body["user"], &body["prompt"]),
+    (&body["gateName"], &body["userName"], &body["prompt"]),
     (&json!("sanitizer"), &json!("the-owner"), &json!("Plain words."))
   );
   assert_eq!(body["answer"], "CLEAN");
   assert_eq!(ground.scratch.count("SELECT count(*) FROM judgements", vec![]).await, 0);
 
-  let (status, read) = ground.get("/trials/sanitizer?limit=5").await;
+  let (status, read) = ground.get("/trials?gateName=sanitizer&limit=5").await;
 
   assert_eq!(status, StatusCode::OK);
-  assert_eq!(read["trials"], json!([body]));
+  assert_eq!(read["items"], json!([body]));
+  assert_eq!(read["more"], false);
 
   let (status, body) = ground
     .post(
       "/trials",
-      json!({ "stage": "sanitizer", "prompt": "a".repeat(1_000_001), "user": "the-owner" }),
+      json!({ "gateName": "sanitizer", "prompt": "a".repeat(1_000_001), "userName": "the-owner" }),
     )
     .await;
 
-  assert_eq!(status, StatusCode::BAD_REQUEST);
-  refused(&body, "prompt_too_long");
+  assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+  refused(&body, "too-large");
 
-  let (status, body) = ground.get("/trials/no-such-gate").await;
+  let (status, body) = ground.get("/trials?gateName=no-such-gate").await;
 
   assert_eq!(status, StatusCode::NOT_FOUND);
-  refused(&body, "no_gate");
+  refused(&body, "no-gate");
 }
 
 #[tokio::test]
@@ -223,7 +233,7 @@ async fn the_seeker_picks_the_documents_a_question_calls_for() {
     .await;
 
   assert_eq!(status, StatusCode::BAD_GATEWAY);
-  refused(&body, "no_answer");
+  refused(&body, "no-answer");
 }
 
 #[tokio::test]
@@ -232,7 +242,7 @@ async fn a_documents_translation_is_queued_and_read_back() {
   let (status, body) = ground
     .post(
       "/documents/translations",
-      json!({ "document": "docs/deploys.md", "version": "v1", "target": "ko", "parts": 1, "wanted": [{ "part": 0, "text": "How a deploy goes." }] }),
+      json!({ "document": "docs/deploys.md", "version": "v1", "target": "ko", "partCount": 1, "wanted": [{ "part": 0, "text": "How a deploy goes." }] }),
     )
     .await;
 
@@ -249,20 +259,21 @@ async fn a_documents_translation_is_queued_and_read_back() {
     .await;
 
   assert_eq!(status, StatusCode::OK);
-  assert!(body["parts"].is_array());
+  assert!(body["items"].is_array());
+  assert_eq!(body["more"], false);
 
   let (status, body) = ground
     .post(
       "/documents/translations",
-      json!({ "document": "deploys", "version": "v1", "target": "ko", "parts": 1, "wanted": [] }),
+      json!({ "document": "deploys", "version": "v1", "target": "ko", "partCount": 1, "wanted": [] }),
     )
     .await;
 
-  assert_eq!(status, StatusCode::BAD_REQUEST);
-  refused(&body, "document_unknown");
+  assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+  refused(&body, "document-unknown");
 
   let (status, body) = ground.get("/documents/translations/state?document=docs/deploys.md&target=fr").await;
 
-  assert_eq!(status, StatusCode::BAD_REQUEST);
-  refused(&body, "language_unknown");
+  assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+  refused(&body, "language-unknown");
 }

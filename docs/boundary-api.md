@@ -1,8 +1,9 @@
 # The gate's boundary
 
-This document is the gate's boundary: every route it serves, every call it makes on another unit, the unit
-command it carries, and what it owns. A unit reaches the gate only across it, and the gate reaches another
-unit only by the calls below. A route or a call that is not here is not part of the boundary.
+This document is the gate's boundary: where its served routes are stated, every call it makes on another
+unit, the unit command it carries, and what it owns. A unit reaches the gate only across it, and the gate
+reaches another unit only by the calls below. A route or a call that is not in `docs/api.md` or here is not
+part of the boundary.
 
 The gate is the gate stage of a turn. The receiver builds a turn's envelope; the gate sanitises the words on
 their way into a model's context, picks the reference the turn is handed, and checks the answer on its way
@@ -36,211 +37,26 @@ each release links to the data root's `env/gate.toml`. It names:
 
 No address, port, host, path or name of a deployment is written in the code; every one is read from here.
 
-## Wire conventions
-
-The gate serves route families in its callers' conventions, so each caller reads the gate as its own document
-says:
-
-| Family | Callers | Bodies | Refusal |
-|---|---|---|---|
-| the units' | bmo-receiver, bmo-job, bmo-artifact, the voice unit, the console's plugin bundle | JSON, snake_case | status and `{error, code}`, the code snake_case |
-| the brain's | bmo-brain | JSON, camelCase, every route `POST` | a refusal is an answer: 200 with `answered` false and `refusal` (`code`, `message` and the code's own fields); a failure is status and `{error, code}`, the code kebab-case |
-| the agency's hook | bmo-agency | `{point, ask}` in, `{answer}` out | none: a hook answers its point's default where it cannot answer |
-
-- **Auth.** Every route takes `Authorization: Bearer <token>` with the gate's token, and answers 401 without
-  it.
-- **Numbers.** A room is its chat, a message its message number, a person their sender number: each a signed
-  64-bit integer. Times are Unix seconds unless a route says otherwise.
-- **No sentence a person reads goes out of the gate.** Every answer is data, codes and their fields, and an
-  English sentence only where an error needs one. A screen's words are the console's language pack.
-- **The refusal body** is two keys: `error`, one English sentence naming why, and `code`, a stable code a caller
-  decides on. The one third key is `reason` beside `laya_mode_refused`, the code of the mode refusal it is. The
-  codes are `docs/codes.md`.
-
-| Status | When |
-|---|---|
-| 400 | the body or the query is wrong as asked |
-| 401 | the token is missing or wrong |
-| 404 | the route, the gate, the room or the trial named does not exist |
-| 409 | the request conflicts with what stands, or the run it asked was stopped (`stopped`) |
-| 500 | the gate failed while answering, its database among it (`database`) |
-| 502 | a call the route needed on another unit failed (`unit_failed`, naming the unit) |
-| 503 | the service is up but cannot answer yet (`not_ready`) |
-
 ## Routes served
 
-### For bmo-receiver
+`docs/api.md` states every route the gate serves, one section per resource, in the common wire format: camelCase
+keys, epoch milliseconds, signed 64-bit ids, `{code, error}` on a non-2xx answer, and a page of `items` and
+`more`. No section of that document is written for one caller, and no route names one.
 
-As the receiver's `docs/boundary-api.md` states them in 「The gate」, and its gate port makes them.
-
-| Route | Request | Answer |
-|---|---|---|
-| `POST /reference/selected` | `chat`, `message?`, `lines` (the room's recent messages in the room shape, each a string), `speakers` (the people whose words the turn answers), `situation?` (`agent`, `room`: `owner` or `group`, `events`: each `kind` and `item?`, `now`), `holds?` (names), `round?`, `people_spoke`, `answered?`, `off` (the gates switched off for the agent), `lore?` (whether the room reads the lore, as its tone says; true where absent), `records` | `entries`: each `path`, `text`, `source` (`document`, `person`, `rule`, `situation`, `knowledge`, `memory`, `room` or `archive`) |
-| `POST /sanitised` | `text`, `label`, `chat?`, `message?` | `text`, `changed`; 409 `stopped` where its run was stopped |
-| `POST /judgements` | `chat`, `message?`, `stage`, `verdict`, `detail?`, `ms?`, `round?` | 204 |
-| `POST /judgements/attached` | `chat`, `message`, `since` | 204 |
-| `POST /options/copied` | `agent` (the companion), `from` (the chat agent) | 204 |
-
-- **A turn's reference** is the reference gates, the person-book search and the situation-rule matcher run
-  over the envelope, each on its own road, and the pieces they pick read from the brain. A gate named in
-  `off` is not asked. Where `records` is true the turn's offers and verdicts are written.
-- **A judgement** is a decision written into a room's log: a round's skip, a re-ask, an answer sent. It is
-  written as it comes, with the moment it was written.
-- **The attach** puts a round's judgements under the message that answered it: every judgement of the room
-  written at or after `since` and standing under no message yet is put under `message`. The receiver asks it
-  once the answer is sent, `since` being the moment the round began.
-- **A companion's gate options** are the `from` agent's rows copied as they stand, under the companion's name,
-  so its gates run on the same options from its first turn and are tuned apart afterwards. A `from` with no rows
-  copies nothing and is no refusal.
-
-### For bmo-job
-
-As bmo-job's `docs/api.md` states them in 「bmo-gate」, and its crate `job-gate` makes them.
-
-| Route | Request | Answer |
-|---|---|---|
-| `POST /translations/kept/read` | `language`, `originals` | `kept`, each `original` and `text` |
-| `POST /translations` | `language`, `originals` | `readings`, each `text` and `whole` |
-| `PUT /translations/kept` | `language`, `original`, `text` | 204 |
-| `POST /sanitised` | `text`, `label`, `chat?` | `text`, `changed`; 409 `stopped` |
-| `POST /knowledge/selected` | `agent`, `chat`, `lines` | `pieces`, each `path` and `text` |
-
-- **A language** is a language tag. A translation is kept under its original and its language, so the same
-  original is never translated twice into one language.
-- **Reading kept translations** never asks the translator; `kept` holds one entry for each original with a
-  translation kept in the language.
-- **Translating** answers one reading for each original, in the order given: an original with no part in
-  another language stands as it is; any other has its parts in another language translated, each part
-  standing beside the rest as it did, and is kept; a part the translator could not render stays in its
-  original, the reading is not `whole`, and nothing is kept for it.
-- **Keeping a translation** keeps `text` as the reading of `original` in the language, in place of any kept
-  before.
-- **The sanitiser** defuses the smallest spans that carry security-intrusion material and leaves the rest as it
-  was. Words with nothing worth judging come back as they are; where the sanitiser has no answer, the words that
-  made them worth judging are blanked, so they are never handed on raw. A verdict is kept under the message
-  where `message` names one.
-- **Selecting knowledge** picks, from the brain's libraries the agent may be offered in the room, the pieces a
-  piece of work's own lines call for. The narrowing, the pick and the count of what was attached are the
-  gate's.
-
-### For bmo-artifact
-
-As bmo-artifact's `docs/api.md` states it under 「bmo-gate」.
-
-| Route | Request | Answer |
-|---|---|---|
-| `POST /knowledge/work` | `chat_id`, `lines` | `pieces`, each `path` and `text` |
-
-The same pick as `POST /knowledge/selected`, for the chat agent: a search's work names its question as one
-line. A pick that fails costs the run its reference and nothing else.
-
-### For bmo-brain
-
-As the brain's `docs/boundary-api.md` states them in 「The gate」, in the brain's conventions.
-
-| Route | Body | Answer |
-|---|---|---|
-| `POST /sanitiser/documents` | `path`, `text` | `answered` true and `text`, or `answered` false and `refusal` naming why |
-| `POST /sheets/judge` | `agent`, `part` (`common` or `room`), `chatId` (the room's, or null for the common part), `person`, `pieces` (each `path` and `text`), `ceiling`, `registration` or null | `sheet`, or null where none came |
-
-- **A document's sanitising** reads the text an editor changed and answers the text to keep. Which texts need
-  looking at is the gate's; a text with nothing worth judging comes back as it is.
-- **A sheet's judgement** is the person-book summariser: one person's sheet of one part, written from the pieces
-  handed in and held under `ceiling` characters, on the registration named where one is, else on the gate's own
-  road.
-
-### For bmo-agency: the session summariser
-
-The gate answers the agency's `session-summariser` hook point (the agency's `docs/api.md`, 「Hooks」). It
-registers `POST /hooks` with `point` `session-summariser`, its own address for the point and its token as it
-starts, and answers:
-
-| Route | Ask | Answer |
-|---|---|---|
-| `POST /hooks/session-summariser` | `point` and `ask`: `kind` (`chat`, `worker` or `switch`), `mode`, `sessionId?`, `cwd`, `account?`, `transcript?`, `ownNote?`, `chatId?` | `answer`: the whole note the next run is handed, or null |
-
-The note's length, its wording and how a session is read are the summariser's. A summariser that fails answers
-null, and nothing is carried over.
-
-### For the chat units: the output gate
-
-| Route | Request | Answer |
-|---|---|---|
-| `POST /formats/decided` | `chat`, `text` (one part of a reply, as the dialect divided it, in markdown) | `markup`: the markup the part goes out as, or null to send its plain text |
-
-- **The output gate** (`docs/output-gate.md`) reads the part as the `telegram-html` dialect reads it, folds it where
-  the gate says FOLD, and hands back the first candidate the structure check passes. Its decision is written into
-  the room's log, and a candidate the check refuses is kept as a format case. It never fails a part: where it has
-  no answer the part goes out open, and plain where nothing else is left.
-
-### For the voice unit: the voice gates
-
-| Route | Request | Answer |
-|---|---|---|
-| `POST /stages/{stage}/runs` | `prompt`, `system?`, `chat?`, `message?`, `agent?`, `thinking?` (true where absent), `alongside?` (false where absent) | `answer` (the gate's text, or null where its road gave none), `ms`; 409 `stopped` |
-
-- **One run of one gate,** for a unit that reads the answer itself: the voice unit's reading gate and script
-  polishing gate, `voice-reading` and `voice-polish`. The run goes on the stage's road with the stage's options
-  and is recorded as a road like any gate run.
-- **The instructions** are the stage's own where `system` is absent. A stage that is not a gate is 404
-  `no_gate`; a stage switched off answers null without asking any road.
-
-### For the console
-
-The console's plugin bundle (`client/`, `docs/layout.md`, 「The console plugin bundle」) is served by the web
-unit, and the bundle's own server routes, running in the console, call these. Times here are Unix seconds.
-
-| Route | Request | Answer |
-|---|---|---|
-| `GET /gates` | | `gates`: each gate in the gate order, its `key`, its `part` (`pre`, `post` or `apart`), its `step`, its `condition` or null, and its profile: `switchable`, `laya_probe`, `default_laya_mode` and `answer_tokens` |
-| `GET /options/{key}` | | `timeout_ms`, `laya_mode`, `laya_tau`, `laya_probe`, `switchable`, `enabled`, `laya_fallback`, `effective` (`thinking`, `answer_tokens`, `timeout_ms`, `laya_mode`, `laya_tau`) and `defaults` |
-| `POST /options/{key}` | any of `timeout_ms`, `laya_mode`, `laya_tau`, `enabled`, `laya_fallback`; a Laya field sent null goes back to the default | `key`, `options`: the gate's route as a run reads it (`provider`, `model`, `laya`, `timeout_ms`, `set_at`) |
-| `GET /rooms/{chat}/judgements?before=&limit=` | | `judgements`, newest first, each `id`, `chat`, `message`, `stage`, `verdict`, `detail`, `created_at`, `ms`, `round`, `roads` (each `id`, `provider`, `model`, `outcome`, `ms`, `tokens`: `input_tokens`, `output_tokens`, `cache_read_tokens` and `cache_write_tokens`, or null where the road kept none) and `offers` (each gate's `stage`, `held`, `asked`, `kept`: how many each rule kept, `item`, `keyword` and `person`, `capped`, and `rules`, the rules a candidate could be kept by, or null where it could be kept by all); and `has_more` |
-| `POST /trials` | `stage`, `prompt`, `user` | the trial: `id`, `stage`, `user`, `prompt`, `answer` or null, `ms`, `created_at` |
-| `GET /trials/{stage}?limit=` | | `trials`, oldest first, each as above |
-| `GET /laya` | | `health` (`state`, `model`, `device`, `vram_bytes`, `load_ms`, `versions`, `address`, `check_ms`, `checked_at`, `answered_at`), `gates` (each `stage`, `mode`, `tau`, `agreement` or null, `checkpoint` or null, `refused`: each mode the gate may not run in, with its code), `modes` and `taus` |
-| `POST /documents/sought` | `question`, `entries` (each `slug`, `line`, `group?`) | `picks`, the slugs chosen; 502 `no_answer` where the seeker gave none |
-| `POST /documents/translations` | `document`, `version`, `target`, `parts`, `wanted` (each `part` and `text`) | 202 with `taken`, the parts queued |
-| `GET /documents/translations/state?document=&target=` | | `pending`, `failure` (`reason`, `provider`, `model`) or null |
-| `GET /documents/translations/parts?document=&version=&target=` | | `parts`, each `part`, `text` and `failed` |
-| `GET /events` | | a server-sent event stream: `judgement` (a judgement as `POST /judgements` wrote it), `document-translation` (`document`, `detail`) and `laya` (Laya's health state or model moved) |
-
-- **A gate's options** are its wait, its switch where its profile lets it be switched off, its Laya mode, τ and
-  fallback LLM (`docs/laya.md`). What it thinks and how much it may answer are its tier's on its road, and a
-  change naming either is refused `own_llm`.
-- **A trial** puts one prompt to one gate as a turn would, records no judgement, and keeps the trial. A prompt is
-  at most a million characters.
-- **A page** of judgements or trials is a hundred where `limit` names none, and five hundred at most; `before` is
-  the `id` the next page starts below.
-- **A judgement's roads** are its stage's road records of the same round, or of the same message where either names
-  no round, that fall within the time the judgement took, give or take five seconds; each road goes to one judgement.
-  Its `offers` are the offers record of its round.
-- **A translation of a document** is queued part by part; each part is kept once it comes back with its
-  structure kept, asked once more where it lost it, and kept as failed where it lost it twice.
-
-### Health
-
-`GET /health` answers `version` (the service's version), `ready` (its database and its settings stand) and
-`laya` (the relay's last answer: `up`, `down` or `off`).
-
-`bmo-gate health` asks the service the settings name (「The unit command」), at its `address` with its own
-token, waiting at most five seconds, and ends 0 where it answers ready and 1 where it does not, saying why. It is
-the deployment's check rather than a noun, so `nouns` does not declare it.
-
-### Records
-
-`bmo-gate records <table>` prints every row of one of the gate's own tables, from the database the settings name
-or the one `--db` names, one JSON object a line with every column under its own name, in the order the rows were
-written. It is how the training tooling reads the gate's own records into its conversation snapshot
-(`docs/gate-data.md`, 「The conversation source」). A name that is not one of the gate's own tables ends with 2. It
-reads and writes nothing else, and like `health` it is no noun, so `nouns` does not declare it.
+- **Records.** `bmo-gate records <table>` prints every row of one of the gate's own tables, from the database the
+  settings name or the one `--db` names, one JSON object a line with every column under its own name, in the
+  order the rows were written. It is how the training tooling reads the gate's own records into its
+  conversation snapshot (`docs/gate-data.md`, 「The conversation source」). A name that is not one of the gate's
+  own tables ends with 2. It reads and writes nothing else, and like `health` it is no noun, so `nouns` does not
+  declare it.
 
 ## Calls the gate makes
 
 ### bmo-brain
 
-In the brain's conventions (its `docs/boundary-api.md`, 「Wire conventions」): camelCase, every call `POST`, a
-refusal an answer.
+In the common conventions: camelCase, epoch milliseconds, every call `POST`, and an error of `{code, error}`.
+These are the calls the gate's hand-written port makes; the gap below names what the brain's published client
+does not carry.
 
 | Call | Route | Body | Answer |
 |---|---|---|---|
@@ -261,7 +77,7 @@ attached and what it matched.
 
 ### bmo-receiver
 
-The receiver's routes 「For the brain」, in the same conventions, which the gate reads its room facts through.
+The receiver's routes in the common conventions, which the gate reads its room facts through.
 
 | Call | Route | Body | Answer |
 |---|---|---|---|
@@ -457,6 +273,12 @@ Statements here that a sibling's document does not yet match, each for that sibl
 - **The agency publishes no command that runs one batch apart** with the words the training tooling's claude road
   hands it (「bmo-agency」 above); the road runs whatever command the tooling's settings name until the agency
   states one.
+- **The upstreams' published clients do not carry the calls the gate makes.** bmo-brain's client serves memory
+  rows, notes, watches, reminders, fragments and libraries, and not the generated reference, person-book,
+  room-rule and session routes the gate reads; bmo-agency's client serves sessions and turns, and not the
+  route resolution, a run apart or a stop the gate's runs call; bmo-job's client serves items, and not a row
+  another unit raises. The gate's hand-written ports in `crates/ports` stand for these calls until their
+  owners serve them, and the gate takes the client of each one as soon as it does.
 - **No unit but the gate serves its part of the training tooling's conversation snapshot:** the receiver's messages
   and sent messages, the agency's run log, bmo-job's items and job runs, and bmo-artifact's searches stand
   unavailable in every snapshot (`docs/gate-data.md`, 「The conversation source」) until each owner serves a route

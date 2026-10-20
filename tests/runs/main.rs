@@ -26,7 +26,7 @@ pub async fn ground() -> (Scratch, Arc<FakeAgency>, Arc<FakeGateway>) {
 
 /// The chat agent's wait for a gate written through the options, as the console writes it.
 pub async fn wait(runs: &gate_runs::Runs, stage: &str, ms: i64) {
-  gate_runs::options::change(runs, stage, &json!({ "timeout_ms": ms }), 1).await.unwrap();
+  gate_runs::options::change(runs, stage, &json!({ "timeoutMs": ms }), 1).await.unwrap();
 }
 
 /// The runs over a ground, with no record folders.

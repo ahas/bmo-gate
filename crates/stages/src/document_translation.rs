@@ -380,7 +380,7 @@ impl Queue {
       state.pending = state.pending.saturating_sub(1);
     }
 
-    stages.publish("document-translation", json!({ "document": part.document, "detail": detail }));
+    stages.publish("document-translation.changed", json!({ "document": part.document, "detail": detail }));
   }
 }
 

@@ -2,15 +2,16 @@
 # as a member as it stands. The root package also holds the checks that span the repository and every test of
 # the repository in `tests/`, the Python and Bun suites among them, which a Cargo test of their own runs.
 [workspace]
-members = ["crates/codes", "crates/command", "crates/laya-relay", "crates/markup", "crates/policy", "crates/ports", "crates/reference", "crates/runs", "crates/server", "crates/stages", "crates/store", "crates/words"]
+members = ["crates/client", "crates/codes", "crates/command", "crates/laya-relay", "crates/markup", "crates/policy", "crates/ports", "crates/reference", "crates/runs", "crates/server", "crates/stages", "crates/store", "crates/words"]
 resolver = "3"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.0-rev.1"
 edition = "2024"
 
 [workspace.dependencies]
 async-trait = "0.1.92"
+bmo-gate-client = { path = "crates/client" }
 # The stand-in units the ports' tests answer from.
 axum = { version = "0.8.4", default-features = false, features = ["http1", "json", "query", "tokio"] }
 chrono = { version = "0.4.41", default-features = false, features = ["std"] }
@@ -18,6 +19,7 @@ chrono = { version = "0.4.41", default-features = false, features = ["std"] }
 clap = { version = "4.5.40", features = ["derive", "env"] }
 futures-util = "0.3.34"
 gate-codes = { path = "crates/codes" }
+schemars = "1.2.3"
 gate-command = { path = "crates/command" }
 gate-markup = { path = "crates/markup" }
 gate-policy = { path = "crates/policy" }
@@ -50,6 +52,7 @@ sha2 = "0.10.9"
 sqlx = { version = "0.8.6", default-features = false, features = ["postgres", "runtime-tokio"] }
 sse-stream = "0.2.6"
 tempfile = "3.20.0"
+thiserror = "2.0.21"
 tokio = { version = "1.47.0", features = ["macros", "rt", "rt-multi-thread", "net", "time", "signal", "io-util", "process"] }
 toml = { version = "0.8.23", default-features = false, features = ["parse"] }
 unicode-normalization = "0.1.25"
@@ -88,6 +91,7 @@ path = "src/bin/laya-relay.rs"
 
 [dev-dependencies]
 axum.workspace = true
+bmo-gate-client.workspace = true
 # The unit command's words, as the tests hand them to it.
 clap.workspace = true
 futures-util.workspace = true
@@ -119,6 +123,11 @@ sqlx.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
 toml.workspace = true
+
+# The contract's test: the committed OpenAPI document is the one the types generate.
+[[test]]
+name = "api"
+path = "tests/api.rs"
 
 # The store's tests, one binary over a scratch database of each test's own.
 [[test]]

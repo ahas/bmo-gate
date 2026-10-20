@@ -1,41 +1,41 @@
-//! Documents for the console (`docs/boundary-api.md`, 「For the console」): the documents a question calls for out
-//! of an index, and a document's translation queued part by part, its state and its parts read back.
+//! Documents (`docs/api.md`, 「Documents」): the documents a question calls for out of an index, and a document's
+//! translation queued part by part, its state and its parts read back.
 
 use std::sync::Arc;
 
 use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
+use bmo_gate_client::{
+  DocumentPart, DocumentPartsQuery, DocumentStateQuery, DocumentTranslationOrder, DocumentTranslationState,
+  Page, Picks, SeekAsk, SeekEntry, Taken, TranslationFailure, WantedPart,
+};
 use gate_codes::Code;
-use gate_stages::document_seek::{SeekEntry, sought as seek};
+use gate_stages::document_seek::{self, SeekEntry as GateSeekEntry};
 use gate_stages::document_translation::{self, Order, State as Standing};
 use gate_store::entity::document_translations;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
-use serde::{Deserialize, Serialize};
 
 use crate::App;
 use crate::answer::{Answered, Body, Query, Refused};
 
-#[derive(Deserialize)]
-pub struct Seek {
-  pub question: String,
-  pub entries: Vec<SeekEntry>,
-}
-
-#[derive(Serialize)]
-pub struct Picks {
-  pub picks: Vec<String>,
-}
-
-pub async fn sought(State(app): State<Arc<App>>, Body(asked): Body<Seek>) -> Answered<Json<Picks>> {
-  let picks = seek(&app.stages, &asked.entries, &asked.question)
+pub async fn sought(State(app): State<Arc<App>>, Body(asked): Body<SeekAsk>) -> Answered<Json<Picks>> {
+  let entries: Vec<GateSeekEntry> = asked
+    .entries
+    .into_iter()
+    .map(|entry: SeekEntry| GateSeekEntry {
+      slug: entry.slug,
+      line: entry.line,
+      group: entry.group,
+    })
+    .collect();
+  let picks = document_seek::sought(&app.stages, &entries, &asked.question)
     .await
     .ok_or_else(|| Refused::new(Code::NoAnswer, "the document seeker gave no answer"))?;
 
   Ok(Json(Picks { picks }))
 }
 
-/// A document's name, refused `document_unknown` where it is no root and path.
 fn document(name: &str) -> Answered<()> {
   match name.split_once('/') {
     Some((root, path)) if !root.is_empty() && !path.is_empty() => Ok(()),
@@ -43,36 +43,15 @@ fn document(name: &str) -> Answered<()> {
   }
 }
 
-/// A target language, refused `language_unknown` where the translator does not take it.
 fn target(language: &str) -> Answered<()> {
   document_translation::language(language)
     .map(drop)
     .ok_or_else(|| Refused::new(Code::LanguageUnknown, format!("the translator takes no {language}")))
 }
 
-#[derive(Deserialize)]
-pub struct Wanted {
-  pub part: i64,
-  pub text: String,
-}
-
-#[derive(Deserialize)]
-pub struct Ordered {
-  pub document: String,
-  pub version: String,
-  pub target: String,
-  pub parts: i64,
-  pub wanted: Vec<Wanted>,
-}
-
-#[derive(Serialize)]
-pub struct Taken {
-  pub taken: usize,
-}
-
 pub async fn translate(
   State(app): State<Arc<App>>,
-  Body(asked): Body<Ordered>,
+  Body(asked): Body<DocumentTranslationOrder>,
 ) -> Answered<(StatusCode, Json<Taken>)> {
   document(&asked.document)?;
   target(&asked.target)?;
@@ -83,47 +62,39 @@ pub async fn translate(
       document: asked.document,
       version: asked.version,
       target: asked.target,
-      parts: asked.parts,
-      wanted: asked.wanted.into_iter().map(|one| (one.part, one.text)).collect(),
+      parts: asked.part_count,
+      wanted: asked.wanted.into_iter().map(|one: WantedPart| (one.part, one.text)).collect(),
     },
   );
 
   Ok((StatusCode::ACCEPTED, Json(Taken { taken })))
 }
 
-#[derive(Deserialize)]
-pub struct Named {
-  pub document: String,
-  pub target: String,
+fn standing(state: Standing) -> DocumentTranslationState {
+  DocumentTranslationState {
+    pending: state.pending,
+    failure: state.failure.map(|failure| TranslationFailure {
+      reason: failure.reason,
+      provider: failure.provider,
+      model: failure.model,
+    }),
+  }
 }
 
-pub async fn state(State(app): State<Arc<App>>, Query(asked): Query<Named>) -> Answered<Json<Standing>> {
+pub async fn state(
+  State(app): State<Arc<App>>,
+  Query(asked): Query<DocumentStateQuery>,
+) -> Answered<Json<DocumentTranslationState>> {
   document(&asked.document)?;
   target(&asked.target)?;
 
-  Ok(Json(app.queue.state(&asked.document, &asked.target)))
+  Ok(Json(standing(app.queue.state(&asked.document, &asked.target))))
 }
 
-#[derive(Deserialize)]
-pub struct Version {
-  pub document: String,
-  pub version: String,
-  pub target: String,
-}
-
-#[derive(Serialize)]
-pub struct Part {
-  pub part: i64,
-  pub text: Option<String>,
-  pub failed: bool,
-}
-
-#[derive(Serialize)]
-pub struct Parts {
-  pub parts: Vec<Part>,
-}
-
-pub async fn parts(State(app): State<Arc<App>>, Query(asked): Query<Version>) -> Answered<Json<Parts>> {
+pub async fn parts(
+  State(app): State<Arc<App>>,
+  Query(asked): Query<DocumentPartsQuery>,
+) -> Answered<Json<Page<DocumentPart>>> {
   document(&asked.document)?;
   target(&asked.target)?;
 
@@ -136,14 +107,15 @@ pub async fn parts(State(app): State<Arc<App>>, Query(asked): Query<Version>) ->
     .await
     .map_err(Refused::database)?;
 
-  Ok(Json(Parts {
-    parts: rows
+  Ok(Json(Page::of(
+    rows
       .into_iter()
-      .map(|row| Part {
+      .map(|row| DocumentPart {
         part: row.part,
         text: row.text,
         failed: row.failed != 0,
       })
       .collect(),
-  }))
+    false,
+  )))
 }
