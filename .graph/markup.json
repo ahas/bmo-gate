@@ -1,0 +1,69 @@
+[
+  {
+    "id": "markup/reading",
+    "title": "Text readings",
+    "what": "Small readings of a text the gate shares: English against a declared test, JavaScript's character classes, fenced blocks and prose, and web addresses.",
+    "files": [
+      "crates/markup/src/english.rs",
+      "crates/markup/src/text.rs",
+      "crates/markup/src/js.rs",
+      "crates/markup/src/web_address.rs"
+    ],
+    "symbols": [
+      "EnglishTest",
+      "prose",
+      "units",
+      "web_addresses",
+      "markdown_link_at"
+    ],
+    "aliases": [],
+    "needs": [],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974247
+  },
+  {
+    "id": "markup/telegram",
+    "title": "Telegram markup",
+    "what": "An agent's markdown read line by line into Telegram's HTML and plain text, the structure check every markup passes, and a message's size in UTF-16 units.",
+    "files": [
+      "crates/markup/src/format.rs",
+      "crates/markup/src/markdown.rs",
+      "crates/markup/src/telegram.rs"
+    ],
+    "symbols": [
+      "markup_fault",
+      "MarkupFault",
+      "escape_html",
+      "TEXT_LIMIT",
+      "plain_parts"
+    ],
+    "aliases": [],
+    "needs": [
+      "markup/reading",
+      "policy/parts"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974253
+  },
+  {
+    "id": "markup/writing",
+    "title": "The writing nets",
+    "what": "The nets under the writing rules: a dash left between words replaced as a person would type it, and the owner's banned words found outside quoted spans.",
+    "files": [
+      "crates/markup/src/dashes.rs",
+      "crates/markup/src/wording.rs"
+    ],
+    "symbols": [
+      "without_dashes",
+      "BannedTerm",
+      "Glossary",
+      "WordingHit"
+    ],
+    "aliases": [],
+    "needs": [
+      "markup/reading"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974250
+  }
+]

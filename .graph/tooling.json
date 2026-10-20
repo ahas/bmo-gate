@@ -1,0 +1,155 @@
+[
+  {
+    "id": "tooling/conversation",
+    "title": "The conversation snapshot",
+    "what": "The conversation snapshot the tooling builds from the gate's records and the units' routes, with the room's shapes and personal data removed.",
+    "files": [
+      "training/tooling/src/conversation.ts",
+      "training/tooling/src/snapshot.ts",
+      "training/tooling/src/room-shape.ts",
+      "training/tooling/src/pii.ts",
+      "training/tooling/src/real-rows.ts",
+      "training/tooling/scripts/laya-real.ts",
+      "prompts/tooling/pii.toml"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "tooling/settings",
+      "api/command"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974368
+  },
+  {
+    "id": "tooling/gate-roads",
+    "title": "The distilled gates' data",
+    "what": "The distilled gates' data: real rows taken from a conversation, judged on a road, merged and kept under a ledger (docs/gate-data.md).",
+    "files": [
+      "training/tooling/src/gate-claim.ts",
+      "training/tooling/src/gate-judge.ts",
+      "training/tooling/src/gate-ledger.ts",
+      "training/tooling/src/gate-merge.ts",
+      "training/tooling/src/gate-run.ts",
+      "training/tooling/src/gate-verdict.ts",
+      "training/tooling/src/fold-state.ts",
+      "training/tooling/scripts/laya-judge.ts",
+      "training/tooling/scripts/laya-merge.ts",
+      "prompts/tooling/gate-judge.toml",
+      "docs/gate-data.md"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "tooling/conversation",
+      "tooling/roads",
+      "laya/rows"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974374
+  },
+  {
+    "id": "tooling/nodes",
+    "title": "Reaching the nodes",
+    "what": "Reaching a node from the tooling: its connection through bmo-node's command, its machine, and the installs of the Laya service and its tunnel.",
+    "files": [
+      "training/tooling/src/node-calls.ts",
+      "training/tooling/src/node-reach.ts",
+      "training/tooling/src/machine.ts",
+      "training/tooling/src/tunnel-install.ts",
+      "training/tooling/src/llm-install.ts",
+      "training/tooling/src/card-adapter.ts",
+      "training/tooling/src/card-descriptions.ts",
+      "training/tooling/scripts/llm-install.ts"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "tooling/settings",
+      "calls/node",
+      "calls/arbiter"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974363
+  },
+  {
+    "id": "tooling/placement",
+    "title": "The Laya placement",
+    "what": "Where the Laya service and its training stand: the placement file the card master and the relay read, and the training card's adapter.",
+    "files": [
+      "training/tooling/src/placement.ts",
+      "training/tooling/src/laya-nodes.ts",
+      "training/tooling/src/laya-train-adapter.ts",
+      "training/tooling/scripts/laya-nodes.ts",
+      "training/tooling/scripts/laya-train-adapter.ts"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "tooling/settings",
+      "tooling/nodes",
+      "calls/arbiter"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974366
+  },
+  {
+    "id": "tooling/reference-data",
+    "title": "The reference gates' data",
+    "what": "The reference gates' data: turns read from the conversation, labelled and judged, distilled into rows and corrected (docs/reference-data.md).",
+    "files": [
+      "training/tooling/src/reference/",
+      "training/tooling/scripts/reference-correct.ts",
+      "training/tooling/scripts/reference-data.ts",
+      "training/tooling/scripts/reference-round.ts",
+      "training/tooling/scripts/work-distill.ts",
+      "prompts/tooling/reference-judge.toml",
+      "docs/reference-data.md"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "tooling/conversation",
+      "tooling/roads",
+      "tooling/settings"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974377
+  },
+  {
+    "id": "tooling/roads",
+    "title": "The roads the tooling asks on",
+    "what": "The roads a model is asked on in the tooling: claude, codex, a local server or a text endpoint, and the reading of a model's answer into rows.",
+    "files": [
+      "training/tooling/src/claude-road.ts",
+      "training/tooling/src/codex-road.ts",
+      "training/tooling/src/local-road.ts",
+      "training/tooling/src/text-road.ts",
+      "training/tooling/src/laya-teach.ts"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "tooling/settings",
+      "calls/agency"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974371
+  },
+  {
+    "id": "tooling/settings",
+    "title": "The tooling's settings",
+    "what": "The training tooling's own settings, data root, flag reader and prompt files, read at every ask and never filled in with a default.",
+    "files": [
+      "training/tooling/src/settings.ts",
+      "training/tooling/src/roots.ts",
+      "training/tooling/src/flags.ts",
+      "training/tooling/src/prompts.ts"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974360
+  }
+]

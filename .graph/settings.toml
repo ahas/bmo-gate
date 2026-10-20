@@ -1,0 +1,22 @@
+repository = "bmo-gate"
+base = false
+
+[coverage]
+# Every tracked Rust, TypeScript, Vue and Python file outside the tests, but these: the crate roots that only
+# list their modules, the type declarations alone, and the types the OpenAPI document generates.
+layout = "bmo-next"
+extensions = ["rs", "ts", "vue", "py"]
+roots = ["package/", "training/", "runtime/"]
+unindexed = [
+  "src/lib.rs",
+  "crates/client/src/lib.rs",
+  "crates/laya-relay/src/lib.rs",
+  "crates/markup/src/lib.rs",
+  "crates/ports/src/lib.rs",
+  "crates/store/src/entity.rs",
+  "crates/words/src/lib.rs",
+  "client/host/components.d.ts",
+  "client/host/server.d.ts",
+  "client/shared/gate.ts",
+  "package/openapi.d.ts",
+]

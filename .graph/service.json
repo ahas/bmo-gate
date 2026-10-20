@@ -1,0 +1,62 @@
+[
+  {
+    "id": "service/deployment",
+    "title": "The deployment",
+    "what": "The repository's deployment: the service units under deploy/, the testbed declaration, and the layout document that states the folders.",
+    "files": [
+      "deploy/",
+      "testbed.toml",
+      "README.md",
+      "docs/layout.md"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "api/http",
+      "api/command",
+      "laya/relay"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974224
+  },
+  {
+    "id": "service/retention",
+    "title": "Retention",
+    "what": "The sweep that keeps format cases and sanitiser verdicts ninety days, run as the service starts and once a day after.",
+    "files": [
+      "crates/stages/src/retention.rs"
+    ],
+    "symbols": [
+      "FORMAT_CASES_MS",
+      "SANITISED_MS"
+    ],
+    "aliases": [],
+    "needs": [
+      "store/database"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974222
+  },
+  {
+    "id": "service/watches",
+    "title": "The service's watches",
+    "what": "The watches the service keeps going beside its routes: the agency's road events, the summariser hook, Laya's health and the attachments count.",
+    "files": [
+      "crates/server/src/watches.rs"
+    ],
+    "symbols": [
+      "start",
+      "SUMMARISER"
+    ],
+    "aliases": [],
+    "needs": [
+      "runs/records",
+      "reference/attachments",
+      "runs/summary",
+      "gates/laya-health",
+      "store/database"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974220
+  }
+]

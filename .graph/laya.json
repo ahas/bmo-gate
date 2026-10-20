@@ -1,0 +1,179 @@
+[
+  {
+    "id": "laya/card-turn",
+    "title": "The card turn client",
+    "what": "The turn client the Laya server and the training use to take their hold on a node's card through the node arbiter.",
+    "files": [
+      "runtime/laya-server/turn.py"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "calls/arbiter"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974395
+  },
+  {
+    "id": "laya/checkpoints",
+    "title": "Laya's checkpoints",
+    "what": "Laya's checkpoints kept and moved: a finished one collected from its node, the collection rotated, and spent runs cleared.",
+    "files": [
+      "training/tooling/src/laya-collect.ts",
+      "training/tooling/src/laya-rotate.ts",
+      "training/tooling/src/laya-spent.ts",
+      "training/tooling/scripts/laya-collect.ts",
+      "training/tooling/scripts/laya-rotate.ts",
+      "training/tooling/scripts/laya-spent.ts"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "tooling/settings",
+      "tooling/placement",
+      "tooling/nodes"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974386
+  },
+  {
+    "id": "laya/front",
+    "title": "The Laya front and tunnel",
+    "what": "The front and tunnel on a node: the gate's decide call carried to the engine, the same decisions as an OpenAI-compatible API and over MCP.",
+    "files": [
+      "runtime/front/front.py",
+      "runtime/front/ws-dial.py",
+      "runtime/front/bmo-llm-front.service",
+      "runtime/front/bmo-llm-laya.service",
+      "runtime/front/bmo-llm-tunnel.service",
+      "runtime/front/tunnel-proxy.conf",
+      "docs/llm-server.md"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "laya/server"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974398
+  },
+  {
+    "id": "laya/relay",
+    "title": "The relay",
+    "what": "The relay on the operations machine: the one address the gate asks Laya at, each call handed to the placement's nodes in order.",
+    "files": [
+      "crates/laya-relay/src/placement.rs",
+      "crates/laya-relay/src/relay.rs",
+      "src/bin/laya-relay.rs",
+      "deploy/bmo-laya-relay.service",
+      "docs/llm-server.md"
+    ],
+    "symbols": [
+      "Relay",
+      "Waits",
+      "NODE_HEADER",
+      "asking_order"
+    ],
+    "aliases": [],
+    "needs": [
+      "tooling/placement"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974401
+  },
+  {
+    "id": "laya/rows",
+    "title": "Laya's training rows",
+    "what": "Laya's training rows: synthesised and audited, frozen into dataset parts, and fitted to what one checkpoint call reads.",
+    "files": [
+      "training/tooling/src/laya.ts",
+      "training/tooling/src/laya-synth.ts",
+      "training/tooling/src/laya-synth-run.ts",
+      "training/tooling/src/laya-audit.ts",
+      "training/tooling/src/laya-dataset.ts",
+      "training/tooling/src/laya-frozen.ts",
+      "training/tooling/scripts/laya-synth.ts",
+      "training/tooling/scripts/laya-audit.ts",
+      "training/tooling/scripts/laya-status.ts",
+      "prompts/tooling/laya-synth.toml"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "tooling/settings",
+      "tooling/roads"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974380
+  },
+  {
+    "id": "laya/server",
+    "title": "The Laya decision server",
+    "what": "The Laya decision server: one checkpoint per gate behind health and decide calls, with its prediction, its measurements and its bench.",
+    "files": [
+      "runtime/laya-server/server.py",
+      "runtime/laya-server/predict.py",
+      "runtime/laya-server/metrics.py",
+      "runtime/laya-server/bench.py",
+      "docs/laya-server.md"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974392
+  },
+  {
+    "id": "laya/service",
+    "title": "Putting a checkpoint in service",
+    "what": "Putting a checkpoint in service: the card declaration, the service's health and served checkpoint, and the adapter that moves it on the card master's word.",
+    "files": [
+      "training/tooling/src/laya-serve.ts",
+      "training/tooling/src/laya-service.ts",
+      "training/tooling/src/laya-adapter.ts",
+      "training/tooling/src/weights.ts",
+      "training/tooling/scripts/laya-serve.ts",
+      "training/tooling/scripts/laya-adapter.ts",
+      "weights/",
+      "docs/llm-server.md"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "laya/checkpoints",
+      "tooling/placement",
+      "tooling/nodes",
+      "calls/arbiter"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974389
+  },
+  {
+    "id": "laya/training",
+    "title": "Training Laya",
+    "what": "Training Laya's checkpoints on the nodes: the pass, its calibration and evaluation, the ledger and curve, rehearsal and the Python loop.",
+    "files": [
+      "training/tooling/src/train/",
+      "training/tooling/src/laya-rehearsal.ts",
+      "training/laya/",
+      "training/tooling/scripts/laya-train.ts",
+      "training/tooling/scripts/laya-ledger.ts",
+      "training/tooling/scripts/laya-tables.ts",
+      "training/tooling/scripts/laya-rehearsal.ts",
+      "prompts/tooling/rehearsal.toml",
+      "docs/training.md",
+      "docs/cuda.md"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "laya/rows",
+      "laya/checkpoints",
+      "tooling/placement",
+      "tooling/roads",
+      "tooling/settings"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974383
+  }
+]

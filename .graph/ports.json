@@ -1,0 +1,19 @@
+[
+  {
+    "id": "ports/http",
+    "title": "How the ports reach their units",
+    "what": "How every port reaches its unit: the base address and token, a path built from segments, a refused connection offered again, and an answer read as its shape.",
+    "files": [
+      "crates/ports/src/http.rs"
+    ],
+    "symbols": [
+      "Peer",
+      "Answer",
+      "PortError"
+    ],
+    "aliases": [],
+    "needs": [],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974255
+  }
+]

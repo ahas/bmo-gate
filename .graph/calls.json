@@ -1,0 +1,148 @@
+[
+  {
+    "id": "calls/agency",
+    "title": "bmo-agency API",
+    "what": "The calls the gate makes on bmo-agency: agents, rulebooks, providers, a work key's route, a mapping, a session apart, its one turn and a run stopped.",
+    "files": [
+      "crates/ports/src/agency.rs",
+      "docs/boundary-api.md"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "ports/http"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974262,
+    "boundary": {
+      "side": "calls",
+      "repository": "bmo-agency",
+      "api": "api/http"
+    }
+  },
+  {
+    "id": "calls/arbiter",
+    "title": "bmo-arbiter API",
+    "what": "The calls the gate makes on bmo-arbiter's card master and node arbiter: a placement, a service's units on a card, and a card turn.",
+    "files": [
+      "crates/ports/src/arbiter.rs",
+      "docs/boundary-api.md"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "ports/http"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974268,
+    "boundary": {
+      "side": "calls",
+      "repository": "bmo-arbiter",
+      "api": "api/http"
+    }
+  },
+  {
+    "id": "calls/brain",
+    "title": "bmo-brain API",
+    "what": "The calls the gate makes on bmo-brain: memory rows, fragments, knowledge, person-book sheets, room rules and a session's loads.",
+    "files": [
+      "crates/ports/src/brain.rs",
+      "docs/boundary-api.md"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "ports/http"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974258,
+    "boundary": {
+      "side": "calls",
+      "repository": "bmo-brain",
+      "api": "api/http"
+    }
+  },
+  {
+    "id": "calls/gateway",
+    "title": "The model gateway",
+    "what": "The call the gate makes on the agency's model gateway: one chat completion with no tools and no session, the run's wait in its headers.",
+    "files": [
+      "crates/ports/src/gateway.rs",
+      "docs/boundary-api.md"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "ports/http"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974265,
+    "boundary": {
+      "side": "calls",
+      "repository": "bmo-agency",
+      "api": "api/http"
+    }
+  },
+  {
+    "id": "calls/job",
+    "title": "bmo-job API",
+    "what": "The call the gate makes on bmo-job: a row raised for a job to look into, keyed so the same piece is not raised twice.",
+    "files": [
+      "crates/ports/src/job.rs",
+      "docs/boundary-api.md"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "ports/http"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974271,
+    "boundary": {
+      "side": "calls",
+      "repository": "bmo-job",
+      "api": "api/http"
+    }
+  },
+  {
+    "id": "calls/node",
+    "title": "bmo-node command API",
+    "what": "The calls the training tooling makes on bmo-node's command: a node's connection by its registered name, and the console or login that drives it.",
+    "files": [
+      "training/tooling/src/node-calls.ts",
+      "training/tooling/src/node-reach.ts",
+      "docs/boundary-api.md"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974273,
+    "boundary": {
+      "side": "calls",
+      "repository": "bmo-node",
+      "api": "api/cli"
+    }
+  },
+  {
+    "id": "calls/receiver",
+    "title": "bmo-receiver API",
+    "what": "The calls the gate makes on bmo-receiver: room titles and roads, who spoke, display names, waits, the agent's number and the owner notice.",
+    "files": [
+      "crates/ports/src/receiver.rs",
+      "docs/boundary-api.md"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "ports/http"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974260,
+    "boundary": {
+      "side": "calls",
+      "repository": "bmo-receiver",
+      "api": "api/http"
+    }
+  }
+]

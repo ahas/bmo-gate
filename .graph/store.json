@@ -1,0 +1,40 @@
+[
+  {
+    "id": "store/database",
+    "title": "The gate's store",
+    "what": "The gate's own database: the connection, the migrations that make its eleven tables, and the statements the gates write them with.",
+    "files": [
+      "crates/store/src/lib.rs",
+      "crates/store/src/migration.rs",
+      "crates/store/src/migration/",
+      "crates/stages/src/sql.rs",
+      "docs/boundary-api.md"
+    ],
+    "symbols": [
+      "connect",
+      "connect_with"
+    ],
+    "aliases": [],
+    "needs": [],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974226
+  },
+  {
+    "id": "store/tables",
+    "title": "The gate's tables",
+    "what": "The store's entity modules, one for each of the gate's eleven tables, with every column as the migration makes it.",
+    "files": [
+      "crates/store/src/entity/",
+      "crates/store/src/entity/gate_roads.rs"
+    ],
+    "symbols": [
+      "Model"
+    ],
+    "aliases": [],
+    "needs": [
+      "store/database"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498998532
+  }
+]

@@ -1,0 +1,311 @@
+[
+  {
+    "id": "gates/document-seek",
+    "title": "The document seeker",
+    "what": "The document seeker: a question and the viewer's index answered with the entries to open, an oversized index cut in two and asked again.",
+    "files": [
+      "crates/stages/src/document_seek.rs",
+      "prompts/document-seek/",
+      "docs/api.md"
+    ],
+    "symbols": [
+      "STAGE",
+      "SeekEntry",
+      "is_slug",
+      "request",
+      "parse"
+    ],
+    "aliases": [],
+    "needs": [
+      "gates/stages",
+      "policy/reference"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974316
+  },
+  {
+    "id": "gates/document-translation",
+    "title": "A document's translation",
+    "what": "A document's translation ordered by the viewer: parts queued and translated a few at a time, each kept only with its structure, and its state read back.",
+    "files": [
+      "crates/stages/src/document_translation.rs",
+      "crates/words/src/translation.rs"
+    ],
+    "symbols": [
+      "Queue",
+      "Order",
+      "Outcome",
+      "Kept",
+      "State",
+      "language"
+    ],
+    "aliases": [],
+    "needs": [
+      "gates/translator",
+      "gates/markdown",
+      "store/database",
+      "store/tables"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974311
+  },
+  {
+    "id": "gates/fold",
+    "title": "The fold probe",
+    "what": "What the output gate asks Laya about one outgoing message: its opening and closing as written and the counts that say how large it is.",
+    "files": [
+      "crates/stages/src/fold.rs"
+    ],
+    "symbols": [
+      "FoldProbe",
+      "fold_state",
+      "STATE_TOKENS"
+    ],
+    "aliases": [],
+    "needs": [
+      "markup/telegram",
+      "policy/laya"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974301
+  },
+  {
+    "id": "gates/laya",
+    "title": "Laya's road",
+    "what": "The one road every gate takes past Laya: its probes, requests, questions, verdicts and modes, and the pairs kept for teaching (docs/laya.md).",
+    "files": [
+      "crates/stages/src/laya.rs",
+      "crates/stages/src/ordered.rs",
+      "docs/laya.md",
+      "docs/laya-gates.md"
+    ],
+    "symbols": [
+      "Side",
+      "Probe",
+      "Question",
+      "Request",
+      "Reply",
+      "LayaRun",
+      "Ordered"
+    ],
+    "aliases": [],
+    "needs": [
+      "runs/road",
+      "policy/laya"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974293
+  },
+  {
+    "id": "gates/laya-agreement",
+    "title": "Laya's agreement",
+    "what": "How often Laya agrees with each gate's LLM, read from the verdict record as the table the owner reads before choosing a gate's tau.",
+    "files": [
+      "crates/stages/src/laya_agreement.rs"
+    ],
+    "symbols": [
+      "Agreement",
+      "agreement",
+      "PairRow",
+      "TAU_GRID"
+    ],
+    "aliases": [],
+    "needs": [
+      "store/database",
+      "store/tables"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974298
+  },
+  {
+    "id": "gates/laya-health",
+    "title": "Laya's health",
+    "what": "Laya's health watched once a minute through the relay, kept as the gate's one health row and told to the screens when it moves.",
+    "files": [
+      "crates/stages/src/laya_health.rs"
+    ],
+    "symbols": [
+      "Health",
+      "Outcome",
+      "next_health",
+      "report_of"
+    ],
+    "aliases": [],
+    "needs": [
+      "gates/laya",
+      "store/database"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974295
+  },
+  {
+    "id": "gates/markdown",
+    "title": "Markdown structure",
+    "what": "A markdown text read as the documents viewer reads it: headings, sections, inline code and where it may be cut, and the shape a translation must keep.",
+    "files": [
+      "crates/stages/src/markdown.rs",
+      "crates/stages/src/markdown_shape.rs"
+    ],
+    "symbols": [
+      "headings",
+      "heading_shape",
+      "paragraph_count",
+      "list_shape",
+      "prose_blocks"
+    ],
+    "aliases": [],
+    "needs": [],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974314
+  },
+  {
+    "id": "gates/output",
+    "title": "The output gate",
+    "what": "The output gate: whether a reply part is folded, its structure checked, its decision logged and a refused candidate kept as a format case.",
+    "files": [
+      "crates/stages/src/output.rs",
+      "prompts/output-gate/",
+      "docs/output-gate.md",
+      "docs/api.md"
+    ],
+    "symbols": [
+      "OutputGate",
+      "FOLD",
+      "OPEN",
+      "parse_fold",
+      "format_request"
+    ],
+    "aliases": [],
+    "needs": [
+      "gates/stages",
+      "gates/fold",
+      "markup/telegram",
+      "policy/output",
+      "store/database"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974306
+  },
+  {
+    "id": "gates/record-language",
+    "title": "Records in the owner's language",
+    "what": "A record put into the owner's language: each English part rendered by the translator and checked before it stands, kept under the English it came from.",
+    "files": [
+      "crates/stages/src/records.rs",
+      "prompts/translator/record.md"
+    ],
+    "symbols": [
+      "PLAIN_WRITING",
+      "worker_system",
+      "plain_words",
+      "Record"
+    ],
+    "aliases": [],
+    "needs": [
+      "gates/translator",
+      "gates/markdown",
+      "markup/writing",
+      "policy/translation"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974321
+  },
+  {
+    "id": "gates/sanitiser",
+    "title": "The context sanitiser",
+    "what": "The context sanitiser: security-intrusion material found in the smallest spans and defused, with the trigger words' pre-filter and the local fallback.",
+    "files": [
+      "crates/stages/src/sanitizer.rs",
+      "crates/policy/src/triggers.rs",
+      "prompts/sanitizer/",
+      "docs/api.md"
+    ],
+    "symbols": [
+      "SanitizerProbe",
+      "might_trigger",
+      "local_redact",
+      "read_sanitised"
+    ],
+    "aliases": [],
+    "needs": [
+      "gates/stages",
+      "store/database"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974303
+  },
+  {
+    "id": "gates/sheets",
+    "title": "Person-book sheets",
+    "what": "The person-book summariser: one person's sheet of one part written from the pieces handed in and held to its ceiling and sections.",
+    "files": [
+      "crates/stages/src/sheets.rs",
+      "prompts/people-standing/",
+      "docs/api.md"
+    ],
+    "symbols": [
+      "Part",
+      "Piece",
+      "SheetAsk",
+      "sheet_problem",
+      "standing_prompt"
+    ],
+    "aliases": [],
+    "needs": [
+      "gates/stages",
+      "runs/road",
+      "calls/agency"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974318
+  },
+  {
+    "id": "gates/stages",
+    "title": "What the gates stand on",
+    "what": "What every gate stands on: the runs, the Laya side, what a text is read by, and the events the gate's readers hear.",
+    "files": [
+      "crates/stages/src/lib.rs"
+    ],
+    "symbols": [
+      "Stages",
+      "Reading",
+      "Event"
+    ],
+    "aliases": [],
+    "needs": [
+      "runs/road",
+      "gates/laya",
+      "policy/translation",
+      "markup/reading"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974290
+  },
+  {
+    "id": "gates/translator",
+    "title": "The translator",
+    "what": "The translator: a text's parts in another language put beside the rest, its structure kept, and each reading kept under its original's digest.",
+    "files": [
+      "crates/stages/src/translator.rs",
+      "prompts/translator/",
+      "docs/api.md"
+    ],
+    "symbols": [
+      "Read",
+      "Reader",
+      "by_gate",
+      "STAGE",
+      "OWNER_LANGUAGE"
+    ],
+    "aliases": [],
+    "needs": [
+      "gates/stages",
+      "policy/translation",
+      "markup/reading",
+      "markup/writing",
+      "store/database"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974308
+  }
+]

@@ -1,0 +1,48 @@
+[
+  {
+    "id": "console/domain",
+    "title": "The gate page's domain",
+    "what": "What the console's gate page calls a gate and a Laya mode, from the host's language pack or the gate's own name.",
+    "files": [
+      "client/app/domain/gates.ts"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974404
+  },
+  {
+    "id": "console/page",
+    "title": "The gate trial page",
+    "what": "The gate trial page at /gates/<stage>: a prompt put to one gate as a turn would, the gate's trials oldest first, and its Laya mode and agreement.",
+    "files": [
+      "client/app/pages/gates/[stage].vue"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "console/domain",
+      "console/routes"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974406
+  },
+  {
+    "id": "console/routes",
+    "title": "The console's server routes",
+    "what": "The console bundle's server routes: a trial put, a gate's trials read and Laya's view read, through the generated client and the host's sign-in.",
+    "files": [
+      "client/server/api/",
+      "client/server/utils/gate.ts"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "contract/client",
+      "api/http"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974409
+  }
+]

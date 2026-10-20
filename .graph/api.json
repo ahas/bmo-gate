@@ -1,0 +1,128 @@
+[
+  {
+    "id": "api/bundle",
+    "title": "The console bundle",
+    "what": "The gates' console bundle: a Nuxt layer on bmo-ui that a host extends to show the gate trial page and call the gate through its server routes.",
+    "files": [
+      "client/nuxt.config.ts",
+      "client/package.json",
+      "docs/layout.md"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "console/page",
+      "console/routes",
+      "console/domain",
+      "contract/client"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974217,
+    "boundary": {
+      "side": "exposes"
+    }
+  },
+  {
+    "id": "api/command",
+    "title": "The unit command",
+    "what": "The bmo-gate unit command and its ten nouns: gate eval, gate bench, gate laya-agreement, gate format-cases and the six reference benches.",
+    "files": [
+      "src/bin/bmo-gate.rs",
+      "crates/command/src/lib.rs",
+      "docs/boundary-api.md"
+    ],
+    "symbols": [
+      "NOUNS",
+      "Cli",
+      "Fault"
+    ],
+    "aliases": [],
+    "needs": [
+      "contract/codes",
+      "store/database",
+      "command/gate-eval",
+      "command/gate-bench",
+      "command/format-cases",
+      "command/laya-agreement",
+      "command/records",
+      "command/health",
+      "command/reference-benches",
+      "command/ceiling"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974215,
+    "boundary": {
+      "side": "exposes"
+    }
+  },
+  {
+    "id": "api/events",
+    "title": "The event stream",
+    "what": "The gate's server-sent event stream: judgements, document translations and Laya's state, told as they happen and read on by any caller.",
+    "files": [
+      "crates/server/src/routes/events.rs",
+      "docs/api.md"
+    ],
+    "symbols": [],
+    "aliases": [],
+    "needs": [
+      "gates/stages"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974213,
+    "boundary": {
+      "side": "exposes"
+    }
+  },
+  {
+    "id": "api/http",
+    "title": "The gate's HTTP API",
+    "what": "The routes the gate serves over HTTP, with their bodies, answers and refusals, behind the bearer token the settings name (docs/api.md, crates/server).",
+    "files": [
+      "src/bin/gate-server.rs",
+      "crates/server/src/lib.rs",
+      "crates/server/src/answer.rs",
+      "crates/server/src/settings.rs",
+      "crates/server/src/routes/",
+      "docs/api.md",
+      "docs/boundary-api.md",
+      "docs/openapi.json"
+    ],
+    "symbols": [
+      "Refused",
+      "Answered",
+      "Body",
+      "Query"
+    ],
+    "aliases": [],
+    "needs": [
+      "contract/codes",
+      "contract/client",
+      "store/database",
+      "gates/stages",
+      "gates/laya",
+      "gates/laya-health",
+      "gates/sanitiser",
+      "gates/output",
+      "gates/translator",
+      "gates/document-translation",
+      "gates/document-seek",
+      "gates/sheets",
+      "reference/road",
+      "reference/pickers",
+      "reference/narrowing",
+      "runs/road",
+      "runs/options",
+      "runs/trials",
+      "runs/live",
+      "runs/summary",
+      "runs/records",
+      "calls/receiver"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792499018778,
+    "boundary": {
+      "side": "exposes"
+    }
+  }
+]

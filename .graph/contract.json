@@ -1,0 +1,45 @@
+[
+  {
+    "id": "contract/client",
+    "title": "The gate's contract and clients",
+    "what": "The gate's contract in Rust and TypeScript: every body and answer as a type, the routes as calls, and the OpenAPI document both clients are generated from.",
+    "files": [
+      "crates/client/src/client.rs",
+      "crates/client/src/openapi.rs",
+      "crates/client/src/types.rs",
+      "crates/client/src/bin/gate-openapi.rs",
+      "package/index.ts",
+      "docs/api.md",
+      "docs/openapi.json"
+    ],
+    "symbols": [
+      "GateClient",
+      "ClientFailure"
+    ],
+    "aliases": [],
+    "needs": [
+      "contract/codes"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974208,
+    "boundary": {
+      "side": "exposes"
+    }
+  },
+  {
+    "id": "contract/codes",
+    "title": "Refusal codes",
+    "what": "Every refusal the gate answers, its stable kebab-case code, the status it goes out under and the sentence beside it (crates/codes, docs/codes.md).",
+    "files": [
+      "crates/codes/src/lib.rs",
+      "docs/codes.md"
+    ],
+    "symbols": [
+      "Code"
+    ],
+    "aliases": [],
+    "needs": [],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974206
+  }
+]

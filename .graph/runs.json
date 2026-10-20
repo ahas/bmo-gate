@@ -1,0 +1,140 @@
+[
+  {
+    "id": "runs/live",
+    "title": "Live runs",
+    "what": "The gate runs the service holds while they go, held in memory for the live board and gone when the service ends.",
+    "files": [
+      "crates/runs/src/live.rs"
+    ],
+    "symbols": [
+      "GateRun",
+      "Held",
+      "hold"
+    ],
+    "aliases": [],
+    "needs": [
+      "runs/road"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974288
+  },
+  {
+    "id": "runs/options",
+    "title": "Gate options",
+    "what": "A gate's own options for each agent: its wait, switch, Laya mode, tau and fallback LLM, read and changed through the console.",
+    "files": [
+      "crates/runs/src/options.rs",
+      "crates/words/src/options.rs"
+    ],
+    "symbols": [
+      "GateRow",
+      "Refusal",
+      "LAYA_MODES"
+    ],
+    "aliases": [],
+    "needs": [
+      "policy/gate-order",
+      "policy/laya",
+      "store/database"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974277
+  },
+  {
+    "id": "runs/records",
+    "title": "Run records",
+    "what": "What a gate's run leaves in the gate's tables: a row for the road it walked with its tokens, and the judgement written into a room's log.",
+    "files": [
+      "crates/runs/src/records.rs"
+    ],
+    "symbols": [
+      "Road",
+      "Judgement",
+      "Outcome",
+      "Spent",
+      "now"
+    ],
+    "aliases": [],
+    "needs": [
+      "store/database",
+      "store/tables"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974280
+  },
+  {
+    "id": "runs/road",
+    "title": "A gate's run",
+    "what": "A gate's run on its one road: the route, a thrown-away session or a gateway request, the pool it waits in, and the answer or the end.",
+    "files": [
+      "crates/runs/src/lib.rs",
+      "crates/runs/src/route.rs",
+      "crates/runs/src/session.rs",
+      "crates/runs/src/gateway.rs",
+      "crates/runs/src/pool.rs"
+    ],
+    "symbols": [
+      "Runs",
+      "GateRequest",
+      "Run",
+      "GateError",
+      "Ended",
+      "RecordFolders"
+    ],
+    "aliases": [],
+    "needs": [
+      "policy/gate-order",
+      "calls/agency",
+      "calls/gateway"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974275
+  },
+  {
+    "id": "runs/summary",
+    "title": "Session summaries",
+    "what": "The session summariser: the note a closed session hands the run that replaces it, and the agency's hook that answers with it.",
+    "files": [
+      "crates/runs/src/summary.rs",
+      "prompts/session-summary/"
+    ],
+    "symbols": [
+      "Turn",
+      "Closed",
+      "Kind",
+      "transcript_text",
+      "STAGE"
+    ],
+    "aliases": [],
+    "needs": [
+      "runs/road",
+      "policy/translation",
+      "calls/agency"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974282
+  },
+  {
+    "id": "runs/trials",
+    "title": "Console trials",
+    "what": "The gates the console's trial puts a question to, each asked as it asks itself: the output gate of each dialect, the reference gates and the situation matcher.",
+    "files": [
+      "crates/runs/src/tried.rs"
+    ],
+    "symbols": [
+      "Tried",
+      "gates",
+      "request",
+      "OUTPUT_GATE"
+    ],
+    "aliases": [],
+    "needs": [
+      "runs/road",
+      "gates/output",
+      "reference/road",
+      "gates/stages"
+    ],
+    "base": "6288c31eba163ed5908ff95b119f9725ea444abd",
+    "changed": 1792498974285
+  }
+]
