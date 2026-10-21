@@ -48,7 +48,8 @@ reqwest = { version = "0.13.5", default-features = false, features = ["json", "q
 sea-orm = { version = "1.1.17", default-features = false, features = ["macros", "runtime-tokio-rustls", "sqlx-postgres"] }
 sea-orm-migration = { version = "1.1.17", default-features = false, features = ["runtime-tokio-rustls", "sqlx-postgres"] }
 serde = { version = "1.0.219", features = ["derive"] }
-serde_json = "1.0.140"
+# The old archive's floats are read back exactly, so the migration compares equal rather than one ULP apart.
+serde_json = { version = "1.0.140", features = ["float_roundtrip"] }
 sha2 = "0.10.9"
 sqlx = { version = "0.8.6", default-features = false, features = ["postgres", "runtime-tokio"] }
 sse-stream = "0.2.6"
