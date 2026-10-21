@@ -156,7 +156,7 @@ pub struct OptionsCopied {
 // ---------------------------------------------------------------------------------------------------------------
 // Laya
 
-/// One τ where a gate's agreement was counted.
+/// One tau where a gate's agreement was counted.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AgreementAt {

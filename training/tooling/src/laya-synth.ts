@@ -123,7 +123,7 @@ export interface SynthAsk {
 }
 
 // Each answer of a question an equal share of that question's rows, which is what the specification
-// fixes for every gate. The real distribution is lopsided and is left to τ rather than taught.
+// fixes for every gate. The real distribution is lopsided and is left to tau rather than taught.
 export function targetBalance(question: SynthQuestion): Record<string, number> {
   const answers = answersOf(question);
 

@@ -553,7 +553,7 @@ impl Asked {
   }
 }
 
-// The mode a gate actually runs in and its τ, as the chat agent's options row and the gate's profile make it.
+// The mode a gate actually runs in and its tau, as the chat agent's options row and the gate's profile make it.
 async fn mode_of(side: &Side, stage: &str) -> Result<(String, Option<f64>), GateError> {
   let Some(profile) = PROFILES.of(stage) else {
     return Ok(("off".to_owned(), None));
@@ -611,7 +611,7 @@ async fn ask_for<P: Probe>(side: &Side, run: &LayaRun, probe: &P, input: &P::Inp
   }
 }
 
-// The verdict Laya's answer may stand for in this mode at this τ, or none where the LLM decides.
+// The verdict Laya's answer may stand for in this mode at this tau, or none where the LLM decides.
 fn standing<P: Probe>(probe: &P, mode: &str, tau: Option<f64>, asked: &Asked) -> Option<P::Verdict> {
   let Asked::Answered { reading, .. } = asked else { return None };
   let tau = tau?;
@@ -662,7 +662,7 @@ fn part_of<P: Probe>(probe: &P, asked: &Asked, ids: &[String]) -> Asked {
   }
 }
 
-// Where a probe settled one question at a time divides: the questions whose own answer stands at τ, as Laya's
+// Where a probe settled one question at a time divides: the questions whose own answer stands at tau, as Laya's
 // part of the verdict, and the rest, left to the LLM. None where no question stands, or every one does and
 // the whole answer still did not.
 struct Split<V> {
@@ -785,7 +785,7 @@ async fn record<P: Probe>(
 }
 
 /// A gate's verdict by way of Laya where its mode lets it: off, its LLM alone; shadow, its LLM with Laya
-/// asked beside it and the pair kept; filter or asymmetric, Laya's verdict where it stands at τ and the LLM's
+/// asked beside it and the pair kept; filter or asymmetric, Laya's verdict where it stands at tau and the LLM's
 /// otherwise — for a probe settled one question at a time, Laya's on the questions that stand and the LLM's on
 /// the rest, asked of it alone. `llm` runs the gate on the input it is handed, and what it raises — a stop
 /// above all — goes on to the caller untouched.

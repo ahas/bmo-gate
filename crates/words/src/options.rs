@@ -7,7 +7,7 @@ pub const NOT_GATE: &str = "Not a gate: {key}";
 pub const OWN_LLM: &str = "A gate's thinking and answer size are set by its tier's own LLM settings.";
 /// `nothing_to_change`: the change names no field.
 pub const NOTHING: &str =
-  "Nothing to change: send one of the wait, the Laya mode, τ, the switch or the Laya fallback LLM.";
+  "Nothing to change: send one of the wait, the Laya mode, tau, the switch or the Laya fallback LLM.";
 /// `laya_fallback_unknown`: `{fallback}` is the word for no fallback.
 pub const FALLBACK: &str = "The Laya fallback LLM is a provider's name or {fallback}.";
 /// `switch_not_boolean`.
@@ -19,7 +19,7 @@ pub const TIMEOUT: &str = "The wait is between {least} and {most} seconds.";
 /// `laya_mode_unknown`: `{modes}` the modes there are.
 pub const MODE: &str = "The Laya mode is one of {modes}.";
 /// `laya_tau_out_of_range`.
-pub const TAU: &str = "τ is a number between 0 and 1.";
+pub const TAU: &str = "tau is a number between 0 and 1.";
 /// `laya_mode_refused` with `no_probe`.
 pub const NO_QUESTION: &str = "This gate has no Laya question, so it can only be off: {key}";
 /// `laya_mode_refused` with `no_safe_verdict`.
@@ -27,4 +27,4 @@ pub const NO_SAFETY: &str = "This gate has no safe verdict, so it cannot be asym
 /// `laya_mode_refused` with `no_checkpoint`.
 pub const NO_CHECKPOINT: &str = "The Laya server has no checkpoint for this gate, so it was not put in {mode} mode: the latest health check does not name it: {key}";
 /// `laya_mode_refused` with `needs_tau`.
-pub const NEEDS_TAU: &str = "The {mode} mode needs a τ.";
+pub const NEEDS_TAU: &str = "The {mode} mode needs a tau.";

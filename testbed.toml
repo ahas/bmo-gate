@@ -15,8 +15,9 @@ setup = ["cd training/tooling && bun install --frozen-lockfile", "cd package && 
 [test.database]
 
 [check]
-# The sweeps that read the tree before anything runs: Korean in the code, the README's folder table and the
-# dependencies the manifests name. The ledger is the Korean allowed per code file; it allows none.
+# The sweeps that read the tree before anything runs: letters that are not English in the code, the README's
+# folder table and the dependencies the manifests name. The ledger records the lines each code file holds of
+# the Korean the gate's test input, its patterns and its sample states are written in.
 quick = ["korean", "layout", "dependencies"]
 korean_ledger = "korean-ledger.json"
 # The base libraries every unit may build on. The gate reaches every other unit through the routes and commands

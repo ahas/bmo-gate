@@ -88,7 +88,7 @@ pub fn document() -> Value {
     "/options/{gateName}",
     "gate_options_change",
     "Gates",
-    "Change a gate's wait, switch, Laya mode, τ or fallback; a Laya field sent null goes back to the default.",
+    "Change a gate's wait, switch, Laya mode, tau or fallback; a Laya field sent null goes back to the default.",
     vec![("gateName", "string")],
     None,
     Some(made::<GateOptionChange>),

@@ -1,5 +1,5 @@
 //! A gate's own options (`docs/boundary-api.md`, 「For the console」; `docs/laya.md`, 「Mode and τ per gate」): its
-//! wait, which only its row sets, its Laya mode, τ and fallback LLM, and its switch where its profile lets it be
+//! wait, which only its row sets, its Laya mode, tau and fallback LLM, and its switch where its profile lets it be
 //! switched off, kept for each agent. What a gate runs on beside them — its thinking and answer room — is its
 //! tier's on its own road. The screen reads and writes the chat agent's rows; a companion's are copied from them.
 
@@ -102,13 +102,13 @@ pub async fn timeout_ms(db: &DatabaseConnection, key: &str, agent: &str) -> Resu
   Ok(row(db, key, agent).await?.and_then(|row| row.timeout_ms))
 }
 
-/// Whether Laya's verdict may stand in a mode, which then needs a τ to stand on.
+/// Whether Laya's verdict may stand in a mode, which then needs a tau to stand on.
 pub fn decides(mode: &str) -> bool {
   mode == "filter" || mode == "asymmetric"
 }
 
 /// The mode a gate actually runs in: off without a probe, and shadow where its row would let Laya decide with no
-/// τ, or asymmetric for a gate with no safe verdict.
+/// tau, or asymmetric for a gate with no safe verdict.
 pub fn effective_mode(profile: &Profile, chosen: Option<&str>, tau: Option<f64>) -> String {
   let Some(default) = profile.laya_mode.as_deref() else {
     return "off".into();
@@ -159,7 +159,7 @@ pub fn answer_room(stage: &str, mapping: Option<&Mapping>) -> i64 {
 }
 
 /// What a gate actually runs on: on a registered model what it asks that road for, the defaults otherwise; and
-/// its own row's wait, Laya mode and τ.
+/// its own row's wait, Laya mode and tau.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Effective {
@@ -323,7 +323,7 @@ fn whole(value: &Value) -> Option<i64> {
     .or_else(|| value.as_f64().filter(|number| number.fract() == 0.0).map(|number| number as i64))
 }
 
-/// One gate's wait, switch, Laya mode, τ and fallback LLM for the chat agent, each written where it is sent and
+/// One gate's wait, switch, Laya mode, tau and fallback LLM for the chat agent, each written where it is sent and
 /// left as the row had it otherwise; a Laya field sent as null goes back to the profile's default, and the wait
 /// is never cleared. A mode is taken only where the gate can run in it.
 pub async fn change(runs: &Runs, key: &str, body: &Value, at: i64) -> Result<(), Refusal> {

@@ -148,7 +148,7 @@ export function gateTableLines(rows: readonly GateTableRow[], tau: number = TABL
     return ["Nothing to put in the gate table."];
   }
 
-  const head = ["run", "gate", "questions", "beside", "accuracy before→after", "balanced before→after", "balanced change", "yes recall before→after", "yes change", "ECE before→after", `missed calls (τ${tau})`];
+  const head = ["run", "gate", "questions", "beside", "accuracy before→after", "balanced before→after", "balanced change", "yes recall before→after", "yes change", "ECE before→after", `missed calls (tau${tau})`];
   const body = rows.map((row) => [
     runWord(row.rehearsal), row.gate,
     row.questions === null ? "—" : String(row.questions),
@@ -171,7 +171,7 @@ export function missedTableLines(rows: readonly MissedTableRow[]): string[] {
     return ["This pass has no asymmetric gate."];
   }
 
-  const head = ["run", "gate", "question", "answer Laya settles", "τ", "settled", "coverage", "missed calls", "missed rate"];
+  const head = ["run", "gate", "question", "answer Laya settles", "tau", "settled", "coverage", "missed calls", "missed rate"];
   const body = rows.flatMap((row) => row.thresholds.map((at) => [
     runWord(row.rehearsal), row.gate, row.question, row.settles,
     at.tau.toFixed(2), String(at.settled), shown(at.coverage), String(at.missed), shown(at.missedRate),

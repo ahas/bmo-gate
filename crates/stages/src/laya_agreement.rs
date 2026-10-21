@@ -1,7 +1,7 @@
 //! How often Laya agrees with each gate's LLM (`docs/laya.md`, 「Agreement」), read back from the verdict record:
 //! per gate, over its pairs where both gave a verdict — or, for a gate settled one question at a time, over its
-//! questions — the agreement, and at each τ of the grid the share Laya would settle and the agreement within it.
-//! It is what the owner reads before choosing a gate's τ and moving it off shadow.
+//! questions — the agreement, and at each tau of the grid the share Laya would settle and the agreement within it.
+//! It is what the owner reads before choosing a gate's tau and moving it off shadow.
 
 use gate_markup::text::{count_text, fixed};
 use gate_policy::fill_marks;
@@ -28,7 +28,7 @@ pub struct PairRow {
   pub failure: Option<String>,
 }
 
-/// One τ of a gate settled one question at a time: how many of its compared questions Laya was that sure of,
+/// One tau of a gate settled one question at a time: how many of its compared questions Laya was that sure of,
 /// and how many of those it answered as the LLM did.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TallyAt {
@@ -39,7 +39,7 @@ pub struct TallyAt {
 
 /// A gate settled one question at a time, counted over its questions: of those Laya answered, how many it
 /// settled for the gate; of those the LLM's verdict also speaks of, how many Laya answered as the LLM did; and
-/// the same at each τ, by the question's own confidence.
+/// the same at each tau, by the question's own confidence.
 #[derive(Clone, Debug, PartialEq)]
 pub struct QuestionTally {
   pub stage: String,
@@ -50,15 +50,15 @@ pub struct QuestionTally {
   pub by_tau: Vec<TallyAt>,
 }
 
-/// One gate's figures at one τ.
+/// One gate's figures at one tau.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub struct AgreementAt {
   pub tau: f64,
-  /// The share of pairs Laya would settle at this τ, and how often it agrees with the LLM on them.
+  /// The share of pairs Laya would settle at this tau, and how often it agrees with the LLM on them.
   pub coverage: Option<f64>,
   pub agreement: Option<f64>,
-  /// For a gate with a safe verdict: how many pairs Laya called safe at this τ, and how often the LLM called
+  /// For a gate with a safe verdict: how many pairs Laya called safe at this tau, and how often the LLM called
   /// them safe too.
   pub safe_count: Option<usize>,
   pub safe_agreement: Option<f64>,
@@ -393,7 +393,7 @@ fn percent_text(value: Option<f64>) -> String {
   value.map_or_else(|| "\u{2014}".to_owned(), |value| format!("{}%", fixed(value * 100.0, 1)))
 }
 
-/// The agreement as the owner reads it: a block per gate, its pairs and failures, then a line per τ with the
+/// The agreement as the owner reads it: a block per gate, its pairs and failures, then a line per tau with the
 /// share Laya would settle and how often it agrees there — and, for a gate with a safe verdict, how many Laya
 /// called safe and how often the LLM did too.
 pub fn agreement_lines(agreements: &[Agreement]) -> Vec<String> {

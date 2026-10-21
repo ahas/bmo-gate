@@ -1,5 +1,5 @@
 //! `gate laya-agreement` (docs/laya.md, 「Agreement」): how often Laya agrees with each gate's LLM, over everything
-//! recorded — the table the owner reads before choosing a gate's τ and moving it off shadow — from the gate's
+//! recorded — the table the owner reads before choosing a gate's tau and moving it off shadow — from the gate's
 //! database or the one `--db` names, which it only reads.
 
 use clap::Args;

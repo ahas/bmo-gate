@@ -11,9 +11,9 @@ export const taus = [0, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99] as const;
 // Laya's answer for one turn and gate, per candidate slug: its probability of yes.
 export type LayaAnswers = Record<string, number>;
 
-// A reference gate's filter settles it candidate by candidate, so the figures at τ count candidates:
-// those whose own confidence reaches τ, their share of the ones Laya answered, how many of them
-// matched the gold among the uncontested ones, and the turns every candidate of which reached τ —
+// A reference gate's filter settles it candidate by candidate, so the figures at tau count candidates:
+// those whose own confidence reaches tau, their share of the ones Laya answered, how many of them
+// matched the gold among the uncontested ones, and the turns every candidate of which reached tau —
 // the turns the LLM is not asked at all.
 export interface TauFigures {
   tau: number;

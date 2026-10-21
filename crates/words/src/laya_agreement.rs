@@ -6,7 +6,7 @@ pub const USAGE: &str = "\
 usage: bmo gate laya-agreement [--stage <gate>] [--db <address>] [--json]
 
 Shows how often Laya agrees with each gate's LLM: the pairs, the failures, the agreement overall, and at
-each τ the share Laya would take on (covered) and the agreement within it. A gate that decides each
+each tau the share Laya would take on (covered) and the agreement within it. A gate that decides each
 candidate apart is counted by question rather than by pair, with the share of the questions Laya answered
 that it settled in the gate's place (settled by Laya). A gate with a safe verdict adds how often Laya said
 safe and the share of those the LLM called safe too.
@@ -24,6 +24,6 @@ pub const QUESTIONS: &str = "questions {count}";
 pub const PAIRS: &str = "pairs {count}";
 pub const SETTLED: &str = " · settled by Laya {share}";
 
-/// The head of a gate's τ lines, and the two columns a gate with a safe verdict adds to it.
-pub const HEAD: &str = "  τ      covered  agreement";
+/// The head of a gate's tau lines, and the two columns a gate with a safe verdict adds to it.
+pub const HEAD: &str = "  tau    covered  agreement";
 pub const SAFE_HEAD: &str = "     said safe  LLM safe too";

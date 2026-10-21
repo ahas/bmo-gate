@@ -33,7 +33,7 @@ describe("gateFigures", () => {
     expect([figures.llmMatchGold, figures.llmComparable]).toEqual([1, 1]);
   });
 
-  test("settles each candidate at τ by its own confidence", () => {
+  test("settles each candidate at tau by its own confidence", () => {
     // quiet and photos answered right, links answered no where its gold is yes.
     const laya = new Map([["a/room-rules", { quiet: 0.9, photos: 0.2, links: 0.3 }]]);
     const figures = gateFigures("room-rules", [{ key: "a", recorded: [] }], labels, laya).laya!;

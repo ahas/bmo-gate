@@ -270,7 +270,7 @@ export interface paths {
         /** One gate's options as it stands for the chat agent. */
         get: operations["gate_options"];
         put?: never;
-        /** Change a gate's wait, switch, Laya mode, τ or fallback; a Laya field sent null goes back to the default. */
+        /** Change a gate's wait, switch, Laya mode, tau or fallback; a Laya field sent null goes back to the default. */
         post: operations["gate_options_change"];
         delete?: never;
         options?: never;
@@ -435,7 +435,7 @@ export interface components {
             /** @description `pair` or `question`: what the figures are counted over. */
             unit: string;
         };
-        /** @description One τ where a gate's agreement was counted. */
+        /** @description One tau where a gate's agreement was counted. */
         AgreementAt: {
             /** Format: double */
             agreement: number | null;

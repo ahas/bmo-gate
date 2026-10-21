@@ -64,7 +64,7 @@
         "type": "object"
       },
       "AgreementAt": {
-        "description": "One τ where a gate's agreement was counted.",
+        "description": "One tau where a gate's agreement was counted.",
         "properties": {
           "agreement": {
             "format": "double",
@@ -2631,7 +2631,7 @@
             "$ref": "#/components/responses/Error"
           }
         },
-        "summary": "Change a gate's wait, switch, Laya mode, τ or fallback; a Laya field sent null goes back to the default.",
+        "summary": "Change a gate's wait, switch, Laya mode, tau or fallback; a Laya field sent null goes back to the default.",
         "tags": [
           "Gates"
         ],
