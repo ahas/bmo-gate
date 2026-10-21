@@ -7,3 +7,5 @@ __pycache__/
 /training/tooling/tooling.toml
 # The typecheck's build record, wherever a project of its writes one.
 *.tsbuildinfo
+.graph/*
+!.graph/settings.toml
