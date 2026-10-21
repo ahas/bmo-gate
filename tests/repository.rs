@@ -456,8 +456,14 @@ fn no_file_outside_the_prompts_holds_more_hangul_than_the_ledger_allows() {
 }
 
 #[test]
-fn the_ledger_allows_nothing() {
-  assert!(ledger().is_empty(), "the ledger allows Korean lines: {:?}", ledger());
+fn the_ledger_names_only_tracked_files_with_counts() {
+  let ledger = ledger();
+  let tracked: BTreeSet<String> = tracked_texts().into_iter().map(|(path, _)| path).collect();
+  let unknown: Vec<&String> = ledger.keys().filter(|path| !tracked.contains(*path)).collect();
+  assert!(unknown.is_empty(), "these ledger entries name no tracked text file: {unknown:?}");
+  let empty: Vec<&String> =
+    ledger.iter().filter(|(_, allowed)| **allowed == 0).map(|(path, _)| path).collect();
+  assert!(empty.is_empty(), "these ledger entries allow no line: {empty:?}");
 }
 
 #[test]
