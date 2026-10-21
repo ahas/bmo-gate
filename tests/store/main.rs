@@ -5,4 +5,5 @@
 mod scratch;
 
 mod entities;
+mod import;
 mod migration;

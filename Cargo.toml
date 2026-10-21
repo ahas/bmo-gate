@@ -127,6 +127,8 @@ sqlx.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
 toml.workspace = true
+# A scratch database's address, another database's name in the test server's own.
+url.workspace = true
 
 # The contract's test: the committed OpenAPI document is the one the types generate.
 [[test]]

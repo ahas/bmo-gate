@@ -3,6 +3,7 @@
 //! connection every reader opens.
 
 pub mod entity;
+pub mod import;
 pub mod migration;
 
 use std::str::FromStr;

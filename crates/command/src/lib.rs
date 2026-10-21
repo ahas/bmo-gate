@@ -92,6 +92,23 @@ pub enum Noun {
   Health,
   /// Every row of one of the gate's own tables, one JSON object a line: the training tooling's read, and no noun.
   Records(records::RecordsArgs),
+  /// Moves the old archive's gate tables from the item's export into this store (TODO #1923), and no noun.
+  #[command(disable_help_flag = true)]
+  Import(ImportArgs),
+}
+
+/// What `import` is given.
+#[derive(clap::Args, Debug)]
+pub struct ImportArgs {
+  /// The export directory the item's export hand wrote.
+  #[arg(long)]
+  pub export: PathBuf,
+  /// The PostgreSQL address of this store.
+  #[arg(long)]
+  pub database: String,
+  /// Reads the export and reports what it would write, writing nothing.
+  #[arg(long)]
+  pub dry_run: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -150,6 +167,26 @@ pub async fn dispatch(noun: Noun) -> Answered {
     Noun::Reference(noun) => reference::run(noun).await,
     Noun::Health => health::health(&settings_path()).await,
     Noun::Records(args) => records::records(args).await,
+    Noun::Import(args) => moved(args).await,
+  }
+}
+
+/// The old archive's gate tables moved into this store: the report printed, and a failure where the
+/// count-and-sample compare found one.
+async fn moved(args: ImportArgs) -> Answered {
+  match gate_store::import::run(&args.database, &args.export, args.dry_run).await {
+    Ok(report) => {
+      let lines = report.lines();
+      if report.sample.failures.is_empty() {
+        Ok(lines)
+      } else {
+        Err(Fault::Failed {
+          lines,
+          said: format!("{} rows failed to compare", report.sample.failures.len()),
+        })
+      }
+    }
+    Err(said) => Err(Fault::failed(said)),
   }
 }
 

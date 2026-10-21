@@ -271,6 +271,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "toml",
+ "url",
 ]
 
 [[package]]
@@ -909,6 +910,7 @@ dependencies = [
  "async-trait",
  "sea-orm",
  "sea-orm-migration",
+ "serde_json",
  "sqlx",
 ]
 

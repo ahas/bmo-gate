@@ -160,6 +160,30 @@ impl Scratch {
     &self.db
   }
 
+  /// The database's name on the test server.
+  pub fn name(&self) -> &str {
+    &self.database
+  }
+
+  /// The database's address, as a reader handed one opens it.
+  pub fn address(&self) -> String {
+    address_of(&self.database)
+  }
+}
+
+/// The test server's address with another database in its place.
+pub fn address_of(database: &str) -> String {
+  let address = std::env::var("BMO_TEST_POSTGRES")
+    .ok()
+    .filter(|named| !named.is_empty())
+    .unwrap_or_else(|| "postgres:///bmo_test?host=/var/run/postgresql".into());
+  let mut url = url::Url::parse(&address).expect("the test server's address reads");
+  url.set_path(&format!("/{database}"));
+
+  url.to_string()
+}
+
+impl Scratch {
   /// A statement run as written, answering whether it ran.
   pub async fn run(&self, sql: &str, values: Vec<Value>) -> Result<(), sea_orm::DbErr> {
     self
