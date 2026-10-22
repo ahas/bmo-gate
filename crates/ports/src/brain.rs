@@ -11,6 +11,9 @@ use serde_json::{Map, Value};
 
 use crate::http::{Answer, Caller, Peer};
 
+/// The rows one page of the brain's memories may hold, which is the ceiling its route takes.
+const PAGE_LIMIT: &str = "500";
+
 /// A request the brain understood and did not carry out: its code, its English sentence and the code's own
 /// fields.
 #[derive(Clone, Debug, PartialEq, Deserialize)]
@@ -605,7 +608,7 @@ impl HttpBrain {
         .get(
           "standing rows",
           "memories",
-          &[("scope", scope.as_str()), ("state", "standing"), ("limit", "1000")],
+          &[("scope", scope.as_str()), ("state", "standing"), ("limit", PAGE_LIMIT)],
         )
         .await?;
 
