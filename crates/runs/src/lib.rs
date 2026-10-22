@@ -43,6 +43,9 @@ pub struct Runs {
   pub agency: Arc<dyn Agency>,
   pub gateway: Arc<dyn Gateway>,
   pub chat_agent: String,
+  /// The agent a run's session stands under where the settings name one: a place of the gate's own, apart
+  /// from the chat agent's, whose turns a gate run would otherwise stand over.
+  pub run_agent: Option<String>,
   pub session_folder: String,
   pub records: RecordFolders,
   pools: Pools,
@@ -185,6 +188,7 @@ impl Runs {
       agency,
       gateway,
       chat_agent: chat_agent.into(),
+      run_agent: None,
       session_folder: session_folder.into(),
       records,
       pools: Pools::default(),

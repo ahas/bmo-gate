@@ -25,6 +25,7 @@ each release links to the data root's `env/gate.toml`. It names:
 | `database` | the address of the gate's own database, holding the tables under 「What the gate owns」 and nothing else |
 | `data_root` | where the gate's runtime data lives: Laya's checkpoints, datasets and run output, and the gate's run files |
 | `chat_agent` | the registration name whose gate options stand for the deployment, and which a companion's are copied from |
+| `run_agent` | the registration name a gate run's own session stands under, so its program keeps a place apart from the agent whose turn it judges; absent, the caller's agent stands, or the stage's name where the caller names none |
 | `session_folder` | the folder a gate run's thrown-away session is started in |
 | `owner_room` | the room a row the gate raises reports to |
 | `[agency]`, `[brain]`, `[receiver]`, `[job]` | each unit's `address`, and the `token_file` under `env/` holding the token it is called with |

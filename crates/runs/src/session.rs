@@ -83,9 +83,14 @@ pub async fn ask(runs: &Runs, run: &Run<'_>) -> Result<Ended, GateError> {
     return Ok(unanswered(Outcome::Timeout, "its wait ran out before the turn went in"));
   }
 
-  // The gate's own agent carries the run's system prompt; the chat agent answers only where a caller names no
-  // agent of the gate's.
-  let agent = request.agent.clone().unwrap_or_else(|| run.stage.to_owned());
+  // The run's session stands under the gate's own agent where the settings name one, its program's place kept
+  // apart from the agent whose turn it judges; otherwise the caller's agent, and the stage's name where it names
+  // none.
+  let agent = runs
+    .run_agent
+    .clone()
+    .or_else(|| request.agent.clone())
+    .unwrap_or_else(|| run.stage.to_owned());
   let apart = Apart {
     provider: route.provider.clone(),
     model: model.clone(),

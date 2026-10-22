@@ -93,7 +93,7 @@ pub fn stages(settings: &Settings, db: DatabaseConnection) -> Result<Arc<Stages>
     peer(&settings.gateway.address, None)?,
     settings.env_file(&settings.gateway.key_file),
   ));
-  let runs = Runs::new(
+  let mut runs = Runs::new(
     db.clone(),
     agency,
     gateway,
@@ -104,6 +104,8 @@ pub fn stages(settings: &Settings, db: DatabaseConnection) -> Result<Arc<Stages>
       codex: settings.records.codex.clone(),
     },
   );
+
+  runs.run_agent = settings.run_agent.clone();
   let side = Side::new(
     db,
     settings.laya.as_ref().map(|laya| laya.address.as_str()),

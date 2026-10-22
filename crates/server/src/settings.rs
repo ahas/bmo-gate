@@ -58,6 +58,10 @@ pub struct Settings {
   pub database: String,
   pub data_root: PathBuf,
   pub chat_agent: String,
+  /// The agent a gate run's own session stands under, so its program keeps a place of its own; none keeps the
+  /// caller's agent, and the stage's name where the caller names none.
+  #[serde(default)]
+  pub run_agent: Option<String>,
   pub session_folder: String,
   pub owner_room: i64,
   pub agency: Unit,
