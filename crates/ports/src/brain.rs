@@ -12,7 +12,7 @@ use serde_json::{Map, Value};
 use crate::http::{Answer, Caller, Peer};
 
 /// The rows one page of the brain's memories may hold, which is the ceiling its route takes.
-const PAGE_LIMIT: &str = "500";
+const PAGE_ROWS: usize = 500;
 
 /// A request the brain understood and did not carry out: its code, its English sentence and the code's own
 /// fields.
@@ -599,20 +599,36 @@ impl HttpBrain {
     self.caller.get(call, &segments, query).await
   }
 
-  // The standing rows of the agent's own scope and of the room's.
+  // The standing rows of the agent's own scope and of the room's, read in pages of the size the route
+  // takes, each after the last id read, so a scope holding more than one page is read whole rather than
+  // cut or refused.
   async fn memories(&self, agent: &str, chat: i64) -> Answer<Vec<BrainMemory>> {
     let mut all: Vec<BrainMemory> = Vec::new();
+    let limit = PAGE_ROWS.to_string();
 
     for scope in [agent.to_owned(), room_scope(agent, chat)] {
-      let page: Page<BrainMemory> = self
-        .get(
-          "standing rows",
-          "memories",
-          &[("scope", scope.as_str()), ("state", "standing"), ("limit", PAGE_LIMIT)],
-        )
-        .await?;
+      let mut after: Option<i64> = None;
 
-      all.extend(page.items);
+      loop {
+        let after_text = after.map(|id| id.to_string());
+        let mut query: Vec<(&str, &str)> =
+          vec![("scope", scope.as_str()), ("state", "standing"), ("limit", &limit)];
+
+        if let Some(after) = after_text.as_deref() {
+          query.push(("after", after));
+        }
+
+        let page: Page<BrainMemory> = self.get("standing rows", "memories", &query).await?;
+        let full = page.items.len() >= PAGE_ROWS;
+        let last = page.items.last().map(|row| row.id);
+
+        all.extend(page.items);
+
+        match (full, last) {
+          (true, Some(id)) => after = Some(id),
+          _ => break,
+        }
+      }
     }
 
     Ok(all)

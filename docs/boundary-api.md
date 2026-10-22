@@ -65,7 +65,7 @@ brain's generic rows to what the reference road reads, with the old fragment fie
 
 | Call | Route | Body or query | Answer |
 |---|---|---|---|
-| open standing rows | `GET /memories` | `scope` (the agent's and the room's, asked apart), `state=standing`, `limit` | `items`: the brain's memory rows, their `conditions` and `labels` |
+| open standing rows | `GET /memories` | `scope` (the agent's and the room's, asked apart), `state=standing`, `limit` at the route's ceiling, and `after` for each page after the first | `items`: the brain's memory rows, their `conditions` and `labels` |
 | conditional rows | `GET /memories` | the same standing rows | their `conditions`: `condition`, `event`, `action` |
 | matched rows written | `POST /memory-matches` | `memoryIds`, `actorName`, `spentMs`, `tokenCount` | the match |
 | rows the events wake | the standing rows | | the gate filters them by the events their `conditions` name |
