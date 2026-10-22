@@ -234,8 +234,8 @@ pub async fn route_view(runs: &Runs, key: &str) -> Result<RouteView, Refusal> {
   profile(key)?;
 
   let road = route::read(runs, key).await.map_err(Refusal::unit)?;
-  let routes = runs.agency.routes().await.map_err(|why| Refusal::unit(fault(why)))?;
-  let set_at = routes.iter().find(|one| one.key == key).and_then(|one| one.set_at).unwrap_or(0);
+  let route = runs.agency.work_key(key).await.map_err(|why| Refusal::unit(fault(why)))?;
+  let set_at = route.and_then(|one| one.set_at).unwrap_or(0);
 
   Ok(RouteView {
     provider: road.provider.clone(),

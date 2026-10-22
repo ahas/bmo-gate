@@ -50,6 +50,12 @@ pub struct Route {
   pub route_mode: String,
   pub account: Option<String>,
   pub set_at: Option<i64>,
+  /// The provider the work key goes out on.
+  pub provider: Option<String>,
+  /// The model the work key's tier maps there.
+  pub model: Option<String>,
+  pub effort: Option<String>,
+  pub answer_tokens: Option<i64>,
 }
 
 /// The mapping a work key goes out on at a tier.
@@ -162,8 +168,8 @@ pub trait Agency: Send + Sync {
   /// The providers in the walk's order.
   fn providers(&self) -> BoxFuture<'_, Answer<Vec<Provider>>>;
 
-  /// Every work key's route as the fallback settings hold it.
-  fn routes(&self) -> BoxFuture<'_, Answer<Vec<Route>>>;
+  /// One work key's route, or none where the agency holds no route for it.
+  fn work_key<'a>(&'a self, key: &'a str) -> BoxFuture<'a, Answer<Option<Route>>>;
 
   /// The mapping a work key goes out on at a tier, on the provider named or the walk's first, or none where no
   /// provider serves it.
@@ -183,8 +189,8 @@ pub trait Agency: Send + Sync {
   /// A gate run's one turn, carried to its end.
   fn turn<'a>(&'a self, turn: &'a GateTurn) -> BoxFuture<'a, Answer<TurnEnd>>;
 
-  /// A run of the gate's stopped, with why.
-  fn stop<'a>(&'a self, run: &'a str, reason: &'a str) -> BoxFuture<'a, Answer<()>>;
+  /// The run's session ended, its turn cut short where one is still going.
+  fn stop<'a>(&'a self, session: &'a str, reason: &'a str) -> BoxFuture<'a, Answer<()>>;
 
   /// The roads conversational turns walk, from the moment the stream opens.
   fn roads_walked(&self) -> BoxFuture<'_, Answer<BoxStream<'static, Answer<RoadWalked>>>>;
@@ -211,10 +217,10 @@ impl HttpAgency {
     }
   }
 }
-
 #[derive(Deserialize)]
 struct Agents {
-  agents: Vec<Agent>,
+  #[serde(default)]
+  items: Vec<Agent>,
 }
 
 #[derive(Deserialize)]
@@ -224,79 +230,112 @@ struct Rulebooks {
 
 #[derive(Deserialize)]
 struct Providers {
-  providers: Vec<Provider>,
+  #[serde(default)]
+  items: Vec<Provider>,
+}
+
+#[allow(dead_code)]
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WorkKey {
+  key: String,
+  provider: String,
+  model: String,
+  #[serde(default)]
+  effort: Option<String>,
+  #[serde(default)]
+  answer_tokens: Option<i64>,
+  #[serde(default)]
+  cap_ms: i64,
+  #[serde(default)]
+  run_mode: String,
 }
 
 #[derive(Deserialize)]
-struct Fallback {
-  profiles: Vec<Route>,
+#[serde(rename_all = "camelCase")]
+struct AgencySession {
+  id: String,
+  agent_name: String,
+  #[serde(default)]
+  scope: Value,
+}
+
+#[allow(dead_code)]
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AgencyTurn {
+  #[serde(default)]
+  id: i64,
+  #[serde(default)]
+  session_id: String,
+  #[serde(default)]
+  state: String,
+  #[serde(default)]
+  delivery: Option<String>,
+  #[serde(default)]
+  outcome: Option<String>,
+  #[serde(default)]
+  answer: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StandIn {
+  #[serde(default)]
+  stand_in_available: bool,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct Resolve<'a> {
-  work_key: &'a str,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  provider: Option<&'a str>,
-  tier: &'a str,
-}
-
-#[derive(Deserialize)]
-struct Answers {
-  answers: bool,
+struct StartApart<'a> {
+  agent_name: &'a str,
+  scope: &'static str,
+  options: ApartOptions<'a>,
 }
 
 #[derive(Serialize)]
-struct ApartScope<'a> {
-  kind: &'static str,
+#[serde(rename_all = "camelCase")]
+struct ApartOptions<'a> {
   provider: &'a str,
   model: &'a str,
   cwd: &'a str,
-  todo: Option<i64>,
-  role: Option<&'a str>,
 }
 
 #[derive(Serialize)]
-struct Start<'a> {
-  agent: &'a str,
-  scope: ApartScope<'a>,
+#[serde(rename_all = "camelCase")]
+struct TurnSend<'a> {
+  prompt: &'a str,
+  gate: GateSend<'a>,
 }
 
 #[derive(Serialize)]
-struct Resume {
-  kind: &'static str,
-}
-
-#[derive(Serialize)]
-struct TurnBody<'a> {
-  #[serde(flatten)]
-  turn: &'a GateTurn,
-  resume: Resume,
-}
-
-#[derive(Serialize)]
-struct Stop<'a> {
-  run: &'a str,
-  reason: &'a str,
+#[serde(rename_all = "camelCase")]
+struct GateSend<'a> {
+  system: &'a str,
+  thinking: bool,
+  model: &'a str,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  effort: Option<&'a str>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  answer_tokens: Option<i64>,
 }
 
 #[derive(Serialize)]
 struct Hook<'a> {
-  point: &'a str,
   url: &'a str,
   #[serde(skip_serializing_if = "Option::is_none")]
   token: Option<&'a str>,
 }
 
 /// The code the agency answers a read of nothing held with.
-const NOTHING_HELD: &str = "nothing-held";
+const NOTHING_HELD: &str = "not-found";
 
 impl Agency for HttpAgency {
   fn agents(&self) -> BoxFuture<'_, Answer<Vec<Agent>>> {
     Box::pin(async move {
       let agents: Agents = self.caller.get("agents", &["agents"], &[]).await?;
 
-      Ok(agents.agents)
+      Ok(agents.items)
     })
   }
 
@@ -313,15 +352,26 @@ impl Agency for HttpAgency {
     Box::pin(async move {
       let providers: Providers = self.caller.get("providers", &["providers"], &[]).await?;
 
-      Ok(providers.providers)
+      Ok(providers.items)
     })
   }
 
-  fn routes(&self) -> BoxFuture<'_, Answer<Vec<Route>>> {
+  fn work_key<'a>(&'a self, key: &'a str) -> BoxFuture<'a, Answer<Option<Route>>> {
     Box::pin(async move {
-      let fallback: Fallback = self.caller.get("routes", &["fallback"], &[]).await?;
-
-      Ok(fallback.profiles)
+      match self.caller.get::<WorkKey>("work key", &["work-keys", key], &[]).await {
+        Ok(work) => Ok(Some(Route {
+          key: work.key,
+          route_mode: work.run_mode,
+          account: None,
+          set_at: None,
+          provider: Some(work.provider),
+          model: Some(work.model),
+          effort: work.effort,
+          answer_tokens: work.answer_tokens,
+        })),
+        Err(PortError::Refused { code, .. }) if code == NOTHING_HELD => Ok(None),
+        Err(why) => Err(why),
+      }
     })
   }
 
@@ -332,66 +382,95 @@ impl Agency for HttpAgency {
     tier: &'a str,
   ) -> BoxFuture<'a, Answer<Option<Mapping>>> {
     Box::pin(async move {
-      self
-        .caller
-        .post_or_nothing(
-          "route resolved",
-          &["routes", "resolve"],
-          &Resolve {
-            work_key,
-            provider,
-            tier,
-          },
-          NOTHING_HELD,
-        )
-        .await
+      let mut query: Vec<(&str, &str)> = vec![("tier", tier)];
+
+      if let Some(provider) = provider {
+        query.push(("provider", provider));
+      }
+
+      match self.caller.get::<Mapping>("mapping", &["work-keys", work_key], &query).await {
+        Ok(mapping) => Ok(Some(mapping)),
+        Err(PortError::Refused { code, .. }) if code == NOTHING_HELD => Ok(None),
+        Err(why) => Err(why),
+      }
     })
   }
 
   fn stand_in<'a>(&'a self, agent: &'a str) -> BoxFuture<'a, Answer<bool>> {
     Box::pin(async move {
-      let answers: Answers = self.caller.get("stand-in", &["stand-in"], &[("agent", agent)]).await?;
-
-      Ok(answers.answers)
+      match self.caller.get::<StandIn>("stand-in", &["agents", agent], &[]).await {
+        Ok(stand) => Ok(stand.stand_in_available),
+        Err(PortError::Refused { code, .. }) if code == NOTHING_HELD => Ok(false),
+        Err(why) => Err(why),
+      }
     })
   }
 
   fn start_apart<'a>(&'a self, agent: &'a str, apart: &'a Apart) -> BoxFuture<'a, Answer<Session>> {
     Box::pin(async move {
-      let scope = ApartScope {
-        kind: "apart",
-        provider: &apart.provider,
-        model: &apart.model,
-        cwd: &apart.cwd,
-        todo: None,
-        role: None,
-      };
-
-      self
+      let started: AgencySession = self
         .caller
-        .post("session started", &["session", "start"], &Start { agent, scope })
-        .await
+        .post(
+          "session started",
+          &["sessions"],
+          &StartApart {
+            agent_name: agent,
+            scope: "conversation",
+            options: ApartOptions {
+              provider: &apart.provider,
+              model: &apart.model,
+              cwd: &apart.cwd,
+            },
+          },
+        )
+        .await?;
+
+      Ok(Session {
+        id: started.id,
+        agent: started.agent_name,
+        scope: started.scope,
+      })
     })
   }
 
   fn turn<'a>(&'a self, turn: &'a GateTurn) -> BoxFuture<'a, Answer<TurnEnd>> {
     Box::pin(async move {
-      let body = TurnBody {
-        turn,
-        resume: Resume { kind: "fresh" },
-      };
+      let sent: AgencyTurn = self
+        .caller
+        .post(
+          "gate turn",
+          &["sessions", &turn.session, "turns"],
+          &TurnSend {
+            prompt: &turn.prompt,
+            gate: GateSend {
+              system: &turn.system,
+              thinking: turn.thinking,
+              model: &turn.model,
+              effort: turn.mapping.effort.as_deref(),
+              answer_tokens: turn.mapping.answer_tokens,
+            },
+          },
+        )
+        .await?;
 
-      self.caller.post("gate turn", &["session", "turn"], &body).await
+      Ok(TurnEnd {
+        delivery: sent.delivery.unwrap_or_default(),
+        run: None,
+        outcome: sent.outcome.unwrap_or_default(),
+        answer: sent.answer,
+        reason: None,
+        engine_error: None,
+        went_out: None,
+        reply: None,
+        failure: None,
+      })
     })
   }
 
-  fn stop<'a>(&'a self, run: &'a str, reason: &'a str) -> BoxFuture<'a, Answer<()>> {
-    Box::pin(async move {
-      self
-        .caller
-        .done("run stopped", Method::POST, &["runs", "stop"], &Stop { run, reason })
-        .await
-    })
+  fn stop<'a>(&'a self, session: &'a str, _reason: &'a str) -> BoxFuture<'a, Answer<()>> {
+    Box::pin(
+      async move { self.caller.without("session ended", Method::DELETE, &["sessions", session]).await },
+    )
   }
 
   fn roads_walked(&self) -> BoxFuture<'_, Answer<BoxStream<'static, Answer<RoadWalked>>>> {
@@ -421,7 +500,7 @@ impl Agency for HttpAgency {
     Box::pin(async move {
       self
         .caller
-        .done("hook registered", Method::POST, &["hooks"], &Hook { point, url, token })
+        .done("hook registered", Method::PUT, &["hooks", point], &Hook { url, token })
         .await
     })
   }

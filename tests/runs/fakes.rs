@@ -79,6 +79,10 @@ impl FakeAgency {
       route_mode: mode.to_owned(),
       account: None,
       set_at: Some(42),
+      provider: None,
+      model: None,
+      effort: None,
+      answer_tokens: None,
     });
   }
 }
@@ -123,8 +127,8 @@ impl Agency for FakeAgency {
     Box::pin(async move { Ok(self.providers.lock().unwrap().clone()) })
   }
 
-  fn routes(&self) -> BoxFuture<'_, Answer<Vec<Route>>> {
-    Box::pin(async move { Ok(self.routes.lock().unwrap().clone()) })
+  fn work_key<'a>(&'a self, key: &'a str) -> BoxFuture<'a, Answer<Option<Route>>> {
+    Box::pin(async move { Ok(self.routes.lock().unwrap().iter().find(|one| one.key == key).cloned()) })
   }
 
   fn resolve<'a>(

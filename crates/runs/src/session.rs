@@ -83,17 +83,20 @@ pub async fn ask(runs: &Runs, run: &Run<'_>) -> Result<Ended, GateError> {
     return Ok(unanswered(Outcome::Timeout, "its wait ran out before the turn went in"));
   }
 
-  let agent = request.agent.as_deref().unwrap_or(&runs.chat_agent);
+  // The gate's own agent carries the run's system prompt; the chat agent answers only where a caller names no
+  // agent of the gate's.
+  let agent = request.agent.clone().unwrap_or_else(|| run.stage.to_owned());
   let apart = Apart {
     provider: route.provider.clone(),
     model: model.clone(),
     cwd: runs.session_folder.clone(),
   };
-  let session = match tokio::time::timeout_at(run.deadline, runs.agency.start_apart(agent, &apart)).await {
+  let session = match tokio::time::timeout_at(run.deadline, runs.agency.start_apart(&agent, &apart)).await {
     Err(_) => return Ok(unanswered(Outcome::Timeout, "its wait ran out before its session stood")),
     Ok(Err(why)) => return Ok(unanswered(Outcome::Error, format!("its session would not stand: {why}"))),
     Ok(Ok(session)) => session,
   };
+  let session_id = session.id.clone();
   let turn = GateTurn {
     session: session.id,
     prompt: request.prompt.clone(),
@@ -114,7 +117,7 @@ pub async fn ask(runs: &Runs, run: &Run<'_>) -> Result<Ended, GateError> {
 
   match tokio::time::timeout_at(run.deadline, runs.agency.turn(&turn)).await {
     Err(_) => {
-      if let Err(why) = runs.agency.stop(&run.name, "its gate's wait ran out").await {
+      if let Err(why) = runs.agency.stop(&session_id, "its gate's wait ran out").await {
         eprintln!("{}: {} could not be stopped: {why}", run.stage, run.name);
       }
 

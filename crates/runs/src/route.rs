@@ -68,14 +68,9 @@ fn enabled(providers: &[Provider], name: &str) -> bool {
 /// The run mode the work key stands on, as the agency's fallback settings hold it; the walk where they hold
 /// none.
 pub async fn run_mode(runs: &Runs, stage: &str) -> Result<String, GateError> {
-  let routes = runs.agency.routes().await.map_err(fault)?;
+  let route = runs.agency.work_key(stage).await.map_err(fault)?;
 
-  Ok(
-    routes
-      .into_iter()
-      .find(|route| route.key == stage)
-      .map_or_else(|| AUTO.to_owned(), |route| route.route_mode),
-  )
+  Ok(route.map_or_else(|| AUTO.to_owned(), |route| route.route_mode))
 }
 
 /// The provider a gate's road begins on, with the mapping its tier resolves to there: the one its run mode names

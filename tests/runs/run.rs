@@ -100,7 +100,7 @@ async fn a_programs_provider_is_one_thrown_away_session_and_its_one_turn() {
 
   assert_eq!(answer.as_deref(), Some("FOLD"));
   assert_eq!(started.len(), 1);
-  assert_eq!(started[0].0, "the-chat-agent");
+  assert_eq!(started[0].0, "output-format");
   assert_eq!(started[0].1.provider, "claude-code");
   assert_eq!(started[0].1.model, "a-model");
   assert_eq!(started[0].1.cwd, "/a/session/folder");
@@ -156,7 +156,7 @@ async fn a_turn_past_its_wait_is_stopped_and_the_gate_has_no_answer() {
 
   assert_eq!(answer, None);
   assert_eq!(stopped.len(), 1);
-  assert!(stopped[0].starts_with("gate:sanitizer:"));
+  assert!(stopped[0].starts_with("session-"));
   assert_eq!(roads(&scratch).await, ["sanitizer claude-code a-model timeout - - - - - -"]);
 }
 

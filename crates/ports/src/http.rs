@@ -304,6 +304,17 @@ impl Caller {
     }
   }
 
+  /// A call sent with `method` and no body, whose answer is only its success.
+  pub async fn without(&self, call: &'static str, method: Method, segments: &[&str]) -> Answer<()> {
+    let response = self.send(call, || self.request(method.clone(), segments)).await?;
+
+    if response.status().is_success() {
+      Ok(())
+    } else {
+      Err(self.refused(call, response).await)
+    }
+  }
+
   /// A body posted and its answer read whole as text, whatever its status, with the status beside it.
   pub async fn post_text<B: Serialize + ?Sized>(
     &self,

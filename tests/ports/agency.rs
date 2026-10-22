@@ -1,5 +1,5 @@
 //! The agency port: the agents, the rulebooks, the providers, a work key's route and mapping, the stand-in, a
-//! thrown-away session and its one turn, a run stopped, the roads walked and the hook registered.
+//! thrown-away session and its one turn, a session ended, the roads walked and the hook registered.
 
 use axum::http::Method;
 use futures_util::StreamExt;
@@ -10,7 +10,7 @@ use crate::peer;
 use crate::stub::Stub;
 
 #[tokio::test]
-async fn the_reads_answer_the_agents_the_rulebooks_the_providers_and_the_routes() {
+async fn the_reads_answer_the_agents_the_rulebooks_the_providers_and_the_work_key() {
   let stub = Stub::start().await;
   let agency = HttpAgency::new(peer(&stub, "control-token"));
 
@@ -18,7 +18,13 @@ async fn the_reads_answer_the_agents_the_rulebooks_the_providers_and_the_routes(
     Method::GET,
     "/agents",
     200,
-    json!({ "agents": [{ "name": "chat-agent", "label": "The agent", "awake": true, "brainFolder": "", "recollectorRegistration": null, "role": "chat" }], "roles": [] }),
+    json!({ "items": [{ "name": "chat-agent", "label": "The agent", "awake": true, "brainFolder": "", "recollectorRegistration": null, "role": "chat" }] }),
+  );
+  stub.answer(
+    Method::GET,
+    "/agents/chat-agent",
+    200,
+    json!({ "name": "chat-agent", "standInAvailable": false }),
   );
   stub.answer(
     Method::GET,
@@ -30,57 +36,78 @@ async fn the_reads_answer_the_agents_the_rulebooks_the_providers_and_the_routes(
     Method::GET,
     "/providers",
     200,
-    json!({ "providers": [{ "name": "claude-code", "enabled": true, "registered": false, "coworker": true, "lines": ["gate"] }] }),
+    json!({ "items": [{ "name": "claude-code", "enabled": true, "registered": false, "coworker": true, "lines": ["gate"] }] }),
   );
   stub.answer(
     Method::GET,
-    "/fallback",
+    "/work-keys/room-rules",
     200,
-    json!({ "profiles": [{ "key": "room-rules", "routeMode": "laya", "account": null, "setAt": 12, "label": "x" }], "order": [] }),
+    json!({ "key": "room-rules", "provider": "claude-code", "model": "a-model", "effort": "low", "answerTokens": 2048, "capMs": 0, "runMode": "run" }),
   );
-  stub.answer(Method::GET, "/stand-in", 200, json!({ "answers": false }));
 
   let agents = agency.agents().await.unwrap();
   let rulebooks = agency.rulebooks(&["plain-writing", "recollection"]).await.unwrap();
   let providers = agency.providers().await.unwrap();
-  let routes = agency.routes().await.unwrap();
+  let route = agency.work_key("room-rules").await.unwrap().unwrap();
   let stand_in = agency.stand_in("chat-agent").await.unwrap();
 
   assert_eq!(agents[0].brain_folder.as_deref(), Some(""));
   assert_eq!(agents[0].rest["role"], json!("chat"));
   assert_eq!(rulebooks[0].text, "Write plainly.");
   assert_eq!(providers[0].lines, vec!["gate"]);
-  assert_eq!(routes[0].route_mode, "laya");
+  assert_eq!(route.provider.as_deref(), Some("claude-code"));
+  assert_eq!(route.model.as_deref(), Some("a-model"));
+  assert_eq!(route.answer_tokens, Some(2048));
   assert!(!stand_in);
   assert_eq!(stub.one("/rulebooks").query.as_deref(), Some("names=plain-writing%2Crecollection"));
-  assert_eq!(stub.one("/stand-in").query.as_deref(), Some("agent=chat-agent"));
   assert_eq!(stub.one("/agents").bearer().as_deref(), Some("control-token"));
 }
 
 #[tokio::test]
-async fn a_mapping_is_resolved_and_a_key_no_provider_serves_resolves_to_none() {
+async fn a_mapping_is_resolved_at_a_tier_and_a_key_no_provider_serves_resolves_to_none() {
   let stub = Stub::start().await;
   let agency = HttpAgency::new(peer(&stub, "t"));
 
   stub.answer(
-    Method::POST,
-    "/routes/resolve",
+    Method::GET,
+    "/work-keys/room-rules",
     200,
-    json!({ "provider": "claude-code", "tier": "Light", "model": "a-model", "effort": "low", "answerTokens": 2048 }),
+    json!({ "key": "room-rules", "provider": "claude-code", "model": "a-model", "effort": "low", "answerTokens": 2048 }),
   );
 
   let mapping = agency.resolve("room-rules", None, "Light").await.unwrap().unwrap();
 
+  assert_eq!(mapping.provider.as_deref(), Some("claude-code"));
   assert_eq!(mapping.model.as_deref(), Some("a-model"));
   assert_eq!(mapping.answer_tokens, Some(2048));
-  assert_eq!(stub.one("/routes/resolve").json(), json!({ "workKey": "room-rules", "tier": "Light" }));
+  assert_eq!(stub.one("/work-keys/room-rules").query.as_deref(), Some("tier=Light"));
+
+  let named = Stub::start().await;
+  named.answer(
+    Method::GET,
+    "/work-keys/room-rules",
+    200,
+    json!({ "key": "room-rules", "provider": "codex", "model": "a-codex-model", "effort": "low", "answerTokens": null }),
+  );
+
+  assert_eq!(
+    HttpAgency::new(peer(&named, "t"))
+      .resolve("room-rules", Some("codex"), "Light")
+      .await
+      .unwrap()
+      .unwrap()
+      .provider
+      .as_deref(),
+    Some("codex")
+  );
+  assert_eq!(named.one("/work-keys/room-rules").query.as_deref(), Some("tier=Light&provider=codex"));
 
   let none = Stub::start().await;
   none.answer(
-    Method::POST,
-    "/routes/resolve",
+    Method::GET,
+    "/work-keys/room-rules",
     404,
-    json!({ "error": "no provider serves it", "code": "nothing-held" }),
+    json!({ "error": "no route serves room-rules", "code": "not-found" }),
   );
 
   assert_eq!(
@@ -93,25 +120,21 @@ async fn a_mapping_is_resolved_and_a_key_no_provider_serves_resolves_to_none() {
 }
 
 #[tokio::test]
-async fn a_gate_run_is_a_session_apart_and_one_fresh_turn_carrying_the_whole_system_prompt() {
+async fn a_gate_run_is_a_conversation_and_one_turn_carrying_the_whole_system_prompt() {
   let stub = Stub::start().await;
   let agency = HttpAgency::new(peer(&stub, "t"));
 
   stub.answer(
     Method::POST,
-    "/session/start",
-    200,
-    json!({ "id": "s-1", "agent": "chat-agent", "scope": { "kind": "apart" } }),
+    "/sessions",
+    201,
+    json!({ "id": "s-1", "agentName": "room-rules", "scope": "conversation" }),
   );
   stub.answer(
     Method::POST,
-    "/session/turn",
-    200,
-    json!({
-      "delivery": "taken", "run": "gate:room-rules:1", "outcome": "answered", "answer": "[]", "reason": null,
-      "engineError": null, "went_out": { "provider": "claude-code", "model": "a-model", "effort": "low", "tier": "Light" },
-      "reply": { "mode": "claude-code" }, "failure": null
-    }),
+    "/sessions/s-1/turns",
+    201,
+    json!({ "id": 1, "sessionId": "s-1", "state": "ended", "delivery": "delivered", "outcome": "answered", "answer": "[]" }),
   );
 
   let apart = Apart {
@@ -119,7 +142,7 @@ async fn a_gate_run_is_a_session_apart_and_one_fresh_turn_carrying_the_whole_sys
     model: "a-model".into(),
     cwd: "/tmp/empty".into(),
   };
-  let session = agency.start_apart("chat-agent", &apart).await.unwrap();
+  let session = agency.start_apart("room-rules", &apart).await.unwrap();
   let turn = GateTurn {
     session: session.id.clone(),
     prompt: "the material".into(),
@@ -141,42 +164,39 @@ async fn a_gate_run_is_a_session_apart_and_one_fresh_turn_carrying_the_whole_sys
 
   assert_eq!(ended.outcome, "answered");
   assert_eq!(ended.answer.as_deref(), Some("[]"));
-  assert_eq!(ended.went_out.unwrap().model.as_deref(), Some("a-model"));
   assert_eq!(
-    stub.one("/session/start").json(),
-    json!({ "agent": "chat-agent", "scope": { "kind": "apart", "provider": "claude-code", "model": "a-model", "cwd": "/tmp/empty", "todo": null, "role": null } })
+    stub.one("/sessions").json(),
+    json!({ "agentName": "room-rules", "scope": "conversation", "options": { "provider": "claude-code", "model": "a-model", "cwd": "/tmp/empty" } })
   );
   assert_eq!(
-    stub.one("/session/turn").json(),
+    stub.one("/sessions/s-1/turns").json(),
     json!({
-      "session": "s-1", "prompt": "the material", "provider": "claude-code", "model": "a-model",
-      "mapping": { "model": "a-model", "effort": "low", "tier": "Light" }, "name": "gate:room-rules:1",
-      "work_key": "room-rules", "chat": 7, "system": "the gate's instructions", "thinking": false, "resume": { "kind": "fresh" }
+      "prompt": "the material",
+      "gate": {
+        "system": "the gate's instructions", "thinking": false, "model": "a-model", "effort": "low"
+      }
     })
   );
 }
 
 #[tokio::test]
-async fn a_run_is_stopped_and_the_hook_registered() {
+async fn a_session_is_ended_and_the_hook_registered() {
   let stub = Stub::start().await;
   let agency = HttpAgency::new(peer(&stub, "t"));
 
-  stub.answer(Method::POST, "/runs/stop", 200, json!({ "stopped": 1 }));
-  stub.canned(Method::POST, "/hooks", 204, "application/json", String::new());
+  stub.canned(Method::DELETE, "/sessions/s-3", 204, "application/json", String::new());
+  stub.canned(Method::PUT, "/hooks/session-summariser", 200, "application/json", json!({}).to_string());
 
-  agency.stop("gate:sanitizer:3", "the caller left").await.unwrap();
+  agency.stop("s-3", "the caller left").await.unwrap();
   agency
     .register_hook("session-summariser", "http://gate.example/hooks/session-summariser", Some("gate-token"))
     .await
     .unwrap();
 
+  assert_eq!(stub.one("/sessions/s-3").method, Method::DELETE);
   assert_eq!(
-    stub.one("/runs/stop").json(),
-    json!({ "run": "gate:sanitizer:3", "reason": "the caller left" })
-  );
-  assert_eq!(
-    stub.one("/hooks").json(),
-    json!({ "point": "session-summariser", "url": "http://gate.example/hooks/session-summariser", "token": "gate-token" })
+    stub.one("/hooks/session-summariser").json(),
+    json!({ "url": "http://gate.example/hooks/session-summariser", "token": "gate-token" })
   );
 }
 

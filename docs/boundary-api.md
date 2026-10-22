@@ -111,14 +111,14 @@ In the agency's conventions (its `docs/api.md`): camelCase, the agency's control
 | the agents | `GET /agents` | the registrations a gate run names and the agents a turn is for |
 | shared rulebooks | `GET /rulebooks?names=` | `plain-writing` and `recollection`, the rulebooks the translator's record and the session summariser stand on |
 | the providers | `GET /providers` | the provider order a gate's road begins on and whether each is on |
-| a gate's route | `GET /fallback` | the run mode the gate's work key stands on, Laya among the modes |
-| a mapping | `POST /routes/resolve` | `workKey`, `provider?`, `tier`: the `provider`, `model`, `effort` and `answerTokens` a gate run goes out on |
-| a stand-in | `GET /stand-in?agent=` | whether a stand-in answers while Claude Code's road is closed |
-| a session | `POST /session/start` | `agent`, `scope` `{kind: apart, provider, model, cwd, todo: null, role: null}`: one thrown-away session for one gate run on a provider's program |
-| a turn | `POST /session/turn` | `session`, `prompt`, and the work parts: `provider`, `model`, `mapping`, `resume` `{kind: fresh}`, `name`, `work_key`, `chat`, `system`, the gate's whole system prompt, and `thinking`, whether the run thinks |
-| a run stopped | `POST /runs/stop` | a run of the gate's somebody stopped |
+| a gate's route | `GET /work-keys/{workKey}` | the run mode the gate's work key stands on |
+| a mapping | `GET /work-keys/{workKey}?provider=&tier=` | the `provider`, `model`, `effort` and `answerTokens` a gate run goes out on |
+| a stand-in | `GET /agents/{agentName}` | `standInAvailable`, whether a stand-in answers while Claude Code's road is closed |
+| a session | `POST /sessions` | `agentName`, `scope` `conversation`, `options` `{provider, model, cwd}`: one thrown-away conversation for one gate run on a provider's program |
+| a turn | `POST /sessions/{sessionId}/turns` | `prompt`, and the `gate` part: `system`, the gate's whole system prompt; `thinking`, whether the run thinks; and `model`, `effort` and `answerTokens`, the mapping its tier resolved to |
+| a session ended | `DELETE /sessions/{sessionId}` | a run of the gate's somebody stopped, its turn cut short |
 | the events | `GET /events?kinds=road-walked` | the road each conversational turn walked, which the gate writes into its road records |
-| a hook registered | `POST /hooks` | `point` `session-summariser`, `url`, `token` |
+| a hook registered | `PUT /hooks/{point}` | `point` `session-summariser`, `url`, `token` |
 
 The training tooling's claude road hands a batch to the agency's command for a run apart, as the tooling's settings
 name it (`docs/gate-data.md`, 「The claude road」), with `--model`, `--effort`, `--config-dir`, `--system-file`,
@@ -266,23 +266,18 @@ patch.
 
 Statements here that a sibling's document does not yet match, each for that sibling to take up:
 
-- **The agency's thrown-away session** carries no part for a whole system prompt or for thinking off; the gate
-  sends `system` and `thinking` with the turn's work parts, for the agency to deliver as the program's whole
-  system prompt and its thinking.
 - **The agency's session summariser hook** hands a Claude Code or Codex session by its id alone, with no
   `transcript`; the summariser reads the session's record from the folders its `[records]` settings name, on
   the machine both run on, until the agency hands the transcript itself.
-- **The agency's `GET /fallback`** does not state, in its document, the fields of a work key's run mode the gate
-  reads.
 - **The agency publishes no command that runs one batch apart** with the words the training tooling's claude road
   hands it (「bmo-agency」 above); the road runs whatever command the tooling's settings name until the agency
   states one.
 - **The upstreams' published clients do not carry the calls the gate makes.** bmo-brain's client serves memory
   rows, notes, watches, reminders, fragments and libraries, and not the generated reference, person-book,
   room-rule and session routes the gate reads; bmo-agency's client serves sessions and turns, and not the
-  route resolution, a run apart or a stop the gate's runs call; bmo-job's client serves items, and not a row
-  another unit raises. The gate's hand-written ports in `crates/ports` stand for these calls until their
-  owners serve them, and the gate takes the client of each one as soon as it does.
+  work-key route the gate resolves; bmo-job's client serves items, and not a row another unit raises. The
+  gate's hand-written ports in `crates/ports` stand for these calls until their owners serve them, and the
+  gate takes the client of each one as soon as it does.
 - **No unit but the gate serves its part of the training tooling's conversation snapshot:** the receiver's messages
   and sent messages, the agency's run log, bmo-job's items and job runs, and bmo-artifact's searches stand
   unavailable in every snapshot (`docs/gate-data.md`, 「The conversation source」) until each owner serves a route
