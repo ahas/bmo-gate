@@ -54,24 +54,28 @@ keys, epoch milliseconds, signed 64-bit ids, `{code, error}` on a non-2xx answer
 
 ### bmo-brain
 
-In the common conventions: camelCase, epoch milliseconds, every call `POST`, and an error of `{code, error}`.
-These are the calls the gate's hand-written port makes; the gap below names what the brain's published client
-does not carry.
+In the common conventions: camelCase, epoch milliseconds, and an error of `{code, error}`. The reads are
+`GET` and the writes `POST`. These are the calls the gate's hand-written port makes; the brain's published
+client does not carry the reference road's view of the rows.
 
-| Call | Route | Body | Answer |
+The brain holds every member under the caller's own scope and gives the scope no meaning: an agent's scope
+is named by the agent, and a room's by the agent and the room (`<agent>:room:<chat>`). The gate maps the
+brain's generic rows to what the reference road reads, with the old fragment fields kept in `labels`.
+
+| Call | Route | Body or query | Answer |
 |---|---|---|---|
-| open standing rows | `/memory/standing` | `agent`, `chatId` | `rows` |
-| conditional rows | `/memory/conditions` | `agent`, `chatId` | `rows`: `slug`, `condition`, `action` |
-| matched rows written | `/memory/matched` | `agent`, `chatId`, `matched`, `spent` | `ok` |
-| rows the events wake | `/memory/events` | `agent`, `chatId`, `events` (each `kind`, `item`) | `rows` |
-| fragments offered | `/fragments/offer` | `agent`, `chatId`, `kinds` | `fragments` |
-| fragments attached | `/fragments/hits` | `agent`, `chatId`, `attached` (each `kind`, `chatId`, `owner`, `slug`) | `ok` |
-| knowledge read | `/knowledge/read` | `agent`, `chatId`, `slugs` | `documents`: `slug`, `path`, `text`, `version` |
-| person book read | `/people/read` | `agent`, `chatId`, `senders`, `slugs` | `sheets` and `pieces` |
-| owner room rules | `/room-rules/read` | `chatId` | `rules`: `id`, `subject`, `text` |
-| a session's loads | `/sessions/loads` | `session` | `loads`: `path`, `version` |
-| a room forgotten | `/rooms/forgotten` | `chatId` | `ok` |
+| open standing rows | `GET /memories` | `scope` (the agent's and the room's, asked apart), `state=standing`, `limit` | `items`: the brain's memory rows, their `conditions` and `labels` |
+| conditional rows | `GET /memories` | the same standing rows | their `conditions`: `condition`, `event`, `action` |
+| matched rows written | `POST /memory-matches` | `memoryIds`, `actorName`, `spentMs`, `tokenCount` | the match |
+| rows the events wake | the standing rows | | the gate filters them by the events their `conditions` name |
+| fragments offered | `GET /knowledge` | `scopes` (the agent's and the room's), `kinds` (the brain's kind for the reference kind: `person` for the person-book chunks, `library-knowledge`, `room-rule`) | `fragments`: active and shared rows, switched off for the scope not, their old fields in `labels` |
+| fragments attached | `POST /fragment-hits` | `keys` (the fragments' brain keys), `actorName`, `scope` (the room's) | `recordedCount` |
+| knowledge read | `GET /knowledge` | `scopes`, `kinds=library-knowledge` | `fragments`: `key`, `path`, `text`, `version`, filtered by the old `labels.slug` |
+| person book read | `GET /knowledge` | `scopes`, `kinds=person`, `subjectKey` where the senders are asked | `fragments`: the sheets and the person-book pieces, read from `labels` |
+| owner room rules | `POST /room-rules/read` | `chatId` | `rules`: `id`, `subject`, `text` |
+| a session's loads | `POST /sessions/loads` | `session` | `loads`: `path`, `version` |
 
+The shipped documents and the lore are held nowhere in the brain, so the gate is offered no rows of them.
 The brain picks nothing: the gate narrows and picks among what these answer, and writes back only what it
 attached and what it matched.
 

@@ -29,6 +29,7 @@ fn unoffered<T>(unit: &'static str, call: &'static str) -> Answer<T> {
 /// A fragment row of a kind, its slug and title, in the room or shared, owned by a person or nobody.
 pub fn fragment(kind: &str, slug: &str, title: &str, chat_id: Option<i64>, owner: Option<i64>) -> Fragment {
   Fragment {
+    key: format!("{kind}:{slug}"),
     kind: kind.into(),
     chat_id,
     owner,
@@ -231,10 +232,6 @@ impl Brain for FakeBrain {
 
   fn loads<'a>(&'a self, _session: &'a str) -> BoxFuture<'a, Answer<Vec<Load>>> {
     Box::pin(async move { unoffered("bmo-brain", "loads") })
-  }
-
-  fn forgotten(&self, _chat: i64) -> BoxFuture<'_, Answer<()>> {
-    Box::pin(async move { unoffered("bmo-brain", "forgotten") })
   }
 }
 

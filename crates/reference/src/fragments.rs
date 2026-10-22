@@ -21,6 +21,8 @@ use gate_stages::sql::run;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Fragment {
   pub id: i64,
+  /// The brain's own key for the row, which a hit names it by.
+  pub key: String,
   pub kind: String,
   pub chat_id: Option<i64>,
   pub owner: Option<i64>,
@@ -44,6 +46,7 @@ impl Fragment {
   pub fn of(row: brain::Fragment) -> Self {
     Self {
       id: NEXT.fetch_add(1, Ordering::Relaxed),
+      key: row.key,
       kind: row.kind,
       chat_id: row.chat_id,
       owner: row.owner,
@@ -63,6 +66,7 @@ impl Fragment {
   /// The row as the brain finds it again to count what a turn attached.
   pub fn hit(&self) -> Hit {
     Hit {
+      key: self.key.clone(),
       kind: self.kind.clone(),
       chat_id: self.chat_id,
       owner: self.owner,
