@@ -14,7 +14,9 @@ its verdicts are kept, how rows and figures are read off them, and how it is gro
   differently, or retires a piece, the next pass's rows say so, and nothing here has to be told.
 - **The input is the gate's, byte for byte.** What a gate is handed — the turn's messages as a state, and
   one question per candidate the narrowing kept, in the probe's own words — is built by the gate's code
-  and read from it (「The input」). The training tooling never reads the fragment table or the brain itself.
+  and read from it (「The input」). Where the deployed gate still asks an earlier wording of its question, the
+  row asks the gate's own in its place (`docs/gate-data.md`, 「A question reworded」). The training tooling
+  never reads the fragment table or the brain itself.
 - **A pass reads its turns once, as it starts,** through the conversation source (`docs/gate-data.md`, 「The
   conversation source」), and the gate's code builds the inputs against the same moment, so a turn and its
   input are read together.

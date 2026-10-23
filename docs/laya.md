@@ -241,6 +241,12 @@ mode other than `off`.
 - **Where the pairs are written** is the gate's own database, by whichever route the gate runs for.
 - **Tests never reach the server:** every test run starts with the address empty, and a test of Laya
   passes its own.
+- **A probe's questions are English.** Each question's fixed wording and the word a candidate is named by
+  stand in the gate's Laya question data, the same words the distilled data carries
+  (`docs/laya-gates.md`); only the state is the room's words, as written. The situation-rule matcher's two
+  questions are the two its LLM is asked, in the same words. The checkpoints in service now were trained on
+  Korean wordings and have not learnt the English ones; the checkpoints retrained on the English questions
+  supersede them, and moving a gate's mode meanwhile is the owner's (「Who decides」).
 
 - **Formatting gate (`output-format`)** — one yes/no question: should this message be folded. Laya's
   yes is FOLD and its no is OPEN. The state is the markdown as written, reduced to its opening, its

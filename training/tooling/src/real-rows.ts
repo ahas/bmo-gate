@@ -9,6 +9,7 @@ import { indexOf, plainShapeLine, roomShapeLine } from "./room-shape";
 import { scrubText } from "./pii";
 import { roomKindOf } from "./conversation";
 import { candidateOf, synthesisFor } from "./laya-synth";
+import { questionsNow } from "./laya-wording";
 
 import type { ArchivedMessage, RecordedQuestions } from "./conversation";
 import type { GateSynthesis } from "./laya-synth";
@@ -276,7 +277,10 @@ export function candidateSetsByRoom(gate: GateSynthesis, recorded: readonly Reco
   const byRoom = new Map<number, Record<string, LayaQuestion>[]>();
 
   for (const one of recorded) {
-    const sets = offeredSets(gate, one.questions as Record<string, LayaQuestion>);
+    // A record of a gate deployed on an earlier wording of its question asks in that wording, and the rows
+    // built of it ask the gate's own (docs/gate-data.md, 「A question reworded」).
+    const asked = one.questions as Record<string, LayaQuestion>;
+    const sets = offeredSets(gate, questionsNow(gate, asked) ?? asked);
 
     if (sets.length === 0) {
       continue;

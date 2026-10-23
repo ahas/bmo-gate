@@ -30,7 +30,7 @@ MCP_HEADERS = {
     "accept": "application/json, text/event-stream",
     "mcp-protocol-version": "2025-06-18",
 }
-QUESTIONS = {"q": {"type": "noul", "instructions": "\uc774 \uba54\uc2dc\uc9c0\ub294 \uc77c\uc815 \ubcc0\uacbd \uc694\uccad\uc778\uac00?"}}
+QUESTIONS = {"q": {"type": "noul", "instructions": "Is this message a request to change a schedule?"}}
 ANSWER = {"answers": {"q": {"type": "noul", "noul": 0.93, "confidence": 0.93}}, "ms": 18.2}
 HEALTH = {"state": "up", "model": "room-rules=checkpoints/room-rules/r/step-000044", "device": "cuda",
           "gates": {"room-rules": {"model": "checkpoints/room-rules/r/step-000044", "onCard": True}}}

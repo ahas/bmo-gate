@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, test } from "bun:test";
 
 import {
@@ -24,7 +27,8 @@ import {
 import type { GateSynthesis, LanguageBucket, SynthAsk, SynthRow } from "../../training/tooling/src/laya-synth";
 import type { Gold } from "../../training/tooling/src/laya-dataset";
 import type { LayaQuestion } from "../../training/tooling/src/laya";
-import { filled, promptText } from "../../training/tooling/src/prompts";
+import { filled, promptText, promptTexts } from "../../training/tooling/src/prompts";
+import { repositoryRoot } from "../../training/tooling/src/roots";
 import { useToolingSettings } from "./settings";
 
 useToolingSettings();
@@ -35,6 +39,7 @@ function said(table: string, key: string, values: Readonly<Record<string, string
 }
 
 const shares = { calibration: 0.15, test: 0.15 };
+const hangul = /[\uAC00-\uD7A3]/;
 
 function gate(name: string): GateSynthesis {
   const found = synthesisFor(name);
@@ -64,16 +69,70 @@ describe("the nine gates", () => {
 
   test("the nine gates each have a descriptor", () => {
     expect(gateSyntheses().map((one) => one.title)).toEqual([
-      "\uC2DC\uC2A4\uD15C \uBB38\uC11C \uBD84\uB958\uAE30",
-      "\uBC29 \uADDC\uCE59 \uBD84\uB958\uAE30",
-      "\uC11C\uACE0 \uC9C0\uC2DD \uBD84\uB958\uAE30",
-      "\uC0C1\uD669 \uADDC\uCE59 \uB9E4\uCE6D\uAE30",
-      "\uBA54\uBAA8 \uBD84\uB958\uAE30",
-      "\uCD9C\uB825 \uC11C\uC2DD",
-      "\uBB34\uD574\uD654 \uAC8C\uC774\uD2B8",
-      "\uC778\uBB3C\uBD81 \uC11C\uCE6D",
-      "\uC751\uB2F5 \uC5EC\uBD80 \uD310\uC815\uAE30",
+      "System document classifier",
+      "Room rule classifier",
+      "Library knowledge classifier",
+      "Situation rule matcher",
+      "Note classifier",
+      "Output format",
+      "Sanitiser gate",
+      "Person-book search",
+      "Reply-or-not judge",
     ]);
+  });
+
+  // Every line a model reads is English: only the conversation stays in the rooms' words. Hangul stands in
+  // the writer's prompt only inside a worked row's state and in the room record's own attachment markers and
+  // a reply note's sender, which are the conversation as the rooms write it.
+  test("every instruction and every question the writer is shown is English", () => {
+    const conversation = new Set(["prompt.transcripts.attachments", "prompt.transcripts.room_note"]);
+
+    for (const table of ["prompt", "prompt.transcripts", "prompt.batch", "prompt.languages", "prompt.rooms"]) {
+      for (const [key, text] of Object.entries(promptTexts("laya-synth", table))) {
+        if (!conversation.has(`${table}.${key}`)) {
+          expect(`${table}.${key}: ${text}`).not.toMatch(hangul);
+        }
+      }
+    }
+
+    for (const spec of gateSyntheses()) {
+      const words = [spec.title, spec.judges, spec.candidateWord ?? "", ...spec.questions.flatMap((one) => [one.instructions, ...Object.values(one.options ?? {})])];
+
+      expect(words.filter((one) => hangul.test(one))).toEqual([]);
+
+      for (const question of Object.values(spec.example.questions)) {
+        // A candidate's line may name a person as the rooms write the name; the question before it may not.
+        const declared = spec.questions.find((one) => question.instructions.startsWith(one.instructions));
+
+        expect(declared).toBeDefined();
+      }
+    }
+  });
+
+  // The writer's questions are the ones the gates ask (`prompts/laya/questions.toml`), word for word, so a
+  // checkpoint trained on the written rows has learnt what the gate asks. The sanitiser's rows are harvested
+  // apart and its gate's question is its own.
+  test("each question the writer is shown is the gate's own, word for word", () => {
+    const asked = Bun.TOML.parse(readFileSync(join(repositoryRoot(), "prompts", "laya", "questions.toml"), "utf8")) as {
+      fold: string;
+      gates: Record<string, { question: string; subject: string }>;
+      situation: { applies: string; spent: string; about: string };
+    };
+
+    for (const [name, one] of Object.entries(asked.gates)) {
+      const spec = synthesisFor(name);
+
+      if (spec !== null) {
+        expect(spec.questions.map((question) => question.instructions)).toEqual([one.question]);
+        expect(spec.candidateWord).toBe(one.subject);
+      }
+    }
+
+    const situation = gate("situation-rules");
+
+    expect(situation.questions.map((question) => question.instructions)).toEqual([asked.situation.applies, asked.situation.spent]);
+    expect(asked.situation.about.startsWith(`${situation.candidateWord} {slug}: `)).toBe(true);
+    expect(gate("output-format").questions[0]!.instructions).toBe(asked.fold);
   });
 
   test("no gate asks a score question", () => {

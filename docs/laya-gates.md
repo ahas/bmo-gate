@@ -14,9 +14,15 @@ beside those, the language mix and the answer balance its distilled training dat
   each of the eight asks.
 - **No τ is chosen here.** Choosing τ for a gate, and moving a gate off `shadow`, is the owner's and no job's
   (`docs/laya.md`, 「Who decides」).
-- **The questions' own wording** is the room language's, word for word as the checkpoints were trained on
-  it, and stands in the gate's Laya question data, one entry per gate key and question. This document gives
-  each question's meaning in English; a gate asks the wording the data holds, never a translation of it.
+- **The questions' own wording is English**, and stands in the gate's Laya question data, one entry per gate
+  key and question, with the word a candidate is named by. The distilled data carries the same words, and a
+  checkpoint is trained on them, so a gate asks exactly the wording its checkpoint learnt. Only a row's state is
+  the rooms' own words, as they were written. This document gives each question's meaning; the data holds its
+  wording.
+- **A checkpoint trained on the questions in Korean has not learnt them.** The checkpoints in service now
+  were trained on Korean wordings of these questions; each is superseded by the checkpoint retrained on the
+  English ones, and none is put back in service after it. Rows written in a Korean wording stay usable: the
+  tooling reads them as asking the English one (`docs/gate-data.md`, 「A question reworded」).
 
 ## Question types
 
@@ -142,7 +148,7 @@ proportion that gate really meets.
   | `system-documents` | 70% | 10% | 20% | the turn's own messages; the owner's room and the work rooms carry job reports written in English and command lines inside sentences of the room language |
   | `room-rules` | 80% | 5% | 15% | room rules are asked about in ordinary rooms, where English arrives as a borrowed word or a single pasted line |
   | `library-knowledge` | 75% | 8% | 17% | the knowledge library holds working knowledge, so the turns that reach for it lean technical more often than an ordinary room's |
-  | `situation-rules` | 80% | 5% | 15% | a situation is the room's own talk and a rule is written in the room's language |
+  | `situation-rules` | 80% | 5% | 15% | a situation is the room's own talk |
   | `output-format` | 65% | 5% | 30% | the chat agent's answers are in the room language by the answer-language rule and carry code blocks, paths and logs inside them more often than any other gate's input |
   | `sanitizer` | 40% | 35% | 25% | what it reads is carried material — job prompts, fetched pages, documents, logs — whose English share is far larger than any room's |
   | `people-search` | 80% | 5% | 15% | the turn's own messages in a room where people are being talked about |

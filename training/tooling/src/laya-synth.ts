@@ -88,8 +88,8 @@ export interface GateSynthesis {
   questions: readonly SynthQuestion[];
   // How many candidates one row offers, for a gate that asks per candidate.
   candidates: { min: number; max: number } | null;
-  // The word a reference gate's probe calls its candidates by — the word before `structure: …` — for a gate
-  // whose one question is asked of each candidate beside that candidate's index line.
+  // The word a gate's questions name a candidate by — the word before `structure: …` — for a gate that asks
+  // its questions of each candidate beside that candidate's own line.
   candidateWord?: string;
   // The share of this gate's rows written in each language, and why, from the specification.
   language: Readonly<Record<LanguageBucket, number>>;
@@ -407,7 +407,8 @@ export function validateSynthRow(gate: GateSynthesis, row: SynthRow, wanted: Lan
   return { ok: true };
 }
 
-function declaredFor(gate: GateSynthesis, questionId: string): SynthQuestion | null {
+/** The question of the gate a row's question of this name asks, or null where the gate gives no question that name. */
+export function declaredFor(gate: GateSynthesis, questionId: string): SynthQuestion | null {
   if (!gate.perCandidate) {
     return gate.questions.find((question) => question.id === questionId) ?? null;
   }

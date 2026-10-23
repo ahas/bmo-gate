@@ -97,6 +97,40 @@ fn every_gate_laya_asks_of_its_candidates_has_its_question() {
 }
 
 #[test]
+fn every_question_laya_is_asked_is_english() {
+  let situation = &QUESTIONS.situation;
+  let mut words = vec![
+    QUESTIONS.fold.as_str(),
+    QUESTIONS.intrusion.as_str(),
+    situation.applies.as_str(),
+    situation.spent.as_str(),
+    situation.about.as_str(),
+  ];
+
+  for asked in QUESTIONS.gates.values() {
+    words.push(&asked.question);
+    words.push(&asked.subject);
+  }
+
+  for said in words {
+    assert!(said.is_ascii(), "{said}");
+  }
+}
+
+// The situation-rule matcher asks Laya the two questions its LLM is asked, in the same words.
+#[test]
+fn the_situation_questions_are_the_ones_the_matcher_llm_is_asked() {
+  let told = gate_policy::prompts::instructions("situation-rules").expect("the matcher's instructions");
+
+  for question in [&QUESTIONS.situation.applies, &QUESTIONS.situation.spent] {
+    let mut letters = question.chars();
+    let first = letters.next().expect("a question").to_lowercase().collect::<String>();
+
+    assert!(told.contains(&format!("{first}{}", letters.as_str())), "{question}");
+  }
+}
+
+#[test]
 fn the_reference_gates_are_the_ones_the_order_marks() {
   let stages: Vec<&str> = REFERENCE.gates.iter().map(|gate| gate.stage.as_str()).collect();
 

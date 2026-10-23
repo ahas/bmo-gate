@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { splitFiles } from "../laya-frozen";
 import { datasetSplits } from "../laya-dataset";
+import { askedNow } from "../laya-wording";
 
 import type { DatasetRow, DatasetSplit } from "../laya-dataset";
 
@@ -48,7 +49,8 @@ export function totalRows(rows: Record<DatasetSplit, number>): number {
 }
 
 // One gate's rows out of a folder holding the three split files, written into a folder of its own.
-// Where the folder holds several gates, only this gate's rows are taken.
+// Where the folder holds several gates, only this gate's rows are taken. Each is copied asking its gate's
+// own wording (docs/gate-data.md, 「A question reworded」); a row that already does is copied as it stands.
 export function copyGateRows(from: string, gate: string, to: string): GateCopy | string {
   const rows = { train: 0, calibration: 0, test: 0 } as Record<DatasetSplit, number>;
   const ids: string[] = [];
@@ -68,6 +70,11 @@ export function copyGateRows(from: string, gate: string, to: string): GateCopy |
       } catch {
         return false;
       }
+    }).map((line) => {
+      const row = JSON.parse(line) as DatasetRow;
+      const asked = askedNow(row);
+
+      return asked === row ? line : JSON.stringify(asked);
     });
 
     rows[split] = lines.length;

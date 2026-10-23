@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { splitOf } from "../laya-dataset";
 import { layaFits, layaRequestParts } from "../laya";
 import { languageOf, synthesisFor, validateSynthRow } from "../laya-synth";
+import { questionsNow } from "../laya-wording";
 import { scrubText } from "../pii";
 import { labelKey, labelShare, referenceGates } from "./labels";
 
@@ -183,7 +184,11 @@ function partRow(
   // the rest.
   const labelled = Object.entries(part.questions).flatMap(([id, question], at) => shares[at] === null ? [] : [[id, question] as const]);
   const judged = shares.filter((share) => share !== null);
-  const left = leave({ ...part, questions: Object.fromEntries(labelled) });
+  const spec = specOf(gate);
+  const rewritten = leave({ ...part, questions: Object.fromEntries(labelled) });
+  // A gate deployed on an earlier wording of its question builds its input in that wording, and the row
+  // asks the gate's own (docs/gate-data.md, 「A question reworded」).
+  const left = { ...rewritten, questions: questionsNow(spec, rewritten.questions) ?? rewritten.questions };
   const request = fittingState(left);
 
   if (request === null) {
@@ -199,7 +204,6 @@ function partRow(
   // the rewriting renamed the question.
   const ids = Object.keys(request.questions);
   const gold = Object.fromEntries(ids.map((id, at) => [id, noul(judged[at]!)]));
-  const spec = specOf(gate);
   const state = String(request.state);
   const verdict = validateSynthRow(spec, { state, questions: { ...request.questions }, gold }, languageOf(state));
 

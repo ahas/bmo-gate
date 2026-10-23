@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { refuseOverwrite, splitFiles } from "./laya-frozen";
 import { rehearsalMetaFile } from "./laya-rehearsal";
 import { addTokens, languageFile, metaFile, noTokens, progressFile, readProgress, readWholeBatches, roadsOf, splitsOf } from "./laya-synth-run";
+import { askedNow } from "./laya-wording";
 import { gateFolder, gatesFolderName } from "./roots";
 
 import type { DatasetRow, DatasetSplit } from "./laya-dataset";
@@ -14,8 +15,10 @@ import type { SynthMeta, TokenTally } from "./laya-synth-run";
 // three splits because each gate is its own generation; the training driver reads one folder and
 // cuts it by each row's own gate, so the splits it needs are every gate's rows together.
 //
-// Nothing here rewrites a row. A row frozen by its gate is the row that lands in the dataset, and
-// the merge only decides which folders go in and whether they belong to one another.
+// The merge decides which folders go in and whether they belong to one another, and reads every row in
+// its gate's own wording (docs/gate-data.md, 「A question reworded」): a row written in an earlier
+// wording of the same question lands asking the gate's own, with the id and the split it was made with.
+// Nothing else in a row is touched, and nothing is written into a gate's folder.
 
 export interface MergeOptions {
   // The run's folder, which is where the gates' own folders stand.
@@ -122,7 +125,7 @@ function readFinished(folder: string, gate: string, meta: string): GatePart | st
         return refusal;
       }
 
-      rows[split].push(row);
+      rows[split].push(askedNow(row));
     }
   }
 
@@ -158,7 +161,7 @@ function readBatches(folder: string, gate: string, finished: boolean): GatePart 
     }
   }
 
-  const made = splitsOf(whole.rows, progress);
+  const made = splitsOf(whole.rows.map((one) => ({ ...one, row: askedNow(one.row) })), progress);
 
   return {
     gate,

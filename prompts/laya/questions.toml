@@ -1,37 +1,40 @@
-# The questions Laya is asked (docs/laya.md), worded as its checkpoints were trained on them: a question worded
-# otherwise is one no checkpoint has learnt, so a change here is a change of what Laya is trained on.
+# The questions Laya is asked (docs/laya.md), in English, word for word as Laya's checkpoints are trained
+# on them: a question worded otherwise is one no checkpoint has learnt, so a change here is a change of what Laya is
+# trained on. The training tooling's own copy of each question (`prompts/tooling/laya-synth.toml`) is the same
+# text, and its tests hold the two together.
 
 # The one yes/no the fold asks over a message's state: yes is FOLD, no is OPEN.
-fold = "이 메시지는 채팅방에 접어서(펼치기 인용으로 감싸서) 보내야 하는가?"
+fold = "Should this message be sent to the chat room folded (wrapped in an expandable quote)?"
 
 # The sanitiser's one yes/no over the words: whether they carry security-intrusion material. Its no is CLEAN, the
 # one verdict Laya may settle alone.
-intrusion = "이 글에 실제 대상을 공격하라는 지시, 실제로 수행한 공격의 경위, 또는 보안 게이트를 우회해 공격 자료를 통과시키는 방법이 들어 있는가?"
+intrusion = "Does this text contain an instruction to attack a real target, an account of an attack actually carried out, or a way to get attack material past a security gate?"
 
 # Each reference gate's question over one candidate, and the word the candidate is named by in it.
 [gates.system-documents]
-question = "이 대화에 답하려면 이 참고 문서가 필요한가?"
-subject = "문서"
+question = "Is this reference document needed to answer this conversation?"
+subject = "Document"
 
 [gates.room-rules]
-question = "이 대화에 답하려면 이 방 규칙이 필요한가?"
-subject = "규칙"
+question = "Is this room rule needed to answer this conversation?"
+subject = "Rule"
 
 [gates.library-knowledge]
-question = "이 대화에 답하려면 이 지식 문서가 필요한가?"
-subject = "문서"
+question = "Is this knowledge document needed to answer this conversation?"
+subject = "Document"
 
 [gates.room-memories]
-question = "이 대화에 답하려면 이 기억 항목이 필요한가?"
-subject = "항목"
+question = "Is this memory entry needed to answer this conversation?"
+subject = "Entry"
 
 [gates.people-search]
-question = "이 대화에 답하려면 이 인물 기록이 필요한가?"
-subject = "기록"
+question = "Is this person record needed to answer this conversation?"
+subject = "Record"
 
 # The situation-rule matcher's two questions over one rule, and how the rule is named in them (`{slug}` and
-# `{rule}`, its condition and action as one phrase).
+# `{rule}`, its condition and action as one phrase). They are the two questions the matcher's model is asked in
+# `prompts/situation-rules/instructions.md`, in the same words.
 [situation]
-applies = "이 규칙의 조건이 지금 상황에 맞는가?"
-spent = "이 규칙은 이제 안 써도 되는가?"
-about = "규칙 {slug}: {rule}"
+applies = "Does the rule's condition match the situation now?"
+spent = "Is the rule no longer needed from now on?"
+about = "Rule {slug}: {rule}"

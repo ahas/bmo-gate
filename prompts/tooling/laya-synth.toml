@@ -1,6 +1,8 @@
 # What the tooling tells a model when it has the model write a gate's rows (docs/gate-data.md, 「Invented data」),
-# and each gate's specification as the rows carry it (docs/laya-gates.md), in the rooms' own language and word
-# for word as the gates' data was written by: a question worded otherwise is one no checkpoint has learnt.
+# and each gate's specification as the rows carry it (docs/laya-gates.md). Every instruction and every question
+# is English; Korean stands here only as conversation, in the worked rows' states, and as the room record's own
+# attachment markers. A question is worded word for word as the gate asks it (`prompts/laya/questions.toml`): a
+# question worded otherwise is one no checkpoint has learnt.
 #
 # `{{name}}` marks are filled by the code: `{{agent}}` with the chat agent's name and `{{owner}}` with the
 # owner's, from the tooling's settings `agent_name` and `owner_name`; every other mark with the value its
@@ -9,93 +11,94 @@
 # The part of a writing prompt that never changes while one gate is written, line by line in the order it is
 # said.
 [prompt]
-opening = "너는 판정 모델 학습용 데이터를 짓는다. 이 묶음은 게이트 하나의 것이다: {{title}} ({{gate}})."
-judges = "이 게이트가 정하는 것: {{judges}}"
-row = "한 행은 JSON 객체 하나이고 state, questions, gold 세 자리를 가진다."
-row_state = "- state: 게이트가 받는 입력. 아래 모양 그대로 짓는다."
-row_questions = "- questions: 게이트가 묻는 질문들. 이름과 type과 instructions를 그대로 쓴다."
-row_gold = "- gold: 질문마다 정답을 확률 분포로 적는다. label은 확률이 가장 높은 답이고, probabilities는 그 질문이 가질 수 있는 답을 빠짐없이 그리고 그 답만 담으며 합이 1이다."
-untranslated = "questions 의 instructions 는 아래 적힌 한국어 그대로 쓴다. state 를 영어로 쓰는 묶음에서도 질문은 번역하지 않는다 — 게이트가 실제로 묻는 말이 그것 하나뿐이기 때문이다. 번역한 행은 버려진다."
-spread = "  확신하면 한쪽에 몰고, 사람도 갈릴 만한 자리면 갈린 만큼 나눈다. 애매한 행일수록 0.5에 가깝게 적는다."
-questions = "이 게이트의 질문:"
-noul_answers = "true 또는 false"
-per_candidate = "- 후보마다 하나씩. 이름은 {{name}}, type은 {{type}}."
-candidate_slug = "후보의 슬러그"
-slug_and_id = "`<슬러그>:{{id}}`"
-whole_question = "- 이름 `{{id}}`, type {{type}}."
-instructions = "  instructions는 「{{instructions}}」로 시작한다."
-instructions_candidate = " 뒤에 그 후보가 무엇인지 붙인다."
-answers = "  답: {{answers}}."
-asymmetric = "  이 질문은 비대칭이다. 판정 모델이 혼자 낼 수 있는 답은 {{safe}} 하나뿐이므로, 그 답과 그 반대가 갈리는 경계 사례를 넉넉히 짓는다."
-candidates = "후보는 한 행에 {{min}}개에서 {{max}}개."
-slug_shape = "후보의 슬러그는 소문자와 숫자와 붙임표만 쓴다."
-candidate_language = "후보의 슬러그와 그 후보가 무엇인지 적는 줄은 브레인이 영어로 들고 있는 목차에서 오므로 영어로 쓴다. 오간 말이 어느 언어든 그렇다."
-transcript = "대화 줄의 모양 — 이 모양을 벗어난 행은 버려진다:"
-fields = "state 의 자리마다 담는 것 — 게이트가 실제로 받는 그대로:"
-choices = "state 의 이 자리에는 정해진 낱말만 들어간다. 다른 낱말을 지어 쓰면 그 행은 버려진다:"
-choice_or = " 또는 "
-rules = "지켜야 할 것:"
-invented_people = "- 가상 인물로 짓는다. 이름, 말투, 나이대, 호칭이 행마다 달라야 하고 같은 인물을 돌려 쓰지 않는다."
-no_copying = "- 실제 기록을 옮겨 적지 않는다. 전부 새로 짓는다."
-one_call = "- 한 행은 판정 모델 한 번의 호출에 들어가야 한다. state는 넉넉잡아 {{most}}자를 넘기지 않는다."
-one_call_range = "- 한 행은 판정 모델 한 번의 호출에 들어가야 한다. state는 {{least}}자에서 {{most}}자 사이로 짓는다. 이 게이트가 실제로 받는 입력이 그 길이라, 이보다 짧은 행은 길이로 들킨다."
-example = "보기 한 행:"
-answer_only = "답은 JSON 배열 하나로만 낸다. 설명도 머리말도 쓰지 않는다."
+opening = "You write training data for a judging model. This batch belongs to one gate: {{title}} ({{gate}})."
+judges = "What this gate decides: {{judges}}"
+row = "A row is one JSON object with three fields: state, questions and gold."
+row_state = "- state: the input the gate receives. Write it in exactly the shape below."
+row_questions = "- questions: the questions the gate asks. Use their names, type and instructions exactly as given."
+row_gold = "- gold: for every question, the right answer as a probability distribution. label is the answer with the highest probability; probabilities holds every answer the question can take and no other, and sums to 1."
+untranslated = "Copy the questions' instructions exactly as written below, whatever language a batch's messages are in. A row whose question is reworded or translated is discarded."
+spread = "  Put the weight on one side where the answer is certain, and split it as far as people would split where they would disagree. The more ambiguous a row, the closer to 0.5."
+questions = "This gate's questions:"
+noul_answers = "true or false"
+per_candidate = "- One for each candidate. Its name is {{name}}, its type {{type}}."
+candidate_slug = "the candidate's slug"
+slug_and_id = "`<slug>:{{id}}`"
+whole_question = "- Name `{{id}}`, type {{type}}."
+instructions = "  The instructions begin with 「{{instructions}}」."
+instructions_candidate = " After that comes what the candidate is."
+answers = "  Answers: {{answers}}."
+asymmetric = "  This question is asymmetric. The judging model may give only one answer on its own, {{safe}}, so write plenty of borderline cases where that answer and its opposite part."
+candidates = "Each row offers {{min}} to {{max}} candidates."
+slug_shape = "A candidate's slug uses only lower-case letters, digits and hyphens."
+candidate_language = "A candidate's slug and the line saying what the candidate is come from the table of contents the brain holds in English, so write them in English, whatever language the messages are in."
+transcript = "The shape of a conversation line. A row outside this shape is discarded:"
+fields = "What each field of the state holds, exactly as the gate receives it:"
+choices = "These fields of the state take only the fixed words below. A row that makes up another word is discarded:"
+choice_or = " or "
+rules = "Rules:"
+invented_people = "- The people are invented. Names, ways of speaking, ages and forms of address differ from row to row, and no person is used twice."
+no_copying = "- Copy nothing from real records. Write everything new."
+one_call = "- A row fits one call of the judging model. The state stays under {{most}} characters, generously counted."
+one_call_range = "- A row fits one call of the judging model. The state runs between {{least}} and {{most}} characters. That is the length of the input this gate really receives, so a shorter row gives itself away by its length."
+example = "One example row:"
+answer_only = "Answer with one JSON array and nothing else: no explanation and no preamble."
 
 # How a transcript line is written, by the shape its gate receives.
 [prompt.transcripts]
-attachments = "- 첨부는 본문 안의 자리표시자다: `[사진]`, `[음성 1:23]`, `[파일 보고서.pdf]`, `[스티커 🐤]`, `[동영상 0:47]`."
-plain_line = "<보낸 사람 이름> (id <보낸 사람 번호>): <본문>"
-plain_unknown = "- 번호를 모르는 사람은 `unknown`."
-plain_no_time = "- 이 모양에는 시각도 답장 표시도 없다. 넣지 않는다."
-room_line = "[<시각>] #<메시지 번호> <보낸 사람 이름> (id <보낸 사람 번호>, OWNER): <본문> <노트>"
-room_time = "- 시각은 UTC의 ISO 8601 순간이다. 행마다 해와 달과 시간대를 흩어 쓰고, 한 달에 몰지 않는다."
-room_owner = "- `, OWNER`는 {{owner}}가 보낸 줄에만 붙는다."
-room_note = "- 노트는 본문 뒤에 붙는 대괄호 한 문장이고, 없으면 아무것도 붙지 않는다. 답장이면 `[replies to message 812, sent by 지우, shown elsewhere in this prompt]`처럼 적는다."
+attachments = "- An attachment is a placeholder inside the text, written as the room's record writes it: `[사진]`, `[음성 1:23]`, `[파일 보고서.pdf]`, `[스티커 🐤]`, `[동영상 0:47]`."
+plain_line = "<sender name> (id <sender number>): <text>"
+plain_unknown = "- A sender whose number is not known is `unknown`."
+plain_no_time = "- This shape carries no time and no reply marker. Do not add them."
+room_line = "[<time>] #<message number> <sender name> (id <sender number>, OWNER): <text> <note>"
+room_time = "- The time is an ISO 8601 instant in UTC. Spread the years, months and hours across the rows rather than bunching them in one month."
+room_owner = "- `, OWNER` stands only on lines {{owner}} sent."
+room_note = "- A note is one bracketed sentence after the text, and nothing stands there where there is none. A reply reads like `[replies to message 812, sent by 지우, shown elsewhere in this prompt]`."
 
 # The part that changes every batch.
 [prompt.batch]
-count = "{{count}}행을 지어라."
-language = "언어: {{help}}"
-room = "방: {{help}}"
-lean = "이 묶음은 {{lean}} 쪽 답이 나오는 입력으로 짓는다."
-edge = "이 묶음은 경계 사례다. 답이 한눈에 보이지 않고 사람도 갈릴 만한 입력으로 짓는다."
-mixed_candidates = "후보 가운데 답이 true인 것과 false인 것이 한 행 안에 섞이게 한다."
-seed = "앞선 묶음과 겹치지 않게 짓는다. 이 묶음의 표식: {{seed}}"
+count = "Write {{count}} rows."
+language = "Language: {{help}}"
+room = "Room: {{help}}"
+lean = "Write this batch with inputs whose answer comes out {{lean}}."
+edge = "This batch is borderline cases: inputs whose answer is not plain at a glance and on which people would disagree."
+mixed_candidates = "Within one row, mix candidates whose answer is true with candidates whose answer is false."
+seed = "Write nothing that overlaps an earlier batch. This batch's mark: {{seed}}"
 
-# What each language a batch is written in means.
+# What each language a batch is written in means. The language is judged by the messages alone; the questions'
+# instructions stay as written in every one.
 [prompt.languages]
-korean = "한국어로 쓴다. 영어는 낱말이나 식별자나 경로 정도로만 섞인다."
-english = "주고받는 말을 영어로만 쓴다. 보낸 사람 이름은 한국어여도 되고, 질문의 instructions 는 한국어 그대로 둔다 — 언어는 오간 말로만 따진다."
-mixed = "한국어와 영어가 섞인다. 한 줄이 넘는 영어 덩어리 — 로그, 코드 블록, 경로 목록 — 가 한국어 글 안에 들어간다. 질문의 instructions 는 한국어 그대로 둔다."
+korean = "The messages are written in Korean. English mixes in only as a word, an identifier or a path."
+english = "The messages are written in English only. A sender's name may be Korean."
+mixed = "The messages mix Korean and English: a block of English longer than one line, such as a log, a code block or a list of paths, stands inside Korean text."
 
 # What each kind of room a batch is set in is.
 [prompt.rooms]
-owner = "{{owner}}와 {{agent}} 둘뿐인 개인방."
-group = "사람 여럿이 있는 방."
-ai = "다른 AI가 사람들과 함께 있는 방. 그 AI도 제 이름으로 말한다."
+owner = "A private room with only {{owner}} and {{agent}} in it."
+group = "A room with several people in it."
+ai = "A room where another AI is present with the people. That AI speaks under its own name too."
 
 # Each gate's specification as the rows carry it: its title, what it decides, the word its candidates are named
 # by, each question's wording (and a choice question's options), and the worked row the prompt shows. A gold is
 # written as its label and, for a yes/no, the chance of yes; for a choice, every option's chance.
 [gates.system-documents]
-title = "시스템 문서 분류기"
-judges = "이 턴에 답하려면 시스템 참고 문서 가운데 어떤 것이 필요한가"
-candidate_word = "문서"
+title = "System document classifier"
+judges = "which of the system's reference documents are needed to answer this turn"
+candidate_word = "Document"
 
 [gates.system-documents.questions.needed]
-instructions = "이 대화에 답하려면 이 참고 문서가 필요한가?"
+instructions = "Is this reference document needed to answer this conversation?"
 
 [gates.system-documents.example]
 state = "민서 (id 4471902): {{agent}} 워커가 잡을 어디서 받아오는지 알아?\n{{owner}} (id 10000001): 구조 문서에 적혀 있을걸"
 
 [gates.system-documents.example.questions]
-structure = "이 대화에 답하려면 이 참고 문서가 필요한가? 문서 structure: 챗 프로바이더, 리시버, 에이전트, 게이트, 워커가 무엇이고 {{agent}}가 언제 깨는지"
-wording = "이 대화에 답하려면 이 참고 문서가 필요한가? 문서 wording: 외래어 표기와 쓰지 않는 말"
-agent-work = "이 대화에 답하려면 이 참고 문서가 필요한가? 문서 agent-work: {{agent}}가 일을 어떻게 맡고 어떻게 넘기는지"
-agent-voice = "이 대화에 답하려면 이 참고 문서가 필요한가? 문서 agent-voice: {{agent}}가 말할 때의 말투와 부르는 말"
-agent-history = "이 대화에 답하려면 이 참고 문서가 필요한가? 문서 agent-history: {{agent}}가 어디서 왔고 무엇을 겪었는지"
-relations-owner = "이 대화에 답하려면 이 참고 문서가 필요한가? 문서 relations-owner: {{agent}}와 {{owner}} 사이"
+structure = "Is this reference document needed to answer this conversation? Document structure: what the chat provider, the receiver, the agents, the gates and the workers are, and when {{agent}} wakes"
+wording = "Is this reference document needed to answer this conversation? Document wording: how loanwords are spelt and the words not used"
+agent-work = "Is this reference document needed to answer this conversation? Document agent-work: how {{agent}} takes on work and how it hands it over"
+agent-voice = "Is this reference document needed to answer this conversation? Document agent-voice: {{agent}}'s tone when speaking and the names it calls people by"
+agent-history = "Is this reference document needed to answer this conversation? Document agent-history: where {{agent}} came from and what it has been through"
+relations-owner = "Is this reference document needed to answer this conversation? Document relations-owner: between {{agent}} and {{owner}}"
 
 [gates.system-documents.example.gold]
 structure = { label = "true", noul = 0.94 }
@@ -106,20 +109,20 @@ agent-history = { label = "false", noul = 0.04 }
 relations-owner = { label = "false", noul = 0.08 }
 
 [gates.room-rules]
-title = "방 규칙 분류기"
-judges = "이 턴에 답하려면 이 방의 규칙 가운데 어떤 것이 필요한가"
-candidate_word = "규칙"
+title = "Room rule classifier"
+judges = "which of this room's rules are needed to answer this turn"
+candidate_word = "Rule"
 
 [gates.room-rules.questions.needed]
-instructions = "이 대화에 답하려면 이 방 규칙이 필요한가?"
+instructions = "Is this room rule needed to answer this conversation?"
 
 [gates.room-rules.example]
 state = "정훈 (id 8820114): 이따 회식 자리 사진 올릴게\n수아 (id 3310577): 얼굴 나온 건 빼고 올려줘"
 
 [gates.room-rules.example.questions]
-photo-consent = "이 대화에 답하려면 이 방 규칙이 필요한가? 규칙 photo-consent: 얼굴이 나온 사진은 찍힌 사람이 괜찮다고 한 뒤에만 올린다"
-night-quiet = "이 대화에 답하려면 이 방 규칙이 필요한가? 규칙 night-quiet: 밤 열한 시가 넘으면 알림 가는 말을 걸지 않는다"
-no-links = "이 대화에 답하려면 이 방 규칙이 필요한가? 규칙 no-links: 낯선 주소는 그대로 붙이지 않고 무엇인지 적어 준다"
+photo-consent = "Is this room rule needed to answer this conversation? Rule photo-consent: a photo showing a face is posted only after the person in it has agreed"
+night-quiet = "Is this room rule needed to answer this conversation? Rule night-quiet: after eleven at night, send nothing that sets off a notification"
+no-links = "Is this room rule needed to answer this conversation? Rule no-links: an unfamiliar address is not pasted as it is; say what it is instead"
 
 [gates.room-rules.example.gold]
 photo-consent = { label = "true", noul = 0.91 }
@@ -127,22 +130,22 @@ night-quiet = { label = "false", noul = 0.04 }
 no-links = { label = "false", noul = 0.02 }
 
 [gates.library-knowledge]
-title = "서고 지식 분류기"
-judges = "이 턴에 답하려면 서고의 지식 문서 가운데 어떤 것이 필요한가"
-candidate_word = "문서"
+title = "Library knowledge classifier"
+judges = "which of the library's knowledge documents are needed to answer this turn"
+candidate_word = "Document"
 
 [gates.library-knowledge.questions.needed]
-instructions = "이 대화에 답하려면 이 지식 문서가 필요한가?"
+instructions = "Is this knowledge document needed to answer this conversation?"
 
 [gates.library-knowledge.example]
 state = "태오 (id 9912034): 배포할 때 콘솔이 500 뜨는 거 그거 왜 그런지 알아?\n태오 (id 9912034): 새로고침하면 또 멀쩡해"
 
 [gates.library-knowledge.example.questions]
-deploy-console = "이 대화에 답하려면 이 지식 문서가 필요한가? 문서 deploy-console: 콘솔은 배포와 함께 올라가고, 서 있는 사본 위로 빌드하면 라우트 조각 이름이 바뀐다"
-mail-filter = "이 대화에 답하려면 이 지식 문서가 필요한가? 문서 mail-filter: 들어온 메일에 스팸 표시를 달아 다시 넣는 걸음"
-photo-repair = "이 대화에 답하려면 이 지식 문서가 필요한가? 문서 photo-repair: 잃어버린 사진을 다시 받아 채우는 일"
-room-window = "이 대화에 답하려면 이 지식 문서가 필요한가? 문서 room-window: 방마다 따로 서는 대화 창과 그 길이"
-unit-restart = "이 대화에 답하려면 이 지식 문서가 필요한가? 문서 unit-restart: 유닛을 다시 세우는 순서와 기다리는 곳"
+deploy-console = "Is this knowledge document needed to answer this conversation? Document deploy-console: the console goes up with the deployment, and building over a running copy renames the route chunks"
+mail-filter = "Is this knowledge document needed to answer this conversation? Document mail-filter: the step that marks incoming mail as spam and puts it back"
+photo-repair = "Is this knowledge document needed to answer this conversation? Document photo-repair: fetching lost photos again to fill the gaps"
+room-window = "Is this knowledge document needed to answer this conversation? Document room-window: the conversation window each room keeps and its length"
+unit-restart = "Is this knowledge document needed to answer this conversation? Document unit-restart: the order units are brought back up in and where to wait"
 
 [gates.library-knowledge.example.gold]
 deploy-console = { label = "true", noul = 0.96 }
@@ -152,14 +155,15 @@ room-window = { label = "false", noul = 0.05 }
 unit-restart = { label = "true", noul = 0.58 }
 
 [gates.situation-rules]
-title = "상황 규칙 매칭기"
-judges = "조건과 행동이 한 쌍인 규칙이 지금 상황에 맞는지, 그리고 그 규칙이 이제 다 쓰였는지"
+title = "Situation rule matcher"
+judges = "whether a rule pairing a condition with an action matches the situation now, and whether that rule is now used up"
+candidate_word = "Rule"
 
 [gates.situation-rules.questions.applies]
-instructions = "이 규칙의 조건이 지금 상황에 맞는가?"
+instructions = "Does the rule's condition match the situation now?"
 
 [gates.situation-rules.questions.spent]
-instructions = "이 규칙은 이제 안 써도 되는가?"
+instructions = "Is the rule no longer needed from now on?"
 
 [gates.situation-rules.example]
 state = { room = "group", situation = [
@@ -168,10 +172,10 @@ state = { room = "group", situation = [
 ] }
 
 [gates.situation-rules.example.questions]
-"grocery-ping:applies" = "이 규칙의 조건이 지금 상황에 맞는가? 규칙 grocery-ping: 연우가 장 보러 나갔다고 하면, 돌아왔다고 할 때까지 장 본 것을 묻지 않는다"
-"grocery-ping:spent" = "이 규칙은 이제 안 써도 되는가? 규칙 grocery-ping: 연우가 장 보러 나갔다고 하면, 돌아왔다고 할 때까지 장 본 것을 묻지 않는다"
-"photo-thanks:applies" = "이 규칙의 조건이 지금 상황에 맞는가? 규칙 photo-thanks: 누가 사진을 올리면 한마디 받아 준다"
-"photo-thanks:spent" = "이 규칙은 이제 안 써도 되는가? 규칙 photo-thanks: 누가 사진을 올리면 한마디 받아 준다"
+"grocery-ping:applies" = "Does the rule's condition match the situation now? Rule grocery-ping: when 연우 says they are going out for groceries, ask nothing about the shopping until they say they are back"
+"grocery-ping:spent" = "Is the rule no longer needed from now on? Rule grocery-ping: when 연우 says they are going out for groceries, ask nothing about the shopping until they say they are back"
+"photo-thanks:applies" = "Does the rule's condition match the situation now? Rule photo-thanks: when someone posts a photo, acknowledge it with a word"
+"photo-thanks:spent" = "Is the rule no longer needed from now on? Rule photo-thanks: when someone posts a photo, acknowledge it with a word"
 
 [gates.situation-rules.example.gold]
 "grocery-ping:applies" = { label = "false", noul = 0.12 }
@@ -180,69 +184,69 @@ state = { room = "group", situation = [
 "photo-thanks:spent" = { label = "false", noul = 0.07 }
 
 [gates.knowledge-classifier]
-title = "메모 분류기"
-judges = "메모 하나가 적어 둔 작업 방식이 누구의 것인가"
+title = "Note classifier"
+judges = "whose way of working one note records"
 
 [gates.knowledge-classifier.questions.scope]
-instructions = "이 메모가 기록하는 작업 방식은 누구의 것인가?"
-options = { universal = "모든 방의 {{agent}}가 따를 보편 규칙", personal = "메모를 남긴 사람 한 명의 방식", room = "이 방에서만 통하는 약속", none = "작업 방식이 아니다" }
+instructions = "Whose way of working does this note record?"
+options = { universal = "a universal rule {{agent}} follows in every room", personal = "the way of the one person who left the note", room = "an agreement that holds in this room alone", none = "not a way of working" }
 
 [gates.knowledge-classifier.example]
 state = { note = "혜린은 표를 받으면 먼저 합계 줄부터 본다. 합계가 맞아야 나머지를 읽는다.", author = "member" }
 
 [gates.knowledge-classifier.example.questions]
-scope = { type = "choice", instructions = "이 메모가 기록하는 작업 방식은 누구의 것인가?", criteria = { universal = "모든 방의 {{agent}}가 따를 보편 규칙", personal = "메모를 남긴 사람 한 명의 방식", room = "이 방에서만 통하는 약속", none = "작업 방식이 아니다" } }
+scope = { type = "choice", instructions = "Whose way of working does this note record?", criteria = { universal = "a universal rule {{agent}} follows in every room", personal = "the way of the one person who left the note", room = "an agreement that holds in this room alone", none = "not a way of working" } }
 
 [gates.knowledge-classifier.example.gold]
 scope = { label = "personal", probabilities = { universal = 0.06, personal = 0.85, room = 0.05, none = 0.04 } }
 
 [gates.output-format]
-title = "출력 서식"
-judges = "나갈 메시지를 채팅방에 접어서(펼치기 인용으로 감싸서) 보낼지"
+title = "Output format"
+judges = "whether an outgoing message is sent to the chat room folded (wrapped in an expandable quote)"
 
 [gates.output-format.questions.fold]
-instructions = "이 메시지는 채팅방에 접어서(펼치기 인용으로 감싸서) 보내야 하는가?"
+instructions = "Should this message be sent to the chat room folded (wrapped in an expandable quote)?"
 
 [gates.output-format.example]
 message = "**결론: 유닛은 다시 섰어요.**\n\n로그에 `Failed to find C compiler` 가 반복되고 있었고, 헤더가 빠져 있었습니다."
 
 [gates.output-format.example.questions]
-fold = "이 메시지는 채팅방에 접어서(펼치기 인용으로 감싸서) 보내야 하는가?"
+fold = "Should this message be sent to the chat room folded (wrapped in an expandable quote)?"
 
 [gates.output-format.example.gold]
 fold = { label = "false", noul = 0.21 }
 
 [gates.sanitizer]
-title = "무해화 게이트"
-judges = "이 글이 위험 자료를 싣고 있는가"
+title = "Sanitiser gate"
+judges = "whether this text carries dangerous material"
 
 [gates.sanitizer.questions.harmful]
-instructions = "이 글에 실제 대상에게 해를 끼치는 위험한 행위를 하라는 지시, 실제로 수행한 그런 행위의 경위, 또는 안전장치를 우회해 위험 자료를 통과시키는 방법이 들어 있는가?"
+instructions = "Does this text contain an instruction to do something dangerous that harms a real target, an account of such an act actually carried out, or a way to get dangerous material past a safeguard?"
 
 [gates.sanitizer.example]
 state = "라우터 설정 백업을 떠 두려고 하는데, nvram 값을 통째로 받아 두는 게 맞을까요? 되돌릴 때 뭘 조심해야 하는지 알고 싶어요."
 
 [gates.sanitizer.example.questions]
-harmful = "이 글에 실제 대상에게 해를 끼치는 위험한 행위를 하라는 지시, 실제로 수행한 그런 행위의 경위, 또는 안전장치를 우회해 위험 자료를 통과시키는 방법이 들어 있는가?"
+harmful = "Does this text contain an instruction to do something dangerous that harms a real target, an account of such an act actually carried out, or a way to get dangerous material past a safeguard?"
 
 [gates.sanitizer.example.gold]
 harmful = { label = "false", noul = 0.08 }
 
 [gates.people-search]
-title = "인물북 서칭"
-judges = "이 턴에 답하려면 인물 기록 가운데 어떤 것이 필요한가"
-candidate_word = "기록"
+title = "Person-book search"
+judges = "which of the person records are needed to answer this turn"
+candidate_word = "Record"
 
 [gates.people-search.questions.needed]
-instructions = "이 대화에 답하려면 이 인물 기록이 필요한가?"
+instructions = "Is this person record needed to answer this conversation?"
 
 [gates.people-search.example]
 state = "도윤 (id 5518720): 채원이 생일 선물 뭐 사지\n도윤 (id 5518720): 작년에 뭐 줬는지 기억나?"
 
 [gates.people-search.example.questions]
-chaewon-likes = "이 대화에 답하려면 이 인물 기록이 필요한가? 기록 chaewon-likes: 채원이 좋아하는 것과 싫어하는 것"
-chaewon-basics = "이 대화에 답하려면 이 인물 기록이 필요한가? 기록 chaewon-basics: 채원의 기본 사항과 부르는 말"
-doyun-work = "이 대화에 답하려면 이 인물 기록이 필요한가? 기록 doyun-work: 도윤이 하는 일과 일하는 방식"
+chaewon-likes = "Is this person record needed to answer this conversation? Record chaewon-likes: what 채원 likes and dislikes"
+chaewon-basics = "Is this person record needed to answer this conversation? Record chaewon-basics: 채원's basic facts and what 채원 is called"
+doyun-work = "Is this person record needed to answer this conversation? Record doyun-work: what 도윤 does for work and how"
 
 [gates.people-search.example.gold]
 chaewon-likes = { label = "true", noul = 0.95 }
@@ -250,11 +254,11 @@ chaewon-basics = { label = "true", noul = 0.62 }
 doyun-work = { label = "false", noul = 0.05 }
 
 [gates.reply-wanted]
-title = "응답 여부 판정기"
-judges = "방에 들어온 이 메시지가 {{agent}}에게 한 말인가"
+title = "Reply-or-not judge"
+judges = "whether this message that came into the room was said to {{agent}}"
 
 [gates.reply-wanted.questions.forAgent]
-instructions = "이 메시지는 {{agent}}에게 한 말인가?"
+instructions = "Was this message said to {{agent}}?"
 
 [gates.reply-wanted.example]
 state = { room = "group", recent = [
@@ -263,8 +267,7 @@ state = { room = "group", recent = [
 ], message = "[2026-06-19T08:13:20.000Z] #5512 세영 (id 3391044): 아 맞다 고마워" }
 
 [gates.reply-wanted.example.questions]
-forAgent = "이 메시지는 {{agent}}에게 한 말인가?"
+forAgent = "Was this message said to {{agent}}?"
 
 [gates.reply-wanted.example.gold]
 forAgent = { label = "true", noul = 0.83 }
-

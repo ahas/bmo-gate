@@ -1,6 +1,6 @@
 //! The questions Laya is asked (docs/laya.md): the yes/no each probing gate puts over one candidate, and how a
-//! candidate is named in it. They stand in `prompts/laya/questions.toml`, in the language Laya's checkpoints
-//! were trained on, since a question worded otherwise is one no checkpoint has learnt.
+//! candidate is named in it. They stand in `prompts/laya/questions.toml`, in English, word for word as Laya's
+//! checkpoints are trained on them, since a question worded otherwise is one no checkpoint has learnt.
 
 use std::collections::BTreeMap;
 use std::sync::LazyLock;

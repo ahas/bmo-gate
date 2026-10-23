@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { answersOf, languageBuckets, languageOf, stateText, synthesisFor, targetBalance, validateSynthRow } from "./laya-synth";
 import { splitFiles } from "./laya-frozen";
 import { languageFile, metaFile } from "./laya-synth-run";
+import { askedNow } from "./laya-wording";
 
 import type { DatasetRow, DatasetSplit, Gold } from "./laya-dataset";
 import type { GateSynthesis, LanguageBucket, SynthRefusal, SynthRow } from "./laya-synth";
@@ -187,7 +188,11 @@ export function readFrozen(folder: string): { rows: AuditRow[]; broken: number }
         continue;
       }
 
-      rows.push({ row, language: languages.get(row.id) ?? null, read: readRow(row) });
+      // A row is measured in its gate's own wording, so one written in an earlier wording of the same
+      // question is not refused for it (docs/gate-data.md, 「A question reworded」).
+      const asked = askedNow(row);
+
+      rows.push({ row: asked, language: languages.get(row.id) ?? null, read: readRow(asked) });
     }
   }
 

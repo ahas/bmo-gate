@@ -85,7 +85,8 @@ that gate would have been given, and the questions it would have been asked, wit
   which is how the gates themselves cut it.
 - **The situation-rule matcher's candidates are what that room was really offered**, read back out
   of the probe inputs the verdict record kept. Reading the brain's rows would build a row out of what the
-  room holds now rather than what the matcher was offered then.
+  room holds now rather than what the matcher was offered then. A record kept while the matcher asked an
+  earlier wording of its questions builds rows asking the gate's own (「A question reworded」).
 - **A row is offered as many candidates as its gate says it offers**, never as many as the record
   holds. What the record keeps for a room is every rule that room was ever offered, which can run
   past what the matcher is handed at once; a row carrying the lot is a row no turn of that gate ever
@@ -635,7 +636,8 @@ Everything a run makes stands under one folder named for the run.
   `languages.jsonl` naming each row's language bucket; `synth.meta.json` with that gate's figures
   and token tally; `progress.json` with how far it got and which thread it rode.
 - **The merged folder holds the same three splits and the same two sidecars**, with every gate's rows
-  in them together and one meta whose gate list covers all of them.
+  in them together and one meta whose gate list covers all of them. Every row in it asks its gate's own
+  wording of its questions, whichever wording it was written in (「A question reworded」).
 - **The merge refuses to stitch two different runs together.** Rows asked, batch size and split
   shares must agree across the per-gate metas, or there is no single dataset to make — those are the
   shape every gate was cut to. The road, the model and the effort are not among them: they belong to
@@ -726,6 +728,31 @@ In order, with the rebuilt gate's own run name:
    its own (`docs/training.md`, 「A pass」).
 6. The checkpoint into service with `bun scripts/laya-serve.ts <gate>/<run>/step-<n> --gate <gate>`
    (`docs/laya-server.md`).
+
+## A question reworded
+
+A question whose words changed while its meaning stood — the same question in another language — has not
+moved: a gold answering one wording answers the other, and the gate's rows stay. Laya's questions are English
+(`docs/laya-gates.md`), and rows written while they were Korean are read that way.
+
+- **A row is read in its gate's own wording.** The merge, the audit and a training pass's copy of a gate's
+  rows — and the real rows and the reference rows, as they are built — read each question against the gate's wording in `prompts/tooling/laya-synth.toml` and against the
+  earlier wordings of the same question that `prompts/tooling/laya-wordings.toml` lists for that gate. A
+  question opening with an earlier wording is read with the gate's own in its place and its candidate named
+  by the gate's own candidate word; the candidate's slug and index line after it stay as written. A choice
+  question carries the gate's own options. A row already asking the gate's wording is left as it is.
+- **Nothing on disk is rewritten.** A gate's batches and split files keep the words they were written in;
+  what is read off them — a merged dataset, an audit, a pass's copy — carries the gate's own. So rows in two
+  wordings under one gate merge into one dataset keyed by that gate.
+- **A writing run reads the gates' words once, as it starts.** A run started before the wording changed
+  goes on writing the earlier one until it is taken up again, and writes the gate's own after that; both
+  read the same.
+- **A reworded row keeps its id and its split.** Both were fixed where the row was made, from the words it
+  was made with, so a row held out for the test stays held out and a pass counts no row twice.
+- **A wording the list does not hold is not the gate's.** The audit refuses its row as asking something
+  else, as it refuses any row whose question is not the gate's.
+- **The list holds a wording only of the same question.** A question whose meaning moved has its gate
+  rebuilt (「A gate whose question moved」), never a line in the list.
 
 ## The bars a gate must clear
 

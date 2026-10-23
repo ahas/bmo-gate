@@ -7,13 +7,16 @@ import { auditFrozen } from "../../training/tooling/src/laya-audit";
 import { driveGates } from "../../training/tooling/src/gate-run";
 import { frozenGatesUnder, gatesTrainingWouldRefuse, growingCounts, mergeGates, readsAsRehearsal } from "../../training/tooling/src/gate-merge";
 import { rehearsalMetaFile } from "../../training/tooling/src/laya-rehearsal";
-import { batchName, freezeBatch, languageFile, metaFile, writeProgress } from "../../training/tooling/src/laya-synth-run";
+import { batchName, batchesFolder, freezeBatch, languageFile, metaFile, writeProgress } from "../../training/tooling/src/laya-synth-run";
+import { earlierWordings } from "../../training/tooling/src/laya-wording";
 import { splitFiles } from "../../training/tooling/src/laya-frozen";
 import { datasetFolder, gateFolder } from "../../training/tooling/src/roots";
 import { synthesisFor } from "../../training/tooling/src/laya-synth";
 import { scratchDir } from "./scratch";
 
 import type { DatasetRow, DatasetSplit } from "../../training/tooling/src/laya-dataset";
+import type { LayaQuestion } from "../../training/tooling/src/laya";
+import type { FrozenRow } from "../../training/tooling/src/laya-synth-run";
 import type { GateSynthesis, LanguageBucket, SynthAsk, SynthRow } from "../../training/tooling/src/laya-synth";
 import type { SynthAsker, SynthMeta } from "../../training/tooling/src/laya-synth-run";
 import { useToolingSettings } from "./settings";
@@ -124,7 +127,7 @@ describe("the gates put into one dataset", () => {
     }
   });
 
-  test("no row is rewritten on the way in", async () => {
+  test("a row asking its gate's own wording goes in as it stands", async () => {
     const root = await runOf([sanitizer]);
 
     merged(root);
@@ -529,6 +532,120 @@ describe("a cut taken while the judging goes on", () => {
     for (const split of ["train", "calibration", "test"] as const) {
       expect(rowsIn(cut, split)).toEqual(rowsIn(whole, split));
     }
+  });
+});
+
+// A run started before a gate's questions were reworded writes the earlier wording until it is taken up
+// again, and the gate's own after that (docs/gate-data.md, 「A question reworded」).
+describe("a gate whose rows ask its question in two wordings", () => {
+  const rules = gate("room-rules");
+  const splits = ["train", "calibration", "test"] as const;
+
+  // The gate's own transcript shape, so its rows stand; the line's language is the message's.
+  const transcriptAsker: SynthAsker = async (spec, ask: SynthAsk) => ({
+    text: JSON.stringify(Array.from({ length: ask.count }, (_, index) => ({
+      state: `Mina (id 4471902): ${textFor(ask.language, `${ask.seed}-${index}`)}`,
+      questions: JSON.parse(JSON.stringify(spec.example.questions)) as SynthRow["questions"],
+      gold: JSON.parse(JSON.stringify(spec.example.gold)) as SynthRow["gold"],
+    }))),
+    sessionId: `thread-${spec.gate}`,
+    tokens: { inputTokens: 90, outputTokens: 400, cacheReadTokens: 11_008, cacheWriteTokens: 0 },
+  });
+
+  async function rulesRun(): Promise<string> {
+    const root = scratch();
+
+    await driveGates({
+      root,
+      gates: [rules, notes],
+      rows: 40,
+      batchSize: 5,
+      model: "gpt-5.6-terra",
+      effort: "high",
+      shares: { calibration: 0.15, test: 0.15 },
+      atOnce: 10,
+      resume: false,
+      overwrite: false,
+    }, async (spec, ask, session) => spec.gate === rules.gate ? transcriptAsker(spec, ask, session) : standIn(spec, ask, session));
+
+    return root;
+  }
+
+  // The row as the run wrote it before the rewording: the earlier question and candidate word.
+  function earlier(row: DatasetRow): DatasetRow {
+    const wordings = earlierWordings(rules.gate);
+    const questions = JSON.parse(row.questions) as Record<string, LayaQuestion>;
+
+    for (const [slug, question] of Object.entries(questions)) {
+      question.instructions = question.instructions.replace(
+        `${rules.questions[0]!.instructions} ${rules.candidateWord!} ${slug}:`,
+        `${wordings.questions.needed![0]!} ${wordings.candidateWords[0]!} ${slug}:`,
+      );
+    }
+
+    return { ...row, questions: JSON.stringify(questions) };
+  }
+
+  function rewrite(path: string, change: (line: string, at: number) => string): void {
+    const lines = readFileSync(path, "utf8").split("\n").filter((line) => line.trim() !== "");
+
+    writeFileSync(path, `${lines.map(change).join("\n")}\n`);
+  }
+
+  function asksOwnWording(row: DatasetRow): boolean {
+    return Object.entries(JSON.parse(row.questions) as Record<string, LayaQuestion>)
+      .every(([slug, question]) => question.instructions.startsWith(`${rules.questions[0]!.instructions} ${rules.candidateWord!} ${slug}: `));
+  }
+
+  test("a finished gate merges into one dataset keyed by the gate, every row asking the gate's own wording", async () => {
+    const root = await rulesRun();
+    const folder = gateFolder(root, rules.gate);
+    const frozen = splits.flatMap((split) => rowsIn(folder, split));
+
+    expect(frozen.length).toBeGreaterThan(0);
+
+    for (const split of splits) {
+      rewrite(join(folder, splitFiles[split]), (line, at) => at % 2 === 0 ? JSON.stringify(earlier(JSON.parse(line) as DatasetRow)) : line);
+    }
+
+    const written = splits.flatMap((split) => rowsIn(folder, split));
+
+    expect(written.some(asksOwnWording) && !written.every(asksOwnWording)).toBe(true);
+
+    const report = merged(root);
+
+    expect(typeof report === "string" ? report : report.gates.sort()).toEqual([notes.gate, rules.gate].sort());
+
+    const landed = splits.flatMap((split) => rowsIn(datasetFolder(root), split).map((row) => ({ ...row, split }))).filter((row) => row.gate === rules.gate);
+
+    expect(landed).toHaveLength(frozen.length);
+    expect(landed.every(asksOwnWording)).toBe(true);
+    expect(new Map(landed.map((row) => [row.id, row.split]))).toEqual(new Map(frozen.map((row) => [row.id, row.split])));
+    expect(landed.map((row) => row.questions).sort()).toEqual(frozen.map((row) => row.questions).sort());
+    // What stands in the gate's folder keeps the words it was written in.
+    expect(splits.flatMap((split) => rowsIn(folder, split))).toEqual(written);
+  });
+
+  test("a growing cut reads the batches the same way", async () => {
+    const root = await rulesRun();
+    const folder = gateFolder(root, rules.gate);
+    const frozen = splits.flatMap((split) => rowsIn(folder, split));
+
+    expect(frozen.length).toBeGreaterThan(0);
+    rewrite(join(folder, batchesFolder, batchName(rules.gate, 0)), (line) => {
+      const one = JSON.parse(line) as FrozenRow;
+
+      return JSON.stringify({ ...one, row: earlier(one.row) });
+    });
+
+    const report = merged(root, { growing: true });
+
+    expect(typeof report === "string" ? report : report.gates.sort()).toEqual([notes.gate, rules.gate].sort());
+
+    const landed = splits.flatMap((split) => rowsIn(datasetFolder(root), split)).filter((row) => row.gate === rules.gate);
+
+    expect(landed).toHaveLength(frozen.length);
+    expect(landed.every(asksOwnWording)).toBe(true);
   });
 });
 

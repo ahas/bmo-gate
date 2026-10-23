@@ -11,7 +11,7 @@ its own, so a change to one never builds or tests the others.
 | `.graph/` | The code dependency graph: one node per feature, with the files it is made of and what it reads, written by the graph service and read by `bmo graph` |
 | `src/` | The root package: the version, the service binary, the Laya relay's binary and the unit command, built on the crates |
 | `crates/` | The Rust crates the root package is built from: the contract and its client, the store, the codes, the clients of the other units, the policy, the words, the markup, the gates and the reference selection, the service's routes and watches, the unit command's nouns, the Laya relay |
-| `prompts/` | What each gate is told, a folder a gate, the questions Laya is asked, the evaluation set's members' briefs, the words the training tooling hands its writers and judges and the stand-ins its rows carry, and the words the sanitiser's pre-filter matches in the rooms' own language: the one folder Korean stands in |
+| `prompts/` | What each gate is told, a folder a gate, the questions Laya is asked, the evaluation set's members' briefs, the words the training tooling hands its writers and judges, the stand-ins its rows carry and the earlier wordings they may ask, and the words the sanitiser's pre-filter matches in the rooms' own language: the one folder Korean stands in |
 | `runtime/` | What serves Laya on its nodes: the decision server and the front around it, each a Python project of its own; and the GGUF engine's unit templates and node setup (`docs/gguf-llm.md`) |
 | `training/` | What makes Laya's checkpoints: the dataset and training tooling, a Bun project of its own, and the Python training scripts |
 | `weights/` | The declarations of Laya's weights: each service's card declaration, in the card master's own format, and where the checkpoints are found, `checkpoints.toml`. The weights themselves are runtime data and never stand in the repository |
@@ -35,8 +35,9 @@ stands, and no other.
   `tests/laya/` and are run by a Cargo test of their own.
 - **Korean stands only in `prompts/`.** A gate's instructions are English, and Korean stands in them only as data:
   the words of a room's messages the gate must recognise, the marks, names and terms it must leave as written, and
-  the words its answer is to be written in. Laya's questions, the evaluation set's briefs and
-  the words the training tooling hands its writers and judges and the stand-ins and placeholders its rows carry, under `prompts/tooling/`, are worded as the models read them, and the sanitiser's trigger words as the rooms write them; every other file is English, and the Korean a test feeds the code, a pattern reads, a bench sends as a sample state or the console bundle's Korean words (`client/i18n/ko.json`, the piece of a console's language pack the bundle carries) hold is written by its unicode escapes and recorded in `korean-ledger.json`, which the testbed's language check reads.
+  the words its answer is to be written in. Laya's questions and what the training tooling tells the model writing a gate's rows are
+  English too, Korean standing in them only as conversation: a worked row's messages and the room record's attachment markers. The evaluation set's briefs,
+  the words the training tooling hands its judges, the stand-ins and placeholders its rows carry and the earlier wordings of Laya's questions its rows may still ask, under `prompts/tooling/`, are worded as the models read them or the rows hold them, and the sanitiser's trigger words as the rooms write them; every other file is English, and the Korean a test feeds the code, a pattern reads, a bench sends as a sample state or the console bundle's Korean words (`client/i18n/ko.json`, the piece of a console's language pack the bundle carries) hold is written by its unicode escapes and recorded in `korean-ledger.json`, which the testbed's language check reads.
 - **No weights, datasets or run output in git.** They are runtime data under the data root the settings name;
   the repository holds only the declarations that say where they are read from.
 

@@ -76,6 +76,9 @@ The driver asks those four and never which kind of source it is talking to.
 - **Rows are copied, not pointed at.** A pass copies each gate's three files into its own folder
   before anything goes to a node, and trains on that copy for its whole life, however the source
   moves under it.
+- **The copy asks the gate's own wording.** A row written in an earlier wording of its gate's
+  questions is copied with the gate's own in its place (`docs/gate-data.md`, 「A question reworded」),
+  so a checkpoint learns the words the gate asks whatever source its rows came from.
 
 ## When a gate is trained
 
