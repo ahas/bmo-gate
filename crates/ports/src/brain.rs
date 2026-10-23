@@ -10,8 +10,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 
 use crate::brain_rows::{
-  BrainMember, Memory, Page, STANDING_TYPES, brain_type, conditions, fragment_row, in_room, label,
-  memory_row, person_of, slug_of, standing, woken_by,
+  BrainMember, LORE_TYPE, Layer, Memory, Page, STANDING_TYPES, brain_type, conditions, fragment_row,
+  in_room, label, lore_rows, lore_slug, memory_row, path_of, person_of, slug_of, standing, woken_by,
 };
 use crate::http::{Answer, Caller, Peer};
 
@@ -111,6 +111,9 @@ pub struct Fragment {
   pub title: String,
   pub path: String,
   pub scope: Option<String>,
+  /// The heading of the brain's table of contents the row stands under, where its library has headings.
+  #[serde(default)]
+  pub section: Option<String>,
   pub position: i64,
   pub active: bool,
   pub last_hit_at: Option<i64>,
@@ -233,6 +236,9 @@ pub trait Brain: Send + Sync {
     chat: i64,
     slugs: &'a [String],
   ) -> BoxFuture<'a, Answer<Reply<Vec<Document>>>>;
+
+  /// The lore pieces asked for, by their slugs.
+  fn lore<'a>(&'a self, agent: &'a str, slugs: &'a [String]) -> BoxFuture<'a, Answer<Vec<Document>>>;
 
   /// The speakers' sheets and the person-book pieces asked for, or the brain's refusal of a slug outside the
   /// room.
@@ -369,6 +375,39 @@ impl HttpBrain {
     Ok(all)
   }
 
+  // A brain's layers, read in pages of the size the route takes, each after the largest id read, and set in the
+  // order the brain lists them by.
+  async fn layers(&self, brain: i64) -> Answer<Vec<Layer>> {
+    let mut all: Vec<Layer> = Vec::new();
+    let path = format!("brains/{brain}/layers");
+    let limit = PAGE_ROWS.to_string();
+    let mut after: Option<i64> = None;
+
+    loop {
+      let after_text = after.map(|id| id.to_string());
+      let mut query: Vec<(&str, &str)> = vec![("limit", &limit)];
+
+      if let Some(after) = after_text.as_deref() {
+        query.push(("after", after));
+      }
+
+      let page: Page<Layer> = self.get("layers read", &path, &query).await?;
+      let last = page.items.iter().map(|layer| layer.id).max();
+      let more = page.more;
+
+      all.extend(page.items);
+
+      match (more, last) {
+        (true, Some(id)) => after = Some(id),
+        _ => break,
+      }
+    }
+
+    all.sort_by_key(|layer| (layer.position, layer.id));
+
+    Ok(all)
+  }
+
   // The memories the standing rows and the conditions are read from: every active row of the standing
   // types read in the room.
   async fn held(&self, agent: &str, chat: i64) -> Answer<Vec<Memory>> {
@@ -392,6 +431,13 @@ impl HttpBrain {
     };
     let brain = self.brain(agent).await?;
     let rows = self.active(brain, brain_type).await?;
+
+    if brain_type == LORE_TYPE {
+      let layers = self.layers(brain).await?;
+      let read: Vec<Memory> = rows.into_iter().filter(|memory| in_room(memory, chat)).collect();
+
+      return Ok(lore_rows(agent, &read, &layers));
+    }
 
     Ok(
       rows
@@ -546,6 +592,26 @@ impl Brain for HttpBrain {
         .collect();
 
       Ok(Reply::Answered(documents))
+    })
+  }
+
+  fn lore<'a>(&'a self, agent: &'a str, slugs: &'a [String]) -> BoxFuture<'a, Answer<Vec<Document>>> {
+    Box::pin(async move {
+      let brain = self.brain(agent).await?;
+      let rows = self.active(brain, LORE_TYPE).await?;
+
+      Ok(
+        rows
+          .iter()
+          .filter(|memory| slugs.iter().any(|one| one == &lore_slug(memory)))
+          .map(|memory| Document {
+            slug: lore_slug(memory),
+            path: path_of(memory),
+            text: memory.text.clone(),
+            version: memory.id.to_string(),
+          })
+          .collect(),
+      )
     })
   }
 

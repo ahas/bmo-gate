@@ -33,7 +33,7 @@ each release links to the data root's `env/gate.toml`. It names:
 | `[gateway]` | the agency's model gateway: its `address`, and the `key_file` under `env/` |
 | `[laya]` | the gate's own Laya relay, where one stands: its `address`, and the `token_file` under `env/` |
 | `[records]` | where the session summariser reads a closed session's record: `claude`, Claude Code's configuration folders searched in order, and `codex`, Codex's sessions folder |
-| `[shipped]` | `folder`, under which the shipped pieces' bodies are read — the system's reference documents and the lore, as the deployment places them — a row's path read relative to it |
+| `[shipped]` | `folder`, under which the shipped pieces' bodies are read — the system's reference documents, as the deployment places them — a row's path read relative to it |
 | `[reading]` | what the translator's checks read a text by: `set_aside`, the words the English test reads past — the names of people and agents and the marks a note's strands open with — and `wording`, the file the owner's banned words are read from, where the deployment keeps one |
 
 No address, port, host, path or name of a deployment is written in the code; every one is read from here.
@@ -74,14 +74,23 @@ no room at all.
 | conditional rows | the standing rows | | their old `conditions` label, or a `situation`'s text as its condition |
 | rows the events wake | the standing rows | | the gate filters them by the events their `event` or `conditions` labels name |
 | matched rows written | `POST /brains/{brainId}/hits` | `memoryIds`, `actorName` | `recordedCount` |
-| fragments offered | `GET /brains/{brainId}/memories` | `type` (the brain's type for the reference kind: `sheet` for the person-book, `knowledge`, `rule`), `status=active`, paged | `items`: the rows read in the room, each mapped to a fragment row whose key and version are the memory's id |
+| fragments offered | `GET /brains/{brainId}/memories` | `type` (the brain's type for the reference kind: `sheet` for the person-book, `knowledge`, `rule`, `lore`), `status=active`, paged | `items`: the rows read in the room, each mapped to a fragment row whose key and version are the memory's id |
+| lore sections | `GET /brains/{brainId}/layers` | `limit` at the route's ceiling, `after` the largest id read for each page after the first | `items`: the brain's layers, each `id`, `name` and `position`; a lore row's section is its layer |
 | fragments attached | `POST /brains/{brainId}/hits` | `memoryIds` (the attached rows' ids), `actorName` | `recordedCount` |
 | knowledge read | `GET /brains/{brainId}/memories` | `type=knowledge`, `status=active`, paged | `items`, filtered by the slug asked |
+| lore read | `GET /brains/{brainId}/memories` | `type=lore`, `status=active`, paged | `items`, filtered by the slug asked; a piece's body is the row's text |
 | person book read | `GET /brains/{brainId}/memories` | `type=sheet`, `status=active`, paged | `items`: the speakers' sheets (their `person` subject among the senders) and the pieces asked for by slug; a row whose `kind` label is `person-book` is a piece |
 | owner room rules | `POST /room-rules/read` | `chatId` | `rules`: `id`, `subject`, `text` |
 | a session's loads | `POST /sessions/loads` | `session` | `loads`: `path`, `version` |
 
-The shipped documents and the lore are held nowhere in the brain, so the gate is offered no rows of them.
+The system's reference documents are held nowhere in the brain, so the gate is offered no rows of them, and
+the shipped folder holds their bodies alone. The lore is the agent's brain's: memories of type `lore`, each
+in a layer named `lore` or `lore/<section heading>` (the brain's `docs/design.md`, 「Persona and lore」),
+offered in a room that reads the lore and in no other. Each row is one candidate: its slug is the part of
+its key after `lore/`, its index line its `title` label with its `scope` label as the line's bracket where
+it carries one, its section its layer's name, and its body its text. The rows stand in their layers'
+positions and, within a layer, in their own, and a row the turn attached is handed back as a hit like any
+other.
 The brain picks nothing: the gate narrows and picks among what these answer, and writes back only what it
 attached.
 
@@ -275,6 +284,10 @@ Statements here that a sibling's document does not yet match, each for that sibl
 - **The agency's session summariser hook** hands a Claude Code or Codex session by its id alone, with no
   `transcript`; the summariser reads the session's record from the folders its `[records]` settings name, on
   the machine both run on, until the agency hands the transcript itself.
+- **The brain's layers are listed by position but paged after the last id seen,** so a page boundary can
+  pass over a layer whose id is lower than one already read. The gate reads the layers at the route's
+  ceiling of a page and asks each later page after the largest id it has read, until the brain pages its
+  layers in the order it lists them.
 - **The agency publishes no command that runs one batch apart** with the words the training tooling's claude road
   hands it (「bmo-agency」 above); the road runs whatever command the tooling's settings name until the agency
   states one.
@@ -317,5 +330,5 @@ Statements here that a sibling's document does not yet match, each for that sibl
 - **No unit serves what the reference nouns read beyond that** (`docs/reference-selection.md`, 「What it picks and
   what it costs, measured」): the agency lists no agent's runs out of its run log, so `reference compare` reads
   the stored runs it is handed; the brain serves its rows and not its index files, so `reference roads` sets
-  the index files beside the rows for the shipped pieces alone; and no unit keeps the usage record, so `reference
-  waste` gives no size for a turn's own prompt.
+  the index file beside the rows for the system's reference documents alone; and no unit keeps the usage
+  record, so `reference waste` gives no size for a turn's own prompt.

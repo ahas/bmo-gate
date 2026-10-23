@@ -3,9 +3,10 @@
 //!
 //! The row road is the one a turn walks: the libraries are built out of the rows the brain answers. The file road
 //! below reads the index files with the rules each library was read by, and is written out in full rather than
-//! taken from the road, because a comparison against the code under test measures nothing. The files it can read
-//! are the shipped pieces' — the system documents' index and the lore's, under the shipped folder; every other
-//! library's index files are the brain's, which it serves as rows alone, so those gates are named unavailable.
+//! taken from the road, because a comparison against the code under test measures nothing. The file it can read
+//! is the system documents' index, under the shipped folder, so the row road is read as a room that reads no lore;
+//! the lore and every other library are the brain's, which it serves as rows alone, so those gates are named
+//! unavailable.
 //!
 //! What is compared, for every room the receiver keeps and every room the reference record names: the candidates
 //! the system documents' gate is offered, in the order it is offered them, and the body each resolves to.
@@ -108,7 +109,7 @@ pub async fn roads(reference: &Reference, json: bool) -> Answered {
   let mut offers = 0;
 
   for &chat_id in &rooms {
-    let rows: Vec<String> = road::gates_of(reference, chat_id, reference.chat_agent(), true)
+    let rows: Vec<String> = road::gates_of(reference, chat_id, reference.chat_agent(), false)
       .await
       .map_err(|why| Fault::failed(format!("reference roads: {why}")))?
       .into_iter()
@@ -225,29 +226,21 @@ fn body(shipped: &Path, path: &Path) -> Option<String> {
   shipped.join(path).exists().then(|| path.to_string_lossy().into_owned())
 }
 
-// The system documents' gate as its index files offer it: the reference documents' index, a document's body named
-// for its slug in capitals, and the lore's index with its chunks, every room reading the lore. Nothing where no
-// shipped folder is named.
+// The system documents' gate as its index file offers it: the reference documents' index, a document's body named
+// for its slug in capitals. Nothing where no shipped folder is named.
 fn file_offers(shipped: Option<&Path>) -> Vec<Offer> {
   let Some(shipped) = shipped else { return vec![] };
-  let documents = read(&shipped.join("docs").join("reference-index.md")).into_iter().map(|entry| {
-    let name = format!("{}.md", entry.slug.to_uppercase());
 
-    Offer {
-      path: body(shipped, Path::new(&name)),
-      slug: entry.slug,
-      about: entry.title,
-    }
-  });
-  let lore = read(&shipped.join("docs").join("lore").join("index.md")).into_iter().map(|entry| {
-    let chunk = Path::new("docs").join("lore").join("chunks").join(format!("{}.md", entry.slug));
+  read(&shipped.join("docs").join("reference-index.md"))
+    .into_iter()
+    .map(|entry| {
+      let name = format!("{}.md", entry.slug.to_uppercase());
 
-    Offer {
-      path: body(shipped, &chunk),
-      slug: entry.slug,
-      about: entry.title,
-    }
-  });
-
-  documents.chain(lore).collect()
+      Offer {
+        path: body(shipped, Path::new(&name)),
+        slug: entry.slug,
+        about: entry.title,
+      }
+    })
+    .collect()
 }

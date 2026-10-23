@@ -133,8 +133,11 @@ flowchart TB
   a gate reads is those rows written out as lines, in the order their entries stand
   (the brain's `docs/fragments.md`).
 - **`system-documents`** — two libraries at once: the system's own reference documents, each naming
-  a system document the deployment ships (`docs/reference-index.md`), and the lore pieces in a room that
-  reads the lore.
+  a system document the deployment ships (`docs/reference-index.md`), and, in a room that reads the lore,
+  the lore pieces the agent's brain holds — one library a section, the brain's lore layers in their order,
+  each piece in its place within its layer and read through the brain (the brain's `docs/design.md`,
+  「Persona and lore」; `docs/boundary-api.md`, 「bmo-brain」). A room that reads no lore is offered none of
+  it.
 - **`room-rules`** — the room's own rulebook, read for that room and no other.
 - **`library-knowledge`** — the knowledge pieces this room may see: the rows that name this room and
   the rows that name none, which are the shared ones (the brain's `docs/knowledge.md`).
@@ -258,7 +261,7 @@ flowchart TB
 - **Every document the reference attaches goes to a chat session in full once per version**, and as a
   one-line mark on every later turn of that session that attaches the same version. That is all of them:
   the standing memories, the standing sheets, a piece the person-book search picked, a system document, a
-  lore chunk, a room rule, a knowledge chunk, a situation rule, and an index handed over in place of pieces.
+  lore piece, a room rule, a knowledge chunk, a situation rule, and an index handed over in place of pieces.
 - **Why:** a chat session is a continuing conversation, so a document loaded once stays in that session's
   context and is read on later turns too. Sending the same text again buys nothing but its size.
 - **What a version is:** the attached text itself. One changed character is a new version, and a new version
@@ -331,9 +334,10 @@ flowchart TB
   the new version is neither loaded twice, by the notice and by the reference, nor missed.
 - **Which documents those are**, read off the path:
   - in the brain: a knowledge chunk and the knowledge index, everything under a room's `rules/` and
-    `people/`, and everything under a person's common `people/<userId>/`;
-  - shipped: the lore index and its chunks, and the system reference index. A system document itself is
-    announced to no session at all, so it needs no rule here.
+    `people/`, and everything under a person's common `people/<userId>/`. A lore piece is the brain's too,
+    under its memory's path, and a changed piece is a new memory under a path of its own;
+  - shipped: the system reference index. A system document itself is announced to no session at all, so it
+    needs no rule here.
 - **Every other document's notice** carries its current text.
 
 ### What the log and the console show
@@ -518,12 +522,9 @@ record. The figures below are the commands' own runs.
 - **The two roads offer the same turn the same thing.** `bmo reference roads` puts every
   room the receiver keeps and every room the reference record names through both: the
   candidates each gate is offered out of the fragment rows, and the candidates the index files
-  themselves name. The index files it reads are the shipped pieces' — the system documents' index and the
-  lore's, under the shipped folder; the brain's libraries are the brain's files, which it serves as rows alone,
-  so their gates are named unavailable and compared no further. Over 7 rooms and 1,101 candidates the sets and the bodies they resolve to are
-  the same, and the one difference is an order — where several common person books stand in one
-  gate's index, the rows put them in the person's order rather than in the order a directory
-  happened to be read in.
+  themselves name. The index file it reads is the system documents' own, under the shipped folder, so the
+  row road is read as a room that reads no lore: the lore and the other libraries are the brain's, which it
+  serves as rows alone, so the other gates are named unavailable and compared no further.
 - **What attaches and what the answer used, per piece.** `bmo reference waste` sets every
   piece's attachments out of the verdict record beside the use judge's word on them (`docs/reference-data.md`): how often it was attached, how often the answer used it, the share it
   was carried for nothing and the tokens that cost, with each gate's time. A piece's size is its body as the

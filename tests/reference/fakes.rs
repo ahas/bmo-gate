@@ -39,6 +39,7 @@ pub fn fragment(kind: &str, slug: &str, title: &str, chat_id: Option<i64>, owner
     title: title.into(),
     path: format!("{kind}/{slug}.md"),
     scope: None,
+    section: None,
     position: 0,
     active: true,
     last_hit_at: None,
@@ -95,12 +96,14 @@ pub struct FakeBrain {
   pub woken: Mutex<Vec<MemoryRow>>,
   pub fragments: Mutex<Vec<Fragment>>,
   pub documents: Mutex<HashMap<String, String>>,
+  pub lore: Mutex<HashMap<String, String>>,
   pub sheets: Mutex<Vec<Sheet>>,
   pub pieces: Mutex<HashMap<String, (String, i64)>>,
   pub hits: Mutex<Vec<Hit>>,
   pub matched: Mutex<Vec<(Vec<String>, Vec<String>)>>,
   pub events: Mutex<Vec<Event>>,
   pub knowledge_asked: Mutex<Vec<Vec<String>>>,
+  pub lore_asked: Mutex<Vec<Vec<String>>>,
 }
 
 impl Brain for FakeBrain {
@@ -188,6 +191,28 @@ impl Brain for FakeBrain {
           })
           .collect(),
       ))
+    })
+  }
+
+  fn lore<'a>(&'a self, _agent: &'a str, slugs: &'a [String]) -> BoxFuture<'a, Answer<Vec<Document>>> {
+    Box::pin(async move {
+      self.lore_asked.lock().unwrap().push(slugs.to_vec());
+
+      let lore = self.lore.lock().unwrap();
+
+      Ok(
+        slugs
+          .iter()
+          .filter_map(|slug| {
+            lore.get(slug).map(|text| Document {
+              slug: slug.clone(),
+              path: format!("lore/{slug}.md"),
+              text: text.clone(),
+              version: "v".into(),
+            })
+          })
+          .collect(),
+      )
     })
   }
 

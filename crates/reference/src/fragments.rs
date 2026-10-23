@@ -30,6 +30,8 @@ pub struct Fragment {
   pub title: String,
   pub path: String,
   pub scope: Option<String>,
+  /// The heading of the brain's table of contents the row stands under, where its library has headings.
+  pub section: Option<String>,
   pub position: i64,
   pub keywords: Vec<String>,
   pub items: Vec<i64>,
@@ -54,6 +56,7 @@ impl Fragment {
       title: row.title,
       path: row.path,
       scope: row.scope,
+      section: row.section,
       position: row.position,
       keywords: row.keywords,
       items: row.items,

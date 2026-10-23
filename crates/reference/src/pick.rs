@@ -22,12 +22,13 @@ use crate::fragments::{self, Fragment, Verdict, index_entries, index_line};
 use crate::{Entry, Reference, Source};
 
 /// Where a library's bodies are read: a shipped piece's under the folder the deployment places the shipped pieces
-/// in, by its row's path; a knowledge chunk's and a room rule's through the brain's knowledge read; a person-book
-/// piece's through the brain's person-book read.
+/// in, by its row's path; a knowledge chunk's and a room rule's through the brain's knowledge read; a lore piece's
+/// through the brain's lore read; a person-book piece's through the brain's person-book read.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Body {
   Shipped,
   Knowledge,
+  Lore,
   People,
 }
 
@@ -501,6 +502,7 @@ pub async fn read_bodies(
 ) -> HashMap<String, (String, String)> {
   let mut read: HashMap<String, (String, String)> = HashMap::new();
   let mut knowledge = vec![];
+  let mut lore = vec![];
   let mut people = vec![];
 
   for slug in slugs {
@@ -524,6 +526,7 @@ pub async fn read_bodies(
         }
       }
       Body::Knowledge => knowledge.push(slug.clone()),
+      Body::Lore => lore.push(slug.clone()),
       Body::People => people.push(slug.clone()),
     }
   }
@@ -539,6 +542,15 @@ pub async fn read_bodies(
         eprintln!("reference: chat {chat_id} {stage} pieces were refused: {}", refusal.message)
       }
       Err(why) => eprintln!("reference: chat {chat_id} {stage} pieces could not be read: {why}"),
+    }
+  }
+
+  if !lore.is_empty() {
+    match reference.brain.lore(agent, &lore).await {
+      Ok(documents) => {
+        read.extend(documents.into_iter().map(|document| (document.slug, (document.path, document.text))));
+      }
+      Err(why) => eprintln!("reference: chat {chat_id} {stage} lore pieces could not be read: {why}"),
     }
   }
 

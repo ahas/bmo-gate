@@ -23,7 +23,8 @@ use crate::{Entry, Reference, SituationTurn, Source, memories, situation};
 // Where a situation rule stands when the turn is over its total: above every other kind.
 const SITUATION_HOLD: u8 = 4;
 
-/// The shipped kinds the system-documents gate offers, and the index each is read as.
+/// The kinds the system-documents gate offers: the shipped reference documents, and the lore of the agent's
+/// brain.
 pub const SYSTEM_DOCUMENT: &str = "system-document";
 pub const LORE: &str = "lore";
 
@@ -81,7 +82,8 @@ async fn library(
   Ok(Library::of(index_path, rows, source, body))
 }
 
-// The system's own reference documents, and the lore in a room that reads it.
+// The system's own reference documents, and in a room that reads it the lore of the agent's brain, one library a
+// section of its table of contents, in the order the brain gives them.
 async fn system_libraries(
   reference: &Reference,
   chat_id: i64,
@@ -101,19 +103,24 @@ async fn system_libraries(
   .into_iter()
   .collect();
 
-  if lore {
-    libraries.extend(
-      library(
-        reference,
-        agent,
-        chat_id,
-        LORE,
-        "docs/lore/index.md".to_owned(),
-        Source::Document,
-        Body::Shipped,
-      )
-      .await?,
-    );
+  if !lore {
+    return Ok(libraries);
+  }
+
+  let rows = fragments::rows(reference, agent, chat_id, LORE).await.map_err(fault)?;
+  let mut sections: Vec<(String, Vec<Fragment>)> = vec![];
+
+  for row in rows {
+    let section = row.section.clone().unwrap_or_else(|| LORE.to_owned());
+
+    match sections.iter_mut().find(|(name, _)| *name == section) {
+      Some((_, rows)) => rows.push(row),
+      None => sections.push((section, vec![row])),
+    }
+  }
+
+  for (section, rows) in sections {
+    libraries.extend(Library::of(section, rows, Source::Document, Body::Lore));
   }
 
   Ok(libraries)

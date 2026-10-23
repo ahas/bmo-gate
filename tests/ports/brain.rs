@@ -96,6 +96,21 @@ fn knowledge_piece() -> Value {
   })
 }
 
+/// A lore piece in a layer, at a position, its labels as the persona's installer writes them.
+fn lore_piece(id: i64, slug: &str, layer: i64, position: i64, labels: Value) -> Value {
+  json!({
+    "id": id, "brainId": 9, "key": format!("lore/{slug}"), "type": "lore", "text": format!("the piece {slug}"),
+    "layerId": layer, "position": position, "subjects": [], "status": "active", "lineageId": id,
+    "supersededBy": null, "validFrom": 9, "validTo": null, "importance": 5, "hits": 0, "lastHitAt": null,
+    "lastConfirmedAt": null, "strength": 1.0, "retrievalStrength": 0.0, "consolidatedAt": null,
+    "actorName": "installer", "labels": labels, "createdAt": 9
+  })
+}
+
+fn layer(id: i64, name: &str, position: i64) -> Value {
+  json!({ "id": id, "brainId": 9, "name": name, "description": name, "position": position, "createdAt": 9 })
+}
+
 fn served(stub: &Stub, kind: &str, items: Vec<Value>) {
   stub.answer(Method::GET, "/brains/9/memories", 200, page(items));
   let _ = kind;
@@ -209,6 +224,84 @@ async fn the_document_read_filters_the_knowledge_by_its_slug() {
   let none = brain.knowledge("chat-agent", 7, &["none".to_owned()]).await.unwrap();
   let Reply::Answered(documents) = none else { panic!("answered") };
   assert!(documents.is_empty());
+}
+
+#[tokio::test]
+async fn the_lore_stands_in_its_layers_order_and_a_piece_is_read_by_its_slug() {
+  let stub = Stub::start().await;
+  let brain = HttpBrain::new(peer(&stub, "t"));
+
+  stub.answer(Method::GET, "/brains", 200, brains());
+  stub.answer(
+    Method::GET,
+    "/brains/9/layers",
+    200,
+    page(vec![layer(11, "persona", 0), layer(13, "lore/The town", 2), layer(12, "lore", 1)]),
+  );
+  served(
+    &stub,
+    "lore",
+    vec![
+      lore_piece(
+        50,
+        "harbour",
+        13,
+        0,
+        json!({ "source": "lore/chunks/harbour.md", "title": "the harbour" }),
+      ),
+      lore_piece(
+        51,
+        "founding",
+        12,
+        1,
+        json!({ "source": "lore/chunks/founding.md", "title": "how the town began", "scope": "[old]" }),
+      ),
+      lore_piece(
+        52,
+        "weather",
+        12,
+        0,
+        json!({ "source": "lore/chunks/weather.md", "title": "the weather" }),
+      ),
+    ],
+  );
+
+  let offered = brain.offered("chat-agent", 7, &["lore".to_owned()]).await.unwrap();
+  let placed: Vec<(&str, Option<&str>, &str)> = offered
+    .iter()
+    .map(|row| (row.slug.as_str(), row.section.as_deref(), row.title.as_str()))
+    .collect();
+
+  assert_eq!(
+    placed,
+    [
+      ("weather", Some("lore"), "the weather"),
+      ("founding", Some("lore"), "how the town began"),
+      ("harbour", Some("lore/The town"), "the harbour"),
+    ]
+  );
+  assert_eq!(offered[1].scope.as_deref(), Some("[old]"));
+  assert_eq!(offered[0].scope, None);
+  assert_eq!((offered[0].key.as_str(), offered[0].kind.as_str()), ("52", "lore"));
+  assert_eq!(offered[0].path, "memories/52");
+
+  let query = stub.one("/brains/9/memories").query.unwrap_or_default();
+  assert!(query.contains("type=lore") && query.contains("status=active"), "{query}");
+
+  let read = brain
+    .lore("chat-agent", &["founding".to_owned(), "elsewhere".to_owned()])
+    .await
+    .unwrap();
+  assert_eq!(read.len(), 1);
+  assert_eq!(
+    (
+      read[0].slug.as_str(),
+      read[0].path.as_str(),
+      read[0].text.as_str(),
+      read[0].version.as_str()
+    ),
+    ("founding", "memories/51", "the piece founding", "51")
+  );
 }
 
 #[tokio::test]

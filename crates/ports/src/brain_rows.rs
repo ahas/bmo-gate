@@ -1,5 +1,5 @@
-//! The brain's members as its API answers them (the brain's `docs/boundary-api.md`, 「Brains」), and the
-//! reading of them into what the reference road reads: a memory of the brain's new shape — a row of a type,
+//! The brain's members and layers as its API answers them (the brain's `docs/boundary-api.md`, 「Brains」), and
+//! the reading of them into what the reference road reads: a memory of the brain's new shape — a row of a type,
 //! about subjects, in a version — mapped to the gate's memory rows and fragment rows, the old fields a moved
 //! row kept in its `labels` read where they stand and the subjects read where they do not.
 
@@ -45,6 +45,10 @@ pub struct Memory {
   #[serde(default)]
   pub text: String,
   #[serde(default)]
+  pub layer_id: Option<i64>,
+  #[serde(default)]
+  pub position: i64,
+  #[serde(default)]
   pub subjects: Vec<SubjectRef>,
   #[serde(default)]
   pub status: String,
@@ -66,6 +70,18 @@ pub struct Memory {
   pub created_at: i64,
 }
 
+/// A heading of the brain's table of contents: its name and where it stands among the others.
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Layer {
+  #[serde(default)]
+  pub id: i64,
+  #[serde(default)]
+  pub name: String,
+  #[serde(default)]
+  pub position: i64,
+}
+
 /// A page of the brain's.
 #[derive(Deserialize)]
 pub struct Page<T> {
@@ -82,9 +98,16 @@ pub fn brain_type(kind: &str) -> Option<(&'static str, &'static str)> {
     "person-book" | "person" => Some(("sheet", "person")),
     "library-knowledge" | "knowledge" => Some(("knowledge", "library-knowledge")),
     "room-rule" => Some(("rule", "room-rule")),
+    "lore" => Some((LORE_TYPE, "lore")),
     _ => None,
   }
 }
+
+/// The brain's type of the agent's lore, whose rows stand in the layers of its table of contents.
+pub const LORE_TYPE: &str = "lore";
+
+// What a lore row's key opens with before its slug.
+const LORE_KEY: &str = "lore/";
 
 /// The memory types the standing rows and the matcher's conditions are read from: what an agent holds of
 /// its own doing in a room.
@@ -128,6 +151,21 @@ pub fn slug_of(memory: &Memory) -> String {
   label(&memory.labels, "slug")
     .or_else(|| memory.key.clone())
     .unwrap_or_else(|| format!("memory-{}", memory.id))
+}
+
+/// The slug a gate names a lore piece by: its key after `lore/`, else the slug any other row is named by.
+pub fn lore_slug(memory: &Memory) -> String {
+  memory
+    .key
+    .as_deref()
+    .and_then(|key| key.strip_prefix(LORE_KEY))
+    .filter(|slug| !slug.is_empty())
+    .map_or_else(|| slug_of(memory), str::to_owned)
+}
+
+/// The path a piece read through the brain is handed under: the old `path` label, else the memory's own.
+pub fn path_of(memory: &Memory) -> String {
+  label(&memory.labels, "path").unwrap_or_else(|| format!("memories/{}", memory.id))
 }
 
 /// The old conditions a moved row kept, as objects.
@@ -270,8 +308,9 @@ pub fn fragment_row(agent: &str, old_kind: &str, memory: &Memory) -> Fragment {
       .is_some_and(|value| value == "1" || value.eq_ignore_ascii_case("true")),
     slug: slug_of(memory),
     title: label(labels, "title").unwrap_or_default(),
-    path: label(labels, "path").unwrap_or_else(|| format!("memories/{}", memory.id)),
+    path: path_of(memory),
     scope: None,
+    section: None,
     position: label_i64(labels, "position").unwrap_or(0),
     active: memory.status == "active",
     last_hit_at: memory.last_hit_at,
@@ -287,6 +326,31 @@ pub fn fragment_row(agent: &str, old_kind: &str, memory: &Memory) -> Fragment {
     status: label(labels, "status").unwrap_or_else(|| "open".to_owned()),
     body_hash: Some(memory.id.to_string()),
   }
+}
+
+/// The agent's lore as the fragment rows a gate is offered, in its table of contents' order: each row in its
+/// layer's position, then in its own, its section its layer's name, its slug its key after `lore/`, its index line
+/// its `title` label with its `scope` label as the line's bracket.
+pub fn lore_rows(agent: &str, memories: &[Memory], layers: &[Layer]) -> Vec<Fragment> {
+  let layer_of =
+    |memory: &Memory| memory.layer_id.and_then(|id| layers.iter().find(|layer| layer.id == id));
+  let mut placed: Vec<(i64, &Memory)> = memories
+    .iter()
+    .map(|memory| (layer_of(memory).map_or(i64::MAX, |layer| layer.position), memory))
+    .collect();
+
+  placed.sort_by_key(|(layer, memory)| (*layer, memory.layer_id, memory.position, memory.id));
+
+  placed
+    .into_iter()
+    .map(|(_, memory)| Fragment {
+      slug: lore_slug(memory),
+      scope: label(&memory.labels, "scope"),
+      position: memory.position,
+      section: layer_of(memory).map(|layer| layer.name.clone()),
+      ..fragment_row(agent, "lore", memory)
+    })
+    .collect()
 }
 
 /// A rule memory as the owner's room rule: its id the memory's key, its grantee the person it is about.

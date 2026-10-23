@@ -53,8 +53,9 @@ pub const USAGE_ROADS: &str = "\
 usage: bmo reference roads [--db <address>] [--json]
 
 Sets, for each room, whether the road reading the piece table and the road reading the index file offer the
-same candidates in the same order. The index files read are the shipped pieces' under the shipped folder; the
-brain's libraries are the brain's files, which it serves as rows alone, so their gates are named unavailable.
+same candidates in the same order. The index file read is the system documents' under the shipped folder, the
+rooms read as rooms that read no lore; the lore and the brain's other libraries are the brain's, which it serves
+as rows alone, so their gates are named unavailable.
 Without --db it opens the gate's database its settings name. --json prints the figures as JSON.";
 
 pub const USAGE_WASTE: &str = "\

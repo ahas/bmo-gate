@@ -225,3 +225,90 @@ async fn a_piece_of_work_is_handed_the_knowledge_its_lines_call_for_and_nothing_
   assert_eq!(ground.scratch.count("SELECT count(*) FROM reference_offers", vec![]).await, 0);
   assert!(select_knowledge(&ground.reference, "the-chat-agent", 7, &[]).await.is_empty());
 }
+
+// The lore of the agent's brain in two sections, and the body of one of its pieces.
+fn furnish_lore(ground: &Ground) {
+  let piece = |slug: &str, title: &str, section: &str| {
+    let mut row = fragment("lore", slug, title, None, None);
+
+    row.section = Some(section.to_owned());
+    row
+  };
+
+  ground.brain.fragments.lock().unwrap().extend([
+    piece("harbour", "the harbour", "lore"),
+    piece("weather", "the town's weather", "lore/The town"),
+  ]);
+  ground
+    .brain
+    .lore
+    .lock()
+    .unwrap()
+    .insert("harbour".into(), "The harbour is small.".into());
+}
+
+fn reading_lore(lore: bool) -> Turn {
+  Turn { lore, ..turn(&[]) }
+}
+
+#[tokio::test]
+async fn a_room_that_reads_the_lore_is_offered_the_brains_lore_and_handed_a_piece_through_the_brain() {
+  let ground = ground("lore", picking(&["harbour"])).await;
+
+  furnish_lore(&ground);
+
+  let entries = select(&ground.reference, &reading_lore(true)).await.unwrap();
+
+  assert_eq!(paths(&entries), [("lore/harbour.md", Source::Document)]);
+  assert_eq!(entries[0].text, "The harbour is small.");
+  assert_eq!(*ground.brain.lore_asked.lock().unwrap(), [vec!["harbour".to_owned()]]);
+
+  let asked = ground.gateway.asked.lock().unwrap();
+
+  assert_eq!(asked.len(), 1);
+  assert_eq!(offered_slugs(&asked[0].input), ["harbour", "weather"]);
+  assert_eq!(
+    ground
+      .brain
+      .hits
+      .lock()
+      .unwrap()
+      .iter()
+      .map(|hit| hit.slug.as_str())
+      .collect::<Vec<_>>(),
+    ["harbour"]
+  );
+}
+
+#[tokio::test]
+async fn a_room_that_reads_no_lore_is_offered_none_of_it() {
+  let ground = ground("no-lore", picking(&["harbour"])).await;
+
+  furnish_lore(&ground);
+
+  let entries = select(&ground.reference, &reading_lore(false)).await.unwrap();
+
+  assert!(entries.is_empty());
+  assert!(ground.gateway.asked.lock().unwrap().is_empty());
+  assert!(ground.brain.lore_asked.lock().unwrap().is_empty());
+  assert_eq!(
+    ground
+      .scratch
+      .texts("SELECT verdict FROM judgements WHERE stage = 'system-documents'", vec![])
+      .await,
+    ["SKIP: no candidates"]
+  );
+}
+
+#[tokio::test]
+async fn the_lore_with_no_reading_is_handed_over_one_index_a_section() {
+  let ground = ground("lore-unread", |_| Some("I cannot tell.".into())).await;
+
+  furnish_lore(&ground);
+
+  let entries = select(&ground.reference, &reading_lore(true)).await.unwrap();
+
+  assert_eq!(paths(&entries), [("lore", Source::Document), ("lore/The town", Source::Document)]);
+  assert_eq!(entries[0].text, "- harbour \u{2014} the harbour");
+  assert_eq!(entries[1].text, "- weather \u{2014} the town's weather");
+}

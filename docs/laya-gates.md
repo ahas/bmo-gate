@@ -235,9 +235,9 @@ The pilot, 100 rows of each gate on each road, same bar, same audit:
 
 - **Status:** a gate of its own, with a probe of its own.
 - **Input:** the turn's messages in the plain shape, and the system references the room offers that the
-  narrowing keeps for the turn — the documents named in the system reference index, and the lore pieces in a
-  room that reads the lore. Each candidate carries its slug and the one line its index says about it. The
-  input is the gate's own, byte for byte (`docs/reference-data.md`, 「The input」).
+  narrowing keeps for the turn — the documents named in the system reference index, and the lore pieces the
+  agent's brain holds, in a room that reads the lore. Each candidate carries its slug and the one line its
+  index says about it. The input is the gate's own, byte for byte (`docs/reference-data.md`, 「The input」).
 - **Question:** one yes/no per candidate — does answering this conversation need this reference document —
   named by the candidate's own slug.
 - **Answers:** the set of slugs answered yes, or none. Two verdicts agree when the two sets are equal.
@@ -246,7 +246,7 @@ The pilot, 100 rows of each gate on each road, same bar, same audit:
   settleable on its own.
 - **Candidates per row:** 1 to 128 — one call's worth of whatever the narrowing keeps; a turn offered more is
   several rows (「Question types」). A room that does not read the lore offers only the system reference
-  index's own slugs, which are few; a room that reads it offers the lore's chunks beside them, which are
+  index's own slugs, which are few; a room that reads it offers the lore's pieces beside them, which are
   many. Both ends are real and the data carries both.
 
 ## 2. `room-rules`

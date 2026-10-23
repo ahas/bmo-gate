@@ -330,7 +330,12 @@ async fn the_rows_and_the_shipped_index_files_offer_the_system_documents_alike_o
   let mut structure = fragment("system-document", "structure", "the system's large structure", None, None);
 
   structure.path = "STRUCTURE.md".to_owned();
-  ground.brain.fragments.lock().unwrap().push(structure);
+  ground
+    .brain
+    .fragments
+    .lock()
+    .unwrap()
+    .extend([structure, fragment("lore", "harbour", "the harbour", None, None)]);
   ground.receiver.rooms.lock().unwrap().push(RoomTitle {
     chat_id: 7,
     title: Some("A room".into()),
