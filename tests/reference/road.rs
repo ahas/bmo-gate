@@ -8,6 +8,7 @@ use std::collections::HashSet;
 use gate_policy::prompts;
 use gate_policy::reference::REFERENCE;
 use gate_ports::brain::Sheet;
+use gate_reference::memories::memory_line;
 use gate_reference::road::{Turn, held_sheet, select, select_knowledge};
 use gate_reference::{Entry, Source};
 
@@ -109,7 +110,8 @@ fn paths(entries: &[Entry]) -> Vec<(&str, Source)> {
 
 #[tokio::test]
 async fn a_turns_reference_stands_its_memories_and_sheets_first_then_what_each_gate_picked() {
-  let ground = ground("turn", picking(&["structure", "greeting", "deploy-notes", "person-6"])).await;
+  let ground =
+    ground("turn", picking(&["structure", "greeting", "deploy-notes", "person-6", "memory-41"])).await;
 
   furnish(&ground);
 
@@ -134,7 +136,12 @@ async fn a_turns_reference_stands_its_memories_and_sheets_first_then_what_each_g
   let hits: HashSet<String> =
     ground.brain.hits.lock().unwrap().iter().map(|hit| hit.slug.clone()).collect();
 
-  assert_eq!(hits, ["structure", "greeting", "deploy-notes", "person-6"].map(str::to_owned).into());
+  assert_eq!(
+    hits,
+    ["structure", "greeting", "deploy-notes", "person-6", "memory-41"]
+      .map(str::to_owned)
+      .into()
+  );
 
   let scratch = &ground.scratch;
 
@@ -142,19 +149,19 @@ async fn a_turns_reference_stands_its_memories_and_sheets_first_then_what_each_g
     scratch
       .count("SELECT count(*) FROM reference_offers WHERE round = 'round-1'", vec![])
       .await,
-    4
+    5
   );
   assert_eq!(
     scratch
       .count("SELECT count(*) FROM judgements WHERE round = 'round-1' AND message_id = 9", vec![])
       .await,
-    4
+    5
   );
   assert_eq!(
     scratch
       .texts("SELECT slug FROM reference_verdicts WHERE attached = 1 ORDER BY slug", vec![])
       .await,
-    ["deploy-notes", "greeting", "person-6", "structure"]
+    ["deploy-notes", "greeting", "memory-41", "person-6", "structure"]
   );
   assert_eq!(
     scratch
@@ -175,7 +182,7 @@ async fn a_turns_reference_stands_its_memories_and_sheets_first_then_what_each_g
   );
   assert_eq!(
     scratch.count("SELECT count(*) FROM gate_roads WHERE round = 'round-1'", vec![]).await,
-    4
+    5
   );
   assert_eq!(
     scratch
@@ -184,6 +191,7 @@ async fn a_turns_reference_stands_its_memories_and_sheets_first_then_what_each_g
     [
       "library-knowledge PICK: deploy-notes",
       "people-search PICK: person-6",
+      "room-memories PICK: memory-41",
       "room-rules PICK: greeting",
       "system-documents PICK: structure"
     ]
@@ -197,6 +205,7 @@ async fn a_turns_reference_stands_its_memories_and_sheets_first_then_what_each_g
     ("room-rules", ""),
     ("library-knowledge", ""),
     ("people-search", "4"),
+    ("room-memories", ""),
   ] {
     let answer = prompts::render(prompts::answer(stage).unwrap(), &[("selectionCap", cap)]);
     let closing = format!("how do deploys go?\n\n{answer}");
@@ -234,6 +243,7 @@ async fn a_gate_switched_off_is_not_asked_and_a_gate_left_no_candidate_says_so()
       .await,
     [
       "people-search SKIP: no candidates",
+      "room-memories SKIP: no candidates",
       "room-rules SKIP: no candidates",
       "system-documents SKIP: no candidates"
     ]
@@ -287,6 +297,7 @@ async fn every_picker_answering_a_sentence_writes_unreadable_with_the_answer_as_
     [
       "library-knowledge UNREADABLE / Deploys? They go through the testbed, boss.",
       "people-search UNREADABLE / Deploys? They go through the testbed, boss.",
+      "room-memories UNREADABLE / Deploys? They go through the testbed, boss.",
       "room-rules UNREADABLE / Deploys? They go through the testbed, boss.",
       "system-documents UNREADABLE / Deploys? They go through the testbed, boss."
     ]
@@ -447,4 +458,132 @@ async fn a_speakers_sheet_attaches_its_head_and_the_search_alone_attaches_the_re
 
   assert_eq!(sheets.len(), 1, "{entries:?}");
   assert_eq!(sheets[0].text.lines().count(), 30);
+}
+
+// A room's memories: errands whose event came at different moments, one more of them than the due count, and rows
+// waiting on nothing.
+fn furnish_memories(ground: &Ground, words: &str) {
+  let mut rows: Vec<_> = (0..=REFERENCE.memories.due as i64)
+    .map(|at| {
+      let mut row = memory(40 + at, "promise", "", "Tell them once the job ends.");
+
+      row.event_met_at = Some(100 + at);
+      row
+    })
+    .collect();
+
+  rows.extend((51..=54).map(|id| memory(id, "followup", "", &format!("{words} {id}."))));
+  *ground.brain.standing.lock().unwrap() = rows;
+}
+
+// The numbers of the rows an entry carries, in its order.
+fn carried(entry: &Entry) -> Vec<i64> {
+  entry
+    .text
+    .lines()
+    .filter_map(|line| line.strip_prefix("- #"))
+    .filter_map(|line| line.split_whitespace().next())
+    .filter_map(|id| id.parse().ok())
+    .collect()
+}
+
+fn memories_of(entries: &[Entry]) -> Option<&Entry> {
+  entries.iter().find(|entry| entry.path == "memories/7")
+}
+
+#[tokio::test]
+async fn due_memories_attach_unpicked_and_the_rest_only_where_the_memory_picker_picks_them() {
+  let ground = ground("memories", picking(&["memory-52", "memory-53"])).await;
+
+  furnish_memories(&ground, "Follow up on matter");
+
+  let entries = select(&ground.reference, &turn(&[])).await.unwrap();
+  let entry = memories_of(&entries).expect("the memories entry");
+  let due = REFERENCE.memories.due as i64;
+  let mut expected: Vec<i64> = (1..=due).rev().map(|at| 40 + at).collect();
+
+  expected.extend([52, 53]);
+
+  assert_eq!(carried(entry), expected);
+  assert!(entry.text.contains(&format!("of the {} open items", due + 5)));
+  assert!(
+    entry
+      .text
+      .ends_with("- … 3 more open here, not carried this turn: brain_list with chat 7")
+  );
+
+  // The due row past the count is offered with the rows waiting on nothing, in the brain's order.
+  assert_eq!(
+    ground
+      .scratch
+      .texts("SELECT slugs FROM reference_offers WHERE stage = 'room-memories'", vec![])
+      .await,
+    ["[\"memory-40\",\"memory-51\",\"memory-52\",\"memory-53\",\"memory-54\"]"]
+  );
+
+  let hits: Vec<String> = ground.brain.hits.lock().unwrap().iter().map(|hit| hit.slug.clone()).collect();
+
+  assert_eq!(hits, ["memory-52", "memory-53"]);
+  assert_eq!(
+    ground
+      .scratch
+      .texts(
+        "SELECT slug FROM reference_verdicts WHERE stage = 'room-memories' AND attached = 1 ORDER BY slug",
+        vec![]
+      )
+      .await,
+    ["memory-52", "memory-53"]
+  );
+}
+
+#[tokio::test]
+async fn what_the_memory_picker_picks_is_held_to_its_allowance() {
+  let ground =
+    ground("memories-allowance", picking(&["memory-51", "memory-52", "memory-53", "memory-54"])).await;
+  let words = "w".repeat(REFERENCE.memories.budget / 3);
+
+  furnish_memories(&ground, &words);
+
+  let entries = select(&ground.reference, &turn(&[])).await.unwrap();
+  let picked: Vec<i64> =
+    carried(memories_of(&entries).unwrap()).into_iter().filter(|id| *id > 50).collect();
+  let line = memory_line(&memory(51, "followup", "", &format!("{words} 51.")));
+
+  assert_eq!(picked.len(), REFERENCE.memories.budget / gate_markup::js::units(&line));
+  assert_eq!(picked, [51, 52][..picked.len()]);
+}
+
+#[tokio::test]
+async fn nothing_due_and_nothing_picked_carries_no_memories_and_a_failed_pick_hands_over_no_index() {
+  let quiet = ground("memories-none", picking(&[])).await;
+
+  quiet.brain.standing.lock().unwrap().push(memory(51, "followup", "", "Follow up."));
+
+  assert!(memories_of(&select(&quiet.reference, &turn(&[])).await.unwrap()).is_none());
+
+  let failed = ground("memories-unread", |_| Some("I cannot tell.".into())).await;
+
+  furnish_memories(&failed, "Follow up on matter");
+
+  let entries = select(&failed.reference, &turn(&[])).await.unwrap();
+
+  assert_eq!(carried(memories_of(&entries).unwrap()).len(), REFERENCE.memories.due);
+  assert!(!entries.iter().any(|entry| entry.path.starts_with("memories/7/")), "{entries:?}");
+}
+
+#[tokio::test]
+async fn a_turn_with_no_line_carries_the_due_memories_and_asks_no_picker() {
+  let ground = ground("memories-touch", picking(&["memory-51"])).await;
+
+  furnish_memories(&ground, "Follow up on matter");
+
+  let touch = Turn {
+    message_lines: vec![],
+    people_spoke: false,
+    ..turn(&[])
+  };
+  let entries = select(&ground.reference, &touch).await.unwrap();
+
+  assert_eq!(carried(memories_of(&entries).unwrap()).len(), REFERENCE.memories.due);
+  assert!(ground.gateway.asked.lock().unwrap().is_empty());
 }

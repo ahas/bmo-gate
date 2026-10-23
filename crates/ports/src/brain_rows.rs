@@ -235,7 +235,7 @@ pub fn memory_row(agent: &str, memory: &Memory) -> MemoryRow {
   let (condition, action) = match (said("condition"), said("action")) {
     (condition, action) if !condition.is_empty() || !action.is_empty() => (condition, action),
     _ if memory.kind == "situation" => (memory.text.clone(), memory.text.clone()),
-    _ => (String::new(), String::new()),
+    _ => (String::new(), memory.text.clone()),
   };
   let event = label(labels, "event").or_else(|| Some(said("event")).filter(|e| !e.is_empty()));
   MemoryRow {
@@ -315,14 +315,23 @@ pub fn woken_by(memory: &Memory, events: &[Event]) -> bool {
     })
 }
 
-/// Whether a memory waits on nothing: no condition and no event.
+/// Whether a memory's event has come: an errand the event it waited on has met.
+pub fn event_come(memory: &Memory) -> bool {
+  label(&memory.labels, "event_met_at").is_some()
+}
+
+/// Whether a memory stands in its room: it carries no condition, and it waits on no event or its event has
+/// come.
 pub fn standing(memory: &Memory) -> bool {
+  let said = |one: &BTreeMap<String, Value>, name: &str| {
+    !one.get(name).and_then(Value::as_str).unwrap_or_default().is_empty()
+  };
+  let conditions = conditions_of(memory);
+  let waits = label(&memory.labels, "event").is_some() || conditions.iter().any(|one| said(one, "event"));
+
   memory.kind != "situation"
-    && label(&memory.labels, "event").is_none()
-    && conditions_of(memory).iter().all(|one| {
-      one.get("condition").and_then(Value::as_str).unwrap_or_default().is_empty()
-        && one.get("event").and_then(Value::as_str).unwrap_or_default().is_empty()
-    })
+    && !conditions.iter().any(|one| said(one, "condition"))
+    && (!waits || event_come(memory))
 }
 
 /// A memory of the brain as the fragment row a gate is offered: its key is the memory's id, which a hit names

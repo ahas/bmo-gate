@@ -97,8 +97,8 @@
    being let go is written before the new one is asked anything. It stands at the head of the turn, before
    every other gate.
 2. Together, in one step: the three reference gates (`system-documents`, `room-rules`,
-   `library-knowledge`), `people-search` and `situation-rules`. The turn starts all five at once and builds
-   the prompt when the last one answers (`POST /reference/selected`). They read the turn's messages and its
+   `library-knowledge`), `people-search`, `room-memories` and `situation-rules`. The turn starts all six at once
+   and builds the prompt when the last one answers (`POST /reference/selected`). They read the turn's messages and its
    quiet instructions as they were written, and they stand in every turn of the chat agent's, whatever
    brought it (the receiver's `docs/bmo-window.md`).
 3. `sanitizer` — cleans everything the prompt carries once the reference is chosen: the work handed back to
@@ -144,7 +144,8 @@
 - **A gate switched off for an agent is never asked in that agent's turns:** no run, no judgement and no
   tokens under it. Another agent's turn in the same room passes it as its own switch says. The turn goes on
   without it:
-  - a reference gate, `people-search` or `situation-rules` adds nothing to the turn's reference;
+  - a reference gate, `people-search` or `situation-rules` adds nothing to the turn's reference, and
+    `room-memories` leaves the memories entry to the due rows alone;
   - `session-summary` lets the replaced session go with no summary carried over;
   - the sanitizer leaves the text as it was written, and the code's own dash replacement of the outgoing
     clean still runs;
@@ -163,8 +164,8 @@
 - **A judgement's verdict opens with its keyword:** one upper-case word, which the console reads the chip's
   colour and the end of judging by (the web unit's `docs/web.md`, 「Room screen」), and after it, past a colon,
   what was decided. What the model answered, or why it gave nothing, stands in the judgement's detail and never
-  as its verdict. The reference gates (`system-documents`, `room-rules`, `library-knowledge`), `people-search`
-  and `situation-rules` write these, on every road alike:
+  as its verdict. The reference gates (`system-documents`, `room-rules`, `library-knowledge`), `people-search`,
+  `room-memories` and `situation-rules` write these, on every road alike:
 
   | Verdict | When |
   |---|---|
@@ -177,11 +178,11 @@
 
   A decision on Laya is written the same way whoever settled it — Laya, the fallback LLM or the default — and
   its detail says which (`docs/laya.md`, 「A gate whose provider is Laya」).
-- **A reference gate, `people-search` or `situation-rules` that is on for the turn but has no candidate left
-  once the code has narrowed them** — a room with no rulebook, an agent with no knowledge of its own, a turn
+- **A reference gate, `people-search`, `room-memories` or `situation-rules` that is on for the turn but has no
+  candidate left once the code has narrowed them** — a room with no rulebook, an agent with no knowledge of its own, a turn
   no situation rule of the room is open for — is not asked, and leaves the judgement `SKIP: no candidates` in
-  its place, so the chip shows every gate the turn had on and why one stood aside. A reference gate and
-  `people-search` leave beside it their row of the offers record, asked about none, which is how many
+  its place, so the chip shows every gate the turn had on and why one stood aside. A reference gate,
+  `people-search` and `room-memories` leave beside it their row of the offers record, asked about none, which is how many
   candidates the narrowing started from and by which rules it narrowed (`docs/reference-selection.md`,
   「What the code narrows before a gate is asked」).
 - **A gate switched off, or one the turn does not ask by its own declaration** (a turn of the chat agent's

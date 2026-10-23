@@ -15,8 +15,8 @@ the road that decides which of them a turn carries.
   and the subject they said it about.
 - **The gates read the turn's lines.** A turn with no line at all — a keepalive touch, the words
   before a fold — asks no gate.
-- **`people-search`, `room-rules` and `library-knowledge` also read the message the turn follows on
-  from,** as one line in the same shape standing ahead of the turn's own: the message the turn
+- **`people-search`, `room-rules`, `library-knowledge` and `room-memories` also read the message the turn
+  follows on from,** as one line in the same shape standing ahead of the turn's own: the message the turn
   replies to where one of its messages replies outside it, and otherwise the room's message just
   before it. A short answer — 「yes」, 「leave the rest~」 — says nothing on its own, and a gate reading
   it alone judges every candidate by the candidate's own line, so the same few pieces attach to
@@ -100,11 +100,20 @@ flowchart TB
 
 ## What attaches without a gate
 
-- **The room's standing memories** — its rows that wait on no condition, and the errands whose event
-  has come — attach on every turn of that room. No model chooses them: the room is a fact the prompt
-  builder already holds (the brain's `docs/memories.md`). They are the rows an agent keeps of its own doing
-  there — promises, checks, follow-ups, situations and states — and never a rule, so a rule reaches a turn
-  through the `room-rules` gate alone, and never through the memories as well.
+- **The room's due memories** — the errands whose event has come — attach with no model choosing them: their
+  time has come, which is a fact of the row rather than a judgement of the turn. The latest come stand first,
+  and at most the policy's count of them attach, three; a due row past the count is offered to the memory
+  picker with the rest.
+- **The rest of the room's standing memories reach a turn only where the memory picker picks them**
+  (`room-memories`, below). Nothing of them stands on every turn: a room keeps hundreds of open rows, and a turn
+  is about a few. They are the rows an agent keeps of its own doing there — promises, checks, follow-ups and
+  states — and never a rule, so a rule reaches a turn through the `room-rules` gate alone, and never through
+  the memories as well.
+- **The memories go as one entry,** under the room's path `memories/<room>`: an opening that says how many
+  open rows the room holds, what the agent does with them, one line a row — its number, kind, when it was
+  written and moved, whom it is for, the item it was left open by and its words — the due rows first and the
+  picked ones after in the order the brain lists them, and a closing line saying how many more stand and how
+  the agent lists them. A turn on which nothing is due and nothing is picked carries no memories entry.
 - **The rows the turn's events wake** attach by the event alone (the brain's `docs/memories.md`, 「A row with an
   event」).
 - **No room rule attaches without a gate.** Every rule of the room is a candidate of the `room-rules` gate,
@@ -135,19 +144,18 @@ flowchart TB
 - **The reference block** is attached before the message blocks as a `Reference for this message
   (N): ... END OF REFERENCE` block — the same shape as the message blocks, so reference text can
   never pass for something a person said.
-- **The memories are counted against the safety line below; the sheets are not.** Nothing bounds how
-  many rows a room may hold, so they join the turn's total like everything a gate picked. A sheet is
-  held to its own ceiling (above).
+- **The memories entry is counted against the safety line below; the sheets are not.** It joins the turn's
+  total like everything a gate picked. A sheet is held to its own ceiling (above).
 
 ## The gates and what each reads
 
 - **The three reference gates** are `system-documents`, `room-rules` and `library-knowledge`, and
   the person-book search runs beside them over an index of its own. The situation-rule matcher runs
   beside them too, on candidates of a different kind.
-- **Every candidate is a fragment row.** What a library offers a room is the rows of its kind
-  standing for that room and readable by the turn's agent, narrowed by the code to what the turn can be about (below), and the index
-  a gate reads is those rows written out as lines, in the order their entries stand
-  (the brain's `docs/fragments.md`).
+- **Every candidate is a fragment row,** but the memory picker's, which is a standing memory. What a library
+  offers a room is the rows of its kind standing for that room and readable by the turn's agent, narrowed by
+  the code to what the turn can be about (below), and the index a gate reads is those rows written out as
+  lines, in the order their entries stand (the brain's `docs/fragments.md`).
 - **`system-documents`** — two libraries at once: the system's own reference documents, each naming
   a system document the deployment ships (`docs/reference-index.md`), and, in a room that reads the lore,
   the lore pieces the agent's brain holds — one library a section, the brain's lore layers in their order,
@@ -163,6 +171,23 @@ flowchart TB
   the path a speaker's head stands under and held to the same ceiling. A speaker it picks has the whole sheet
   in place of the head, so no sheet attaches twice. A person whose sheet in the room renders as nothing
   attaches nothing.
+- **`room-memories`** — the memory picker: the room's standing memories that are not attached as due, one
+  candidate a row, in the order the brain lists them. A candidate's slug is `memory-<row id>` and its index
+  line the row's kind as its bracket and the first line of its words, cut to the policy's 120 characters with
+  `…`. A row is narrowed as a fragment row is, by the item it was left open by and the person it is for (below).
+  - **It is a picker of the three's shape and not one of them:** it is asked one yes or no per candidate, in
+    their answer shape, reads the message the turn follows on from, and on a turn of the chat agent's own
+    lines alone asks as `room-rules` does; its picks join the memories entry rather than each standing as a
+    piece of its own.
+  - **What it picks is held to 2,000 characters,** the policy's allowance, counted on the rows' lines; a
+    picked row past what is left is passed over and logged.
+  - **A failed pick hands over no index.** The index of a room's memories is nearly the memories themselves,
+    so a turn whose picker gave no reading carries the due rows alone, and the entry's closing line names how
+    the agent lists the rest.
+  - **A picked row is handed back to the brain as a hit,** as an attached fragment is, so a row the turns keep
+    needing stays strong and one no turn asks for fades (the brain's `docs/design.md`, 「Strength and
+    decay」).
+  - **Its Laya mode is off:** no checkpoint has learnt its question, so it runs on its own model alone.
 - **`situation-rules`** — the room's standing memories that carry a condition, and the global ones
   that reach it, offered as their conditions alone. It is not one of the three: its candidates are
   rows rather than documents drawn from an index, it asks two questions of each rather than one, and
@@ -264,9 +289,9 @@ flowchart TB
 
 - **Each gate has its own allowance**, counted in characters of attached text: 24,000 for
   `system-documents`, 12,000 for `room-rules`, 12,000 for `library-knowledge`, 12,000 for
-  `situation-rules`. The room's standing memories have 12,000 of their own on the same footing. A
-  piece that does not fit what is left of its allowance is passed over, and the pass is logged with
-  its name and its size.
+  `situation-rules`, and 2,000 for what the memory picker picks; the due memories are bounded by their count.
+  A piece that does not fit what is left of its allowance is passed over, and the pass is logged with its
+  name and its size.
 - **One turn carries at most 30,000 characters on these gates' word together.** The allowances add
   to far more than that on purpose: a quiet turn lets one gate spend freely, and the total is what
   holds several loud ones at once — and it stands below what any two of them could spend, so it
@@ -289,7 +314,7 @@ flowchart TB
 
 - **Every document the reference attaches goes to a chat session in full once per version**, and as a
   one-line mark on every later turn of that session that attaches the same version. That is all of them:
-  the standing memories, the standing sheets, a piece the person-book search picked, a system document, a
+  the memories entry, the standing sheets, a piece the person-book search picked, a system document, a
   lore piece, a room rule, a knowledge chunk, a situation rule, and an index handed over in place of pieces.
 - **Why:** a chat session is a continuing conversation, so a document loaded once stays in that session's
   context and is read on later turns too. Sending the same text again buys nothing but its size.

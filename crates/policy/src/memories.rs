@@ -1,5 +1,6 @@
-//! The standing rows a turn is handed (docs/reference-selection.md): how much they may carry and the lines
-//! their entry is written in. The rows themselves, their conditions and their withering are the brain's.
+//! The memories a turn is handed (docs/reference-selection.md): the lines their entry is written in. Which rows
+//! it carries is the memory picker's (`crate::reference`); the rows themselves, their conditions and their
+//! withering are the brain's.
 
 use serde::Deserialize;
 
@@ -22,7 +23,6 @@ pub struct EntryLines {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Memories {
-  pub budget_chars: usize,
   pub entry: EntryLines,
 }
 

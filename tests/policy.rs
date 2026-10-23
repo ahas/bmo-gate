@@ -25,6 +25,7 @@ fn the_gate_order_reads_every_gate_once_where_it_first_stands() {
       "room-rules",
       "library-knowledge",
       "people-search",
+      "room-memories",
       "situation-rules",
       "sanitizer",
       "output-format",
@@ -82,6 +83,7 @@ fn every_gate_laya_asks_of_its_candidates_has_its_question() {
   let mut asked: Vec<&str> = REFERENCE.gates.iter().map(|gate| gate.stage.as_str()).collect();
 
   asked.push(&REFERENCE.people.stage);
+  asked.push(&REFERENCE.memories.stage);
 
   for stage in &asked {
     let question = QUESTIONS.of(stage).unwrap_or_else(|| panic!("{stage} has no Laya question"));

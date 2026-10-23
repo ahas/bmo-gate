@@ -21,6 +21,10 @@ subject = "규칙"
 question = "이 대화에 답하려면 이 지식 문서가 필요한가?"
 subject = "문서"
 
+[gates.room-memories]
+question = "이 대화에 답하려면 이 기억 항목이 필요한가?"
+subject = "항목"
+
 [gates.people-search]
 question = "이 대화에 답하려면 이 인물 기록이 필요한가?"
 subject = "기록"

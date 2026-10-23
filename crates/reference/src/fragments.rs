@@ -38,6 +38,8 @@ pub struct Fragment {
   pub written_on: Option<String>,
   pub confirmed_on: Option<String>,
   pub status: String,
+  /// The row's whole text where its library carries it rather than reading it through the brain.
+  pub body: Option<String>,
 }
 
 // The numbers rows are told apart by in this service.
@@ -63,6 +65,7 @@ impl Fragment {
       written_on: row.written_on,
       confirmed_on: row.confirmed_on,
       status: row.status,
+      body: None,
     }
   }
 

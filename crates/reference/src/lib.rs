@@ -1,8 +1,8 @@
 //! A turn's reference (`docs/reference-selection.md`; `docs/boundary-api.md`, `POST /reference/selected`): what a
-//! chat turn is given to read beside the conversation — the room's standing memories, the rows the turn's events
-//! wake and the standing sheets of everyone who spoke, which no model chooses, then what the three reference
-//! gates, the person-book search and the situation-rule matcher pick, each after the code's narrowing, held to
-//! their allowances and the turn's total. The brain answers the rows and reads the pieces; the gate picks.
+//! chat turn is given to read beside the conversation — the room's due memories, the rows the turn's events wake
+//! and the standing sheets of everyone who spoke, which no model chooses, then what the three reference gates, the
+//! person-book search, the memory picker and the situation-rule matcher pick, each after the code's narrowing,
+//! held to their allowances and the turn's total. The brain answers the rows and reads the pieces; the gate picks.
 
 pub mod attachments;
 pub mod fragments;

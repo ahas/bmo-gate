@@ -57,6 +57,34 @@ fn elsewhere() -> Value {
   })
 }
 
+/// A promise the agent wrote itself, about the room: its words are its text.
+fn written_promise() -> Value {
+  json!({
+    "id": 7, "brainId": 9, "key": null, "type": "promise", "text": "Call back tomorrow.", "layerId": null,
+    "position": 0, "subjects": [room("7")], "status": "active", "lineageId": 7, "supersededBy": null,
+    "validFrom": 300, "validTo": null, "importance": 5, "hits": 0, "lastHitAt": null, "lastConfirmedAt": null,
+    "strength": 1.0, "retrievalStrength": 0.0, "consolidatedAt": null, "actorName": "agent-session",
+    "labels": {}, "createdAt": 300
+  })
+}
+
+/// A moved errand waiting on an event, its event met or not.
+fn errand(id: i64, met: bool) -> Value {
+  let mut labels = json!({ "chat_id": "7", "event": "job-ended:12" });
+
+  if met {
+    labels["event_met_at"] = json!("400");
+  }
+
+  json!({
+    "id": id, "brainId": 9, "key": null, "type": "promise", "text": "Tell them it ended.", "layerId": null,
+    "position": 0, "subjects": [room("7")], "status": "active", "lineageId": id, "supersededBy": null,
+    "validFrom": 100, "validTo": null, "importance": 5, "hits": 0, "lastHitAt": null, "lastConfirmedAt": null,
+    "strength": 1.0, "retrievalStrength": 0.0, "consolidatedAt": null, "actorName": "move", "labels": labels,
+    "createdAt": 100
+  })
+}
+
 fn rule() -> Value {
   json!({
     "id": 3, "brainId": 9, "key": "bmo:rooms:7:rules:quiet", "type": "rule", "text": "quiet", "layerId": null,
@@ -159,6 +187,29 @@ async fn the_memory_reads_find_the_agents_brain_and_map_its_standing_types() {
     stub.one("/brains/9/hits").json(),
     json!({ "memoryIds": [4], "actorName": "chat-agent" })
   );
+}
+
+#[tokio::test]
+async fn a_row_the_agent_wrote_stands_by_its_text_and_an_errand_stands_once_its_event_has_come() {
+  let stub = Stub::start().await;
+  let brain = HttpBrain::new(peer(&stub, "t"));
+
+  stub.answer(Method::GET, "/brains", 200, brains());
+  served(&stub, "promise", vec![written_promise(), errand(8, false), errand(9, true)]);
+
+  let standing = brain.standing("chat-agent", 7).await.unwrap();
+  let ids: Vec<i64> = standing.iter().map(|row| row.id).collect();
+
+  // Every standing type is asked for and the stub answers the same page for each, so each row stands once a type.
+  assert!(ids.iter().all(|id| *id == 7 || *id == 9), "{ids:?}");
+  assert!(ids.contains(&7) && ids.contains(&9));
+
+  let written = standing.iter().find(|row| row.id == 7).unwrap();
+  let come = standing.iter().find(|row| row.id == 9).unwrap();
+
+  assert_eq!(written.action, "Call back tomorrow.");
+  assert_eq!((written.condition.as_str(), written.event_met_at), ("", None));
+  assert_eq!(come.event_met_at, Some(400));
 }
 
 #[tokio::test]

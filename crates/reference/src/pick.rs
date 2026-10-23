@@ -23,13 +23,15 @@ use crate::{Entry, Reference, Source};
 
 /// Where a library's bodies are read: a shipped piece's under the folder the deployment places the shipped pieces
 /// in, by its row's path; a knowledge chunk's and a room rule's through the brain's knowledge read; a lore piece's
-/// through the brain's lore read; a person-book piece's through the brain's person-book read.
+/// through the brain's lore read; a person-book piece's through the brain's person-book read; a memory's from the
+/// row itself, which the brain already answered whole.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Body {
   Shipped,
   Knowledge,
   Lore,
   People,
+  Memory,
 }
 
 /// One library of a gate for one turn: the index its gate reads, written out of its rows in their order, and
@@ -523,8 +525,8 @@ pub struct Reader<'a> {
 }
 
 /// The bodies of some slugs, each by the library of `libraries` it stands in — a shipped piece under the shipped
-/// folder, a person as their sheet in the room held to its ceiling, any other through the brain — as its path and
-/// its text, none for a slug whose body could not be read or is empty.
+/// folder, a person as their sheet in the room held to its ceiling, a memory as the row carries it, any other
+/// through the brain — as its path and its text, none for a slug whose body could not be read or is empty.
 pub async fn read_bodies(
   reference: &Reference,
   reader: &Reader<'_>,
@@ -561,6 +563,11 @@ pub async fn read_bodies(
       Body::People => {
         if let Some(owner) = row.owner {
           people.push((slug.clone(), owner));
+        }
+      }
+      Body::Memory => {
+        if let Some(text) = row.body.as_ref().filter(|text| !text.is_empty()) {
+          read.insert(slug.clone(), (row.path.clone(), text.clone()));
         }
       }
     }

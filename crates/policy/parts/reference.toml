@@ -48,6 +48,16 @@ budget = 18000
 bot_lines_alone = "own turn, named items"
 reads_answered = true
 
+# The memory picker: the room's standing memories it is offered as an index and picks out of, what the rows it
+# picks may come to, how many due rows attach with no pick, how long a row's index line runs, and when it is asked.
+[memories]
+stage = "room-memories"
+budget = 2000
+due = 3
+index_chars = 120
+bot_lines_alone = "own turn"
+reads_answered = true
+
 # The situation-rule matcher: what it may attach in one turn, and how a decision on Laya where neither Laya nor
 # its fallback gave one is written down.
 [situation]

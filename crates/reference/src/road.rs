@@ -1,9 +1,9 @@
-//! The road a turn's reference is composed on (`docs/reference-selection.md`): the room's standing memories and the
-//! head of the sheet of everyone who spoke, as the brain renders it from their facts, which no model chooses; each
+//! The road a turn's reference is composed on (`docs/reference-selection.md`): the room's due memories and the head
+//! of the sheet of everyone who spoke, as the brain renders it from their facts, which no model chooses; each
 //! picker's libraries, less what the round already holds and narrowed by the code, with what each was offered
-//! written down; the three reference gates, the
-//! person-book search and the situation-rule matcher asked side by side; each gate's picks held to its allowance and
-//! all of them to the turn's total; and what the turn attached handed to the brain to count.
+//! written down; the three reference gates, the person-book search, the memory picker and the situation-rule
+//! matcher asked side by side; each gate's picks held to its allowance and all of them to the turn's total; and
+//! what the turn attached handed to the brain to count.
 
 use std::collections::{HashMap, HashSet};
 
@@ -12,6 +12,7 @@ use gate_markup::js;
 use gate_policy::laya::QUESTIONS;
 use gate_policy::prompts;
 use gate_policy::reference::{BotLinesAlone, REFERENCE, ReferenceGate};
+use gate_ports::brain::MemoryRow;
 use gate_runs::GateError;
 use gate_runs::records::{self, Judgement, now};
 
@@ -640,10 +641,11 @@ pub async fn no_candidates(
   .await;
 }
 
-/// What this turn's prompt is given to read: the room's standing memories, the standing sheets of everyone who
-/// spoke, what the three reference gates and the matcher pick held to the turn's total, then what the person book's
-/// search picks; what it attached counted on the rows and beside each candidate's verdict where the turn records. A
-/// stop is raised; anything else that breaks the road is the caller's to let go.
+/// What this turn's prompt is given to read: the room's due memories with those the memory picker picks, the
+/// standing sheets of everyone who spoke, what the three reference gates and the matcher pick held to the turn's
+/// total, then what the person book's search picks; what it attached counted on the rows and beside each
+/// candidate's verdict where the turn records. A stop is raised; anything else that breaks the road is the caller's
+/// to let go.
 pub async fn select(reference: &Reference, turn: &Turn) -> Result<Vec<Entry>, GateError> {
   let composed = compose(reference, turn).await?;
 
@@ -662,6 +664,41 @@ pub struct Composed {
   pub verdicts: Vec<Verdict>,
 }
 
+/// The memory picker of a room for one agent's turn, over the room's rows that are not due, as reference.toml
+/// declares it.
+pub fn memory_gate(chat_id: i64, rows: &[MemoryRow]) -> Result<Gate, GateError> {
+  let declared = &REFERENCE.memories;
+
+  Ok(Gate {
+    stage: declared.stage.clone(),
+    libraries: memories::library(chat_id, rows).into_iter().collect(),
+    bot_lines_alone: declared.bot_lines_alone,
+    reads_answered: declared.reads_answered,
+    system: instructions(&declared.stage)?,
+    answer: answer_file(&declared.stage),
+    reads: Reads::Verdicts,
+    cap: None,
+    budget: declared.budget,
+    hold: SITUATION_HOLD,
+    probe: probe(&declared.stage)?,
+  })
+}
+
+// The rows the memory picker's resolved picks stand for, in the order the brain lists them: a pick is a body read
+// out of its row, so an index handed over in place of picks stands for none.
+fn picked_rows<'a>(gate: &Gate, picked: &Picked, rows: &'a [MemoryRow]) -> Vec<&'a MemoryRow> {
+  let ids: HashSet<i64> = picked.entries.iter().filter_map(|entry| entry.fragment).collect();
+  let keys: HashSet<&str> = gate
+    .libraries
+    .iter()
+    .flat_map(|library| library.rows.iter())
+    .filter(|row| ids.contains(&row.id))
+    .map(|row| row.key.as_str())
+    .collect();
+
+  rows.iter().filter(|memory| keys.contains(memory.id.to_string().as_str())).collect()
+}
+
 /// The turn's reference composed as `select` composes it, with what it attached handed back rather than counted.
 pub async fn compose(reference: &Reference, turn: &Turn) -> Result<Composed, GateError> {
   let woken = match &turn.situation {
@@ -669,7 +706,8 @@ pub async fn compose(reference: &Reference, turn: &Turn) -> Result<Composed, Gat
     None => vec![],
   };
   let agent = turn.agent(reference);
-  let memory = memories::standing(reference, turn.chat_id, agent).await;
+  let standing = memories::standing(reference, turn.chat_id, agent).await;
+  let (due, undue) = memories::due_first(&standing);
   let sheets = standing_entries(reference, turn.chat_id, &turn.speaker_ids, agent).await;
   let holds = turn.holds.clone().unwrap_or_default();
   let on = |gate: &str| !turn.off.iter().any(|off| off == gate);
@@ -681,14 +719,20 @@ pub async fn compose(reference: &Reference, turn: &Turn) -> Result<Composed, Gat
       _ => Ok(vec![]),
     }
   };
-  let held = |streams: Vec<(Vec<Entry>, u8)>| {
+  // The memories entry: the due rows, then the rows the memory picker picked.
+  let memory_of = |picked: Vec<&MemoryRow>| {
+    let carried: Vec<&MemoryRow> = due.iter().chain(picked).collect();
+
+    memories::memories_entry(turn.chat_id, standing.len(), &carried)
+  };
+  let held = |memory: &Option<Entry>, streams: Vec<(Vec<Entry>, u8)>| {
     let mut all = vec![(memory.clone().into_iter().collect(), SITUATION_HOLD)];
 
     all.extend(streams);
     within_turn_budget(turn.chat_id, all)
   };
   // A speaker the person-book search picked has the whole sheet in place of the head, under the same path.
-  let standing_first = |kept: Vec<Entry>, picked: Vec<Entry>| {
+  let standing_first = |memory: &Option<Entry>, kept: Vec<Entry>, picked: Vec<Entry>| {
     let is_memory = |entry: &Entry| memory.as_ref() == Some(entry);
     let mut entries: Vec<Entry> = kept.iter().filter(|entry| is_memory(entry)).cloned().collect();
     let whole: HashSet<&str> = picked.iter().map(|entry| entry.path.as_str()).collect();
@@ -711,15 +755,11 @@ pub async fn compose(reference: &Reference, turn: &Turn) -> Result<Composed, Gat
 
     rules.extend(matched.await?);
 
-    let kept = held(vec![(rules, SITUATION_HOLD)]);
-    let is_memory = |entry: &Entry| memory.as_ref() == Some(entry);
-    let mut entries: Vec<Entry> = kept.iter().filter(|entry| is_memory(entry)).cloned().collect();
-
-    entries.extend(sheets.iter().cloned());
-    entries.extend(kept.into_iter().filter(|entry| !is_memory(entry)));
+    let memory = memory_of(vec![]);
+    let kept = held(&memory, vec![(rules, SITUATION_HOLD)]);
 
     return Ok(Composed {
-      entries,
+      entries: standing_first(&memory, kept, vec![]),
       attached: vec![],
       verdicts: vec![],
     });
@@ -728,7 +768,10 @@ pub async fn compose(reference: &Reference, turn: &Turn) -> Result<Composed, Gat
   let in_round = turn.holds.is_some();
   let mut gates = gates_of(reference, turn.chat_id, agent, turn.lore).await?;
   let people = gates.pop().expect("the person-book search");
+  let remembering = memory_gate(turn.chat_id, &undue)?;
   let people_libraries = offered(reference, turn, &people, &holds, in_round, on(&people.stage)).await;
+  let memory_libraries =
+    offered(reference, turn, &remembering, &holds, in_round, on(&remembering.stage)).await;
   let picks = gates.iter().map(|gate| {
     let holds = &holds;
     let asked = on(&gate.stage);
@@ -750,9 +793,17 @@ pub async fn compose(reference: &Reference, turn: &Turn) -> Result<Composed, Gat
 
     pick::pick(reference, picker(turn, agent, &people, people_libraries.clone())).await
   };
-  let (picked, pieces, rules) = tokio::join!(join_all(picks), pieces, matched);
+  let recalled = async {
+    if memory_libraries.is_empty() {
+      return Ok(Picked::nothing(&remembering.stage));
+    }
+
+    pick::pick(reference, picker(turn, agent, &remembering, memory_libraries.clone())).await
+  };
+  let (picked, pieces, recalled, rules) = tokio::join!(join_all(picks), pieces, recalled, matched);
   let picked: Vec<Picked> = picked.into_iter().collect::<Result<_, _>>()?;
   let pieces = pieces?;
+  let recalled = recalled?;
   let mut rule_entries = woken;
 
   rule_entries.extend(rules?);
@@ -765,7 +816,8 @@ pub async fn compose(reference: &Reference, turn: &Turn) -> Result<Composed, Gat
 
   streams.push((rule_entries, SITUATION_HOLD));
 
-  let entries = standing_first(held(streams), pieces.entries.clone());
+  let memory = memory_of(picked_rows(&remembering, &recalled, &undue));
+  let entries = standing_first(&memory, held(&memory, streams), pieces.entries.clone());
 
   if !entries.is_empty() {
     println!(
@@ -777,7 +829,7 @@ pub async fn compose(reference: &Reference, turn: &Turn) -> Result<Composed, Gat
 
   let rows: HashMap<i64, Fragment> = gates
     .iter()
-    .chain(std::iter::once(&people))
+    .chain([&people, &remembering])
     .flat_map(|gate| gate.libraries.iter().flat_map(|library| library.rows.iter()))
     .map(|row| (row.id, row.clone()))
     .collect();
@@ -786,12 +838,19 @@ pub async fn compose(reference: &Reference, turn: &Turn) -> Result<Composed, Gat
   all_picked.push(pieces);
 
   let mut attached: Vec<i64> = vec![];
+  let remembered = memory.as_ref().is_some_and(|memory| entries.contains(memory));
 
-  for id in entries.iter().filter_map(|entry| entry.fragment) {
+  for id in entries
+    .iter()
+    .filter_map(|entry| entry.fragment)
+    .chain(recalled.entries.iter().filter(|_| remembered).filter_map(|entry| entry.fragment))
+  {
     if !attached.contains(&id) {
       attached.push(id);
     }
   }
+
+  all_picked.push(recalled);
 
   let verdicts: Vec<Verdict> = all_picked
     .iter()

@@ -54,6 +54,13 @@ laya_mode = "shadow"
 laya_road = true
 laya_each = true
 
+# The memory picker reads its candidates as the pickers do; no checkpoint has learnt its question, so Laya is off.
+[[profile]]
+key = "room-memories"
+tier = "Simple"
+sampling = { temperature = 0.1, top_p = 0.8, top_k = 20, min_p = 0 }
+laya_mode = "off"
+
 [[profile]]
 key = "situation-rules"
 tier = "Simple"

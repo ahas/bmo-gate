@@ -71,7 +71,7 @@ no room at all.
 | Call | Route | Body or query | Answer |
 |---|---|---|---|
 | the agent's brain | `GET /brains` | `agentKey`, `limit=2` | `items`: the one brain of that agent key, whose id every call below stands under |
-| standing rows | `GET /brains/{brainId}/memories` | `type` (each of `promise`, `check`, `followup`, `situation`, `state`), `status=active`, `limit` at the route's ceiling, `after` for each page after the first | `items`: the rows that wait on nothing, by their old `conditions` label or, for a `situation` the agent wrote, its own text |
+| standing rows | `GET /brains/{brainId}/memories` | `type` (each of `promise`, `check`, `followup`, `situation`, `state`), `status=active`, `limit` at the route's ceiling, `after` for each page after the first | `items`: the rows that wait on nothing, by their old `conditions` label or, for a `situation` the agent wrote, its own text, and the errands whose event has come, by their `event_met_at` label; a row's words are its old condition's action, else its text |
 | conditional rows | the standing rows | | their old `conditions` label, or a `situation`'s text as its condition |
 | rows the events wake | the standing rows | | the gate filters them by the events their `event` or `conditions` labels name |
 | matched rows written | `POST /brains/{brainId}/hits` | `memoryIds`, `actorName` | `recordedCount` |
@@ -241,11 +241,11 @@ verdict are kept ninety days: the service sweeps both tables as it starts and on
 - **The gate order** — which gates stand, the part and step each takes against a turn, and each gate's profile
   (whether it may be switched off, its Laya probe and default mode, its answer floor) — is the gate's, and
   `GET /gates` serves it.
-- **The instructions,** twenty files in twelve folders, one folder a gate: `sanitizer`, `situation-rules`
+- **The instructions,** twenty-two files in thirteen folders, one folder a gate: `sanitizer`, `situation-rules`
   (two), `document-seek`, `system-documents` (two), `room-rules` (two), `library-knowledge` (two),
-  `people-search` (two), `translator` (three), `output-gate/telegram-html`, `session-summary`
-  (two), `voice-reading` and `voice-polish`. The second file of a reference gate, the person-book search and the
-  situation-rule matcher is the answer file its request closes on (`docs/reference-selection.md`, 「What the
+  `people-search` (two), `room-memories` (two), `translator` (three), `output-gate/telegram-html`,
+  `session-summary` (two), `voice-reading` and `voice-polish`. The second file of a reference gate, the
+  person-book search, the memory picker and the situation-rule matcher is the answer file its request closes on (`docs/reference-selection.md`, 「What the
   three reference gates are asked, and what they answer」). A prompt told its own ceiling (the person-book
   search's and the document seeker's) is rendered with the ceiling the gate's run holds to.
 
@@ -335,7 +335,11 @@ Statements here that a sibling's document does not yet match, each for that sibl
   `system-documents`, `room-rules`, `library-knowledge`, `people-search`, `translator`
   (three), `output-gate/telegram-html`, `voice-reading` and `voice-polish`. Its gate switch route validates a
   gate's name against its own copy of the order; the copies are for the agency to retire, reading the order
-  through `GET /gates`.
+  through `GET /gates`. Its copies do not hold the memory picker, `room-memories`, so its gate switch refuses
+  that name until it reads the order.
+- **The agency holds no work-key profile for `room-memories`:** no label, and no seeded road. The gate resolves
+  it by its tier on the agency's walk (「How a gate run reaches a model」) until the agency seeds it beside the
+  other pickers.
 - **No chat unit asks the output gate yet:** the telegram unit's send path folds a reply's parts by its own
   code; it is to ask `POST /formats/decided` for each part where the send asks for the gate.
 - **The brain's knowledge read** answers the knowledge chunks a room may be offered; the gate reads a picked
