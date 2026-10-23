@@ -72,6 +72,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/console/translations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Translate originals into one language, as POST /translations does; the reader's role is read. */
+        post: operations["console_translations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/console/trials": {
         parameters: {
             query?: never;
@@ -1150,6 +1167,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LayaView"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    console_translations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TranslationAsk"];
+            };
+        };
+        responses: {
+            /** @description one reading for each original */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Readings"];
                 };
             };
             default: components["responses"]["Error"];

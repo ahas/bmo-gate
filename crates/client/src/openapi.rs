@@ -557,6 +557,29 @@ pub fn document() -> Value {
     ],
   );
 
+  route(
+    &mut paths,
+    &mut generator,
+    "post",
+    "/console/translations",
+    "console_translations",
+    "Console",
+    "Translate originals into one language, as POST /translations does; the reader's role is read.",
+    vec![],
+    None,
+    Some(made::<TranslationAsk>),
+    &[(200, "one reading for each original", Some(made::<Readings>))],
+    &[
+      "unauthorized",
+      "forbidden",
+      "bad-request",
+      "language-unknown",
+      "stopped",
+      "failed",
+      "upstream-failed",
+    ],
+  );
+
   let error = made::<ErrorBody>(&mut generator).to_value();
   let definitions = generator.take_definitions(true);
   let mut document = Map::new();

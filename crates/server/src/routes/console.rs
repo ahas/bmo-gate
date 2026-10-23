@@ -9,7 +9,7 @@ use axum::extract::{Path, Request, State};
 use axum::http::header::{CACHE_CONTROL, CONTENT_TYPE};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
-use axum::routing::get;
+use axum::routing::{get, post};
 use bmo_gate_client::{ConsoleManifest, ConsoleRole};
 use gate_codes::Code;
 use serde_json::{Map, Value};
@@ -17,7 +17,7 @@ use serde_json::{Map, Value};
 use crate::App;
 use crate::answer::{Answered, Refused};
 use crate::console::{ConsoleBundle, OWNER_ROLE, ROLE};
-use crate::routes::{gates, trials};
+use crate::routes::{gates, translations, trials};
 
 fn served(app: &App) -> Answered<&ConsoleBundle> {
   app
@@ -73,5 +73,6 @@ pub fn screens() -> Router<Arc<App>> {
     .route("/gates", get(gates::gates))
     .route("/laya", get(gates::laya))
     .route("/trials", get(trials::list).post(trials::add_from_console))
+    .route("/translations", post(translations::translate))
     .layer(middleware::from_fn(reader_role))
 }

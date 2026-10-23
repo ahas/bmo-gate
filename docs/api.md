@@ -223,6 +223,7 @@ console's, so nothing here names one.
 | `GET /console/laya` | | as `GET /laya` |
 | `GET /console/trials` | as `GET /trials` | as `GET /trials` |
 | `POST /console/trials` | `gateName`, `prompt` | 201, the trial |
+| `POST /console/translations` | as `POST /translations` | as `POST /translations` |
 
 - **The manifest** names the bundle `gates`, its menu name the words' `gates.title.gates`, its icon
   `i-material-symbols-balance`, its screen path `/gates`, the service `gate` and the API prefix `/console`, and
@@ -239,6 +240,10 @@ console's, so nothing here names one.
   words are answered on the token alone.
 - **The screen's reads** under `/console/` answer as their routes outside it do. Since the API prefix is
   `/console`, a console relays a browser nothing of the gate but them, the module and the stylesheet.
+- **The translator through the console.** `POST /console/translations` translates as `POST /translations` does
+  (「Translations」), behind the same role as every route here. It is the route a console names as its translator
+  (bmo-ui's `docs/console-bundles.md`, 「Translation」), and another bundle's screens reach it where their manifest
+  names the service `gate` under `calls`.
 - **A trial put through the console** is kept with no user name, under the reader's `Owner-Key`, the account
   service's user id, where the call carries one; the trial answers its `userName` empty.
 

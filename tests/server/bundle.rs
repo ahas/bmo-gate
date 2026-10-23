@@ -262,6 +262,39 @@ async fn the_screens_reads_answer_as_their_routes_behind_the_readers_role() {
 }
 
 #[tokio::test]
+async fn the_translator_through_the_console_answers_as_its_route_behind_the_readers_role() {
+  let ground = serving("translations").await;
+  let asked = json!({ "language": "en", "originals": ["Already in English.", ""] });
+
+  let (status, _, bytes) =
+    ask(&ground, &CONSOLE, Method::POST, "/console/translations", Some(asked.clone())).await;
+  let outside = ground
+    .client
+    .post(format!("{}/translations", ground.address))
+    .bearer_auth(TOKEN)
+    .json(&asked)
+    .send()
+    .await
+    .unwrap();
+
+  assert_eq!(status, StatusCode::OK);
+  assert_eq!(json_of(&bytes), outside.json::<Value>().await.unwrap());
+  assert_eq!(json_of(&bytes)["readings"][0]["text"], "Already in English.");
+
+  for (caller, status, code) in [
+    (&NO_TOKEN, StatusCode::UNAUTHORIZED, "unauthorized"),
+    (&NO_ROLE, StatusCode::FORBIDDEN, "forbidden"),
+    (&MEMBER, StatusCode::FORBIDDEN, "forbidden"),
+  ] {
+    let (answered, _, bytes) =
+      ask(&ground, caller, Method::POST, "/console/translations", Some(asked.clone())).await;
+
+    assert_eq!(answered, status, "{code}");
+    refused(&json_of(&bytes), code);
+  }
+}
+
+#[tokio::test]
 async fn a_trial_put_through_the_console_is_kept_under_the_owner_key() {
   let ground = serving("trial").await;
   let reader = Caller {
