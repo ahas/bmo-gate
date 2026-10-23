@@ -37,7 +37,7 @@ fn the_entry_carries_what_fits_and_says_how_many_more_stand() {
   assert!(
     entry
       .text
-      .ends_with("- … 1 more open, too long to carry this turn: memory_list with chat 7")
+      .ends_with("- … 1 more open, too long to carry this turn: brain_list with chat 7")
   );
   assert!(standing_entry(7, &[]).is_none());
 }
