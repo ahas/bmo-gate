@@ -62,7 +62,8 @@ fn offer_of(offer: &reference_offers::Model) -> Offer {
   }
 }
 
-fn judgement_of(row: &judgements::Model) -> Judgement {
+/// A judgement as the routes answer it, with no roads and no offers.
+pub(crate) fn judgement_of(row: &judgements::Model) -> Judgement {
   Judgement {
     id: row.id,
     room_id: row.chat_id,

@@ -1,9 +1,11 @@
 //! The gate's service (`docs/boundary-api.md`): every route the boundary states, behind the gate's bearer token,
 //! and the watches the service keeps going beside them — the agency's road events written into the road records,
-//! Laya's health asked once a minute, and the attachments counted every hour.
+//! the receiver's draft rows written as the `draft` stage, Laya's health asked once a minute, and the attachments
+//! counted every hour.
 
 pub mod answer;
 pub mod console;
+pub mod drafts;
 pub mod routes;
 pub mod settings;
 pub mod watches;

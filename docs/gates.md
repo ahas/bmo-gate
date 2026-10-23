@@ -186,3 +186,20 @@
   「What the code narrows before a gate is asked」).
 - **A gate switched off, or one the turn does not ask by its own declaration** (a turn of the chat agent's
   own lines alone for a gate that never reads them, a turn with no text), leaves nothing.
+- **A round's draft process is the `draft` stage** (the receiver's `docs/drafting.md`): the gate writes one
+  judgement for each row of it the receiver tells (`docs/boundary-api.md`, 「bmo-receiver」), and judges nothing of
+  what was asked or answered. `draft` is no gate: it stands in no part of the gate order, runs no model and has no
+  options. The round's own turn, whose answer is the draft, leaves no row of the stage; each question, item and
+  check asked after it leaves one, and the process's end one more:
+
+  | Verdict | Row |
+  |---|---|
+  | `ROUND <number> <name>: <outcome>` | a question, an item or a check: its number in the process, its name, and `answered`, `skip` or `failed` |
+  | `END: <outcome>` | the end: `message`, `skip`, `withheld`, `ceiling-message` or `ceiling-skip` |
+
+  Its detail is `answerChars=<n> changed=<true|false> ms=<n>`, and after it, past a semicolon, what the receiver
+  said of the row where it said anything: for the end, the row of the process table the turn read and the checks
+  that withheld the text. The judgement carries the round, stands in the round's room, and is put under the
+  round's message the way the round's other judgements are: where one of the round's judgements already stands
+  under a message it is written under that message, and otherwise it waits for the receiver's attach
+  (`docs/api.md`, 「Judgements」). A round that sent nothing leaves its rows under no message.

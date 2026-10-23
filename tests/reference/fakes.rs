@@ -6,7 +6,9 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
+use futures_util::StreamExt;
 use futures_util::future::BoxFuture;
+use futures_util::stream::BoxStream;
 use gate_ports::PortError;
 use gate_ports::brain::{
   Brain, Condition, Document, Event, Fragment, Hit, Load, MemoryRow, Reply, RoomRule, Sheet,
@@ -14,7 +16,7 @@ use gate_ports::brain::{
 use gate_ports::gateway::{Ask, Completion, Gateway};
 use gate_ports::http::Answer;
 use gate_ports::job::{Job, Raised};
-use gate_ports::receiver::{Message, Name, OwnerSpoke, Receiver, Roads, RoomTitle};
+use gate_ports::receiver::{Drafted, Message, Name, OwnerSpoke, Receiver, Roads, RoomTitle};
 use serde_json::{Map, Value};
 
 fn unoffered<T>(unit: &'static str, call: &'static str) -> Answer<T> {
@@ -242,7 +244,7 @@ impl Brain for FakeBrain {
 }
 
 /// The stand-in receiver: the rooms it keeps, the names it knows people by, the messages it keeps by room and number,
-/// the chat agent's own number, and the owner notices it was handed.
+/// the chat agent's own number, the owner notices it was handed, and the draft rows its stream tells.
 #[derive(Default)]
 pub struct FakeReceiver {
   pub rooms: Mutex<Vec<RoomTitle>>,
@@ -250,6 +252,7 @@ pub struct FakeReceiver {
   pub messages: Mutex<HashMap<(i64, i64), Message>>,
   pub own: Mutex<Option<i64>>,
   pub notices: Mutex<Vec<(String, Map<String, Value>)>>,
+  pub drafted: Mutex<Vec<Drafted>>,
 }
 
 impl Receiver for FakeReceiver {
@@ -311,6 +314,14 @@ impl Receiver for FakeReceiver {
     Box::pin(async move {
       self.notices.lock().unwrap().push((code.to_owned(), fields.clone()));
       Ok(())
+    })
+  }
+
+  fn drafts(&self) -> BoxFuture<'_, Answer<BoxStream<'static, Answer<Drafted>>>> {
+    Box::pin(async move {
+      let drafted: Vec<Answer<Drafted>> = self.drafted.lock().unwrap().iter().cloned().map(Ok).collect();
+
+      Ok(futures_util::stream::iter(drafted).boxed())
     })
   }
 }

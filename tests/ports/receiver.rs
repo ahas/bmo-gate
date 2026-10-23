@@ -1,8 +1,10 @@
 //! The receiver port: each room fact's path and body, its answer read, the owner notice's code carried beside its
-//! fields, and a stored message read by its room and number, none where the receiver keeps none.
+//! fields, a stored message read by its room and number, none where the receiver keeps none, and the draft rows
+//! read off the event stream and nothing else of it.
 
 use axum::http::Method;
-use gate_ports::receiver::{HttpReceiver, Message, Name, OwnerSpoke, Receiver, Roads};
+use futures_util::StreamExt;
+use gate_ports::receiver::{Drafted, HttpReceiver, Message, Name, OwnerSpoke, Receiver, Roads};
 use serde_json::{Map, json};
 
 use crate::peer;
@@ -119,4 +121,43 @@ async fn a_stored_message_is_read_by_its_room_and_number_and_the_agent_s_own_num
   assert_eq!(receiver.message(-7, 10).await.unwrap(), None);
   assert_eq!(receiver.own_number("the-chat-agent", -7).await.unwrap(), Some(42));
   assert_eq!(stub.one("/rooms/own-number").json(), json!({ "agent": "the-chat-agent", "chatId": -7 }));
+}
+
+#[tokio::test]
+async fn the_draft_rows_are_read_off_the_event_stream_and_nothing_else_is() {
+  let stub = Stub::start().await;
+  let receiver = HttpReceiver::new(peer(&stub, "receiver-token"));
+  let row = json!({
+    "type": "draft", "chatId": 7, "messageId": null, "round": "round-1", "agentName": "the-chat-agent", "number": 2,
+    "question": "facts", "kind": "question", "answerChars": 120, "changed": true, "outcome": "answered",
+    "detail": null, "ms": 900, "at": 1_700_000_000, "id": 4
+  });
+  let message = json!({ "type": "message", "chatId": 7, "messageId": 30, "id": 3, "at": 1_700_000_000 });
+  let body = format!(
+    "event: run\ndata: {{\"run\":\"a-run\"}}\n\nid: 3\nevent: bot\ndata: {message}\n\nid: 4\nevent: bot\ndata: {row}\n\n\
+     event: live\ndata: {{\"at\":1,\"turns\":[],\"compacting\":[],\"queued\":[]}}\n\n: ping\n\n"
+  );
+
+  stub.canned(Method::GET, "/events", 200, "text/event-stream", body);
+
+  let rows: Vec<_> = receiver.drafts().await.unwrap().collect().await;
+
+  assert_eq!(rows.len(), 1, "{rows:?}");
+  assert_eq!(
+    rows.into_iter().next().unwrap().unwrap(),
+    Drafted {
+      chat_id: 7,
+      round: "round-1".into(),
+      agent_name: "the-chat-agent".into(),
+      number: 2,
+      question: "facts".into(),
+      kind: "question".into(),
+      answer_chars: 120,
+      changed: true,
+      outcome: "answered".into(),
+      detail: None,
+      ms: 900,
+    }
+  );
+  assert_eq!(stub.one("/events").bearer().as_deref(), Some("receiver-token"));
 }

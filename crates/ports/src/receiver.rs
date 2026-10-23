@@ -1,9 +1,11 @@
 //! The receiver port (`docs/boundary-api.md`, 「bmo-receiver」): the room facts the gate reads, through the
 //! receiver's routes in the brain's family — camelCase bodies, every call a `POST` — the owner notice the gate
-//! hands a fact to the chat agent by, and one stored message, read through the route the receiver serves bmo-job
-//! in its snake_case.
+//! hands a fact to the chat agent by, one stored message, read through the route the receiver serves bmo-job
+//! in its snake_case, and the rows of each round's draft process, read off the receiver's event stream.
 
 use futures_util::future::BoxFuture;
+use futures_util::stream::BoxStream;
+use futures_util::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -52,6 +54,26 @@ pub struct Name {
   pub name: Option<String>,
 }
 
+/// One row of a round's draft process, as the receiver's `draft` event tells it: the room, the round and the agent,
+/// the row's number (0 the round's own turn), the question's name, its kind, how long its answer is, whether the
+/// answer changed, how it ended and what the receiver said beside it. The answer itself is never told.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Drafted {
+  pub chat_id: i64,
+  pub round: String,
+  pub agent_name: String,
+  pub number: i64,
+  pub question: String,
+  pub kind: String,
+  pub answer_chars: i64,
+  pub changed: bool,
+  pub outcome: String,
+  #[serde(default)]
+  pub detail: Option<String>,
+  pub ms: i64,
+}
+
 /// Every call the gate makes on the receiver.
 pub trait Receiver: Send + Sync {
   /// Every room's chat, title and senders.
@@ -87,6 +109,9 @@ pub trait Receiver: Send + Sync {
   /// A fact handed to the chat agent in the owner's room, as a code and its fields.
   fn owner_notice<'a>(&'a self, code: &'a str, fields: &'a Map<String, Value>)
   -> BoxFuture<'a, Answer<()>>;
+
+  /// The rows of the rounds' draft processes, from the ring the receiver replays as the stream opens.
+  fn drafts(&self) -> BoxFuture<'_, Answer<BoxStream<'static, Answer<Drafted>>>>;
 }
 
 /// The receiver over HTTP.
@@ -298,6 +323,24 @@ impl Receiver for HttpReceiver {
       let _: Ok = self.caller.post("owner notice", &["owner", "notice"], &body).await?;
 
       Ok(())
+    })
+  }
+
+  fn drafts(&self) -> BoxFuture<'_, Answer<BoxStream<'static, Answer<Drafted>>>> {
+    Box::pin(async move {
+      let events = self.caller.events("draft rows", &["events"], &[]).await?;
+      let drafts = events
+        .try_filter(|(_, data)| futures_util::future::ready(data["type"] == "draft"))
+        .and_then(|(_, data)| {
+          futures_util::future::ready(serde_json::from_value(data).map_err(|why| PortError::Malformed {
+            unit: "bmo-receiver",
+            call: "draft rows",
+            status: 200,
+            why: why.to_string(),
+          }))
+        });
+
+      Ok(drafts.boxed())
     })
   }
 }

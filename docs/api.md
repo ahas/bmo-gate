@@ -68,6 +68,8 @@ An agreement carries `gateName`, `unit` (`pair` or `question`), `pairs`, `failur
   names no round, that fall within the time the judgement took, give or take five seconds; each road goes to
   one judgement. Its `offers` are the offers record of its round. Both are empty on a judgement as `POST`
   answers it and filled on a judgement as `GET` answers it.
+- **The `draft` stage is the gate's own:** it writes those judgements itself, of the receiver's round log
+  (`docs/gates.md`, 「What a turn records」), and they are read and attached like any other.
 - **The attach** puts a round's judgements under the message that answered it: every judgement of the room
   written at or after `since` and standing under no message yet is put under `messageId`. A caller asks it
   once the answer is sent, `since` being the moment the round began.

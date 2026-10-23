@@ -108,7 +108,8 @@ attached.
 
 ### bmo-receiver
 
-The receiver's routes in the common conventions, which the gate reads its room facts through.
+The receiver's routes in the common conventions, which the gate reads its room facts through, and its event
+stream, which the gate reads the rows of each round's draft process off.
 
 | Call | Route | Body | Answer |
 |---|---|---|---|
@@ -120,10 +121,19 @@ The receiver's routes in the common conventions, which the gate reads its room f
 | waits on a happening | `/promises/waits` | `text` | `waits` |
 | own number | `/rooms/own-number` | `agent`, `chatId` | `number`: the sender the agent's words stand under in the room, or null |
 | owner notice | `/owner/notice` | `code` and its fields | `ok` |
+| draft rows | `GET /events`, held open | none | the receiver's event stream; the gate takes the frames whose data's `type` is `draft` and lets every other go |
 
 The reference nouns of the unit command (「The unit command」) read a stored turn's message through the route the
 receiver serves bmo-job, in its snake_case: `GET /rooms/{chat}/messages/{message}`, answering `sender?`,
 `sender_name?`, `sent_at` and `text`, and 404 where the receiver keeps no such message.
+
+A `draft` frame is one row of a round's draft process as the receiver's round log keeps it (the receiver's
+`docs/drafting.md`, 「The round log」): `chatId`, `round`, `agentName`, `number` (0 the round's own turn), `question`,
+`kind` (`turn`, `question`, `item`, `check` or `end`), `answerChars`, `changed`, `outcome` and `detail`, and never
+the answer itself. The gate writes each into its judgements as the `draft` stage (`docs/gates.md`, 「What a turn
+records」). The stream replays the receiver's ring of recent events each time it is opened, and the gate opens it
+again five seconds after it drops; a row the gate has written already is not written twice, and a row that left the
+ring while the stream was down is not written at all.
 
 The owner notice tells the chat agent in the owner's room a fact the gate raised, as a code and its fields:
 `attachment-alarm` (`row`, `stage`, `piece`, `share`) where the attachments watch filed a row

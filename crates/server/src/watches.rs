@@ -1,13 +1,14 @@
 //! What the service keeps going beside its routes: the agency's `road-walked` events written into the road records,
-//! Laya's health asked once a minute and told to the screens where its state or model moved, the attachments
-//! counted every hour, and the bounded tables swept as the service starts and once a day after. None of them
-//! registers a hook at the agency.
+//! the receiver's `draft` rows written as the `draft` stage and told to the screens, Laya's health asked once a
+//! minute and told to the screens where its state or model moved, the attachments counted every hour, and the
+//! bounded tables swept as the service starts and once a day after. None of them registers a hook at the agency.
 
 use std::sync::Arc;
 use std::time::Duration;
 
 use futures_util::StreamExt;
 use gate_ports::agency::RoadWalked;
+use gate_ports::receiver::Drafted;
 use gate_reference::attachments;
 use gate_runs::records::{self, Road, Spent, now};
 use gate_stages::{laya_health, retention};
@@ -15,6 +16,8 @@ use sea_orm::DatabaseConnection;
 use serde_json::json;
 
 use crate::App;
+use crate::drafts;
+use crate::routes::judgements::judgement_of;
 
 /// How long a dropped event stream waits before it is opened again.
 const REOPEN: Duration = Duration::from_secs(5);
@@ -69,6 +72,39 @@ async fn road_walked(app: Arc<App>) {
         }
       }
       Err(why) => eprintln!("gate-server: the agency's road events could not be opened: {why}"),
+    }
+
+    tokio::time::sleep(REOPEN).await;
+  }
+}
+
+/// One row of a round's draft process written as the `draft` stage, and told to the screens where it was written.
+pub async fn write_drafted(app: &App, drafted: &Drafted) {
+  match drafts::write(&app.stages.runs.db, drafted).await {
+    Ok(Some(written)) => app
+      .stages
+      .publish("judgement.created", serde_json::to_value(judgement_of(&written)).unwrap_or(json!({}))),
+    Ok(None) => {}
+    Err(why) => {
+      eprintln!("gate-server: a draft row of chat {} could not be written: {why}", drafted.chat_id)
+    }
+  }
+}
+
+async fn drafted(app: Arc<App>) {
+  let receiver = app.reference.receiver.clone();
+
+  loop {
+    match receiver.drafts().await {
+      Ok(mut stream) => {
+        while let Some(drafted) = stream.next().await {
+          match drafted {
+            Ok(drafted) => write_drafted(&app, &drafted).await,
+            Err(why) => eprintln!("gate-server: a draft row the receiver told did not read: {why}"),
+          }
+        }
+      }
+      Err(why) => eprintln!("gate-server: the receiver's event stream could not be opened: {why}"),
     }
 
     tokio::time::sleep(REOPEN).await;
@@ -134,6 +170,7 @@ async fn sweeps(app: Arc<App>) {
 /// Every watch started beside the routes.
 pub fn start(app: Arc<App>) {
   tokio::spawn(road_walked(app.clone()));
+  tokio::spawn(drafted(app.clone()));
   tokio::spawn(health(app.clone()));
   tokio::spawn(attachments(app.clone()));
   tokio::spawn(sweeps(app));
