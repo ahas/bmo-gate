@@ -102,17 +102,26 @@ flowchart TB
 
 - **The room's standing memories** — its rows that wait on no condition, and the errands whose event
   has come — attach on every turn of that room. No model chooses them: the room is a fact the prompt
-  builder already holds (the brain's `docs/memories.md`).
+  builder already holds (the brain's `docs/memories.md`). They are the rows an agent keeps of its own doing
+  there — promises, checks, follow-ups, situations and states — and never a rule, so a rule reaches a turn
+  through the `room-rules` gate alone, and never through the memories as well.
 - **The rows the turn's events wake** attach by the event alone (the brain's `docs/memories.md`, 「A row with an
   event」).
-- **The standing sheet of everyone who spoke this turn** attaches for the same reason: what the brain
-  knows of that person in this room, as the brain renders it from its facts — their facts about no room and
-  their facts about this room, one line a fact, the most important first (the brain's `docs/design.md`,
-  「A person is a subject」). The gate reads it through the brain's rendering of the person's subject with
+- **No room rule attaches without a gate.** Every rule of the room is a candidate of the `room-rules` gate,
+  read from the room's index on every turn, and reaches a turn only where the gate picks it, whatever labels
+  its row carries.
+- **The head of the standing sheet of everyone who spoke this turn** attaches with no model choosing it, as the
+  memories do: what the brain knows of that person in this room, as the brain renders it from its facts —
+  their facts about no room and their facts about this room, one line a fact, the most important first (the
+  brain's `docs/design.md`, 「A person is a subject」). The gate reads it through the brain's rendering of the person's subject with
   the room's subject as its room, and through nothing else: the brain keeps no sheet as a row, and no
   memory of type `sheet` is ever read (`docs/boundary-api.md`, 「bmo-brain」).
+  - **The head is the sheet's first eight lines,** the policy's count, the most important facts; a person
+    the brain knows no fact of in the room has no sheet. The rest of a speaker's facts reach a turn only
+    through the person-book search, which offers the speakers as it offers anyone (below), and through the
+    agent's own reading of its brain.
   - **A sheet is held to 14,000 characters** by its lines from the top, so what is cut is the least
-    important; a person the brain knows no fact of in the room has no sheet.
+    important.
   - **Its path is the room's and the person's,** `rooms/<room>/people/<user id>/sheet.md`, since the same
     person reads differently in two rooms.
   - **It is the turn's agent's own,** read from that agent's brain; an agent keeping no long-term memory is
@@ -148,11 +157,12 @@ flowchart TB
 - **`room-rules`** — the room's own rulebook, read for that room and no other.
 - **`library-knowledge`** — the knowledge pieces this room may see: the rows that name this room and
   the rows that name none, which are the shared ones (the brain's `docs/knowledge.md`).
-- **`people-search`** — the people the agent's brain knows facts of, one candidate a person, less those
-  who spoke this turn, whose sheets already attach. A candidate's slug is `person-<user id>` and its index
-  line the name the brain knows the person by, else their number; picked, it attaches that person's sheet
-  in this room as a speaker's attaches, under the same path and the same ceiling. A person whose sheet in
-  the room renders as nothing attaches nothing.
+- **`people-search`** — the people the agent's brain knows facts of, one candidate a person, those who
+  spoke this turn among them. A candidate's slug is `person-<user id>` and its index line the name the brain
+  knows the person by, else their number; picked, it attaches that person's whole sheet in this room, under
+  the path a speaker's head stands under and held to the same ceiling. A speaker it picks has the whole sheet
+  in place of the head, so no sheet attaches twice. A person whose sheet in the room renders as nothing
+  attaches nothing.
 - **`situation-rules`** — the room's standing memories that carry a condition, and the global ones
   that reach it, offered as their conditions alone. It is not one of the three: its candidates are
   rows rather than documents drawn from an index, it asks two questions of each rather than one, and

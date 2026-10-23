@@ -1,6 +1,7 @@
 //! The road a turn's reference is composed on (`docs/reference-selection.md`): the room's standing memories and the
-//! sheet of everyone who spoke, as the brain renders it from their facts, which no model chooses; each picker's libraries, less what the round
-//! already holds and narrowed by the code, with what each was offered written down; the three reference gates, the
+//! head of the sheet of everyone who spoke, as the brain renders it from their facts, which no model chooses; each
+//! picker's libraries, less what the round already holds and narrowed by the code, with what each was offered
+//! written down; the three reference gates, the
 //! person-book search and the situation-rule matcher asked side by side; each gate's picks held to its allowance and
 //! all of them to the turn's total; and what the turn attached handed to the brain to count.
 
@@ -198,8 +199,9 @@ pub fn held_sheet(text: &str) -> String {
   kept.join("\n")
 }
 
-/// The standing sheet of everyone who spoke this turn: each one's sheet in the room as the brain renders it from
-/// their facts, held to its ceiling. An agent keeping no long-term memory is given none.
+/// The head of the standing sheet of everyone who spoke this turn: the first lines of each one's sheet in the room
+/// as the brain renders it from their facts, as many as the policy names, held to its ceiling. An agent keeping no
+/// long-term memory is given none.
 pub async fn standing_entries(
   reference: &Reference,
   chat_id: i64,
@@ -213,7 +215,7 @@ pub async fn standing_entries(
     return vec![];
   }
 
-  match reference.brain.sheets(agent, chat_id, &senders).await {
+  match reference.brain.sheets(agent, chat_id, &senders, Some(REFERENCE.sheet_lines)).await {
     Ok(sheets) => sheets
       .into_iter()
       .map(|sheet| Entry {
@@ -229,17 +231,6 @@ pub async fn standing_entries(
       vec![]
     }
   }
-}
-
-// The libraries less the people who spoke this turn, whose sheets the turn carries already.
-fn unspoken(libraries: Vec<Library>, speakers: &[i64]) -> Vec<Library> {
-  libraries
-    .into_iter()
-    .filter_map(|library| match library.body {
-      Body::People => library.with(|row| !row.owner.is_some_and(|owner| speakers.contains(&owner))),
-      _ => Some(library),
-    })
-    .collect()
 }
 
 // The libraries less every piece the round already holds.
@@ -526,7 +517,7 @@ pub async fn narrowing(
 ) -> Narrowing {
   narrowed(
     reference,
-    &unspoken(unheld(&gate.libraries, holds), &turn.speaker_ids),
+    &unheld(&gate.libraries, holds),
     turn.message_lines.join("\n"),
     turn.speaker_ids.clone(),
     rules_of(gate.bot_lines_alone, turn.people_spoke),
@@ -696,11 +687,13 @@ pub async fn compose(reference: &Reference, turn: &Turn) -> Result<Composed, Gat
     all.extend(streams);
     within_turn_budget(turn.chat_id, all)
   };
+  // A speaker the person-book search picked has the whole sheet in place of the head, under the same path.
   let standing_first = |kept: Vec<Entry>, picked: Vec<Entry>| {
     let is_memory = |entry: &Entry| memory.as_ref() == Some(entry);
     let mut entries: Vec<Entry> = kept.iter().filter(|entry| is_memory(entry)).cloned().collect();
+    let whole: HashSet<&str> = picked.iter().map(|entry| entry.path.as_str()).collect();
 
-    entries.extend(sheets.iter().cloned());
+    entries.extend(sheets.iter().filter(|sheet| !whole.contains(sheet.path.as_str())).cloned());
 
     let mut seen: HashSet<String> = entries.iter().map(|entry| entry.path.clone()).collect();
 

@@ -1,5 +1,5 @@
-//! A turn's reference on the road: the standing memories and sheets first, each gate's picks read through the
-//! library they stand in, what each gate was offered, judged and attached written down and the attached rows handed
+//! A turn's reference on the road: the standing memories and the heads of the speakers' sheets first, each gate's
+//! picks read through the library they stand in, what each gate was offered, judged and attached written down and the attached rows handed
 //! to the brain; a gate switched off asked nothing, a gate left no candidate saying so, a gate with no reading handing
 //! over its index, and the knowledge a piece of work is handed.
 
@@ -162,8 +162,8 @@ async fn a_turns_reference_stands_its_memories_and_sheets_first_then_what_each_g
       .await,
     ["kittens"]
   );
-  // The speaker's own sheet stands already, so the person-book search is offered the others, narrowed to whom
-  // the turn names.
+  // The person-book search is offered the speaker beside the others, whose whole sheet it may pick in place of the
+  // head, narrowed to whom the turn names.
   assert_eq!(
     scratch
       .texts(
@@ -171,7 +171,7 @@ async fn a_turns_reference_stands_its_memories_and_sheets_first_then_what_each_g
         vec![]
       )
       .await,
-    ["2 [\"person-6\"]"]
+    ["3 [\"person-5\",\"person-6\"]"]
   );
   assert_eq!(
     scratch.count("SELECT count(*) FROM gate_roads WHERE round = 'round-1'", vec![]).await,
@@ -409,4 +409,42 @@ fn a_sheet_over_its_ceiling_keeps_its_lines_from_the_top() {
   assert!(held.chars().count() + line(lines.len() + 1).chars().count() + 1 > REFERENCE.sheet_chars);
   assert_eq!(held_sheet("- [#1 since 2026-01-02] Short.\n"), "- [#1 since 2026-01-02] Short.");
   assert_eq!(held_sheet(&"x".repeat(REFERENCE.sheet_chars + 1)), "");
+}
+
+// A speaker's sheet of so many facts, one line each.
+fn long_sheet(person: i64, facts: usize) -> Sheet {
+  Sheet {
+    person,
+    path: format!("rooms/7/people/{person}/sheet.md"),
+    text: (1..=facts)
+      .map(|at| format!("- [#{at} since 2026-01-02] Fact {at}."))
+      .collect::<Vec<_>>()
+      .join("\n"),
+  }
+}
+
+#[tokio::test]
+async fn a_speakers_sheet_attaches_its_head_and_the_search_alone_attaches_the_rest() {
+  let headed = ground("sheet-head", picking(&[])).await;
+
+  furnish(&headed);
+  headed.brain.sheets.lock().unwrap()[0] = long_sheet(5, 30);
+
+  let entries = select(&headed.reference, &turn(&[])).await.unwrap();
+  let head = entries.iter().find(|entry| entry.path == "rooms/7/people/5/sheet.md").unwrap();
+
+  assert_eq!(head.text.lines().count(), REFERENCE.sheet_lines);
+  assert_eq!(head.text.lines().next(), Some("- [#1 since 2026-01-02] Fact 1."));
+
+  let whole = ground("sheet-whole", picking(&["person-5"])).await;
+
+  furnish(&whole);
+  whole.brain.sheets.lock().unwrap()[0] = long_sheet(5, 30);
+
+  let entries = select(&whole.reference, &turn(&[])).await.unwrap();
+  let sheets: Vec<&Entry> =
+    entries.iter().filter(|entry| entry.path == "rooms/7/people/5/sheet.md").collect();
+
+  assert_eq!(sheets.len(), 1, "{entries:?}");
+  assert_eq!(sheets[0].text.lines().count(), 30);
 }

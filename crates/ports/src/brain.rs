@@ -224,12 +224,14 @@ pub trait Brain: Send + Sync {
   fn lore<'a>(&'a self, agent: &'a str, slugs: &'a [String]) -> BoxFuture<'a, Answer<Vec<Document>>>;
 
   /// Each of these people's sheets in the room, in the order asked: what the brain renders from their facts
-  /// about no room and their facts about the room. A person the brain knows no fact of there has none.
+  /// about no room and their facts about the room, its first `lines` lines alone where a count is given. A person
+  /// the brain knows no fact of there has none.
   fn sheets<'a>(
     &'a self,
     agent: &'a str,
     chat: i64,
     people: &'a [i64],
+    lines: Option<usize>,
   ) -> BoxFuture<'a, Answer<Vec<Sheet>>>;
 
   /// The rules the owner grants in the room.
@@ -676,6 +678,7 @@ impl Brain for HttpBrain {
     agent: &'a str,
     chat: i64,
     people: &'a [i64],
+    lines: Option<usize>,
   ) -> BoxFuture<'a, Answer<Vec<Sheet>>> {
     Box::pin(async move {
       if people.is_empty() {
@@ -684,7 +687,11 @@ impl Brain for HttpBrain {
 
       let brain = self.brain(agent).await?;
       let room = self.subject(brain, "room", &chat.to_string()).await?.map(|room| room.to_string());
-      let query: Vec<(&str, &str)> = room.as_deref().map(|room| vec![("roomId", room)]).unwrap_or_default();
+      let limit = lines.map(|lines| lines.to_string());
+      let query: Vec<(&str, &str)> = [("roomId", room.as_deref()), ("limit", limit.as_deref())]
+        .into_iter()
+        .filter_map(|(key, value)| value.map(|value| (key, value)))
+        .collect();
       let mut sheets: Vec<Sheet> = Vec::new();
 
       for &person in people {

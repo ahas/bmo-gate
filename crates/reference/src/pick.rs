@@ -592,7 +592,7 @@ pub async fn read_bodies(
   if !people.is_empty() {
     let owners: Vec<i64> = people.iter().map(|(_, owner)| *owner).collect();
 
-    match reference.brain.sheets(agent, chat_id, &owners).await {
+    match reference.brain.sheets(agent, chat_id, &owners, None).await {
       Ok(sheets) => {
         for sheet in sheets {
           let text = crate::road::held_sheet(&sheet.text);

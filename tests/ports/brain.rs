@@ -320,7 +320,7 @@ async fn a_persons_sheet_is_the_brains_rendering_of_their_facts_in_the_room() {
   );
   stub.canned(Method::GET, "/brains/9/subjects/5/sheet", 200, "text/plain", String::new());
 
-  let sheets = brain.sheets("chat-agent", 7, &[31, 32, 33]).await.unwrap();
+  let sheets = brain.sheets("chat-agent", 7, &[31, 32, 33], None).await.unwrap();
 
   assert_eq!(sheets.len(), 1);
   assert_eq!((sheets[0].person, sheets[0].path.as_str()), (31, "rooms/7/people/31/sheet.md"));
@@ -329,6 +329,18 @@ async fn a_persons_sheet_is_the_brains_rendering_of_their_facts_in_the_room() {
     "- [#21 since 2026-01-02] Likes tea.\n- [#22 since 2026-02-03] Keeps a garden."
   );
   assert_eq!(stub.one("/brains/9/subjects/4/sheet").query.as_deref(), Some("roomId=3"));
+
+  // A head is asked for by its line count.
+  brain.sheets("chat-agent", 7, &[31], Some(8)).await.unwrap();
+
+  let heads: Vec<Option<String>> = stub
+    .seen()
+    .into_iter()
+    .filter(|seen| seen.path == "/brains/9/subjects/4/sheet")
+    .map(|seen| seen.query)
+    .collect();
+
+  assert_eq!(heads.last().unwrap().as_deref(), Some("roomId=3&limit=8"));
   assert!(
     stub
       .seen()

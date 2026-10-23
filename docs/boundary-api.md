@@ -83,7 +83,7 @@ no room at all.
 | knowledge read | `GET /brains/{brainId}/memories` | `type=knowledge`, `status=active`, paged | `items`, filtered by the slug asked |
 | lore read | `GET /brains/{brainId}/memories` | `type=lore`, `status=active`, paged | `items`, filtered by the slug asked; a piece's body is the row's text |
 | a subject found | `GET /brains/{brainId}/subjects` | `type` (`person` or `room`), `key` (the user's or the room's id), `limit=1` | `items`: the subject, or none where the brain holds none |
-| a person's sheet | `GET /brains/{brainId}/subjects/{subjectId}/sheet` | `roomId`, the room's subject, where the brain holds one | `text/plain`: one line a fact, `- [#<id> since <date>] <text>`, the most important first; empty where the brain knows no fact of the person there |
+| a person's sheet | `GET /brains/{brainId}/subjects/{subjectId}/sheet` | `roomId`, the room's subject, where the brain holds one; `limit`, the head's line count, for a speaker's head (`docs/reference-selection.md`, 「What attaches without a gate」), and none for a whole sheet | `text/plain`: one line a fact, `- [#<id> since <date>] <text>`, the most important first; empty where the brain knows no fact of the person there |
 | owner room rules | `POST /room-rules/read` | `chatId` | `rules`: `id`, `subject`, `text` |
 | a session's loads | `POST /sessions/loads` | `session` | `loads`: `path`, `version` |
 

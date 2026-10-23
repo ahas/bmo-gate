@@ -221,14 +221,22 @@ impl Brain for FakeBrain {
     _agent: &'a str,
     _chat: i64,
     people: &'a [i64],
+    lines: Option<usize>,
   ) -> BoxFuture<'a, Answer<Vec<Sheet>>> {
     Box::pin(async move {
       let sheets = self.sheets.lock().unwrap();
+      let head = |sheet: &Sheet| Sheet {
+        text: match lines {
+          Some(lines) => sheet.text.lines().take(lines).collect::<Vec<_>>().join("\n"),
+          None => sheet.text.clone(),
+        },
+        ..sheet.clone()
+      };
 
       Ok(
         people
           .iter()
-          .filter_map(|person| sheets.iter().find(|sheet| sheet.person == *person).cloned())
+          .filter_map(|person| sheets.iter().find(|sheet| sheet.person == *person).map(head))
           .collect(),
       )
     })

@@ -68,6 +68,7 @@ pub struct Situation {
 pub struct Reference {
   pub turn_budget_chars: usize,
   pub sheet_chars: usize,
+  pub sheet_lines: usize,
   pub gates: Vec<ReferenceGate>,
   pub people: PeopleSearch,
   pub situation: Situation,
