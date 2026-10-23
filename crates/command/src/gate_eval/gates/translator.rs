@@ -6,11 +6,12 @@
 use std::sync::{Arc, LazyLock};
 
 use futures_util::future::BoxFuture;
+use gate_policy::translation::TRANSLATION;
 use gate_policy::{fill_marks, prompts};
 use gate_stages::Stages;
 use gate_stages::document_translation::{Kept, Outcome, request, translate_part};
 use gate_stages::records::{record_system, worker_system};
-use gate_stages::translator::STAGE;
+use gate_stages::translator::{Reader, STAGE};
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -42,8 +43,8 @@ impl Variant {
   fn target(self) -> Option<&'static str> {
     match self {
       Self::Viewer => None,
-      Self::Worker => Some("en"),
-      Self::Record => Some("ko"),
+      Self::Worker => Some(Reader::Worker.language(&TRANSLATION)),
+      Self::Record => Some(Reader::Record.language(&TRANSLATION)),
     }
   }
 
@@ -145,7 +146,10 @@ impl Member for Translator {
   fn input_schema(&self) -> Value {
     schema::object(&[
       ("variant", schema::one_of(&["viewer", "worker", "record"])),
-      ("target", schema::one_of(&["ko", "en"])),
+      (
+        "target",
+        schema::one_of(&TRANSLATION.language_names.keys().map(String::as_str).collect::<Vec<_>>()),
+      ),
       ("text", schema::text()),
     ])
   }
@@ -168,7 +172,7 @@ impl Member for Translator {
     Box::pin(async move {
       let worker = Arc::new(Variant::Worker.system(stages).await?);
       let example = &WORDS.example;
-      let shown = shown_request(&request(&example.text, "en", &worker));
+      let shown = shown_request(&request(&example.text, Reader::Worker.language(&TRANSLATION), &worker));
       let body = fill_marks(WORDS.body.trim(), &[("form_rule", &form_rule())]);
 
       Ok(

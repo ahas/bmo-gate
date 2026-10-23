@@ -4,7 +4,8 @@ Translates texts into one language through the gate's translator, and answers wh
 
 ## Arguments
 
-- `language`: the language tag to translate into. The translator takes `en` and `ko`; any other is refused.
+- `language`: the language tag to translate into. The translator takes two, the language workers read and the
+  owner's language, as the gate's policy names them (`en` and `ko` as it ships); any other is refused.
 - `texts`: one text or several, at most twenty. Several texts for one language go in one call.
 
 ## What comes back

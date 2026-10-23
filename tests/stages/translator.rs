@@ -1,10 +1,12 @@
 //! The translator's readings: a text with no part in another language stands as it is, a Korean one is read into
 //! English part by part and kept, read back rather than asked again, and left unwhole and unkept where a part did
-//! not come back; a reading kept by hand reads back in its language alone; a language no reader takes is none.
+//! not come back; a reading kept by hand reads back in its language alone; a language no reader takes is none, and
+//! which language each reader takes is the policy's.
 //! Hangul is counted out, never written into the test.
 
 use std::sync::{Arc, Mutex};
 
+use gate_policy::translation::{TRANSLATION, Translation};
 use gate_runs::GateRequest;
 use gate_stages::translator::{Ask, Read, Reader, keep, readings, recalled};
 
@@ -99,8 +101,8 @@ async fn a_language_no_reader_takes_is_none() {
   let ground = ground("language", None, Default::default()).await;
   let (ask, _) = gate(|_| None);
 
-  assert_eq!(Reader::of("en"), Some(Reader::Worker));
-  assert_eq!(Reader::of("ko"), Some(Reader::Record));
+  assert_eq!(Reader::of(&TRANSLATION.worker_language), Some(Reader::Worker));
+  assert_eq!(Reader::of(&TRANSLATION.owner_language), Some(Reader::Record));
   assert!(readings(&ground.stages, "fr", &["x".to_owned()], &ask).await.is_none());
 }
 
@@ -130,4 +132,24 @@ async fn an_english_text_is_read_into_the_owners_language_by_the_record_reader()
   );
   assert!(asked.lock().unwrap()[0].prompt.starts_with("Translate into Korean.\n\n"));
   assert!(asked.lock().unwrap()[0].system.starts_with("the plain-writing rulebook\n\n"));
+}
+
+#[test]
+fn a_deployment_whose_owner_reads_another_language_has_the_record_reader_take_that_one() {
+  let policy = Translation {
+    worker_language: "en".to_owned(),
+    owner_language: "ja".to_owned(),
+    latin_per_hangul: TRANSLATION.latin_per_hangul,
+    record_attempts: TRANSLATION.record_attempts,
+    language_names: [("en", "English"), ("ja", "Japanese")]
+      .into_iter()
+      .map(|(tag, name)| (tag.to_owned(), name.to_owned()))
+      .collect(),
+  };
+
+  assert_eq!(Reader::under(&policy, "ja"), Some(Reader::Record));
+  assert_eq!(Reader::under(&policy, "en"), Some(Reader::Worker));
+  assert_eq!(Reader::under(&policy, "ko"), None);
+  assert_eq!(Reader::Record.language(&policy), "ja");
+  assert_eq!(Reader::Worker.language(&policy), "en");
 }

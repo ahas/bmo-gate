@@ -251,6 +251,7 @@ verdict are kept ninety days: the service sweeps both tables as it starts and on
 | the session summariser's transcript and summary: their lengths and the line the transcript rides under | the gate | its own policy file |
 | the gate order and the gates' profiles | the gate | its own policy file, served by `GET /gates` |
 | the prompt ceilings | the gate | its own policy file |
+| the translator's languages: the worker's, the owner's and each language's name | the gate | its own policy file |
 | a work key's tier, mapping and run mode | the agency | `POST /routes/resolve`, `GET /fallback` |
 | the keepalive's ping bound | the agency | not read: a gate run keeps no session |
 | a resident turn's shape | the agency | not read: a gate run is no resident turn |

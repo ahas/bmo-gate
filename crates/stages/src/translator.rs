@@ -5,12 +5,14 @@
 //! every part that came back read and the rest in its original, and nothing is kept for it, so the next reading asks
 //! again.
 //!
-//! Two readers stand: into the language a worker reads, English, by the worker instructions; and into the owner's
-//! language, Korean, by the record instructions and the checks a record is held to (`crate::records`).
+//! Two readers stand: into the language a worker reads by the worker instructions; and into the owner's language by
+//! the record instructions and the checks a record is held to (`crate::records`). Which language each reads into is
+//! the policy's (`gate_policy::translation`).
 
 use std::sync::Arc;
 
 use futures_util::future::BoxFuture;
+use gate_policy::translation::{TRANSLATION, Translation};
 use gate_runs::GateRequest;
 use sha2::{Digest, Sha256};
 
@@ -25,12 +27,6 @@ pub const STAGE: &str = "translator";
 
 /// How many parts are out at the translator at once.
 pub const LANES: usize = 3;
-
-/// The language a worker reads, which the worker instructions put a text into.
-pub const WORKER_LANGUAGE: &str = "en";
-
-/// The owner's language, which the record instructions put a text into.
-pub const OWNER_LANGUAGE: &str = "ko";
 
 /// What a part is asked of: the translator gate, or whatever stands in for it.
 pub type Ask = Arc<dyn Fn(GateRequest) -> BoxFuture<'static, Option<String>> + Send + Sync>;
@@ -53,7 +49,8 @@ pub fn by_gate(stages: Arc<Stages>) -> Ask {
   })
 }
 
-/// Who reads a text into a language: the worker's reader into English, the record's into the owner's language.
+/// Who reads a text into a language: the worker's reader into the language a worker reads, the record's into the
+/// owner's language, each as the policy names it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Reader {
   Worker,
@@ -61,12 +58,27 @@ pub enum Reader {
 }
 
 impl Reader {
-  /// The reader of a language, or none for a language the translator does not take.
+  /// The reader of a language under the gate's policy, or none for a language no reader takes.
   pub fn of(language: &str) -> Option<Self> {
-    match language {
-      WORKER_LANGUAGE => Some(Self::Worker),
-      OWNER_LANGUAGE => Some(Self::Record),
-      _ => None,
+    Self::under(&TRANSLATION, language)
+  }
+
+  /// The reader of a language under `policy`, or none for a language no reader takes.
+  pub fn under(policy: &Translation, language: &str) -> Option<Self> {
+    if language == policy.worker_language {
+      Some(Self::Worker)
+    } else if language == policy.owner_language {
+      Some(Self::Record)
+    } else {
+      None
+    }
+  }
+
+  /// The language this reader reads into under `policy`.
+  pub fn language(self, policy: &Translation) -> &str {
+    match self {
+      Self::Worker => &policy.worker_language,
+      Self::Record => &policy.owner_language,
     }
   }
 }

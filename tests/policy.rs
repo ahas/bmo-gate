@@ -13,6 +13,7 @@ use gate_policy::memories::MEMORIES;
 use gate_policy::output_gate::OUTPUT_GATE;
 use gate_policy::profiles::PROFILES;
 use gate_policy::reference::REFERENCE;
+use gate_policy::translation::TRANSLATION;
 
 #[test]
 fn the_gate_order_reads_every_gate_once_where_it_first_stands() {
@@ -204,4 +205,18 @@ fn every_instruction_file_under_the_prompts_is_compiled_in_and_marks_fill() {
 fn every_gate_names_its_tier() {
   assert!(PROFILES.profile.iter().all(|one| !one.tier.is_empty()));
   assert_eq!(PROFILES.of("translator").map(|one| one.tier.as_str()), Some("Reliable"));
+}
+
+#[test]
+fn the_translators_two_languages_differ_and_each_is_named() {
+  assert_ne!(TRANSLATION.worker_language, TRANSLATION.owner_language);
+
+  for language in [&TRANSLATION.worker_language, &TRANSLATION.owner_language] {
+    assert!(
+      TRANSLATION.language_name(language).is_some(),
+      "{language} has no name the translator is asked for it by"
+    );
+  }
+
+  assert_eq!(TRANSLATION.language_name("xx"), None);
 }

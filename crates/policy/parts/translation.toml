@@ -1,4 +1,12 @@
-# How the translator's readings weigh a text (docs/boundary-api.md, 「For bmo-job」).
+# The translator's languages and how its readings weigh a text (docs/api.md, 「Translations」; docs/boundary-api.md,
+# 「For bmo-job」).
+
+# The language a worker reads, which the worker instructions put a text into: the worker's reader reads into it.
+worker_language = "en"
+
+# The owner's language, which the record instructions put a text into and a record's checks hold it to: the record's
+# reader reads into it.
+owner_language = "ko"
 
 # A text is English where it holds some Latin letters and fewer Hangul syllables than one to every so many of
 # them, its code, its links and the words the deployment sets aside read past.
@@ -7,3 +15,9 @@ latin_per_hangul = 20
 # How many times a part put into the owner's language is asked for before what is still wrong with it — a list run
 # together, English left, a fenced block changed — leaves it in its original.
 record_attempts = 3
+
+# Every language a text or a document is put into, by its tag, and the name the translator is asked for it by; the
+# worker's and the owner's language among them. A tag named nowhere here is a language the translator does not take.
+[language_names]
+en = "English"
+ko = "Korean"

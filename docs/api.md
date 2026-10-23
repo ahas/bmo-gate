@@ -122,6 +122,10 @@ It answers `entries`, each `path`, `text` and `source` (`document`, `person`, `r
 
 - **A language** is a language tag. A translation is kept under its original and its language, so the same
   original is never translated twice into one language.
+- **The translator takes two languages,** each the gate's policy's (its translation part), so a deployment whose
+  owner reads another language changes the policy and no code: the language a worker reads, which the worker
+  instructions put a text into, and the owner's language, which the record instructions put a text into and a
+  record's checks hold it to. Any other language is 422 `language-unknown`.
 - **Reading kept translations** never asks the translator; the page holds one entry for each original with a
   translation kept in the language.
 - **Translating** answers one reading for each original, in the order given: an original with no part in
@@ -191,9 +195,11 @@ characters; a longer one is 413 `too-large`.
   paragraph, list item, table, block quote, code block and break. A blank line added or dropped between a
   heading or a list and the words beside it leaves the blocks as they were, and a paragraph's lines wrapped
   anew leave it one paragraph; a line of the translator's own beside the translation, a block dropped or two
-  run into one does not. A worker's text read into English (「Translations」) is held to the same structure.
+  run into one does not. A worker's text read into the worker's language (「Translations」) is held to the same
+  structure.
 - A document name is a root and a path, a `/` between them; anything else is 422 `document-unknown`. A target
-  the translator does not take is 422 `language-unknown`.
+  is a language the policy's translation part names, by its tag, with the name the translator is asked for it by;
+  any other is 422 `language-unknown`.
 
 ## Events
 

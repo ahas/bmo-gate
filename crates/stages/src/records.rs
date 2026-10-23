@@ -23,7 +23,7 @@ use crate::Stages;
 use crate::document_translation::{Kept, Outcome, translate_part};
 use crate::markdown::{TRANSLATION_PART_TOKENS, shown_part, translation_parts};
 use crate::markdown_shape::{list_shape, prose_blocks};
-use crate::translator::{Ask, OWNER_LANGUAGE, STAGE, keep_under, recalled_under};
+use crate::translator::{Ask, STAGE, keep_under, recalled_under};
 
 /// The rulebook the record instructions stand on.
 pub const PLAIN_WRITING: &str = "plain-writing";
@@ -168,7 +168,7 @@ impl<'a> Record<'a> {
     let stages = self.stages;
     let shelf = format!("{KEPT_KOREAN}:{}", line.unwrap_or("text").replace(' ', "-"));
 
-    if let Some(kept) = recalled_under(stages, &shelf, OWNER_LANGUAGE, part).await
+    if let Some(kept) = recalled_under(stages, &shelf, &TRANSLATION.owner_language, part).await
       && banned_terms_in(&kept, &self.glossary).is_empty()
     {
       return Ok(kept);
@@ -188,8 +188,10 @@ impl<'a> Record<'a> {
 
     loop {
       let outcome =
-        translate_part(part, OWNER_LANGUAGE, &Arc::new(system), Kept::Headings, |request| ask(request))
-          .await;
+        translate_part(part, &TRANSLATION.owner_language, &Arc::new(system), Kept::Headings, |request| {
+          ask(request)
+        })
+        .await;
       let korean = match outcome {
         Outcome::Translated(text) => without_dashes(&text, false),
         Outcome::Mismatch(lost) => return Err(lost.to_string()),
@@ -199,7 +201,7 @@ impl<'a> Record<'a> {
       let whole = !faults.lists_lost && faults.left_english.is_empty() && !faults.fences_changed;
 
       if whole && faults.banned.is_empty() {
-        if let Err(why) = keep_under(stages, &shelf, OWNER_LANGUAGE, part, &korean).await {
+        if let Err(why) = keep_under(stages, &shelf, &TRANSLATION.owner_language, part, &korean).await {
           self.log.push(format!("a part's rendering could not be kept: {why}"));
         }
 

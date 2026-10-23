@@ -9,6 +9,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::future::Future;
 use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
+use gate_policy::translation::TRANSLATION;
 use gate_policy::{fill_marks, prompts};
 use gate_runs::records::now;
 use gate_runs::{GateError, GateRequest, Piece, Split, route};
@@ -31,13 +32,10 @@ const LANES: usize = 3;
 static WRAPPED: LazyLock<Regex> =
   LazyLock::new(|| Regex::new(r"^```[a-z]*\n([\s\S]*?)\n```\s*$").expect("a fence"));
 
-/// The languages a document is translated into, by the code the viewer names them with.
+/// The name of a language a document is translated into, by the tag the viewer names it with, as the policy names
+/// it; none for a language the translator does not take.
 pub fn language(target: &str) -> Option<&'static str> {
-  match target {
-    "ko" => Some("Korean"),
-    "en" => Some("English"),
-    _ => None,
-  }
+  TRANSLATION.language_name(target)
 }
 
 // A model that wraps its whole answer in a fence has put the translation inside it.
@@ -53,7 +51,7 @@ fn unwrap(answer: &str, source: &str) -> String {
 /// One part as the translator is asked it: beside the gate's other runs, and cut in two at a paragraph where its
 /// road finds it too large, the halves joined in order and a half with no answer leaving the whole unanswered.
 pub fn request(text: &str, target: &str, system: &Arc<String>) -> GateRequest {
-  let language = language(target).unwrap_or("English");
+  let language = language(target).unwrap_or(target);
   let mut asked = GateRequest::new(system.as_str(), format!("Translate into {language}.\n\n{text}"));
 
   asked.thinking = false;
