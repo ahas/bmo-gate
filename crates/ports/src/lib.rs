@@ -5,6 +5,7 @@
 pub mod agency;
 pub mod arbiter;
 pub mod brain;
+pub mod brain_rows;
 pub mod gateway;
 pub mod http;
 pub mod job;

@@ -1,5 +1,6 @@
-//! The brain port: every call's path, query and camelCase body, and every answer read as the brain's own
-//! generic members — fragments with their old fields in `labels`, and memories with their conditions.
+//! The brain port: the agent's brain found by its key, every read a page of that brain's memories by type and
+//! status, each memory read as the brain's own member and mapped to the reference road's rows, and every
+//! hit posted by memory id.
 
 use axum::http::Method;
 use gate_ports::brain::{Brain, Event, Hit, HttpBrain, Reply};
@@ -8,46 +9,107 @@ use serde_json::{Value, json};
 use crate::peer;
 use crate::stub::Stub;
 
-fn memory() -> Value {
+fn brains() -> Value {
+  json!({ "items": [{ "id": 9, "accountKey": "1", "agentKey": "chat-agent", "name": "chat-agent", "createdAt": 1 }], "more": false })
+}
+
+fn page(items: Vec<Value>) -> Value {
+  json!({ "items": items, "more": false })
+}
+
+fn room(key: &str) -> Value {
+  json!({ "id": 1, "type": "room", "key": key })
+}
+
+fn person(key: &str) -> Value {
+  json!({ "id": 2, "type": "person", "key": key })
+}
+
+/// A moved state row, its old fields kept in its labels.
+fn moved_state() -> Value {
   json!({
-    "id": 4, "scope": "bmo:room:7", "subjectKey": null, "kind": "state", "text": "a row",
-    "state": "standing",
-    "conditions": [{ "type": "state", "event": "job-ended:12", "reach": "room", "condition": "when x" }],
-    "labels": { "slug": "c", "agent": "chat-agent", "chat_id": "7", "reach": "room", "event": "job-ended:12" },
-    "matchCount": 0, "lastMatchedAt": null, "createdAt": 100, "changedAt": 100
+    "id": 4, "brainId": 9, "key": null, "type": "state", "text": "a row", "layerId": null, "position": 0,
+    "subjects": [room("7")], "status": "active", "lineageId": 4, "supersededBy": null, "validFrom": 100,
+    "validTo": null, "importance": 5, "hits": 0, "lastHitAt": null, "lastConfirmedAt": null, "strength": 1.0,
+    "retrievalStrength": 0.0, "consolidatedAt": null, "actorName": "move",
+    "labels": {
+      "slug": "c", "agent": "chat-agent", "chat_id": "7", "reach": "room", "event": "job-ended:12",
+      "conditions": "[{\"type\":\"state\",\"event\":\"job-ended:12\",\"reach\":\"room\",\"condition\":\"when x\"}]"
+    },
+    "createdAt": 100
   })
 }
 
-fn fragment() -> Value {
+/// A situation the agent wrote itself: no old labels, its condition its own text, about the room.
+fn written_situation() -> Value {
   json!({
-    "id": 3, "key": "bmo:rooms:7:rules:quiet", "kind": "room-rule", "scope": "bmo:room:7",
-    "subjectKey": null, "title": "Quiet hours", "path": "rooms/7/rules/quiet.md", "text": "quiet",
-    "version": "h", "libraryName": null, "state": "active", "switchedOff": [],
+    "id": 5, "brainId": 9, "key": null, "type": "situation", "text": "When asked the time, answer in one line.",
+    "layerId": null, "position": 0, "subjects": [room("7")], "status": "active", "lineageId": 5,
+    "supersededBy": null, "validFrom": 200, "validTo": null, "importance": 6, "hits": 2, "lastHitAt": 150,
+    "lastConfirmedAt": null, "strength": 1.0, "retrievalStrength": 0.3, "consolidatedAt": null,
+    "actorName": "agent-session", "labels": {}, "createdAt": 200
+  })
+}
+
+/// A promise about another room, which this room never reads.
+fn elsewhere() -> Value {
+  json!({
+    "id": 6, "brainId": 9, "key": null, "type": "promise", "text": "elsewhere", "layerId": null, "position": 0,
+    "subjects": [room("8")], "status": "active", "lineageId": 6, "supersededBy": null, "validFrom": 100,
+    "validTo": null, "importance": 5, "hits": 0, "lastHitAt": null, "lastConfirmedAt": null, "strength": 1.0,
+    "retrievalStrength": 0.0, "consolidatedAt": null, "actorName": "move", "labels": {}, "createdAt": 100
+  })
+}
+
+fn rule() -> Value {
+  json!({
+    "id": 3, "brainId": 9, "key": "bmo:rooms:7:rules:quiet", "type": "rule", "text": "quiet", "layerId": null,
+    "position": 1, "subjects": [room("7")], "status": "active", "lineageId": 3, "supersededBy": null,
+    "validFrom": 9, "validTo": null, "importance": 5, "hits": 3, "lastHitAt": null, "lastConfirmedAt": null,
+    "strength": 1.0, "retrievalStrength": 0.0, "consolidatedAt": null, "actorName": "move",
     "labels": {
       "kind": "room-rule", "slug": "quiet", "agent": "chat-agent", "chat_id": "7", "position": "1",
       "keywords": "[\"quiet\"]", "items": "[12]", "status": "open", "written_on": "2026-10-01",
-      "all_agents": "0"
+      "all_agents": "0", "title": "Quiet hours", "path": "rooms/7/rules/quiet.md"
     },
-    "hitCount": 3, "lastHitAt": null, "createdAt": 9, "changedAt": 9
+    "createdAt": 9
   })
 }
 
-fn knowledge(fragments: Vec<Value>) -> Value {
-  json!({ "fragments": fragments, "memories": [] })
+fn sheet(id: i64, key: &str, labels: Value) -> Value {
+  json!({
+    "id": id, "brainId": 9, "key": key, "type": "sheet", "text": format!("sheet {id}"), "layerId": null,
+    "position": 0, "subjects": [person("31"), room("7")], "status": "active", "lineageId": id,
+    "supersededBy": null, "validFrom": 9, "validTo": null, "importance": 5, "hits": 0, "lastHitAt": null,
+    "lastConfirmedAt": null, "strength": 1.0, "retrievalStrength": 0.0, "consolidatedAt": null,
+    "actorName": "move", "labels": labels, "createdAt": 9
+  })
+}
+
+fn knowledge_piece() -> Value {
+  json!({
+    "id": 40, "brainId": 9, "key": "bmo:knowledge:tomatoes", "type": "knowledge", "text": "Tomatoes like sun.",
+    "layerId": 1, "position": 0, "subjects": [], "status": "active", "lineageId": 40, "supersededBy": null,
+    "validFrom": 9, "validTo": null, "importance": 5, "hits": 0, "lastHitAt": null, "lastConfirmedAt": null,
+    "strength": 1.0, "retrievalStrength": 0.0, "consolidatedAt": null, "actorName": "move",
+    "labels": { "slug": "tomatoes", "path": "knowledge/tomatoes.md" }, "createdAt": 9
+  })
+}
+
+fn served(stub: &Stub, kind: &str, items: Vec<Value>) {
+  stub.answer(Method::GET, "/brains/9/memories", 200, page(items));
+  let _ = kind;
 }
 
 #[tokio::test]
-async fn the_memory_reads_ask_the_brain_by_scope_and_map_its_rows() {
+async fn the_memory_reads_find_the_agents_brain_and_map_its_standing_types() {
   let stub = Stub::start().await;
   let brain = HttpBrain::new(peer(&stub, "brain-token"));
 
-  stub.answer(Method::GET, "/memories", 200, json!({ "items": [memory()], "more": false }));
-  stub.answer(
-    Method::POST,
-    "/memory-matches",
-    201,
-    json!({ "id": 1, "memoryIds": [4], "actorName": "chat-agent", "spentMs": 0, "tokenCount": 0, "createdAt": 1 }),
-  );
+  stub.answer(Method::GET, "/brains", 200, brains());
+  // Every standing type is asked for; the stub answers the same page for each.
+  served(&stub, "promise", vec![moved_state(), written_situation(), elsewhere()]);
+  stub.answer(Method::POST, "/brains/9/hits", 201, json!({ "recordedCount": 1 }));
 
   let standing = brain.standing("chat-agent", 7).await.unwrap();
   let conditions = brain.conditions("chat-agent", 7).await.unwrap();
@@ -58,44 +120,53 @@ async fn the_memory_reads_ask_the_brain_by_scope_and_map_its_rows() {
   }];
   let woken = brain.woken("chat-agent", 7, &events).await.unwrap();
 
-  assert_eq!(standing[0].slug, "c");
-  assert_eq!(standing[0].kind, "state");
+  // The moved row waits on an event, so it is woken rather than standing; the room 8 promise is not read here.
+  assert!(standing.iter().all(|row| row.chat_id == Some(7)), "{standing:?}");
+  assert!(!standing.iter().any(|row| row.slug == "c" || row.slug == "memory-6"), "{standing:?}");
+  assert_eq!(woken.len(), 1);
+  assert_eq!(woken[0].slug, "c");
   assert_eq!(
-    standing[0].event,
+    woken[0].event,
     Some(Event {
       kind: "job-ended".into(),
       item: Some(12)
     })
   );
-  assert_eq!(conditions[0].condition, "when x");
-  assert_eq!(woken[0].slug, "c");
+  let slugs: Vec<&str> = conditions.iter().map(|c| c.slug.as_str()).collect();
+  assert!(slugs.contains(&"c") && slugs.contains(&"memory-5"), "{slugs:?}");
+  assert_eq!(conditions.iter().find(|c| c.slug == "c").unwrap().condition, "when x");
+  assert_eq!(
+    conditions.iter().find(|c| c.slug == "memory-5").unwrap().condition,
+    "When asked the time, answer in one line."
+  );
 
-  let asked: Vec<_> = stub.seen().into_iter().filter(|seen| seen.path == "/memories").collect();
-  assert!(!asked.is_empty());
+  let brains_asked = stub.one("/brains");
+  assert!(brains_asked.query.as_deref().is_some_and(|q| q.contains("agentKey=chat-agent")));
+  assert_eq!(brains_asked.bearer().as_deref(), Some("brain-token"));
+  let asked: Vec<_> = stub.seen().into_iter().filter(|seen| seen.path == "/brains/9/memories").collect();
   assert!(
     asked
       .iter()
-      .all(|seen| seen.query.as_deref().is_some_and(|query| query.contains("state=standing")))
+      .all(|seen| seen.query.as_deref().is_some_and(|q| q.contains("status=active")))
   );
-  assert_eq!(asked[0].bearer().as_deref(), Some("brain-token"));
-
   assert_eq!(
-    stub.one("/memory-matches").json(),
-    json!({ "memoryIds": [4], "actorName": "chat-agent", "spentMs": 0, "tokenCount": 0 })
+    stub.one("/brains/9/hits").json(),
+    json!({ "memoryIds": [4], "actorName": "chat-agent" })
   );
 }
 
 #[tokio::test]
-async fn the_fragment_routes_ask_the_knowledge_route_by_scope_and_kind_and_hand_back_what_attached() {
+async fn the_fragment_reads_ask_the_brain_by_type_and_hand_back_what_attached_by_id() {
   let stub = Stub::start().await;
   let brain = HttpBrain::new(peer(&stub, "t"));
 
-  stub.answer(Method::GET, "/knowledge", 200, knowledge(vec![fragment()]));
-  stub.answer(Method::POST, "/fragment-hits", 201, json!({ "recordedCount": 1 }));
+  stub.answer(Method::GET, "/brains", 200, brains());
+  served(&stub, "rule", vec![rule()]);
+  stub.answer(Method::POST, "/brains/9/hits", 201, json!({ "recordedCount": 1 }));
 
   let offered = brain.offered("chat-agent", 7, &["room-rule".to_owned()]).await.unwrap();
   let attached = [Hit {
-    key: "bmo:rooms:7:rules:quiet".into(),
+    key: "3".into(),
     kind: "room-rule".into(),
     chat_id: Some(7),
     owner: None,
@@ -106,77 +177,71 @@ async fn the_fragment_routes_ask_the_knowledge_route_by_scope_and_kind_and_hand_
   assert_eq!(offered[0].slug, "quiet");
   assert_eq!(offered[0].items, vec![12]);
   assert_eq!(offered[0].hits, 3);
-  assert_eq!(offered[0].key, "bmo:rooms:7:rules:quiet");
+  assert_eq!(offered[0].key, "3");
+  assert_eq!(offered[0].kind, "room-rule");
+  assert_eq!(offered[0].path, "rooms/7/rules/quiet.md");
+  assert_eq!(offered[0].chat_id, Some(7));
 
-  let asked = stub.one("/knowledge");
+  let asked = stub.one("/brains/9/memories");
   let query = asked.query.as_deref().unwrap_or_default();
-  assert!(query.contains("kinds=room-rule"), "{query}");
-  assert!(query.contains("room%3A7") || query.contains("room:7"), "{query}");
-
+  assert!(query.contains("type=rule"), "{query}");
   assert_eq!(
-    stub.one("/fragment-hits").json(),
-    json!({ "keys": ["bmo:rooms:7:rules:quiet"], "actorName": "chat-agent", "scope": "chat-agent:room:7" })
+    stub.one("/brains/9/hits").json(),
+    json!({ "memoryIds": [3], "actorName": "chat-agent" })
   );
 }
 
 #[tokio::test]
-async fn the_document_read_filters_the_knowledge_by_its_old_slug() {
+async fn the_document_read_filters_the_knowledge_by_its_slug() {
   let stub = Stub::start().await;
   let brain = HttpBrain::new(peer(&stub, "t"));
 
-  let mut row = fragment();
-  row["kind"] = json!("library-knowledge");
-  row["labels"]["kind"] = json!("library-knowledge");
-  row["labels"]["slug"] = json!("k");
-  row["path"] = json!("knowledge/k.md");
-  row["text"] = json!("a fact");
-  row["version"] = json!("v1");
-  stub.answer(Method::GET, "/knowledge", 200, knowledge(vec![row]));
+  stub.answer(Method::GET, "/brains", 200, brains());
+  served(&stub, "knowledge", vec![knowledge_piece()]);
 
-  let read = brain.knowledge("chat-agent", 7, &["k".to_owned()]).await.unwrap();
+  let read = brain.knowledge("chat-agent", 7, &["tomatoes".to_owned()]).await.unwrap();
+  let Reply::Answered(documents) = read else { panic!("answered") };
+  assert_eq!(documents.len(), 1);
+  assert_eq!(documents[0].path, "knowledge/tomatoes.md");
+  assert_eq!(documents[0].text, "Tomatoes like sun.");
+  assert_eq!(documents[0].version, "40");
 
-  match read {
-    Reply::Answered(documents) => {
-      assert_eq!(documents[0].slug, "k");
-      assert_eq!(documents[0].text, "a fact");
-      assert_eq!(documents[0].version, "v1");
-    }
-    Reply::Refused(refusal) => panic!("refused {refusal:?}"),
-  }
-  let asked = stub.one("/knowledge");
-  assert!(asked.query.as_deref().is_some_and(|query| query.contains("kinds=library-knowledge")));
+  let none = brain.knowledge("chat-agent", 7, &["none".to_owned()]).await.unwrap();
+  let Reply::Answered(documents) = none else { panic!("answered") };
+  assert!(documents.is_empty());
 }
 
 #[tokio::test]
-async fn the_person_book_reads_sheets_and_pieces_from_the_person_fragments() {
+async fn the_person_book_reads_the_speakers_sheets_and_the_pieces_asked_for() {
   let stub = Stub::start().await;
   let brain = HttpBrain::new(peer(&stub, "t"));
 
-  let sheet = json!({
-    "key": "kakia-chat:people:5:sheet", "kind": "person", "scope": "bmo", "title": null,
-    "path": "people/5/sheet.md", "text": "a sheet", "version": "v2", "labels": { "part": "common" },
-    "createdAt": 1, "changedAt": 1
-  });
-  let piece = json!({
-    "key": "bmo:rooms:7:people:chunks:p5-humor", "kind": "person", "scope": "bmo:room:7", "title": null,
-    "path": "people/5/p.md", "text": "a piece", "version": "v3",
-    "labels": { "kind": "person-book", "slug": "p", "owner": "5" }, "createdAt": 1, "changedAt": 1
-  });
-  stub.answer(Method::GET, "/knowledge", 200, knowledge(vec![sheet, piece]));
+  stub.answer(Method::GET, "/brains", 200, brains());
+  served(
+    &stub,
+    "sheet",
+    vec![
+      sheet(
+        21,
+        "bmo:people:31:common",
+        json!({ "part": "common", "owner": "31", "path": "people/31/common.md" }),
+      ),
+      sheet(
+        22,
+        "bmo:people:31:chunks:garden",
+        json!({ "kind": "person-book", "slug": "garden", "owner": "31" }),
+      ),
+      sheet(23, "bmo:people:32:common", json!({ "part": "common", "owner": "32" })),
+    ],
+  );
 
-  let people = brain.people("chat-agent", 7, &[5], &["p".to_owned()]).await.unwrap();
-
-  match people {
-    Reply::Answered(people) => {
-      assert!(people.sheets.iter().any(|sheet| sheet.part == "common"));
-      assert!(people.pieces.iter().any(|piece| piece.slug == "p" && piece.owner == Some(5)));
-    }
-    Reply::Refused(refusal) => panic!("refused {refusal:?}"),
-  }
-
-  let asked: Vec<_> = stub.seen().into_iter().filter(|seen| seen.path == "/knowledge").collect();
-  assert_eq!(asked.len(), 2, "{asked:?}");
-  assert!(asked[0].query.as_deref().is_some_and(|query| query.contains("subjectKey=5")));
+  let read = brain.people("chat-agent", 7, &[31], &["garden".to_owned()]).await.unwrap();
+  let Reply::Answered(people) = read else { panic!("answered") };
+  assert_eq!(people.sheets.len(), 1);
+  assert_eq!((people.sheets[0].person, people.sheets[0].part.as_str()), (31, "common"));
+  assert_eq!(people.sheets[0].path, "people/31/common.md");
+  assert_eq!(people.pieces.len(), 1);
+  assert_eq!((people.pieces[0].slug.as_str(), people.pieces[0].owner), ("garden", Some(31)));
 }
 
 #[tokio::test]
@@ -188,19 +253,20 @@ async fn the_room_rules_and_the_loads_go_by_their_own_keys() {
     Method::POST,
     "/room-rules/read",
     200,
-    json!({ "rules": [{ "id": "r1", "subject": 9, "text": "may ask for songs" }] }),
+    json!({ "rules": [{ "id": "quiet", "subject": 31, "text": "quiet" }] }),
   );
   stub.answer(
     Method::POST,
     "/sessions/loads",
     200,
-    json!({ "loads": [{ "path": "knowledge/k.md", "version": "v1" }] }),
+    json!({ "loads": [{ "path": "rooms/7/rules/quiet.md", "version": "h" }] }),
   );
-  let rules = brain.room_rules(7).await.unwrap();
-  let loads = brain.loads("session-1").await.unwrap();
 
-  assert_eq!(rules[0].subject, 9);
-  assert_eq!(loads[0].version, "v1");
+  let rules = brain.room_rules(7).await.unwrap();
+  let loads = brain.loads("s").await.unwrap();
+
+  assert_eq!((rules[0].id.as_str(), rules[0].subject), ("quiet", 31));
+  assert_eq!(loads[0].version, "h");
   assert_eq!(stub.one("/room-rules/read").json(), json!({ "chatId": 7 }));
-  assert_eq!(stub.one("/sessions/loads").json(), json!({ "session": "session-1" }));
+  assert_eq!(stub.one("/sessions/loads").json(), json!({ "session": "s" }));
 }
