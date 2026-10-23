@@ -9,3 +9,5 @@ __pycache__/
 *.tsbuildinfo
 .graph/*
 !.graph/settings.toml
+# A tool folder a deployment places, made beside its manifest in the release.
+.placed/

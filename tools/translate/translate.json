@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "properties": {
+    "language": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The language tag to translate into."
+    },
+    "texts": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "maxItems": 20,
+      "description": "The texts to translate, one or several; each is answered by one reading, in this order."
+    }
+  },
+  "required": ["language", "texts"],
+  "additionalProperties": false
+}

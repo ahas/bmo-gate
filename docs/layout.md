@@ -19,6 +19,7 @@ its own, so a change to one never builds or tests the others.
 | `package/` | The TypeScript client generated from `docs/openapi.json`, which the console bundle and any other TypeScript caller use |
 | `client/` | The console plugin bundle: the gates' screens, the ES module the gate serves and a Nuxt layer on the base UI library |
 | `docs/` | The documents, which come before the code |
+| `tools/` | The tools a tool host places: the translator's tool, a folder with its manifest, its schemas, its manual and its executable's crate (`docs/api.md`, 「The tool a tool host places」) |
 | `tests/` | Every test of the repository, whatever its language |
 
 A folder stands only once something is in it. The README's folder table names every top-level folder that
@@ -94,6 +95,10 @@ The testbed deploys the repository as `testbed.toml` declares it (the testbed's 
     and a training pass, are linked and started by hand. No unit builds the sanitiser gate's rows or runs the
     downgrade harvest: their code is not carried (`docs/gate-data.md`, 「Not carried」).
   Each tooling unit runs in the release's `training/tooling/`, under the data root `BMO_DATA_DIR` names.
+- **The translator's tool is placed with the tool host** before the release is put live: its executable,
+  `gate-translate-tool`, a fourth binary of the release's `bin/`, is copied beside its manifest, schemas and manual,
+  and the folder is put with `bmo pocket put` as the gate's own, allowing the capability its entry asks for
+  (`docs/api.md`, 「The tool a tool host places」).
 - **The Python services stand on the nodes, not here.** The decision server, the front and the tunnel run on each
   node the Laya service's placement names, their units under `runtime/front/` put there by the installer from the
   release (`docs/llm-server.md`, 「Installing and updating」); the training scripts are put across by the training

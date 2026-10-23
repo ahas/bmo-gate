@@ -2,11 +2,11 @@
 # as a member as it stands. The root package also holds the checks that span the repository and every test of
 # the repository in `tests/`, the Python and Bun suites among them, which a Cargo test of their own runs.
 [workspace]
-members = ["crates/client", "crates/codes", "crates/command", "crates/laya-relay", "crates/markup", "crates/policy", "crates/ports", "crates/reference", "crates/runs", "crates/server", "crates/stages", "crates/store", "crates/words"]
+members = ["crates/client", "crates/codes", "crates/command", "crates/laya-relay", "crates/markup", "crates/policy", "crates/ports", "crates/reference", "crates/runs", "crates/server", "crates/stages", "crates/store", "crates/words", "tools/translate"]
 resolver = "3"
 
 [workspace.package]
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 license = "MIT"
 
@@ -30,6 +30,7 @@ gate-runs = { path = "crates/runs" }
 gate-server = { path = "crates/server" }
 gate-stages = { path = "crates/stages" }
 gate-store = { path = "crates/store" }
+gate-translate-tool = { path = "tools/translate" }
 gate-words = { path = "crates/words" }
 http-body-util = "0.1.3"
 # The relay's own connections to the nodes, kept open between calls.
@@ -108,6 +109,8 @@ gate-runs.workspace = true
 gate-server.workspace = true
 gate-stages.workspace = true
 gate-store.workspace = true
+# The translator's tool, its call answered against a stand-in gate.
+gate-translate-tool.workspace = true
 gate-words.workspace = true
 http-body-util.workspace = true
 hyper.workspace = true
@@ -178,6 +181,12 @@ path = "tests/server/main.rs"
 [[test]]
 name = "command"
 path = "tests/command/main.rs"
+
+# The tools' test: each tool's manifest read against its folder and the declaration, and the translator's tool's
+# calls answered against a stand-in gate.
+[[test]]
+name = "tools"
+path = "tests/tools/main.rs"
 
 # The relay's contract test: the relay binary started over a scratch data root, its nodes stand-in fronts on the
 # loopback.

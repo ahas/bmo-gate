@@ -246,6 +246,44 @@ console's, so nothing here names one.
 - **A trial put through the console** is kept with no user name, under the reader's `Owner-Key`, the account
   service's user id, where the call carries one; the trial answers its `userName` empty.
 
+## The tool a tool host places
+
+The gate's translator is offered to an agent as one tool the tool host places: `tools/translate`, a folder with its
+own `tool.toml`, placed with the tool host and registered as the gate's own by the deployment (`docs/layout.md`,
+「The deployment」). It speaks version 1 of the tool host's call protocol (the tool host's `docs/api.md`, 「The call
+protocol」), a process a call.
+
+| Entry | Capability | Reached by | What it does |
+|---|---|---|---|
+| `gate/translate` | `gate.translate` | `call`: it is read-only | Translates `texts` into `language` through `POST /translations` (「Translations」) and answers the readings |
+
+- **Its input** is `language`, a language tag, and `texts`, one text or several, at most twenty. It is handed on to
+  the gate as the translation's `language` and `originals`, so a translation kept before is answered without the
+  translator, and every translation made is kept.
+- **Its answer** is the gate's: `readings`, one for each text in the order given, each `text` and `whole`. It stands
+  as the result's structured content and, the same JSON, as its one text piece.
+- **A refusal** is a result marked `isError` whose text names the status, the code and the gate's sentence, as for a
+  language the translator does not take. A gate that could not be reached or answered something unreadable, and a
+  record that names no gate, answer their reason after `ERROR: `.
+- **The entry declares no grant,** so a call is checked against the record's capabilities alone; its manual is
+  `tools/translate/manual.md`.
+
+### What a placed tool reads of its record
+
+Of the session record a call is handed (the tool host's `docs/api.md`, 「The session record」) the tool reads only
+its `variables`. Each variable below is read from them, or from the call's environment where they name none, which
+the host lays from its `--pass-env` and the record's `variablesFile`:
+
+| Variable | Meaning |
+|---|---|
+| `BMO_GATE_URL` | The gate's base address |
+| `BMO_GATE_TOKEN` | The bearer token the gate takes from every caller (「Common rules」) |
+| `BMO_GATE_TOKEN_FILE` | A file holding that token, read where `BMO_GATE_TOKEN` is named nowhere |
+
+A record that carries the namespace `gate` and the capability `gate.translate` therefore carries `BMO_GATE_URL` and
+one of the two token variables, or the host passes them on. A call that finds no address or no token answers its
+reason after `ERROR: `, naming the variable.
+
 ## The document
 
 `docs/openapi.json` is the machine form of this contract: every route, its body, its query, its answers and

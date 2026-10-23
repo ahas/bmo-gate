@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "properties": {
+    "readings": {
+      "type": "array",
+      "description": "One reading for each text, in the order the texts were given.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "text": { "type": "string", "description": "The text in the language asked for." },
+          "whole": {
+            "type": "boolean",
+            "description": "False where a part could not be rendered and stands in its original."
+          }
+        },
+        "required": ["text", "whole"]
+      }
+    }
+  },
+  "required": ["readings"]
+}

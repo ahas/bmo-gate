@@ -1,0 +1,23 @@
+# The translator offered to an agent: the gate's own POST /translations, called with the gate's address and token
+# the record carries (docs/api.md, 「The tool a tool host places」). The repository's tools test holds this
+# manifest to the executable answering it.
+
+[tool]
+name = "translate"
+protocol = 1
+language = "rust"
+build = 'cargo build --release -p gate-translate-tool && cp "$BMO_CARGO_TARGET/release/gate-translate-tool" "$BMO_TOOL_OUT/"'
+check = 'cargo test --test tools'
+run = ["gate-translate-tool"]
+timeout = 60
+
+[[entry]]
+namespace = "gate"
+name = "translate"
+title = "Translate"
+description = "Translates one text or several into the language given through the gate's translator; a translation kept before is reused rather than made again. It answers one reading for each text, in the order given: the reading's text, and whole, false where a part could not be rendered and stands in its original. Answer with the readings as they came back rather than translating them again yourself."
+manual = "manual.md"
+input = "translate.json"
+output = "readings.json"
+hints = { read_only = true, idempotent = true }
+capabilities = ["gate.translate"]
