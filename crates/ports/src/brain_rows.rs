@@ -1,7 +1,8 @@
 //! The brain's members and layers as its API answers them (the brain's `docs/boundary-api.md`, 「Brains」), and
 //! the reading of them into what the reference road reads: a memory of the brain's new shape — a row of a type,
 //! about subjects, in a version — mapped to the gate's memory rows and fragment rows, the old fields a moved
-//! row kept in its `labels` read where they stand and the subjects read where they do not.
+//! row kept in its `labels` read where they stand and the subjects read where they do not; and a person the
+//! brain knows facts of as the person-book search's candidate.
 
 use std::collections::BTreeMap;
 
@@ -70,6 +71,27 @@ pub struct Memory {
   pub created_at: i64,
 }
 
+/// A subject as the brain lists it: a person or a room by the caller's key, and the name the brain knows it by.
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Subject {
+  #[serde(default)]
+  pub id: i64,
+  #[serde(rename = "type", default)]
+  pub kind: String,
+  #[serde(default)]
+  pub key: String,
+  #[serde(default)]
+  pub name: Option<String>,
+}
+
+/// One group of a tally: a subject's id in decimal, null for the rows about no subject.
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct Tally {
+  #[serde(default)]
+  pub group: Option<String>,
+}
+
 /// A heading of the brain's table of contents: its name and where it stands among the others.
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -91,17 +113,26 @@ pub struct Page<T> {
   pub more: bool,
 }
 
-/// The brain's type that stands for one of the gate's reference kinds, and the old fragment kind it reads
-/// back as.
+/// The brain's type that stands for one of the gate's reference kinds, and the fragment kind it reads back as.
+/// The person book is the brain's facts, offered one person a candidate (`person_row`).
 pub fn brain_type(kind: &str) -> Option<(&'static str, &'static str)> {
   match kind {
-    "person-book" | "person" => Some(("sheet", "person")),
+    "person-book" | "person" => Some((FACT_TYPE, PERSON_BOOK)),
     "library-knowledge" | "knowledge" => Some(("knowledge", "library-knowledge")),
     "room-rule" => Some(("rule", "room-rule")),
     "lore" => Some((LORE_TYPE, "lore")),
     _ => None,
   }
 }
+
+/// The brain's type of what is known about a person, one row a fact, which their sheet is rendered from.
+pub const FACT_TYPE: &str = "fact";
+
+/// The fragment kind of a person the person-book search is offered.
+pub const PERSON_BOOK: &str = "person-book";
+
+// What a person candidate's slug opens with before the person's number.
+const PERSON_SLUG: &str = "person-";
 
 /// The brain's type of the agent's lore, whose rows stand in the layers of its table of contents.
 pub const LORE_TYPE: &str = "lore";
@@ -351,6 +382,47 @@ pub fn lore_rows(agent: &str, memories: &[Memory], layers: &[Layer]) -> Vec<Frag
       ..fragment_row(agent, "lore", memory)
     })
     .collect()
+}
+
+/// A person the brain knows facts of as the candidate the person-book search is offered in a room: its slug
+/// `person-<number>`, its index line the name the brain knows them by, else their number, its owner the person,
+/// and its path their sheet's in the room. A sheet is no row, so its key names no memory and attaching it counts
+/// nothing.
+pub fn person_row(agent: &str, chat: i64, person: i64, name: Option<&str>) -> Fragment {
+  Fragment {
+    key: format!("{PERSON_SLUG}{person}"),
+    kind: PERSON_BOOK.to_owned(),
+    chat_id: Some(chat),
+    owner: Some(person),
+    agent: agent.to_owned(),
+    all_agents: false,
+    slug: format!("{PERSON_SLUG}{person}"),
+    title: name
+      .filter(|name| !name.trim().is_empty())
+      .map_or_else(|| person.to_string(), str::to_owned),
+    path: sheet_path(chat, person),
+    scope: None,
+    section: None,
+    position: 0,
+    active: true,
+    last_hit_at: None,
+    hits: 0,
+    set_by: None,
+    set_at: 0,
+    hand: None,
+    hand_at: None,
+    keywords: vec![],
+    items: vec![],
+    written_on: None,
+    confirmed_on: None,
+    status: "open".to_owned(),
+    body_hash: None,
+  }
+}
+
+/// The path a person's sheet in a room is handed under.
+pub fn sheet_path(chat: i64, person: i64) -> String {
+  format!("rooms/{chat}/people/{person}/sheet.md")
 }
 
 /// A rule memory as the owner's room rule: its id the memory's key, its grantee the person it is about.

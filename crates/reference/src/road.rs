@@ -1,5 +1,5 @@
 //! The road a turn's reference is composed on (`docs/reference-selection.md`): the room's standing memories and the
-//! standing sheets of everyone who spoke, which no model chooses; each picker's libraries, less what the round
+//! sheet of everyone who spoke, as the brain renders it from their facts, which no model chooses; each picker's libraries, less what the round
 //! already holds and narrowed by the code, with what each was offered written down; the three reference gates, the
 //! person-book search and the situation-rule matcher asked side by side; each gate's picks held to its allowance and
 //! all of them to the turn's total; and what the turn attached handed to the brain to count.
@@ -11,7 +11,6 @@ use gate_markup::js;
 use gate_policy::laya::QUESTIONS;
 use gate_policy::prompts;
 use gate_policy::reference::{BotLinesAlone, REFERENCE, ReferenceGate};
-use gate_ports::brain::Reply as Read;
 use gate_runs::GateError;
 use gate_runs::records::{self, Judgement, now};
 
@@ -162,42 +161,45 @@ async fn knowledge_libraries(
   )
 }
 
-// The person book a room's search reads: the room's part, then the common part of each person who has spoken in it,
-// one library each in the order of their numbers, as the brain offers them.
+// The person book a room's search reads: one candidate for each person the brain knows facts of, as the brain
+// offers them, in one library.
 async fn people_libraries(
   reference: &Reference,
   chat_id: i64,
   agent: &str,
 ) -> Result<Vec<Library>, GateError> {
   let rows = fragments::rows(reference, agent, chat_id, PERSON_BOOK).await.map_err(fault)?;
-  let (room, common): (Vec<Fragment>, Vec<Fragment>) =
-    rows.into_iter().partition(|row| row.chat_id.is_some());
-  let mut libraries: Vec<Library> =
-    Library::of(format!("rooms/{chat_id}/people/index.md"), room, Source::Person, Body::People)
+
+  Ok(
+    Library::of(format!("rooms/{chat_id}/people/index.md"), rows, Source::Person, Body::People)
       .into_iter()
-      .collect();
-  let mut by_person: Vec<(i64, Vec<Fragment>)> = vec![];
-
-  for row in common {
-    let Some(owner) = row.owner else { continue };
-
-    match by_person.iter_mut().find(|(person, _)| *person == owner) {
-      Some((_, rows)) => rows.push(row),
-      None => by_person.push((owner, vec![row])),
-    }
-  }
-
-  by_person.sort_by_key(|(person, _)| *person);
-
-  for (person, rows) in by_person {
-    libraries.extend(Library::of(format!("people/{person}/index.md"), rows, Source::Person, Body::People));
-  }
-
-  Ok(libraries)
+      .collect(),
+  )
 }
 
-/// Both standing sheets of everyone who spoke this turn, as the brain reads them: the person's common sheet, then
-/// this room's sheet of them where the room keeps a room part. An agent keeping no long-term memory is given none.
+/// A person's sheet held to the reference's ceiling for one: its lines from the top, the most important first, as
+/// many as fit; empty where not even the first does.
+pub fn held_sheet(text: &str) -> String {
+  let ceiling = REFERENCE.sheet_chars;
+  let mut kept: Vec<&str> = vec![];
+  let mut used = 0;
+
+  for line in js::trim(text).split('\n') {
+    let cost = js::units(line) + usize::from(!kept.is_empty());
+
+    if used + cost > ceiling {
+      break;
+    }
+
+    used += cost;
+    kept.push(line);
+  }
+
+  kept.join("\n")
+}
+
+/// The standing sheet of everyone who spoke this turn: each one's sheet in the room as the brain renders it from
+/// their facts, held to its ceiling. An agent keeping no long-term memory is given none.
 pub async fn standing_entries(
   reference: &Reference,
   chat_id: i64,
@@ -211,26 +213,33 @@ pub async fn standing_entries(
     return vec![];
   }
 
-  match reference.brain.people(agent, chat_id, &senders, &[]).await {
-    Ok(Read::Answered(book)) => book
-      .sheets
+  match reference.brain.sheets(agent, chat_id, &senders).await {
+    Ok(sheets) => sheets
       .into_iter()
       .map(|sheet| Entry {
         path: sheet.path,
-        text: sheet.text,
+        text: held_sheet(&sheet.text),
         source: Source::Person,
         fragment: None,
       })
+      .filter(|entry| !entry.text.is_empty())
       .collect(),
-    Ok(Read::Refused(refusal)) => {
-      eprintln!("reference: chat {chat_id} sheets were refused: {}", refusal.message);
-      vec![]
-    }
     Err(why) => {
       eprintln!("reference: chat {chat_id} sheets could not be read: {why}");
       vec![]
     }
   }
+}
+
+// The libraries less the people who spoke this turn, whose sheets the turn carries already.
+fn unspoken(libraries: Vec<Library>, speakers: &[i64]) -> Vec<Library> {
+  libraries
+    .into_iter()
+    .filter_map(|library| match library.body {
+      Body::People => library.with(|row| !row.owner.is_some_and(|owner| speakers.contains(&owner))),
+      _ => Some(library),
+    })
+    .collect()
 }
 
 // The libraries less every piece the round already holds.
@@ -517,7 +526,7 @@ pub async fn narrowing(
 ) -> Narrowing {
   narrowed(
     reference,
-    &unheld(&gate.libraries, holds),
+    &unspoken(unheld(&gate.libraries, holds), &turn.speaker_ids),
     turn.message_lines.join("\n"),
     turn.speaker_ids.clone(),
     rules_of(gate.bot_lines_alone, turn.people_spoke),

@@ -67,6 +67,7 @@ pub struct Situation {
 #[serde(deny_unknown_fields)]
 pub struct Reference {
   pub turn_budget_chars: usize,
+  pub sheet_chars: usize,
   pub gates: Vec<ReferenceGate>,
   pub people: PeopleSearch,
   pub situation: Situation,

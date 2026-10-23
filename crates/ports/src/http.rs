@@ -247,6 +247,22 @@ impl Caller {
     self.read(call, response).await
   }
 
+  /// A read answered as plain text.
+  pub async fn get_text(
+    &self,
+    call: &'static str,
+    segments: &[&str],
+    query: &[(&str, &str)],
+  ) -> Answer<String> {
+    let response = self.send(call, || self.request(Method::GET, segments).query(query)).await?;
+
+    if !response.status().is_success() {
+      return Err(self.refused(call, response).await);
+    }
+
+    response.text().await.map_err(|why| self.unreachable(call, why))
+  }
+
   /// A body sent with `method` and answered as `T`.
   pub async fn send_json<B: Serialize + ?Sized, T: DeserializeOwned>(
     &self,

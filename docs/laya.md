@@ -250,8 +250,8 @@ mode other than `off`.
   many candidates a turn offers, every one is asked about, in as many calls as it takes, against the
   turn's newest messages that fit (「Fitting an input」). The shape is settled one question at a
   time (「A gate settled one question at a time」).
-- **Person-book search (`people-search`)** — the same probe shape over the person-book pieces a room
-  offers: one yes/no per piece, does this turn need this person's record. Its state opens with the
+- **Person-book search (`people-search`)** — the same probe shape over the people a room offers: one
+  yes/no per person, does this turn need this person's record. Its state opens with the
   message the turn follows on from, the oldest line and so the first to stay out where the turn is
   long (`docs/reference-selection.md`, 「What a turn's lines are」). It is settled one question
   at a time too; the pieces Laya settled as wanted come ahead of the ones the LLM names, and the

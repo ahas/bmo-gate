@@ -25,7 +25,7 @@ fn a_gate_runs_off_without_a_probe_and_in_shadow_where_laya_would_decide_unfound
 
 #[test]
 fn the_defaults_carry_the_gates_own_answer_room_and_mode() {
-  assert_eq!(defaults(of("people-standing")).answer_tokens, 8192);
+  assert_eq!(defaults(of("voice-polish")).answer_tokens, 8192);
   assert_eq!(defaults(of("system-documents")).laya_mode, "shadow");
   assert_eq!(defaults(of("translator")).laya_mode, "off");
   assert_eq!(defaults(of("room-rules")).answer_tokens, options::DEFAULT_ANSWER_TOKENS);

@@ -11,7 +11,6 @@ pub mod knowledge;
 pub mod reference;
 pub mod runs;
 pub mod sanitiser;
-pub mod sheets;
 pub mod translations;
 pub mod trials;
 
@@ -34,7 +33,6 @@ pub fn all() -> Router<Arc<App>> {
     .route("/reference/selected", post(reference::reference))
     .route("/sanitised", post(sanitiser::sanitised))
     .route("/sanitiser/documents", post(sanitiser::document))
-    .route("/sheets/judge", post(sheets::judge))
     .route("/translations", post(translations::translate))
     .route("/translations/kept", get(translations::kept).put(translations::keep))
     .route("/knowledge/selected", post(knowledge::selected))

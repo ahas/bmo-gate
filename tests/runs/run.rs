@@ -218,14 +218,14 @@ async fn a_registration_named_by_the_caller_is_run_on_alone() {
     .lock()
     .unwrap()
     .insert("registry".into(), mapping("registry", "the-tier-model", None, Some(9000)));
-  gateway.answers(vec![completion("a sheet")]);
-  wait(&runs, "people-standing", 30_000).await;
+  gateway.answers(vec![completion("a reading")]);
+  wait(&runs, "translator", 30_000).await;
 
-  let mut request = GateRequest::new("write the sheet", "pieces");
+  let mut request = GateRequest::new("translate the part", "the part");
 
   request.registration = Some("an-agents-model".into());
 
-  assert_eq!(runs.run("people-standing", &request).await.unwrap().as_deref(), Some("a sheet"));
+  assert_eq!(runs.run("translator", &request).await.unwrap().as_deref(), Some("a reading"));
 
   let asked = gateway.asked.lock().unwrap()[0].clone();
 

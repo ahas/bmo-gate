@@ -10,8 +10,9 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 
 use crate::brain_rows::{
-  BrainMember, LORE_TYPE, Layer, Memory, Page, STANDING_TYPES, brain_type, conditions, fragment_row,
-  in_room, label, lore_rows, lore_slug, memory_row, path_of, person_of, slug_of, standing, woken_by,
+  BrainMember, FACT_TYPE, LORE_TYPE, Layer, Memory, Page, STANDING_TYPES, Subject, Tally, brain_type,
+  conditions, fragment_row, in_room, label, lore_rows, lore_slug, memory_row, path_of, person_row,
+  sheet_path, slug_of, standing, woken_by,
 };
 use crate::http::{Answer, Caller, Peer};
 
@@ -151,31 +152,13 @@ pub struct Document {
   pub version: String,
 }
 
-/// One standing sheet: the person, its part, its path, its text and its version.
+/// One person's sheet in a room, as the brain renders it from the facts about them: the person, the path it is
+/// handed under and its lines.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Sheet {
   pub person: i64,
-  pub part: String,
   pub path: String,
   pub text: String,
-  pub version: String,
-}
-
-/// One person-book piece read, with whose it is.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PeoplePiece {
-  pub slug: String,
-  pub path: String,
-  pub text: String,
-  pub version: String,
-  pub owner: Option<i64>,
-}
-
-/// What the person book answers a turn: the speakers' sheets and the pieces asked for.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct People {
-  pub sheets: Vec<Sheet>,
-  pub pieces: Vec<PeoplePiece>,
 }
 
 /// One rule the owner grants in a room.
@@ -240,15 +223,14 @@ pub trait Brain: Send + Sync {
   /// The lore pieces asked for, by their slugs.
   fn lore<'a>(&'a self, agent: &'a str, slugs: &'a [String]) -> BoxFuture<'a, Answer<Vec<Document>>>;
 
-  /// The speakers' sheets and the person-book pieces asked for, or the brain's refusal of a slug outside the
-  /// room.
-  fn people<'a>(
+  /// Each of these people's sheets in the room, in the order asked: what the brain renders from their facts
+  /// about no room and their facts about the room. A person the brain knows no fact of there has none.
+  fn sheets<'a>(
     &'a self,
     agent: &'a str,
     chat: i64,
-    senders: &'a [i64],
-    slugs: &'a [String],
-  ) -> BoxFuture<'a, Answer<Reply<People>>>;
+    people: &'a [i64],
+  ) -> BoxFuture<'a, Answer<Vec<Sheet>>>;
 
   /// The rules the owner grants in the room.
   fn room_rules(&self, chat: i64) -> BoxFuture<'_, Answer<Vec<RoomRule>>>;
@@ -257,12 +239,16 @@ pub trait Brain: Send + Sync {
   fn loads<'a>(&'a self, session: &'a str) -> BoxFuture<'a, Answer<Vec<Load>>>;
 }
 
+// A subject as a brain finds it: the brain, the subject's type and its key.
+type SubjectKey = (i64, String, String);
+
 /// The brain over HTTP: the agent's brain found once by the agent's key, its memories read by type and
 /// mapped to the reference road's rows (the brain's `docs/boundary-api.md`, 「Brains」).
 #[derive(Clone, Debug)]
 pub struct HttpBrain {
   caller: Caller,
   brains: std::sync::Arc<std::sync::Mutex<BTreeMap<String, i64>>>,
+  subjects: std::sync::Arc<std::sync::Mutex<BTreeMap<SubjectKey, i64>>>,
 }
 
 impl HttpBrain {
@@ -270,6 +256,7 @@ impl HttpBrain {
     Self {
       caller: Caller::new("bmo-brain", peer),
       brains: std::sync::Arc::new(std::sync::Mutex::new(BTreeMap::new())),
+      subjects: std::sync::Arc::new(std::sync::Mutex::new(BTreeMap::new())),
     }
   }
 }
@@ -424,11 +411,80 @@ impl HttpBrain {
     Ok(all)
   }
 
+  // A subject of a brain by its type and key, remembered once found; none where the brain holds none.
+  async fn subject(&self, brain: i64, kind: &str, key: &str) -> Answer<Option<i64>> {
+    let held = (brain, kind.to_owned(), key.to_owned());
+
+    if let Some(id) = self.subjects.lock().ok().and_then(|subjects| subjects.get(&held).copied()) {
+      return Ok(Some(id));
+    }
+
+    let page: Page<Subject> = self
+      .get(
+        "a subject found",
+        &format!("brains/{brain}/subjects"),
+        &[("type", kind), ("key", key), ("limit", "1")],
+      )
+      .await?;
+    let found = page.items.into_iter().find(|subject| subject.kind == kind && subject.key == key);
+
+    if let (Some(subject), Ok(mut subjects)) = (&found, self.subjects.lock()) {
+      subjects.insert(held, subject.id);
+    }
+
+    Ok(found.map(|subject| subject.id))
+  }
+
+  // The people the brain's live facts are about, each as the person-book search's candidate in the room.
+  async fn people_rows(&self, agent: &str, chat: i64) -> Answer<Vec<Fragment>> {
+    let brain = self.brain(agent).await?;
+    let tallies: Vec<Tally> = self
+      .get(
+        "people offered",
+        &format!("brains/{brain}/tallies"),
+        &[("type", FACT_TYPE), ("status", "active"), ("by", "subject")],
+      )
+      .await?;
+    let ids: Vec<String> = tallies.into_iter().filter_map(|tally| tally.group).collect();
+    let limit = PAGE_ROWS.to_string();
+    let mut people: Vec<(i64, Option<String>)> = Vec::new();
+
+    for ids in ids.chunks(PAGE_ROWS) {
+      let ids = ids.join(",");
+      let page: Page<Subject> = self
+        .get("people named", &format!("brains/{brain}/subjects"), &[("ids", &ids), ("limit", &limit)])
+        .await?;
+
+      people.extend(
+        page
+          .items
+          .into_iter()
+          .filter(|subject| subject.kind == "person")
+          .filter_map(|subject| subject.key.parse().ok().map(|person| (person, subject.name))),
+      );
+    }
+
+    people.sort_by_key(|(person, _)| *person);
+    people.dedup_by_key(|(person, _)| *person);
+
+    Ok(
+      people
+        .iter()
+        .map(|(person, name)| person_row(agent, chat, *person, name.as_deref()))
+        .collect(),
+    )
+  }
+
   // The active rows of a reference kind read in the room, as the gate's fragment rows.
   async fn rows_of(&self, agent: &str, chat: i64, kind: &str) -> Answer<Vec<Fragment>> {
     let Some((brain_type, old_kind)) = brain_type(kind) else {
       return Ok(Vec::new());
     };
+
+    if brain_type == FACT_TYPE {
+      return self.people_rows(agent, chat).await;
+    }
+
     let brain = self.brain(agent).await?;
     let rows = self.active(brain, brain_type).await?;
 
@@ -615,46 +671,42 @@ impl Brain for HttpBrain {
     })
   }
 
-  fn people<'a>(
+  fn sheets<'a>(
     &'a self,
     agent: &'a str,
     chat: i64,
-    senders: &'a [i64],
-    slugs: &'a [String],
-  ) -> BoxFuture<'a, Answer<Reply<People>>> {
+    people: &'a [i64],
+  ) -> BoxFuture<'a, Answer<Vec<Sheet>>> {
     Box::pin(async move {
-      let brain = self.brain(agent).await?;
-      let rows = self.active(brain, "sheet").await?;
-      let mut sheets: Vec<Sheet> = Vec::new();
-      let mut pieces: Vec<PeoplePiece> = Vec::new();
-      let piece = |memory: &Memory| PeoplePiece {
-        slug: slug_of(memory),
-        path: label(&memory.labels, "path").unwrap_or_else(|| format!("memories/{}", memory.id)),
-        text: memory.text.clone(),
-        version: memory.id.to_string(),
-        owner: person_of(memory),
-      };
-
-      for memory in rows.iter().filter(|memory| in_room(memory, chat)) {
-        let is_piece = label(&memory.labels, "kind").is_some_and(|kind| kind == "person-book");
-        let person = person_of(memory);
-        let spoke = person.is_some_and(|person| senders.contains(&person));
-        let asked = slugs.iter().any(|one| one == &slug_of(memory));
-
-        if spoke && !is_piece {
-          sheets.push(Sheet {
-            person: person.unwrap_or(0),
-            part: label(&memory.labels, "part").unwrap_or_default(),
-            path: label(&memory.labels, "path").unwrap_or_else(|| format!("memories/{}", memory.id)),
-            text: memory.text.clone(),
-            version: memory.id.to_string(),
-          });
-        } else if (spoke && is_piece) || asked {
-          pieces.push(piece(memory));
-        }
+      if people.is_empty() {
+        return Ok(Vec::new());
       }
 
-      Ok(Reply::Answered(People { sheets, pieces }))
+      let brain = self.brain(agent).await?;
+      let room = self.subject(brain, "room", &chat.to_string()).await?.map(|room| room.to_string());
+      let query: Vec<(&str, &str)> = room.as_deref().map(|room| vec![("roomId", room)]).unwrap_or_default();
+      let mut sheets: Vec<Sheet> = Vec::new();
+
+      for &person in people {
+        let Some(subject) = self.subject(brain, "person", &person.to_string()).await? else {
+          continue;
+        };
+        let path = format!("brains/{brain}/subjects/{subject}/sheet");
+        let segments: Vec<&str> = path.split('/').collect();
+        let text = self.caller.get_text("a person's sheet", &segments, &query).await?;
+
+        if text.trim().is_empty() {
+          continue;
+        }
+
+        sheets.push(Sheet {
+          person,
+          path: sheet_path(chat, person),
+          text,
+        });
+      }
+
+      Ok(sheets)
     })
   }
 

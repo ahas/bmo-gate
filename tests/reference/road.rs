@@ -6,8 +6,9 @@
 use std::collections::HashSet;
 
 use gate_policy::prompts;
+use gate_policy::reference::REFERENCE;
 use gate_ports::brain::Sheet;
-use gate_reference::road::{Turn, select, select_knowledge};
+use gate_reference::road::{Turn, held_sheet, select, select_knowledge};
 use gate_reference::{Entry, Source};
 
 use crate::fakes::{fragment, memory};
@@ -16,7 +17,7 @@ use crate::{Ground, ground, offered_slugs};
 fn turn(off: &[&str]) -> Turn {
   Turn {
     chat_id: 7,
-    message_lines: vec!["Owner (id 5): how do deploys go?".into()],
+    message_lines: vec!["Owner (id 5): Robin, how do deploys go?".into()],
     message_id: Some(9),
     speaker_ids: vec![5, 5],
     situation: None,
@@ -37,7 +38,7 @@ fn picking(
   move |ask| {
     let slugs = offered_slugs(&ask.input);
 
-    if slugs.iter().any(|slug| slug.starts_with('c')) {
+    if slugs.iter().any(|slug| slug.starts_with("person-")) {
       return Some(
         slugs
           .iter()
@@ -66,30 +67,38 @@ fn furnish(ground: &Ground) {
     fragment("room-rule", "greeting", "how this room greets", Some(7), None),
     fragment("library-knowledge", "deploy-notes", "how a deploy goes", None, None),
     fragment("library-knowledge", "kittens", "the office cat", None, None),
-    fragment("person-book", "c5-told", "what the owner told", None, Some(5)),
+    fragment("person-book", "person-5", "Owner", Some(7), Some(5)),
+    fragment("person-book", "person-6", "Robin", Some(7), Some(6)),
+    fragment("person-book", "person-8", "Sam", Some(7), Some(8)),
   ]);
   brain.documents.lock().unwrap().extend([
     ("deploy-notes".to_owned(), "Deploys go through the testbed.".to_owned()),
     ("greeting".to_owned(), "Greet in one line.".to_owned()),
   ]);
-  brain
-    .pieces
-    .lock()
-    .unwrap()
-    .insert("c5-told".into(), ("The owner told the plan.".into(), 5));
   brain.standing.lock().unwrap().push(memory(
     41,
     "promise",
     "call-back",
     "Call back once the deploy lands.",
   ));
-  brain.sheets.lock().unwrap().push(Sheet {
-    person: 5,
-    part: "common".into(),
-    path: "people/5/sheet.md".into(),
-    text: "The owner.".into(),
-    version: "v".into(),
-  });
+  brain.sheets.lock().unwrap().extend([
+    Sheet {
+      person: 5,
+      path: "rooms/7/people/5/sheet.md".into(),
+      text: "- [#1 since 2026-01-02] Runs the deploys.".into(),
+    },
+    Sheet {
+      person: 6,
+      path: "rooms/7/people/6/sheet.md".into(),
+      text: "- [#2 since 2026-02-03] Keeps the office cat.".into(),
+    },
+  ]);
+  ground
+    .receiver
+    .names
+    .lock()
+    .unwrap()
+    .extend([(6, "Robin".to_owned()), (8, "Sam".to_owned())]);
   std::fs::create_dir_all(ground.shipped.join("system-document")).unwrap();
   std::fs::write(ground.shipped.join("system-document/structure.md"), "  The structure.\n").unwrap();
 }
@@ -100,7 +109,7 @@ fn paths(entries: &[Entry]) -> Vec<(&str, Source)> {
 
 #[tokio::test]
 async fn a_turns_reference_stands_its_memories_and_sheets_first_then_what_each_gate_picked() {
-  let ground = ground("turn", picking(&["structure", "greeting", "deploy-notes", "c5-told"])).await;
+  let ground = ground("turn", picking(&["structure", "greeting", "deploy-notes", "person-6"])).await;
 
   furnish(&ground);
 
@@ -110,20 +119,22 @@ async fn a_turns_reference_stands_its_memories_and_sheets_first_then_what_each_g
     paths(&entries),
     [
       ("memories/7", Source::Memory),
-      ("people/5/sheet.md", Source::Person),
+      ("rooms/7/people/5/sheet.md", Source::Person),
       ("system-document/structure.md", Source::Document),
       ("knowledge/greeting.md", Source::Rule),
       ("knowledge/deploy-notes.md", Source::Knowledge),
-      ("people/5/c5-told.md", Source::Person),
+      ("rooms/7/people/6/sheet.md", Source::Person),
     ]
   );
+  assert_eq!(entries[1].text, "- [#1 since 2026-01-02] Runs the deploys.");
+  assert_eq!(entries[5].text, "- [#2 since 2026-02-03] Keeps the office cat.");
   assert_eq!(entries[2].text, "The structure.");
   assert!(entries[0].text.contains("- #41 promise"));
 
   let hits: HashSet<String> =
     ground.brain.hits.lock().unwrap().iter().map(|hit| hit.slug.clone()).collect();
 
-  assert_eq!(hits, ["structure", "greeting", "deploy-notes", "c5-told"].map(str::to_owned).into());
+  assert_eq!(hits, ["structure", "greeting", "deploy-notes", "person-6"].map(str::to_owned).into());
 
   let scratch = &ground.scratch;
 
@@ -143,13 +154,24 @@ async fn a_turns_reference_stands_its_memories_and_sheets_first_then_what_each_g
     scratch
       .texts("SELECT slug FROM reference_verdicts WHERE attached = 1 ORDER BY slug", vec![])
       .await,
-    ["c5-told", "deploy-notes", "greeting", "structure"]
+    ["deploy-notes", "greeting", "person-6", "structure"]
   );
   assert_eq!(
     scratch
       .texts("SELECT slug FROM reference_verdicts WHERE llm = 0 ORDER BY slug", vec![])
       .await,
     ["kittens"]
+  );
+  // The speaker's own sheet stands already, so the person-book search is offered the others, narrowed to whom
+  // the turn names.
+  assert_eq!(
+    scratch
+      .texts(
+        "SELECT held || ' ' || slugs FROM reference_offers WHERE stage = 'people-search'",
+        vec![]
+      )
+      .await,
+    ["2 [\"person-6\"]"]
   );
   assert_eq!(
     scratch.count("SELECT count(*) FROM gate_roads WHERE round = 'round-1'", vec![]).await,
@@ -161,7 +183,7 @@ async fn a_turns_reference_stands_its_memories_and_sheets_first_then_what_each_g
       .await,
     [
       "library-knowledge PICK: deploy-notes",
-      "people-search PICK: c5-told",
+      "people-search PICK: person-6",
       "room-rules PICK: greeting",
       "system-documents PICK: structure"
     ]
@@ -372,4 +394,19 @@ async fn the_lore_with_no_reading_is_handed_over_one_index_a_section() {
   assert_eq!(paths(&entries), [("lore", Source::Document), ("lore/The town", Source::Document)]);
   assert_eq!(entries[0].text, "- harbour \u{2014} the harbour");
   assert_eq!(entries[1].text, "- weather \u{2014} the town's weather");
+}
+
+#[test]
+fn a_sheet_over_its_ceiling_keeps_its_lines_from_the_top() {
+  let line = |at: usize| format!("- [#{at} since 2026-01-02] {}", "x".repeat(990));
+  let text = (1..=40).map(line).collect::<Vec<_>>().join("\n");
+  let held = held_sheet(&text);
+  let lines: Vec<&str> = held.split('\n').collect();
+
+  assert!(held.chars().count() <= REFERENCE.sheet_chars);
+  assert_eq!(lines[0], line(1));
+  assert_eq!(*lines.last().unwrap(), line(lines.len()));
+  assert!(held.chars().count() + line(lines.len() + 1).chars().count() + 1 > REFERENCE.sheet_chars);
+  assert_eq!(held_sheet("- [#1 since 2026-01-02] Short.\n"), "- [#1 since 2026-01-02] Short.");
+  assert_eq!(held_sheet(&"x".repeat(REFERENCE.sheet_chars + 1)), "");
 }

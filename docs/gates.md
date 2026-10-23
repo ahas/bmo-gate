@@ -13,8 +13,7 @@
   provider's program takes as many runs at once as its pool's bound (「How many runs stand at once」 below). A
   caller that bounds how many of its own requests are out at once marks each request to stand beside the
   gate's other runs instead, and the bound is then the caller's alone — the translator, which keeps three parts
-  out at a time (the web unit's `docs/documents-viewer.md`), and the person-book summariser, which keeps four of
-  one sheet's groups out at a time (the brain's `docs/people-book.md`, 「Finishing the book」).
+  out at a time (the web unit's `docs/documents-viewer.md`).
 - A gate whose caller has a way of its own without it declares so in its profile, and only such a gate may
   be switched off for the whole deployment: its switch is its row of the gate options table (the agency's
   `docs/own-llm.md`, 「Per-gate time limit」), and a gate switched off is never asked. Apart from that, each
@@ -26,6 +25,13 @@
   - The turn's agent travels with the work: a companion's turn asks its reference selection as that
     agent's turn, and every gate asked from inside reads that agent's row. A gate asked outside any agent's
     turn reads the chat agent's.
+- **No gate writes what is known about a person.** What the brain knows of a person is its facts, one row
+  each, written by the agent that read them through the brain's write judgement, which weighs a candidate
+  against the live rows most like it before anything is written (the brain's `docs/design.md`, 「Writing」).
+  A gate has no tool to look those rows up and no way to apply a judgement on them, so writing a fact is
+  never a gate's run. A person's standing sheet is the brain's own rendering of those facts (the brain's
+  `docs/design.md`, 「A person is a subject」), which the reference reads as it stands
+  (`docs/reference-selection.md`, 「What attaches without a gate」), so no gate summarises one either.
 - The session summariser stands at the place the gate order gives it and is called like a gate, but it is a
   recollector, not a gate. No unit asks it: the agency keeps no session summary (its `docs/sessions.md`), so
   it runs under the evaluation set alone (`docs/boundary-api.md`, 「Contract gaps」).
@@ -49,8 +55,8 @@
 ### How many runs stand at once
 
 - **A gate stands no more runs at once than its pool's bound:** the default in the gate's `gate-pool`
-  policy, three, or the bound the gate's own profile names. The translator and the person-book summariser,
-  whose callers keep several parts out at once, name four.
+  policy, three, or the bound the gate's own profile names. The translator, whose caller keeps several parts
+  out at once, names four.
 - **No run free:** while every place of a full pool is taken, the judgement waits for one to come free until
   the gate's own wait (its gate options row) runs out. The gate then has no answer, its road records
   `timeout`, and its caller's own way without it stands (the agency's `docs/own-llm.md`, 「A gate that did
@@ -111,7 +117,6 @@
 
 ### Off-turn
 
-- `people-standing` — writes a person's standing sheet in the digest batch (`POST /sheets/judge`).
 - `document-seek` — picks the document or heading that answers a question asked in the console's document
   viewer (`POST /documents/sought`).
 - `translator` — translates a document the console's document viewer shows, what reaches a job worker into

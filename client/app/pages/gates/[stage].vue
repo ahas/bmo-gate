@@ -101,6 +101,7 @@
             @compositionend.capture="enter.compositionend"
             :submit-on-enter="submitOnEnter"
             :placeholder="t('gates.label.message')"
+            :autofocus="false"
             :disabled="sending"
             color="neutral"
             variant="subtle"

@@ -105,11 +105,18 @@ flowchart TB
   builder already holds (the brain's `docs/memories.md`).
 - **The rows the turn's events wake** attach by the event alone (the brain's `docs/memories.md`, 「A row with an
   event」).
-- **The standing sheets of everyone who spoke this turn** — a person's common sheet and this room's
-  sheet of them — attach for the same reason, and a sheet over its ceiling is passed over
-  (the brain's `docs/people-book.md`). A one-to-one with the chat agent keeps no room sheet, so there the common sheet stands
-  alone, and no room piece is offered there either (the brain's `docs/people-book.md`, 「Two parts」). They are the turn's agent's own, read through the brain's person-book read; an agent
-  keeping no long-term memory is given none, never the chat agent's.
+- **The standing sheet of everyone who spoke this turn** attaches for the same reason: what the brain
+  knows of that person in this room, as the brain renders it from its facts — their facts about no room and
+  their facts about this room, one line a fact, the most important first (the brain's `docs/design.md`,
+  「A person is a subject」). The gate reads it through the brain's rendering of the person's subject with
+  the room's subject as its room, and through nothing else: the brain keeps no sheet as a row, and no
+  memory of type `sheet` is ever read (`docs/boundary-api.md`, 「bmo-brain」).
+  - **A sheet is held to 14,000 characters** by its lines from the top, so what is cut is the least
+    important; a person the brain knows no fact of in the room has no sheet.
+  - **Its path is the room's and the person's,** `rooms/<room>/people/<user id>/sheet.md`, since the same
+    person reads differently in two rooms.
+  - **It is the turn's agent's own,** read from that agent's brain; an agent keeping no long-term memory is
+    given none, never the chat agent's.
 - **A user's own thread** attaches on every turn of their private room once the multi-user model
   is in force: what that user and the chat agent said to each other in the group rooms they are in over the
   last seven days, under the path `threads/user-<id>`, the newest kept under its ceiling (the
@@ -121,7 +128,7 @@ flowchart TB
   never pass for something a person said.
 - **The memories are counted against the safety line below; the sheets are not.** Nothing bounds how
   many rows a room may hold, so they join the turn's total like everything a gate picked. A sheet is
-  held to a ceiling of its own where it is written.
+  held to its own ceiling (above).
 
 ## The gates and what each reads
 
@@ -141,8 +148,11 @@ flowchart TB
 - **`room-rules`** — the room's own rulebook, read for that room and no other.
 - **`library-knowledge`** — the knowledge pieces this room may see: the rows that name this room and
   the rows that name none, which are the shared ones (the brain's `docs/knowledge.md`).
-- **`people-search`** — the person-book pieces of this room and the common pieces of the people who
-  have spoken in it (the brain's `docs/people-book.md`).
+- **`people-search`** — the people the agent's brain knows facts of, one candidate a person, less those
+  who spoke this turn, whose sheets already attach. A candidate's slug is `person-<user id>` and its index
+  line the name the brain knows the person by, else their number; picked, it attaches that person's sheet
+  in this room as a speaker's attaches, under the same path and the same ceiling. A person whose sheet in
+  the room renders as nothing attaches nothing.
 - **`situation-rules`** — the room's standing memories that carry a condition, and the global ones
   that reach it, offered as their conditions alone. It is not one of the three: its candidates are
   rows rather than documents drawn from an index, it asks two questions of each rather than one, and
@@ -236,7 +246,7 @@ flowchart TB
 - **A selection problem never blocks a reply.** Where the road itself throws, the prompt goes out
   with no reference at all rather than not going out.
 - **The person-book search keeps its own shape.** It names the pieces the turn needs, most relevant
-  first and at most four of them, or none; how it picks is the brain's `docs/people-book.md`. What it shares
+  first and at most four of them, or none; how it picks is its own instructions'. What it shares
   with the three is the road around it — it runs beside them, falls back to its index the same way,
   and declares a probe of the same shape.
 
@@ -332,8 +342,9 @@ flowchart TB
 - **Only the room's own picks stand on its turn,** full or mark, so a room-only document never stands on
   another room's turn in either form.
 - **The record holds whole paths,** so one room's document can never be read as another's.
-- **A shared document is one version wherever it went in full.** A common sheet loaded on one room's turn
-  stands as a mark on the same person's turn in another room.
+- **A shared document is one version wherever it went in full.** A system document loaded on one room's
+  turn stands as a mark on another room's turn. A person's sheet is not shared: it is read per room, under
+  the room's path.
 - **An index is filtered per room,** so after a switch that room's version goes in full once.
 
 ### Notices carry only the path
@@ -342,8 +353,8 @@ flowchart TB
   remembers of it is stale, and the current version comes in full with the next turn that attaches it. So
   the new version is neither loaded twice, by the notice and by the reference, nor missed.
 - **Which documents those are**, read off the path:
-  - in the brain: a knowledge chunk and the knowledge index, everything under a room's `rules/` and
-    `people/`, and everything under a person's common `people/<userId>/`. A lore piece is the brain's too,
+  - in the brain: a knowledge chunk and the knowledge index, and everything under a room's `rules/` and
+    `people/`, a person's sheet in the room among them. A lore piece is the brain's too,
     under its memory's path, and a changed piece is a new memory under a path of its own;
   - shipped: the system reference index. A system document itself is announced to no session at all, so it
     needs no rule here.
@@ -370,7 +381,7 @@ flowchart TB
 - **What it is asked about:** the knowledge the room the work reports to may see — the rows naming
   that room and the shared ones, read for the chat agent — narrowed by the code for the work's own lines
   and asked about one candidate at a time, on Laya as the gate's mode says. Nothing else a turn carries
-  attaches: no memory, sheet, room rule, person-book piece or system document.
+  attaches: no memory, sheet, room rule or system document.
 - **The work's lines:**
   - a job: its item's title and request as its requester's line, or the job's own text as a line of the
     bot's where no item stands behind it;
@@ -415,7 +426,7 @@ flowchart TB
   merely wanted are both readable afterwards.
 - **What attached is counted on the fragment's own row** — its hit count and the time it last
   attached, so a piece's standing is readable without walking the per-candidate record
-  (the brain's `docs/fragments.md`).
+  (the brain's `docs/fragments.md`). A person's sheet is no row, so a sheet attached counts nothing.
 - **The row is written whether or not Laya ran.** What it records is the LLM road's own answer, so a
   turn taken while the Laya server was unreachable still leaves every candidate's verdict behind.
 - **What it is for:** these judgements are what a gate's own model is taught and measured on, and a

@@ -26,7 +26,7 @@ fn member(stage: &str) -> &'static dyn EvalGate {
 fn every_gate_of_the_set_is_a_member_once_in_name_order_and_its_words_read() {
   let stages: Vec<&str> = members().iter().map(|member| member.stage()).collect();
 
-  assert_eq!(stages, ["document-seek", "people-standing", "session-summary", "translator"]);
+  assert_eq!(stages, ["document-seek", "session-summary", "translator"]);
   assert!(members().iter().all(|member| !member.topics().is_empty() && member.batch_size() > 0));
 }
 
@@ -39,7 +39,6 @@ async fn each_brief_shows_the_gate_s_real_request_for_its_example() {
     async move { member(stage).brief(&stages).await.unwrap() }
   };
   let seek = brief("document-seek").await;
-  let standing = brief("people-standing").await;
   let summary = brief("session-summary").await;
   let translator = brief("translator").await;
 
@@ -47,10 +46,6 @@ async fn each_brief_shows_the_gate_s_real_request_for_its_example() {
   assert!(seek.contains("SYSTEM PROMPT THE GATE IS GIVEN:\n"));
   assert!(seek.contains("INDEX:\n"));
   assert!(seek.ends_with("though entries look close."));
-  assert!(standing.contains("the document-writing rulebook\n\nthe plain-writing rulebook"));
-  assert!(standing.contains("Part: room-only\nChat id: -1001234567"));
-  assert!(standing.contains("[rooms/-1001234567/people/chunks/p4169-address.md]"));
-  assert!(!standing.contains("{form_rule}"));
   assert!(summary.contains("SYSTEM PROMPT THE GATE IS GIVEN:\nthe recollection rulebook\n\n"));
   assert!(summary.contains("the-chat-agent (room -1001234567): "));
   assert!(summary.contains("WORKER INSTRUCTIONS:\nthe recollection rulebook"));
@@ -61,7 +56,7 @@ async fn each_brief_shows_the_gate_s_real_request_for_its_example() {
       .contains("PROMPT THE GATE IS GIVEN (for the example input):\nTranslate into English.\n\n## ")
   );
 
-  for one in [&seek, &standing, &summary, &translator] {
+  for one in [&seek, &summary, &translator] {
     assert!(!one.contains("BMO") && !one.contains("\u{be44}\u{baa8}"), "an agent's name in a brief");
   }
 }
@@ -96,29 +91,6 @@ async fn document_seek_passes_on_a_right_first_pick_and_on_none_for_a_question_n
   let branches = json!({ "mode": "branches", "entries": input["entries"], "question": "q" });
 
   assert_eq!(seek.refusal(&branches, &key(&[])).as_deref(), Some("a branch index answered none"));
-}
-
-#[tokio::test]
-async fn a_sheet_the_summariser_s_own_check_refuses_scores_nothing() {
-  let ground = ground("member-standing").await;
-  let standing = member("people-standing");
-  let input = json!({
-    "layer": "common", "chatId": -1, "userId": 7,
-    "pieces": [{ "slug": "c7-speech", "text": "## Facts\n- [date 2026-01-02] Likes tea." }],
-  });
-  let key = json!({ "facts": [{ "accept": ["tea"] }], "avoid": ["coffee"] });
-  let kept = standing.run(&ground.stages, &input, &key, &answering(Some("## Speech\n- tea"))).await;
-  let foreign = standing.run(&ground.stages, &input, &key, &answering(Some("## Address\n- tea"))).await;
-
-  assert!(kept.pass);
-  assert!(!foreign.pass);
-  assert_eq!(foreign.checks, 1);
-
-  let other = |layer: &str, slug: &str| json!({ "layer": layer, "chatId": -1, "userId": 7, "pieces": [{ "slug": slug, "text": "t" }] });
-
-  assert_eq!(standing.refusal(&other("common", "c7-speech"), &key), None);
-  assert!(standing.refusal(&other("room", "c7-speech"), &key).is_some());
-  assert!(standing.refusal(&other("common", "c8-speech"), &key).is_some());
 }
 
 #[tokio::test]

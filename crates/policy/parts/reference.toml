@@ -7,6 +7,10 @@
 # What a turn may carry on these gates' word together, in characters.
 turn_budget_chars = 30000
 
+# What a person's sheet may hold where it attaches, in characters: the lines of the brain's rendering from the top,
+# the most important first, as many as fit.
+sheet_chars = 14000
+
 # When the bot's own lines alone ask a gate: "never"; "own turn", on a turn they open but not in a push; or "own
 # turn, named items", on such a turn over what the item rule alone keeps.
 

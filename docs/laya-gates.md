@@ -339,10 +339,10 @@ The pilot, 100 rows of each gate on each road, same bar, same audit:
 ## 7. `people-search`
 
 - **Status:** a gate of its own, with a probe shaped like the reference splits'.
-- **Input:** the turn's messages in the plain shape, and the person-book pieces the room offers that the
-  narrowing keeps for the turn: the room's own pieces about the people in it, and the common pieces of each
-  person who has spoken in that room. Each candidate carries its slug, whose person it is about, and its
-  index line.
+- **Input:** the turn's messages in the plain shape, and the people the room offers that the narrowing
+  keeps for the turn: each person the agent's brain knows facts of who did not speak this turn, one
+  candidate each (`docs/reference-selection.md`, 「The gates and what each reads」). Each candidate carries
+  its slug, whose person it is, and its index line.
 - **Question:** one yes/no per candidate — does answering this conversation need this person's record.
 - **Answers:** the set of slugs answered yes, or none.
 - **Asymmetry:** none.

@@ -188,11 +188,6 @@ impl GateClient {
     answer(self.post(&["sanitiser", "documents"]).json(ask)).await
   }
 
-  /// Judge a person-book sheet.
-  pub async fn judge_sheet(&self, ask: &SheetAsk) -> Result<SheetAnswer, ClientFailure> {
-    answer(self.post(&["sheets", "judge"]).json(ask)).await
-  }
-
   /// Translate originals into one language.
   pub async fn translate(&self, ask: &TranslationAsk) -> Result<Readings, ClientFailure> {
     answer(self.post(&["translations"]).json(ask)).await

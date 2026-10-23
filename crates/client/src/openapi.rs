@@ -235,21 +235,6 @@ pub fn document() -> Value {
     &mut paths,
     &mut generator,
     "post",
-    "/sheets/judge",
-    "sheet_judged",
-    "Sheets",
-    "Write one person's sheet of one part from the pieces handed in.",
-    vec![],
-    None,
-    Some(made::<SheetAsk>),
-    &[(200, "the sheet that came, or none", Some(made::<SheetAnswer>))],
-    &["unauthorized", "bad-request", "stopped", "failed", "upstream-failed"],
-  );
-
-  route(
-    &mut paths,
-    &mut generator,
-    "post",
     "/translations",
     "translations",
     "Translations",
@@ -582,8 +567,8 @@ pub fn document() -> Value {
       "title": "bmo-gate",
       "version": env!("CARGO_PKG_VERSION"),
       "description": "The gate stage of a turn: sanitising words on their way into a model's context, choosing \
-        the reference a turn is handed, checking an answer on its way out, translating, seeking documents, \
-        judging person-book sheets and reading voice lines. Every answer is data in the common wire format; \
+        the reference a turn is handed, checking an answer on its way out, translating, seeking documents \
+        and reading voice lines. Every answer is data in the common wire format; \
         the console bundle carries its screens' words.",
     }),
   );
@@ -612,7 +597,6 @@ pub fn document() -> Value {
       "Judgements",
       "Reference",
       "Sanitiser",
-      "Sheets",
       "Translations",
       "Knowledge",
       "Runs",

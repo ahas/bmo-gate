@@ -76,13 +76,6 @@ laya_mode = "shadow"
 laya_road = true
 
 [[profile]]
-key = "people-standing"
-tier = "Simple"
-sampling = { temperature = 0.3, top_p = 0.8, top_k = 20, min_p = 0 }
-answer_tokens = 8192
-pool = 4
-
-[[profile]]
 key = "document-seek"
 tier = "Simple"
 sampling = { temperature = 0.1, top_p = 0.8, top_k = 20, min_p = 0 }

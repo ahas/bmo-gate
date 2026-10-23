@@ -9,14 +9,13 @@ macro_rules! prompt {
 }
 
 /// Every instruction file, by its path under `prompts/`.
-pub const FILES: [(&str, &str); 21] = [
+pub const FILES: [(&str, &str); 20] = [
   prompt!("document-seek/instructions.md"),
   prompt!("library-knowledge/answer.md"),
   prompt!("library-knowledge/instructions.md"),
   prompt!("output-gate/telegram-html/format.md"),
   prompt!("people-search/answer.md"),
   prompt!("people-search/instructions.md"),
-  prompt!("people-standing/instructions.md"),
   prompt!("room-rules/answer.md"),
   prompt!("room-rules/instructions.md"),
   prompt!("sanitizer/instructions.md"),

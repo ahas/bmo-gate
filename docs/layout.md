@@ -63,6 +63,8 @@ below the root, and its tests under `tests/client/`.
   prompt to one gate as a turn would and lists the gate's trials, oldest first, each with who asked where the
   trial names it, the answer as the gate wrote it and how long it took; beside the gate's name stand its Laya
   mode and agreement. Another gate's page reads that gate afresh.
+- **No page focuses an input on arrival.** The prompt on a gate's page waits to be touched, so opening the page
+  on a phone raises no keyboard.
 - **The calls** go to the gate's screen routes under `/console` at the address bmo-ui's `relay` module answers
   for the service `gate`, through the app's fetcher. A refusal is shown as the words' `gates.error.<code>`, the
   code's hyphens as underscores, where they hold it, and the page's own fallback otherwise.

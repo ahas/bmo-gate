@@ -18,7 +18,6 @@
       "situation_rules": "Situation rules matcher",
       "sanitizer": "Sanitiser",
       "output_format": "Output format gate",
-      "people_standing": "People standing",
       "document_seek": "Document seeker",
       "translator": "Translator",
       "voice_polish": "Voice polish",

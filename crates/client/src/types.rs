@@ -448,37 +448,6 @@ pub struct DocumentSanitised {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// Person-book sheets
-
-/// One piece a sheet is written from.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct SheetPiece {
-  pub path: String,
-  pub text: String,
-}
-
-/// A sheet to judge.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct SheetAsk {
-  pub agent_name: String,
-  /// `common` or `room`.
-  pub part: String,
-  pub room_id: Option<i64>,
-  pub person_id: i64,
-  pub pieces: Vec<SheetPiece>,
-  pub ceiling: usize,
-  pub registration: Option<String>,
-}
-
-/// The sheet that came, or none.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct SheetAnswer {
-  pub sheet: Option<String>,
-}
-
-// ---------------------------------------------------------------------------------------------------------------
 // Translations
 
 /// Originals to translate into one language.

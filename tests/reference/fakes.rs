@@ -9,8 +9,7 @@ use std::sync::Mutex;
 use futures_util::future::BoxFuture;
 use gate_ports::PortError;
 use gate_ports::brain::{
-  Brain, Condition, Document, Event, Fragment, Hit, Load, MemoryRow, People, PeoplePiece, Reply, RoomRule,
-  Sheet,
+  Brain, Condition, Document, Event, Fragment, Hit, Load, MemoryRow, Reply, RoomRule, Sheet,
 };
 use gate_ports::gateway::{Ask, Completion, Gateway};
 use gate_ports::http::Answer;
@@ -98,7 +97,6 @@ pub struct FakeBrain {
   pub documents: Mutex<HashMap<String, String>>,
   pub lore: Mutex<HashMap<String, String>>,
   pub sheets: Mutex<Vec<Sheet>>,
-  pub pieces: Mutex<HashMap<String, (String, i64)>>,
   pub hits: Mutex<Vec<Hit>>,
   pub matched: Mutex<Vec<(Vec<String>, Vec<String>)>>,
   pub events: Mutex<Vec<Event>>,
@@ -216,38 +214,21 @@ impl Brain for FakeBrain {
     })
   }
 
-  fn people<'a>(
+  fn sheets<'a>(
     &'a self,
     _agent: &'a str,
     _chat: i64,
-    senders: &'a [i64],
-    slugs: &'a [String],
-  ) -> BoxFuture<'a, Answer<Reply<People>>> {
+    people: &'a [i64],
+  ) -> BoxFuture<'a, Answer<Vec<Sheet>>> {
     Box::pin(async move {
-      let pieces = self.pieces.lock().unwrap();
+      let sheets = self.sheets.lock().unwrap();
 
-      Ok(Reply::Answered(People {
-        sheets: self
-          .sheets
-          .lock()
-          .unwrap()
+      Ok(
+        people
           .iter()
-          .filter(|sheet| senders.contains(&sheet.person))
-          .cloned()
+          .filter_map(|person| sheets.iter().find(|sheet| sheet.person == *person).cloned())
           .collect(),
-        pieces: slugs
-          .iter()
-          .filter_map(|slug| {
-            pieces.get(slug).map(|(text, owner)| PeoplePiece {
-              slug: slug.clone(),
-              path: format!("people/{owner}/{slug}.md"),
-              text: text.clone(),
-              version: "v".into(),
-              owner: Some(*owner),
-            })
-          })
-          .collect(),
-      }))
+      )
     })
   }
 

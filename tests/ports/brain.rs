@@ -21,10 +21,6 @@ fn room(key: &str) -> Value {
   json!({ "id": 1, "type": "room", "key": key })
 }
 
-fn person(key: &str) -> Value {
-  json!({ "id": 2, "type": "person", "key": key })
-}
-
 /// A moved state row, its old fields kept in its labels.
 fn moved_state() -> Value {
   json!({
@@ -76,14 +72,9 @@ fn rule() -> Value {
   })
 }
 
-fn sheet(id: i64, key: &str, labels: Value) -> Value {
-  json!({
-    "id": id, "brainId": 9, "key": key, "type": "sheet", "text": format!("sheet {id}"), "layerId": null,
-    "position": 0, "subjects": [person("31"), room("7")], "status": "active", "lineageId": id,
-    "supersededBy": null, "validFrom": 9, "validTo": null, "importance": 5, "hits": 0, "lastHitAt": null,
-    "lastConfirmedAt": null, "strength": 1.0, "retrievalStrength": 0.0, "consolidatedAt": null,
-    "actorName": "move", "labels": labels, "createdAt": 9
-  })
+/// A subject of the brain's, as its subjects route lists it.
+fn subject(id: i64, kind: &str, key: &str, name: Option<&str>) -> Value {
+  json!({ "id": id, "brainId": 9, "type": kind, "key": key, "description": "", "name": name, "createdAt": 9 })
 }
 
 fn knowledge_piece() -> Value {
@@ -305,36 +296,109 @@ async fn the_lore_stands_in_its_layers_order_and_a_piece_is_read_by_its_slug() {
 }
 
 #[tokio::test]
-async fn the_person_book_reads_the_speakers_sheets_and_the_pieces_asked_for() {
+async fn a_persons_sheet_is_the_brains_rendering_of_their_facts_in_the_room() {
   let stub = Stub::start().await;
   let brain = HttpBrain::new(peer(&stub, "t"));
 
   stub.answer(Method::GET, "/brains", 200, brains());
-  served(
-    &stub,
-    "sheet",
-    vec![
-      sheet(
-        21,
-        "bmo:people:31:common",
-        json!({ "part": "common", "owner": "31", "path": "people/31/common.md" }),
-      ),
-      sheet(
-        22,
-        "bmo:people:31:chunks:garden",
-        json!({ "kind": "person-book", "slug": "garden", "owner": "31" }),
-      ),
-      sheet(23, "bmo:people:32:common", json!({ "part": "common", "owner": "32" })),
-    ],
+  stub.answer(
+    Method::GET,
+    "/brains/9/subjects",
+    200,
+    page(vec![
+      subject(3, "room", "7", None),
+      subject(4, "person", "31", Some("Robin")),
+      subject(5, "person", "32", None),
+    ]),
+  );
+  stub.canned(
+    Method::GET,
+    "/brains/9/subjects/4/sheet",
+    200,
+    "text/plain",
+    "- [#21 since 2026-01-02] Likes tea.\n- [#22 since 2026-02-03] Keeps a garden.".into(),
+  );
+  stub.canned(Method::GET, "/brains/9/subjects/5/sheet", 200, "text/plain", String::new());
+
+  let sheets = brain.sheets("chat-agent", 7, &[31, 32, 33]).await.unwrap();
+
+  assert_eq!(sheets.len(), 1);
+  assert_eq!((sheets[0].person, sheets[0].path.as_str()), (31, "rooms/7/people/31/sheet.md"));
+  assert_eq!(
+    sheets[0].text,
+    "- [#21 since 2026-01-02] Likes tea.\n- [#22 since 2026-02-03] Keeps a garden."
+  );
+  assert_eq!(stub.one("/brains/9/subjects/4/sheet").query.as_deref(), Some("roomId=3"));
+  assert!(
+    stub
+      .seen()
+      .iter()
+      .all(|seen| !seen.query.as_deref().unwrap_or_default().contains("type=sheet"))
+  );
+}
+
+#[tokio::test]
+async fn the_person_book_offers_one_candidate_for_each_person_the_facts_are_about() {
+  let stub = Stub::start().await;
+  let brain = HttpBrain::new(peer(&stub, "t"));
+
+  stub.answer(Method::GET, "/brains", 200, brains());
+  stub.answer(
+    Method::GET,
+    "/brains/9/tallies",
+    200,
+    json!([
+      { "group": "4", "count": 12, "importance": 5.0, "strength": 1.0, "retrievalStrength": 0.0, "latestValidFrom": 9 },
+      { "group": "3", "count": 7, "importance": 5.0, "strength": 1.0, "retrievalStrength": 0.0, "latestValidFrom": 9 },
+      { "group": "5", "count": 2, "importance": 5.0, "strength": 1.0, "retrievalStrength": 0.0, "latestValidFrom": 9 },
+    ]),
+  );
+  stub.answer(
+    Method::GET,
+    "/brains/9/subjects",
+    200,
+    page(vec![
+      subject(3, "room", "7", None),
+      subject(4, "person", "31", Some("Robin")),
+      subject(5, "person", "32", None),
+    ]),
   );
 
-  let read = brain.people("chat-agent", 7, &[31], &["garden".to_owned()]).await.unwrap();
-  let Reply::Answered(people) = read else { panic!("answered") };
-  assert_eq!(people.sheets.len(), 1);
-  assert_eq!((people.sheets[0].person, people.sheets[0].part.as_str()), (31, "common"));
-  assert_eq!(people.sheets[0].path, "people/31/common.md");
-  assert_eq!(people.pieces.len(), 1);
-  assert_eq!((people.pieces[0].slug.as_str(), people.pieces[0].owner), ("garden", Some(31)));
+  let offered = brain.offered("chat-agent", 7, &["person-book".to_owned()]).await.unwrap();
+  let read: Vec<(&str, &str, Option<i64>, &str, &str)> = offered
+    .iter()
+    .map(|row| (row.kind.as_str(), row.slug.as_str(), row.owner, row.title.as_str(), row.path.as_str()))
+    .collect();
+
+  assert_eq!(
+    read,
+    [
+      ("person-book", "person-31", Some(31), "Robin", "rooms/7/people/31/sheet.md"),
+      ("person-book", "person-32", Some(32), "32", "rooms/7/people/32/sheet.md"),
+    ]
+  );
+
+  let tallies = stub.one("/brains/9/tallies").query.unwrap_or_default();
+
+  assert!(tallies.contains("type=fact") && tallies.contains("by=subject"), "{tallies}");
+  assert!(stub.seen().iter().all(|seen| seen.path != "/brains/9/memories"));
+
+  // A sheet is no memory, so attaching one hands the brain no hit.
+  brain
+    .hits(
+      "chat-agent",
+      7,
+      &[offered[0].clone()].map(|row| gate_ports::brain::Hit {
+        key: row.key,
+        kind: row.kind,
+        chat_id: row.chat_id,
+        owner: row.owner,
+        slug: row.slug,
+      }),
+    )
+    .await
+    .unwrap();
+  assert!(stub.seen().iter().all(|seen| seen.path != "/brains/9/hits"));
 }
 
 #[tokio::test]

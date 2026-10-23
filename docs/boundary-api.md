@@ -8,7 +8,7 @@ part of the boundary.
 The gate is the gate stage of a turn. The receiver builds a turn's envelope; the gate sanitises the words on
 their way into a model's context, picks the reference the turn is handed, and checks the answer on its way
 out; the agency carries the turn; the brain serves the raw material the gate picks from. Beside a turn the
-gate translates, seeks documents, judges person-book sheets and reads voice lines for the units that ask, and
+gate translates, seeks documents and reads voice lines for the units that ask, and
 it records every judgement it makes and the road each run walked. Laya, the decision filter some gates ask
 first, is the gate's own service, reached through the gate's own relay.
 
@@ -75,12 +75,15 @@ no room at all.
 | conditional rows | the standing rows | | their old `conditions` label, or a `situation`'s text as its condition |
 | rows the events wake | the standing rows | | the gate filters them by the events their `event` or `conditions` labels name |
 | matched rows written | `POST /brains/{brainId}/hits` | `memoryIds`, `actorName` | `recordedCount` |
-| fragments offered | `GET /brains/{brainId}/memories` | `type` (the brain's type for the reference kind: `sheet` for the person-book, `knowledge`, `rule`, `lore`), `status=active`, paged | `items`: the rows read in the room, each mapped to a fragment row whose key and version are the memory's id |
+| fragments offered | `GET /brains/{brainId}/memories` | `type` (the brain's type for the reference kind: `knowledge`, `rule`, `lore`), `status=active`, paged | `items`: the rows read in the room, each mapped to a fragment row whose key and version are the memory's id |
+| people offered | `GET /brains/{brainId}/tallies` | `type=fact`, `status=active`, `by=subject` | the subjects the brain's live facts are about, each `group` a subject's id; the person-book search is offered one candidate for each of them that is a person (below) |
+| people named | `GET /brains/{brainId}/subjects` | `ids`, those subjects' ids, comma-separated; `limit` at the route's ceiling | `items`: each `id`, `type`, `key` (a person's user id) and `name` |
 | lore sections | `GET /brains/{brainId}/layers` | `limit` at the route's ceiling, `after` the largest id read for each page after the first | `items`: the brain's layers, each `id`, `name` and `position`; a lore row's section is its layer |
 | fragments attached | `POST /brains/{brainId}/hits` | `memoryIds` (the attached rows' ids), `actorName` | `recordedCount` |
 | knowledge read | `GET /brains/{brainId}/memories` | `type=knowledge`, `status=active`, paged | `items`, filtered by the slug asked |
 | lore read | `GET /brains/{brainId}/memories` | `type=lore`, `status=active`, paged | `items`, filtered by the slug asked; a piece's body is the row's text |
-| person book read | `GET /brains/{brainId}/memories` | `type=sheet`, `status=active`, paged | `items`: the speakers' sheets (their `person` subject among the senders) and the pieces asked for by slug; a row whose `kind` label is `person-book` is a piece |
+| a subject found | `GET /brains/{brainId}/subjects` | `type` (`person` or `room`), `key` (the user's or the room's id), `limit=1` | `items`: the subject, or none where the brain holds none |
+| a person's sheet | `GET /brains/{brainId}/subjects/{subjectId}/sheet` | `roomId`, the room's subject, where the brain holds one | `text/plain`: one line a fact, `- [#<id> since <date>] <text>`, the most important first; empty where the brain knows no fact of the person there |
 | owner room rules | `POST /room-rules/read` | `chatId` | `rules`: `id`, `subject`, `text` |
 | a session's loads | `POST /sessions/loads` | `session` | `loads`: `path`, `version` |
 
@@ -92,6 +95,14 @@ its key after `lore/`, its index line its `title` label with its `scope` label a
 it carries one, its section its layer's name, and its body its text. The rows stand in their layers'
 positions and, within a layer, in their own, and a row the turn attached is handed back as a hit like any
 other.
+A person is read through their sheet, never through a row: the brain holds no memory of type `sheet`, and
+the gate reads none. A speaker's standing and a person the person-book search picks are both that person's
+sheet as the brain renders it with the turn's room as its room — their facts about no room and their facts
+about that room (the brain's `docs/design.md`, 「A person is a subject」) — held to the reference's ceiling
+for a sheet (`docs/reference-selection.md`, 「What attaches without a gate」). A candidate of the person-book
+search is one person subject the brain's live facts are about: its slug `person-<user id>`, its index line
+the subject's name, else the user id, and its owner the user id. A sheet is no row, so attaching one hands
+the brain no hit.
 The brain picks nothing: the gate narrows and picks among what these answer, and writes back only what it
 attached.
 
@@ -220,9 +231,9 @@ verdict are kept ninety days: the service sweeps both tables as it starts and on
 - **The gate order** — which gates stand, the part and step each takes against a turn, and each gate's profile
   (whether it may be switched off, its Laya probe and default mode, its answer floor) — is the gate's, and
   `GET /gates` serves it.
-- **The instructions,** twenty-one files in thirteen folders, one folder a gate: `sanitizer`, `situation-rules`
+- **The instructions,** twenty files in twelve folders, one folder a gate: `sanitizer`, `situation-rules`
   (two), `document-seek`, `system-documents` (two), `room-rules` (two), `library-knowledge` (two),
-  `people-search` (two), `people-standing`, `translator` (three), `output-gate/telegram-html`, `session-summary`
+  `people-search` (two), `translator` (three), `output-gate/telegram-html`, `session-summary`
   (two), `voice-reading` and `voice-polish`. The second file of a reference gate, the person-book search and the
   situation-rule matcher is the answer file its request closes on (`docs/reference-selection.md`, 「What the
   three reference gates are asked, and what they answer」). A prompt told its own ceiling (the person-book
@@ -298,8 +309,8 @@ Statements here that a sibling's document does not yet match, each for that sibl
   hands it (「bmo-agency」 above); the road runs whatever command the tooling's settings name until the agency
   states one.
 - **The upstreams' published clients do not carry the calls the gate makes.** bmo-brain's client serves memory
-  rows, notes, watches, reminders, fragments and libraries, and not the generated reference, person-book,
-  room-rule and session routes the gate reads; bmo-agency's client serves sessions and turns, and not the
+  rows, notes, watches, reminders, fragments and libraries, and not the generated reference, subject, sheet,
+  tally, room-rule and session routes the gate reads; bmo-agency's client serves sessions and turns, and not the
   work-key route the gate resolves; bmo-job's client serves items, and not a row another unit raises. The
   gate's hand-written ports in `crates/ports` stand for these calls until their owners serve them, and the
   gate takes the client of each one as soon as it does.
@@ -308,9 +319,9 @@ Statements here that a sibling's document does not yet match, each for that sibl
   unavailable in every snapshot (`docs/gate-data.md`, 「The conversation source」) until each owner serves a route
   for its part.
 - **The agency keeps copies of gate-owned files:** the gate order (its `policy/gates.toml` and the policy crate's
-  module of it), the prompt ceilings (its `policy/gate-prompts.toml` and its module), and fourteen of the gate's
+  module of it), the prompt ceilings (its `policy/gate-prompts.toml` and its module), and thirteen of the gate's
   instruction files under its `prompts/agents/`: `sanitizer`, `situation-rules`, `document-seek`,
-  `system-documents`, `room-rules`, `library-knowledge`, `people-search`, `people-standing`, `translator`
+  `system-documents`, `room-rules`, `library-knowledge`, `people-search`, `translator`
   (three), `output-gate/telegram-html`, `voice-reading` and `voice-polish`. Its gate switch route validates a
   gate's name against its own copy of the order; the copies are for the agency to retire, reading the order
   through `GET /gates`.

@@ -112,16 +112,6 @@ It answers `entries`, each `path`, `text` and `source` (`document`, `person`, `r
   nothing worth judging comes back as it is.
 - A run stopped by somebody is 409 `stopped`.
 
-## Sheets
-
-`POST /sheets/judge` takes `agentName`, `part` (`common` or `room`), `roomId` (null for the common part),
-`personId`, `pieces` (each `path` and `text`), `ceiling` and `registration` or null. It answers `sheet`, or
-null where none came.
-
-- **A sheet's judgement** is the person-book summariser: one person's sheet of one part, written from the
-  pieces handed in and held under `ceiling` characters, on the registration named where one is, else on the
-  gate's own road.
-
 ## Translations
 
 | Route | Request | Answer |

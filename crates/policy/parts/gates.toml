@@ -7,7 +7,7 @@
 # it runs in some turns only.
 
 # The off-turn part: the gates that run outside any chat turn, in the order the console lists them.
-apart = ["people-standing", "document-seek", "translator", "voice-polish", "voice-reading"]
+apart = ["document-seek", "translator", "voice-polish", "voice-reading"]
 
 # The pre-gate part: the gates that run before the reply is written.
 

@@ -523,7 +523,8 @@ pub struct Reader<'a> {
 }
 
 /// The bodies of some slugs, each by the library of `libraries` it stands in — a shipped piece under the shipped
-/// folder, any other through the brain — as its path and its text, none for a slug whose body could not be read.
+/// folder, a person as their sheet in the room held to its ceiling, any other through the brain — as its path and
+/// its text, none for a slug whose body could not be read or is empty.
 pub async fn read_bodies(
   reference: &Reference,
   reader: &Reader<'_>,
@@ -557,7 +558,11 @@ pub async fn read_bodies(
       }
       Body::Knowledge => knowledge.push(slug.clone()),
       Body::Lore => lore.push(slug.clone()),
-      Body::People => people.push(slug.clone()),
+      Body::People => {
+        if let Some(owner) = row.owner {
+          people.push((slug.clone(), owner));
+        }
+      }
     }
   }
 
@@ -585,14 +590,22 @@ pub async fn read_bodies(
   }
 
   if !people.is_empty() {
-    match reference.brain.people(agent, chat_id, &[], &people).await {
-      Ok(Read::Answered(book)) => {
-        read.extend(book.pieces.into_iter().map(|piece| (piece.slug, (piece.path, piece.text))));
+    let owners: Vec<i64> = people.iter().map(|(_, owner)| *owner).collect();
+
+    match reference.brain.sheets(agent, chat_id, &owners).await {
+      Ok(sheets) => {
+        for sheet in sheets {
+          let text = crate::road::held_sheet(&sheet.text);
+          let Some((slug, _)) = people.iter().find(|(_, owner)| *owner == sheet.person) else {
+            continue;
+          };
+
+          if !text.is_empty() {
+            read.insert(slug.clone(), (sheet.path, text));
+          }
+        }
       }
-      Ok(Read::Refused(refusal)) => {
-        eprintln!("reference: chat {chat_id} {stage} pieces were refused: {}", refusal.message)
-      }
-      Err(why) => eprintln!("reference: chat {chat_id} {stage} pieces could not be read: {why}"),
+      Err(why) => eprintln!("reference: chat {chat_id} {stage} sheets could not be read: {why}"),
     }
   }
 

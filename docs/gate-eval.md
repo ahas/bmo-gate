@@ -10,7 +10,7 @@
   the request from it: the gate's system prompt and the prompt its caller writes. What the gate
   answers is read by the reader its caller uses.
 - **The gates it covers** are the off-turn gates and the session summariser: `document-seek`,
-  `people-standing`, `session-summary` and `translator`.
+  `session-summary` and `translator`.
 - **The two voice gates have no member here.** An item of `voice-polish` or `voice-reading` is read through
   the line's script as the voice runner makes it — the markup unfolded into a script, the figures said by
   rule, the spans the reading gate is asked about and the view the polishing gate is shown — and those rules
@@ -52,10 +52,6 @@
   whole library) and a question. The key is the slugs that answer it, or `none`. Passes where the
   gate's first pick is one of the key's slugs, or where it answers `none` for a `none` key; for a
   branch index it must also name exactly three branches.
-- **people-standing** — the pieces of one part of one person's book, under the paths and the ceiling the
-  brain hands the summariser for that part. The key is the facts the sheet must carry and the strings it
-  must not. Passes where the sheet clears the summariser's own check (length, the other part's sections,
-  no day the pieces do not name) and carries every fact and none of the forbidden strings.
 - **session-summary** — the tail of a room session or a worker session, built into the transcript
   by the gate's own code. The key is the facts the note must carry, the strings it must not, or `none`
   for a tail with nothing to carry. Passes where the note keeps to its 1,200 characters and meets the

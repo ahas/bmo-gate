@@ -415,23 +415,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/sheets/judge": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Write one person's sheet of one part from the pieces handed in. */
-        post: operations["sheet_judged"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/stages/{gateName}/runs": {
         parameters: {
             query?: never;
@@ -972,29 +955,6 @@ export interface components {
             group?: string | null;
             line: string;
             slug: string;
-        };
-        /** @description The sheet that came, or none. */
-        SheetAnswer: {
-            sheet: string | null;
-        };
-        /** @description A sheet to judge. */
-        SheetAsk: {
-            agentName: string;
-            /** Format: uint */
-            ceiling: number;
-            /** @description `common` or `room`. */
-            part: string;
-            /** Format: int64 */
-            personId: number;
-            pieces: components["schemas"]["SheetPiece"][];
-            registration: string | null;
-            /** Format: int64 */
-            roomId: number | null;
-        };
-        /** @description One piece a sheet is written from. */
-        SheetPiece: {
-            path: string;
-            text: string;
         };
         /** @description A turn's situation: the agent, the kind of room, the events and the moment. */
         Situation: {
@@ -1747,31 +1707,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DocumentSanitised"];
-                };
-            };
-            default: components["responses"]["Error"];
-        };
-    };
-    sheet_judged: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SheetAsk"];
-            };
-        };
-        responses: {
-            /** @description the sheet that came, or none */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SheetAnswer"];
                 };
             };
             default: components["responses"]["Error"];
