@@ -1,0 +1,17 @@
+[Unit]
+Description={{label}}'s reverse tunnel to the operations machine: its loopback {{listen_port}} to this node's engine on {{port}}
+After=network-online.target {{name}}-engine.service
+
+[Service]
+Type=simple
+# LLM_KEY (the engine's key, the door's bearer), LISTEN, and the door's TUNNEL_URL, TUNNEL_LOGIN and
+# TUNNEL_HOST come from here.
+EnvironmentFile=%h/{{config}}/env
+# The ssh rides inside a WebSocket to the tunnel door, since this network lets only HTTPS out; the host
+# key is checked against the pinned file and never trusted on first use.
+ExecStart=/usr/bin/ssh -N -i %h/{{config}}/tunnel_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o UserKnownHostsFile=%h/{{config}}/known_hosts -o StrictHostKeyChecking=yes -o HostKeyAlias=${TUNNEL_HOST} "-oProxyCommand=%h/{{dial_python}} %h/{{dial_script}} ${TUNNEL_URL}" -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -R ${LISTEN}:127.0.0.1:{{port}} ${TUNNEL_LOGIN}
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

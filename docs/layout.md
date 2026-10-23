@@ -12,7 +12,7 @@ its own, so a change to one never builds or tests the others.
 | `src/` | The root package: the version, the service binary, the Laya relay's binary and the unit command, built on the crates |
 | `crates/` | The Rust crates the root package is built from: the contract and its client, the store, the codes, the clients of the other units, the policy, the words, the markup, the gates and the reference selection, the service's routes and watches, the unit command's nouns, the Laya relay |
 | `prompts/` | What each gate is told, a folder a gate, the questions Laya is asked, the evaluation set's members' briefs, the words the training tooling hands its writers and judges and the stand-ins its rows carry, and the words the sanitiser's pre-filter matches in the rooms' own language: the one folder Korean stands in |
-| `runtime/` | What serves Laya on its nodes: the decision server and the front around it, each a Python project of its own |
+| `runtime/` | What serves Laya on its nodes: the decision server and the front around it, each a Python project of its own; and the GGUF engine's unit templates and node setup (`docs/gguf-llm.md`) |
 | `training/` | What makes Laya's checkpoints: the dataset and training tooling, a Bun project of its own, and the Python training scripts |
 | `weights/` | The declarations of Laya's weights: each service's card declaration, in the card master's own format, and where the checkpoints are found, `checkpoints.toml`. The weights themselves are runtime data and never stand in the repository |
 | `deploy/` | The service units the testbed's deployment keeps |
@@ -104,5 +104,7 @@ The testbed deploys the repository as `testbed.toml` declares it (the testbed's 
 - **The Python services stand on the nodes, not here.** The decision server, the front and the tunnel run on each
   node the Laya service's placement names, their units under `runtime/front/` put there by the installer from the
   release (`docs/llm-server.md`, 「Installing and updating」); the training scripts are put across by the training
-  tooling (`docs/training.md`, 「The nodes」). The deployment installs none of them on the operations machine.
+  tooling (`docs/training.md`, 「The nodes」); a GGUF model's engine and tunnel are put on their node by the GGUF
+  engine's installer, their units filled from `runtime/gguf-llm/`'s templates (`docs/gguf-llm.md`). The deployment
+  installs none of them on the operations machine.
 

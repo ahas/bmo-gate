@@ -30,7 +30,7 @@ Every other unit is reached through standard APIs alone, and of other repositori
 | `docs/` | The documents, which come before the code: start with `docs/layout.md`, and read `docs/api.md` for the public API and `docs/openapi.json` for its machine form |
 | `package/` | The TypeScript client generated from `docs/openapi.json` |
 | `prompts/` | What each gate is told, the questions Laya is asked, the evaluation set's briefs, the training tooling's prompts, judge words and the data its rows carry, and the sanitiser's trigger words, the one folder Korean stands in |
-| `runtime/` | What serves Laya on its nodes: the decision server, its card turn client and the front, each a Python project of its own |
+| `runtime/` | What serves Laya on its nodes: the decision server, its card turn client and the front, each a Python project of its own; and the GGUF engine's unit templates and node setup |
 | `src/` | The root package: the version, the `gate-server` and `laya-relay` binaries and the `bmo-gate` unit command |
 | `tests/` | Every test of the repository |
 | `tools/` | The tools a tool host places: the translator's tool, `gate/translate`, its manifest, schemas, manual and executable |

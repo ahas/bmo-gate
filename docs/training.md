@@ -28,8 +28,10 @@ record. This document adds no mechanism to either.
   runs a command, `upload <local> <remote> -a <agent>` carries a file to the node and `download <remote> <local>
   -a <agent>` brings one back.
 - **`tunnel_url`, `tunnel_login` and `tunnel_host`** are the tunnel's public name, the login on the operations
-  machine and the name its host key is pinned under, which the Laya service's installer writes into each node's
-  environment file (`docs/llm-server.md`, 「The tunnel」 and 「Installing and updating」).
+  machine as `<account>@<host>`, and the name its host key is pinned under, which the Laya service's installer and
+  the GGUF engine's write into each node's environment file (`docs/llm-server.md`, 「The tunnel」 and 「Installing
+  and updating」; `docs/gguf-llm.md`). The GGUF engine's installer reads its own settings beside these, from the data
+  root's `env/gguf-llm.toml` (`docs/gguf-llm.md`, 「What it reads」).
 - **`agent_name` and `owner_name`** are the chat agent's and the owner's names, which fill the `{{agent}}` and
   `{{owner}}` marks of the words the tooling hands a model (`prompts/tooling/`); **`agent_id` and `owner_id`** are
   their account numbers, by which a real row tells the chat agent's own lines and the owner's room

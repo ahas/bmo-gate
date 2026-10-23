@@ -32,6 +32,9 @@ export interface TunnelledService {
   keyPath(): string;
   /** The node's settings file, carrying the key. */
   envFileText(key: string): string;
+  /** Further files of its settings folder, as [name, text] pairs, made and carried as privately as the
+   * settings file. */
+  configFiles?(key: string): Array<[string, string]>;
   /** The folders it needs on the node, and anything made there once. */
   makeDirsCommand(): string;
   /** What goes across, as [local, remote] pairs, from the repository to the node's home. */
@@ -183,6 +186,38 @@ export function ensureAuthorized(path: string, publicKey: string, listen: string
   return "added";
 }
 
+/** Takes a tunnel's entry away: every line naming the key, and every line letting a key listen on the
+ * service's own listen, which no other service's entry names. */
+export function removeAuthorized(path: string, publicKey: string | null, listen: string): number {
+  if (!existsSync(path)) {
+    return 0;
+  }
+  const material = publicKey === null ? null : keyMaterial(publicKey);
+  const lines = readFileSync(path, "utf8").split("\n");
+  const kept = lines.filter((line) => !((material !== null && keyMaterial(line) === material) || line.includes(`permitlisten="${listen}"`)));
+  if (kept.length !== lines.length) {
+    writeFileSync(path, kept.join("\n"), { mode: 0o600 });
+    chmodSync(path, 0o600);
+  }
+
+  return lines.length - kept.length;
+}
+
+/** Takes a service's key file out of the door's list where it stands there. */
+export function removeDoorKey(listPath: string, keyPath: string): "removed" | "not there" {
+  if (!existsSync(listPath)) {
+    return "not there";
+  }
+  const lines = readFileSync(listPath, "utf8").split("\n");
+  const kept = lines.filter((line) => line.trim() !== keyPath);
+  if (kept.length === lines.length) {
+    return "not there";
+  }
+  writeFileSync(listPath, kept.join("\n"), { mode: 0o600 });
+
+  return "removed";
+}
+
 /** Names a service's key file in the door's list unless it is already there. */
 export function ensureDoorKey(listPath: string, keyPath: string): "added" | "already there" {
   const standing = existsSync(listPath) ? readFileSync(listPath, "utf8") : "";
@@ -204,8 +239,8 @@ export function knownHostsLine(hostKeyText: string, alias: string): string | nul
   return material === null ? null : `${alias} ${material}`;
 }
 
-export function envModeCommand(service: Pick<TunnelledService, "configDir">): string {
-  return `chmod 600 ~/${service.configDir}/env`;
+export function envModeCommand(service: Pick<TunnelledService, "configDir">, names: readonly string[] = ["env"]): string {
+  return `chmod 600 ${names.map((name) => `~/${service.configDir}/${name}`).join(" ")}`;
 }
 
 /** The setup, started and let go of: the hub stops a command it streams after five minutes, and the
@@ -298,17 +333,21 @@ export async function installTunnelledService(service: TunnelledService, options
   }
   done.push("home");
 
-  // 2. The settings file, the service's own lines and the tunnel's, made privately here and carried across whole. The folder it lands in is the
-  // account's alone before the file arrives.
+  // 2. The settings file, the service's own lines and the tunnel's, and any further file of its settings
+  // folder, made privately here and carried across whole. The folder they land in is the account's alone
+  // before a file arrives.
   const scratch = mkdtempSync(join(options.tmpRoot ?? tmpdir(), `${service.serviceDir}-env-`));
   try {
-    const envPath = join(scratch, "env");
-    writeFileSync(envPath, service.envFileText(keyed.key) + tunnelLines(tunnel), { mode: 0o600 });
-    const carried = await upload(envPath, `${home}/${service.configDir}/env`);
-    if (carried.code !== 0) {
-      return stop("env", `the environment file could not be put across — ${runFault(carried)}`);
+    const files: Array<[string, string]> = [["env", service.envFileText(keyed.key) + tunnelLines(tunnel)], ...service.configFiles?.(keyed.key) ?? []];
+    for (const [name, text] of files) {
+      const localPath = join(scratch, name);
+      writeFileSync(localPath, text, { mode: 0o600 });
+      const carried = await upload(localPath, `${home}/${service.configDir}/${name}`);
+      if (carried.code !== 0) {
+        return stop("env", `${name === "env" ? "the environment file" : name} could not be put across — ${runFault(carried)}`);
+      }
     }
-    const moded = await exec(envModeCommand(service));
+    const moded = await exec(envModeCommand(service, files.map(([name]) => name)));
     if (moded.code !== 0) {
       return stop("env", `the environment file's mode could not be set — ${runFault(moded)}`);
     }
