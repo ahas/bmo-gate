@@ -189,8 +189,9 @@ function withDefaults(settings: TextRoadSettings): TextSettings {
   };
 }
 
-// The one model the front serves must be the one the settings gave this road, so a front still serving
-// another model, or one swapped out from under it, cannot label another model's rows as this one's.
+// The front must serve the model the settings gave this road, so a front still serving another model,
+// or one swapped out from under it, cannot label another model's rows as this one's. A front that serves
+// one model must serve this one; a router that serves many (OpenRouter and its kind) must list it.
 // Checked once, since the list changes rarely and asking on every batch would double a gate's requests.
 async function confirmModel(settings: TextSettings, key: string): Promise<void> {
   const response = await settings.fetch(`${settings.baseUrl}/models`, {
@@ -205,8 +206,9 @@ async function confirmModel(settings: TextSettings, key: string): Promise<void> 
   const listed = ((await response.json()) as { data?: { id?: unknown }[] }).data ?? [];
   const ids = listed.map((one) => one.id).filter((id): id is string => typeof id === "string");
 
-  if (ids.length !== 1 || ids[0] !== settings.model) {
-    throw new Error(`the front serves ${ids.join(", ") || "no model"} but the settings give this road ${settings.model}`);
+  if (!ids.includes(settings.model)) {
+    const served = ids.length > 8 ? `${ids.length} models` : ids.join(", ") || "no model";
+    throw new Error(`the front serves ${served} but the settings give this road ${settings.model}`);
   }
 }
 

@@ -331,7 +331,7 @@ that gate's own generator drives (「The sanitiser gate's own build」).
   the name the front lists its model under. A front moved to another model is followed by the next run
   with that setting changed and nothing else. That name labels the run's batches and is the `model` of
   every request.
-- **The front serves one model and the road checks it once**, against the name the settings gave,
+- **The front must serve the model the settings name, and the road checks it once** (a front of one model serves that one; a router of many, OpenRouter among them, lists it),
   so a front still serving another model, or one swapped out from under it, cannot label another
   model's rows as this one's: the run stops at its first batch, naming both. Settings that do not name
   the model stop the run before it asks anything.
