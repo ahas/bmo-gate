@@ -742,11 +742,11 @@ pub async fn pick(reference: &Reference, picker: Picker) -> Result<Picked, GateE
         ask(question, true)
       })
       .await?;
-    let failure = decided.failure.unwrap_or_default();
+    let failure = decided.failure_said();
     let detail = match decided.decided_by {
       laya::DecidedBy::Laya => "Laya".to_owned(),
-      laya::DecidedBy::Llm => fill_marks(&REFERENCE.decided.by_fallback, &[("failure", failure)]),
-      laya::DecidedBy::Default => fill_marks(&REFERENCE.decided.nothing_attached, &[("failure", failure)]),
+      laya::DecidedBy::Llm => fill_marks(&REFERENCE.decided.by_fallback, &[("failure", &failure)]),
+      laya::DecidedBy::Default => fill_marks(&REFERENCE.decided.nothing_attached, &[("failure", &failure)]),
     };
     let verdict = selection_verdict(&decided.verdict);
 

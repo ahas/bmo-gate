@@ -15,6 +15,7 @@ pub async fn health(State(app): State<Arc<App>>) -> Json<Health> {
   let ready = db.ping().await.is_ok();
   let laya = match laya_health::read(db).await.map(|health| health.state) {
     Ok(state) if state == "up" => "up",
+    Ok(state) if state == "busy" => "busy",
     Ok(state) if state == "off" => "off",
     _ => "down",
   }

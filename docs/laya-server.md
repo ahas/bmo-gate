@@ -62,7 +62,9 @@ asks (`docs/laya.md`).
     outright — a claim standing, or no place for the engine among the node's occupants — is answered
     503 at once, saying so; one whose checkpoint cannot be put on the card for want of room is answered
     503; and none of them is asked of a checkpoint. No 503 carries a `Retry-After`: a call is never told
-    to come back. A
+    to come back. Each of these 503s says why under `error`, in words the gate's client reads a busy card
+    from (`docs/laya.md`, 「The client」): `the card is taken for <claim>`, `the card has no room for …`, or
+    `… has no place among this node's occupants`. A
     decision that does not fit on the card even with its checkpoint alone there is answered 503 too
     (「Sharing the card」).
 - **One decision at a time.** Calls wait in line for the card. A call whose caller has hung up by the

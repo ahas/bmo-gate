@@ -443,11 +443,11 @@ pub async fn judge(
   let started = std::time::Instant::now();
   let decided =
     laya::judge_on_laya(stages, &run, &SituationProbe, &input, Verdicts::nothing(), |_| ask(true)).await?;
-  let failure = decided.failure.unwrap_or_default();
+  let failure = decided.failure_said();
   let detail = match decided.decided_by {
     laya::DecidedBy::Laya => "Laya".to_owned(),
-    laya::DecidedBy::Llm => fill_marks(&REFERENCE.decided.by_fallback, &[("failure", failure)]),
-    laya::DecidedBy::Default => fill_marks(&REFERENCE.situation.nothing_matched, &[("failure", failure)]),
+    laya::DecidedBy::Llm => fill_marks(&REFERENCE.decided.by_fallback, &[("failure", &failure)]),
+    laya::DecidedBy::Default => fill_marks(&REFERENCE.situation.nothing_matched, &[("failure", &failure)]),
   };
 
   records::judgement(

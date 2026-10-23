@@ -25,8 +25,9 @@ written for one caller.
 
 ## Health
 
-`GET /health` answers `ready`, `reason` (null when ready), `version` and `laya` (`up`, `down` or `off`, the
-Laya relay's last answer).
+`GET /health` answers `ready`, `reason` (null when ready), `version` and `laya` (`up`, `busy`, `down` or `off`,
+the Laya relay's last answer; `busy` where it answers but its card was taken for the last call to decide,
+`docs/laya.md`, 「The health watcher」).
 
 ## Gates
 

@@ -733,7 +733,7 @@ pub struct Health {
   pub ready: bool,
   pub reason: Option<String>,
   pub version: String,
-  /// `up`, `down` or `off`.
+  /// `up`, `busy`, `down` or `off`.
   pub laya: String,
 }
 

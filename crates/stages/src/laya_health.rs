@@ -20,9 +20,9 @@ const HEALTH_WAIT: Duration = Duration::from_secs(2);
 // The most an answer may weigh before it reads as a bad one.
 const MOST_ANSWER_BYTES: usize = 256 * 1024;
 
-/// The last check as its row keeps it. `up` is a server that answered, `off` a service with no address
-/// set, which asks nothing, `unknown` a server nobody has checked yet, and every other word the
-/// failure the last check met.
+/// The last check as its row keeps it. `up` is a server that answered, `busy` one that answered while the last
+/// call to decide found its card taken, `off` a service with no address set, which asks nothing, `unknown` a
+/// server nobody has checked yet, and every other word the failure the last check met.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Health {
   pub state: String,
@@ -69,19 +69,23 @@ pub struct Report {
   pub ms: i64,
 }
 
-/// What one check came to: the server's report, or the state word of a check that met none.
+/// What one check came to: the server's report, the same with the last call to decide having found the card
+/// taken, or the state word of a check that met none.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Outcome {
   Up(Report),
+  Busy(Report),
   Down(&'static str),
 }
 
 /// The new row out of the last one and a check's outcome. A failed check keeps what the server last
 /// said about itself and when, so the screen can tell what went quiet and since when.
 pub fn next_health(last: &Health, outcome: Outcome, at: i64, address: Option<String>) -> Health {
+  let answered = if matches!(outcome, Outcome::Busy(_)) { "busy" } else { "up" };
+
   match outcome {
-    Outcome::Up(report) => Health {
-      state: "up".to_owned(),
+    Outcome::Up(report) | Outcome::Busy(report) => Health {
+      state: answered.to_owned(),
       model: Some(report.model),
       device: Some(report.device),
       vram_bytes: report.vram_bytes,
@@ -266,7 +270,10 @@ pub async fn pass(db: &DatabaseConnection, side: &Side, at: i64) -> Result<bool,
   let address = side.url().map(str::to_owned);
   let outcome = match &address {
     None => Outcome::Down("off"),
-    Some(address) => ask(address, side.token().as_deref(), HEALTH_WAIT).await,
+    Some(address) => match ask(address, side.token().as_deref(), HEALTH_WAIT).await {
+      Outcome::Up(report) if crate::laya::busy(address).is_some() => Outcome::Busy(report),
+      outcome => outcome,
+    },
   };
   let health = next_health(&last, outcome, at, address);
 

@@ -4,6 +4,7 @@
 //! decides whether Laya's verdict may stand, and the pair of Laya's answer and the LLM's is kept for teaching it.
 //! It knows no gate by name: what a probe asks and what a verdict means are the probe's.
 
+use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, LazyLock};
@@ -38,6 +39,31 @@ const MAX_ANSWER_BYTES: usize = 256 * 1_024;
 
 /// Why Laya gave no answer, in the words the record keeps.
 pub type Failure = &'static str;
+
+/// Why a call to Laya gave no answer: its failure, and for a `busy` card the reason the engine gave.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Missed {
+  pub failure: Failure,
+  pub reason: Option<String>,
+}
+
+impl From<Failure> for Missed {
+  fn from(failure: Failure) -> Self {
+    Self {
+      failure,
+      reason: None,
+    }
+  }
+}
+
+/// A failure as a judgement line names it: its kind, and the reason after it where one stands.
+pub fn failure_said(failure: Option<Failure>, reason: Option<&str>) -> String {
+  match (failure, reason) {
+    (Some(failure), Some(reason)) => format!("{failure}: {reason}"),
+    (Some(failure), None) => failure.to_owned(),
+    (None, _) => String::new(),
+  }
+}
 
 /// One question as a gate asks it.
 #[derive(Clone, Debug)]
@@ -275,9 +301,9 @@ pub fn estimated_tokens(text: &str) -> usize {
   (other as f64 + ascii as f64 * 0.35).ceil() as usize
 }
 
-// The calls this service sends go one at a time; the line holds the address its latest call found out of reach and
-// when that call gave up, so a call to the same address that waited behind it is not sent.
-static LINE: LazyLock<tokio::sync::Mutex<Option<(String, Instant)>>> =
+// The calls this service sends go one at a time; the line holds the address its latest call found out of reach or
+// its card busy, when that call gave up and how, so a call to the same address that waited behind it is not sent.
+static LINE: LazyLock<tokio::sync::Mutex<Option<(String, Instant, Missed)>>> =
   LazyLock::new(tokio::sync::Mutex::default);
 
 fn probability(value: Option<&serde_json::Value>) -> Option<f64> {
@@ -334,16 +360,33 @@ fn answer_for(question: &Question, value: Option<&serde_json::Value>) -> Option<
   }
 }
 
-/// The server's own word for a question too large, a held call, a service unable to take one, an answer gone
-/// wrong, or a refusal.
+/// The server's own word for a question too large, a held call, a busy card, a service unable to take one, an
+/// answer gone wrong, or a refusal.
 pub fn failure_of(status: u16, text: &str) -> Failure {
   match status {
     400 if text.contains("head_max_len") => "too-large",
     504 => "timeout",
+    503 if busy_reason(text).is_some() => "busy",
     503 => "unreachable",
     500.. => "bad-answer",
     _ => "refused",
   }
+}
+
+// The most of a busy card's reason kept.
+const MAX_REASON_CHARS: usize = 200;
+
+/// The reason a 503 gives where it is the engine's own for its card (docs/laya-server.md, 「The server」): the card
+/// taken for a claim, without room for the call, or no place for the engine among the node's occupants. None for
+/// any other 503: the front's for an engine that does not answer, or the relay's for no node taking the call.
+pub fn busy_reason(text: &str) -> Option<String> {
+  let read: serde_json::Value = serde_json::from_str(text).ok()?;
+  let reason = read.get("error")?.as_str()?.trim();
+  let busy = reason.starts_with("the card is taken for ")
+    || reason.starts_with("the card has no room ")
+    || reason.ends_with("has no place among this node's occupants");
+
+  busy.then(|| reason.chars().take(MAX_REASON_CHARS).collect())
 }
 
 async fn ask_part(
@@ -352,7 +395,7 @@ async fn ask_part(
   gate: &str,
   part: &Request,
   until: Instant,
-) -> Result<Vec<(String, Answer)>, Failure> {
+) -> Result<Vec<(String, Answer)>, Missed> {
   let remaining = until
     .checked_duration_since(Instant::now())
     .filter(|left| !left.is_zero())
@@ -379,11 +422,16 @@ async fn ask_part(
     .map_err(|why| if why.is_timeout() { "timeout" } else { "unreachable" })?;
 
   if !(200..300).contains(&status) {
-    return Err(failure_of(status, &text));
+    let failure = failure_of(status, &text);
+
+    return Err(Missed {
+      failure,
+      reason: (failure == "busy").then(|| busy_reason(&text)).flatten(),
+    });
   }
 
   if text.len() > MAX_ANSWER_BYTES {
-    return Err("bad-answer");
+    return Err("bad-answer".into());
   }
 
   let read: serde_json::Value = serde_json::from_str(&text).map_err(|_| "bad-answer")?;
@@ -395,7 +443,7 @@ async fn ask_part(
     .map(|(id, question)| {
       answer_for(question, given.get(id))
         .map(|answer| (id.clone(), answer))
-        .ok_or("bad-answer")
+        .ok_or_else(|| Missed::from("bad-answer"))
     })
     .collect()
 }
@@ -444,11 +492,43 @@ impl Side {
   }
 }
 
+/// For each relay address, the reason the last call to decide there found the card busy, standing until a call
+/// there is answered again (docs/laya.md, 「The health watcher」).
+static BUSY: LazyLock<std::sync::Mutex<HashMap<String, String>>> = LazyLock::new(std::sync::Mutex::default);
+
+/// The reason the last call to the relay at `url` found the card busy, where no call there has been answered since.
+pub fn busy(url: &str) -> Option<String> {
+  BUSY.lock().unwrap_or_else(std::sync::PoisonError::into_inner).get(url).cloned()
+}
+
 /// Laya's answer to every question of the request, or why there is none: a request that does not fit is not
 /// sent, its parts go into the line in order, and the gate's wait covers the line and every part.
-pub async fn ask(side: &Side, gate: &str, request: &Request, wait: Duration) -> Result<Reply, Failure> {
+pub async fn ask(side: &Side, gate: &str, request: &Request, wait: Duration) -> Result<Reply, Missed> {
+  let asked = ask_in_line(side, gate, request, wait).await;
+
+  if let Some(url) = side.url() {
+    let mut busy = BUSY.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+
+    match &asked {
+      Ok(_) => {
+        busy.remove(url);
+      }
+      Err(Missed {
+        failure: "busy",
+        reason,
+      }) => {
+        busy.insert(url.to_owned(), reason.clone().unwrap_or_default());
+      }
+      Err(_) => {}
+    }
+  }
+
+  asked
+}
+
+async fn ask_in_line(side: &Side, gate: &str, request: &Request, wait: Duration) -> Result<Reply, Missed> {
   if request.questions.is_empty() || !request.fits() {
-    return Err("too-large");
+    return Err("too-large".into());
   }
 
   let url = side.url.clone().ok_or("unreachable")?;
@@ -459,17 +539,23 @@ pub async fn ask(side: &Side, gate: &str, request: &Request, wait: Duration) -> 
 
   for part in request.parts() {
     let Ok(mut turn) = tokio::time::timeout_at(until.into(), LINE.lock()).await else {
-      return Err("timeout");
+      return Err("timeout".into());
     };
 
-    if turn.as_ref().is_some_and(|(door, turned_away)| *door == url && *turned_away > started) {
-      return Err("unreachable");
+    // A call that waited behind one the door turned away, or one the card was taken for, leaves as it did.
+    if let Some((door, turned_away, missed)) = turn.as_ref()
+      && *door == url
+      && *turned_away > started
+    {
+      return Err(missed.clone());
     }
 
     let answered = ask_part(&url, &token, gate, &part, until).await;
 
-    if matches!(answered, Err("unreachable")) {
-      *turn = Some((url.clone(), Instant::now()));
+    if let Err(missed) = &answered
+      && matches!(missed.failure, "unreachable" | "busy")
+    {
+      *turn = Some((url.clone(), Instant::now(), missed.clone()));
     }
 
     answers.extend(answered?);
@@ -552,6 +638,7 @@ enum Asked {
   Failed {
     request: Option<Request>,
     failure: Failure,
+    reason: Option<String>,
     ms: Option<f64>,
   },
 }
@@ -586,6 +673,7 @@ async fn ask_for<P: Probe>(side: &Side, run: &LayaRun, probe: &P, input: &P::Inp
       return Asked::Failed {
         request: None,
         failure,
+        reason: None,
         ms: None,
       };
     }
@@ -597,6 +685,7 @@ async fn ask_for<P: Probe>(side: &Side, run: &LayaRun, probe: &P, input: &P::Inp
       return Asked::Failed {
         request: Some(request),
         failure: "bad-answer",
+        reason: None,
         ms: Some(started.elapsed().as_secs_f64() * 1_000.0),
       };
     }
@@ -612,12 +701,14 @@ async fn ask_for<P: Probe>(side: &Side, run: &LayaRun, probe: &P, input: &P::Inp
       Err(failure) => Asked::Failed {
         request: Some(request),
         failure,
+        reason: None,
         ms: Some(reply.ms),
       },
     },
-    Err(failure) => Asked::Failed {
+    Err(missed) => Asked::Failed {
       request: Some(request),
-      failure,
+      failure: missed.failure,
+      reason: missed.reason,
       ms: Some(started.elapsed().as_secs_f64() * 1_000.0),
     },
   }
@@ -670,6 +761,7 @@ fn part_of<P: Probe>(probe: &P, asked: &Asked, ids: &[String]) -> Asked {
       ms: Some(reply.ms),
       request: Some(request),
       failure: "bad-answer",
+      reason: None,
     },
   }
 }
@@ -881,13 +973,22 @@ pub enum DecidedBy {
   Default,
 }
 
-/// What a gate on Laya decided, with the Laya failure that left it to the other two.
+/// What a gate on Laya decided, with the Laya failure that left it to the other two and, for a busy card, the
+/// reason the engine gave.
 #[derive(Clone, Debug)]
 pub struct RoadVerdict<V> {
   pub verdict: V,
   pub failure: Option<Failure>,
+  pub reason: Option<String>,
   pub ms: Option<f64>,
   pub decided_by: DecidedBy,
+}
+
+impl<V> RoadVerdict<V> {
+  /// The failure as the judgement line names it.
+  pub fn failure_said(&self) -> String {
+    failure_said(self.failure, self.reason.as_deref())
+  }
 }
 
 /// A gate whose provider is Laya (docs/laya.md, 「A gate whose provider is Laya」): one call, whose label is
@@ -916,6 +1017,7 @@ where
     Asked::Failed {
       request: None,
       failure: "unreachable",
+      reason: None,
       ms: None,
     }
   };
@@ -926,6 +1028,10 @@ where
   let failure = match &asked {
     Asked::Answered { .. } => verdict.is_none().then_some("bad-answer"),
     Asked::Failed { failure, .. } => Some(*failure),
+  };
+  let reason = match &asked {
+    Asked::Failed { reason, .. } => reason.clone(),
+    Asked::Answered { .. } => None,
   };
   let falls_back = verdict.is_none() && options::laya_fallback(&stages.runs, &run.stage).await?.is_some();
   let answered = if falls_back { llm(input.clone()).await } else { Ok(None) };
@@ -940,12 +1046,12 @@ where
       None => eprintln!(
         "{}: Laya gave no verdict ({}), so the gate's default stands.",
         run.stage,
-        failure.unwrap_or_default()
+        failure_said(failure, reason.as_deref())
       ),
       Some(_) => eprintln!(
         "{}: Laya gave no verdict ({}), so its fallback LLM decided.",
         run.stage,
-        failure.unwrap_or_default()
+        failure_said(failure, reason.as_deref())
       ),
     }
   }
@@ -963,6 +1069,7 @@ where
   Ok(RoadVerdict {
     verdict: verdict.or(llm_verdict).unwrap_or(fallback),
     failure,
+    reason,
     ms,
     decided_by,
   })

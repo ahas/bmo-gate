@@ -44,6 +44,15 @@ fn a_failed_check_keeps_what_the_server_last_said_and_when_it_last_answered() {
 }
 
 #[test]
+fn a_server_answering_while_its_card_is_taken_reads_busy_and_answered() {
+  let busy =
+    next_health(&Health::unknown(), Outcome::Busy(report("laya-1")), 100, Some("http://laya".to_owned()));
+
+  assert_eq!(busy.state, "busy");
+  assert_eq!((busy.model.as_deref(), busy.healthy_at), (Some("laya-1"), Some(100)));
+}
+
+#[test]
 fn an_answer_counts_only_as_up_with_its_model_and_device() {
   let body = json!({
     "state": "up", "model": "laya-1", "device": "cuda:0", "vramBytes": 1024.4, "loadMs": 79.6,

@@ -143,8 +143,8 @@ another asks for the card.
   - Laya waits inside a call for its queue turn for as long as its caller holds the connection, and is
     never answered held. Only a card taken outright — a claim standing, or no place for the engine — is
     answered 503 at once, with no `Retry-After`, and the relay asks the next node (「The relay」); the
-    last node's 503 reaches the gate, whose client takes it as the service out of reach and goes the way its
-    gate goes then (`docs/laya.md`). What bounds a long queue wait is the front's thirty seconds
+    last node's 503 reaches the gate, whose client reads it as a busy card and goes the way its gate goes
+    then, at once (`docs/laya.md`). What bounds a long queue wait is the front's thirty seconds
     and, before them, the asking gate's own patience.
     Laya's own start waits for its turn and the lock with no bound, to load and try its checkpoints,
     since it answers nothing before that anyway.
@@ -542,5 +542,6 @@ mcp=(-H 'content-type: application/json' -H 'accept: application/json, text/even
    to the precision the card computes at.
 7. **The way past a node:** with the first node's engine stopped, or its card held by its arbiter, a
    decision through the relay is answered by the next node, which `x-laya-node` names, and with no
-   node behind it is answered 503 at once, which the gate reads as Laya out of reach.
+   node behind it is answered 503 at once, which the gate reads as a busy card where the last node's engine
+   said so and as Laya out of reach otherwise.
 

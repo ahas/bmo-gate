@@ -179,7 +179,8 @@
   | `SKIP: no candidates` | the gate was on but not asked (below) |
 
   A decision on Laya is written the same way whoever settled it — Laya, the fallback LLM or the default — and
-  its detail says which (`docs/laya.md`, 「A gate whose provider is Laya」).
+  its detail says which, and where Laya gave no verdict why: its failure kind, a busy card with the reason the
+  engine gave, as `busy: the card is taken for <claim>` (`docs/laya.md`, 「A gate whose provider is Laya」).
 - **A reference gate, `people-search`, `room-memories` or `situation-rules` that is on for the turn but has no
   candidate left once the code has narrowed them** — a room with no rulebook, an agent with no knowledge of its own, a turn
   no situation rule of the room is open for — is not asked, and leaves the judgement `SKIP: no candidates` in

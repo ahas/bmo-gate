@@ -141,15 +141,15 @@ async fn decide<P: Probe<Input = String, Verdict = String>>(
     )
     .await?;
     let fold = settled.verdict == FOLD;
-    let failure = settled.failure.unwrap_or_default();
+    let failure = settled.failure_said();
     let detail = match settled.decided_by {
       DecidedBy::Laya => decided.by_laya.clone(),
       DecidedBy::Llm => fill_marks(
         &decided.by_fallback,
-        &[("failure", failure), ("answer", &answered().unwrap_or_default())],
+        &[("failure", &failure), ("answer", &answered().unwrap_or_default())],
       ),
       DecidedBy::Default => {
-        fill_marks(&decided.laya_default, &[("failure", failure), ("verdict", word(FOLD_WHEN_UNDECIDED))])
+        fill_marks(&decided.laya_default, &[("failure", &failure), ("verdict", word(FOLD_WHEN_UNDECIDED))])
       }
     };
 

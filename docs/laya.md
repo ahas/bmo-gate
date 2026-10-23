@@ -69,7 +69,7 @@ the gates' client is written against.
   wait of its own. It is counted from when the gate asks and covers the whole request: its wait in the
   line and every part of it. A gate with an LLM is given it for Laya apart from the LLM's own, so a
   slow Laya never costs such a gate its verdict.
-- **A busy card is the engine's to wait out, not the client's.** The engine waits for its turn at the
+- **A turn at the card is the engine's to wait for, not the client's.** The engine waits for its turn at the
   card inside the call, standing in the node's queue by the call's arrival, for as long as the call is
   held open (`docs/laya-server.md`, 「Sharing the card」), and decides the moment its turn comes. The
   client sends a call once and waits for its answer: it is never told to come back, and never asks again.
@@ -80,10 +80,11 @@ the gates' client is written against.
   in the line waits on its own gate's patience alone: one whose patience runs out while it waits
   leaves the line as `timeout`, and a call ahead of it running out of patience ends nothing but that
   call.
-- **A call that waited behind an `unreachable` one is not sent.** It leaves the line as `unreachable`
-  the moment its turn comes, since the door that turned the call ahead of it away turned it away while it
-  waited; so the gates of one turn wait for one failed call while the server is out of reach, not for
-  one each. A call that joins the line after that failure is sent as any call is.
+- **A call that waited behind an `unreachable` or a `busy` one is not sent.** It leaves the line with that
+  call's failure, a `busy` one with its reason, the moment its turn comes, since the door that turned the call
+  ahead of it away, or the card that was taken, turned it away while it waited; so the gates of one turn wait
+  for one failed call while the server is out of reach or its card taken, not for one each, and each goes its
+  own way at once. A call that joins the line after that failure is sent as any call is.
 - **A request is asked in parts.** The client cuts its questions, in their order, into parts that each
   hold at most 128 questions and at most 32,768 tokens of input — every question counted with the
   state beside it, as the card lays it out — each part carrying the same state. At a full state that is
@@ -99,8 +100,12 @@ the gates' client is written against.
   for being long; the check stands for a probe that failed to.
 - **Failure kinds**, each without any request or answer body in it:
   - `unreachable` — no connection (the tunnel or its door on the operations machine down, or no address set), or a
-    503: the service there but unable to take the call, its engine stopped or loading, its card without
-    room for it, or the card taken outright by a claim
+    503 that is not a busy card: the service there but unable to take the call, its engine stopped or loading,
+    or no node behind the relay taking it
+  - `busy` — a 503 the engine gave for its card, read from the reason it words it with
+    (`docs/laya-server.md`, 「The server」): the card taken outright by a claim, no place for the engine among
+    the node's occupants, or no room on the card for the call. The reason goes with the failure: the
+    judgement line names it as `busy: <reason>`, and the health row reads `busy` (「The health watcher」)
   - `timeout` — no answer within the gate's patience, its wait in the line included, or a 504: the
     front giving up on a call the server held past thirty seconds
   - `refused` — the server said no (a wrong token, a request it could not read, or a gate it holds no
@@ -208,8 +213,8 @@ learned from are the same shape.
   run exactly as the gate runs it off Laya, on the gate's own time limit given anew, and its verdict
   is the gate's. Where the setting is `none`, or the LLM gives no verdict either, the gate takes the
   verdict it names for that. Either way it logs Laya's failure as its error, writes its judgement
-  line as who decided — the LLM and its model, or the default — and why, and records the pair with
-  the failure.
+  line as who decided — the LLM and its model, or the default — and why, a busy card with the engine's
+  reason, and records the pair with the failure's kind.
 - **The fallback LLM is the gate's, chosen in its row:** the agent management screen shows it as a
   choice cell beside the gate on Laya — automatic, none, or a provider by name.
 - **What is recorded:** one pair per call in the verdict record, its mode `road`: used `laya` with no
@@ -329,11 +334,15 @@ mode other than `off`.
 
 - **The gate watches the Laya server.** It asks `GET /health` once a minute, and as it starts, reading
   the address and the token from its `[laya]` settings at each check.
-- **What it keeps:** one row in the gate's `laya_health` table: the state — `up`, the failure
+- **What it keeps:** one row in the gate's `laya_health` table: the state — `up`, `busy`, the failure
   kind, or `off` where no address is set and nothing is asked; no row at all reads as not yet checked —
   the model, the device, the VRAM, the load time and versions, the address it asked, how long the check
   took, and when it was checked and when it last answered, in epoch milliseconds. A failed check keeps what
   the server last said about itself.
+- **A busy card is the row's `busy`.** The server answers its health while its card is taken, so a check
+  alone reads `up` while every call fails. A check the server answers while the last call to decide came
+  back `busy`, and no call has been answered since, writes `busy` instead; the first call answered after
+  it lets the next check write `up`. `GET /health` reads it as `busy`, never as `down`.
 - **What the console reads** is that row and every gate's agreement, through `GET /laya`, with each probed
   gate's mode and τ read from its own row of the gate options; the node the address names is where the
   state leads (the web unit's `docs/web.md`).
