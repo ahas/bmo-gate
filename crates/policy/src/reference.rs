@@ -45,6 +45,17 @@ pub struct Decided {
   pub no_candidates_detail: String,
 }
 
+/// The keywords a picker's and the matcher's verdict lines open with.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Verdicts {
+  pub picked: String,
+  pub matched: String,
+  pub nothing: String,
+  pub unreadable: String,
+  pub no_answer: String,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Situation {
@@ -60,6 +71,7 @@ pub struct Reference {
   pub people: PeopleSearch,
   pub situation: Situation,
   pub decided: Decided,
+  pub verdicts: Verdicts,
 }
 
 impl Reference {

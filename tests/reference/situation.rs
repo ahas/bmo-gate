@@ -3,6 +3,7 @@
 //! brain.
 
 use gate_ports::brain::{Condition, Event};
+use gate_reference::pick::run_verdict;
 use gate_reference::situation::{Verdicts, event_entries, parse_answer, sides_of, situation_entries};
 use gate_reference::{RoomKind, SituationTurn, Source};
 
@@ -98,7 +99,52 @@ async fn a_rule_that_fits_attaches_its_action_and_what_matched_and_spent_go_to_t
         vec![]
       )
       .await,
-    ["applies=late spent=old"]
+    ["MATCH: applies=late spent=old"]
+  );
+  assert!(
+    ground.gateway.asked.lock().unwrap()[0]
+      .input
+      .ends_with(gate_policy::prompts::answer("situation-rules").unwrap())
+  );
+}
+
+#[test]
+fn a_matcher_run_reads_as_its_keyword_and_a_sentence_as_unreadable() {
+  let slugs = vec!["late".to_owned(), "quiet".to_owned()];
+  let verdict =
+    |answer: &str| run_verdict(Some(answer), parse_answer(answer, &slugs).as_ref(), Verdicts::verdict);
+
+  assert_eq!(
+    verdict("late applies: yes\nlate spent: no\nquiet applies: no\nquiet spent: no"),
+    "MATCH: applies=late spent=none"
+  );
+  assert_eq!(verdict("late applies: no\nlate spent: no\nquiet applies: no\nquiet spent: no"), "NONE");
+  assert_eq!(verdict("Still up? Get some sleep soon."), "UNREADABLE");
+  assert_eq!(run_verdict(None, None::<&Verdicts>, Verdicts::verdict), "NO-ANSWER");
+}
+
+#[tokio::test]
+async fn a_matcher_answering_a_sentence_writes_unreadable_with_the_answer_as_its_detail() {
+  let ground = ground("situation-unread", |_| Some("Still up? Get some sleep soon.".into())).await;
+
+  ground.brain.conditions.lock().unwrap().push(Condition {
+    slug: "late".into(),
+    condition: "someone writes after midnight".into(),
+    action: "say good night".into(),
+  });
+
+  let entries = situation_entries(&ground.reference, &turn(), &Default::default()).await.unwrap();
+
+  assert!(entries.is_empty());
+  assert_eq!(
+    ground
+      .scratch
+      .texts(
+        "SELECT verdict || ' / ' || detail FROM judgements WHERE stage = 'situation-rules'",
+        vec![]
+      )
+      .await,
+    ["UNREADABLE / Still up? Get some sleep soon."]
   );
 }
 

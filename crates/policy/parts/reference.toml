@@ -53,3 +53,14 @@ by_fallback = "Laya gave no verdict ({failure}), so the fallback LLM decided."
 nothing_attached = "Laya gave no verdict ({failure}), so it went with nothing attached."
 no_candidates = "SKIP: no candidates"
 no_candidates_detail = "On, but this turn had no candidates to ask it about, so it was not asked."
+
+# The verdict line a picker or the matcher writes for a run it was asked about, its keyword first
+# (docs/gates.md, 「What a turn records」): what a picker named (`PICK: <slugs>`), what the matcher matched
+# (`MATCH: applies=<slugs> spent=<slugs>`), nothing, an answer not in the shape asked for, and no answer at all.
+# What was answered stands in the judgement's detail.
+[verdicts]
+picked = "PICK"
+matched = "MATCH"
+nothing = "NONE"
+unreadable = "UNREADABLE"
+no_answer = "NO-ANSWER"

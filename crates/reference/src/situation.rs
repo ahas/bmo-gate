@@ -23,7 +23,7 @@ use sea_orm::DatabaseConnection;
 
 use crate::fragments::{self, Verdict};
 use crate::memories;
-use crate::pick::verdict_line;
+use crate::pick::{run_verdict, verdict_line};
 use crate::{Entry, Reference, RoomKind, SituationTurn, Source};
 
 /// The matcher's key.
@@ -96,6 +96,18 @@ impl Verdicts {
   /// Both sides as one comparable label.
   pub fn label(&self) -> String {
     format!("applies={} spent={}", laya::set_label(&self.applies), laya::set_label(&self.spent))
+  }
+
+  /// The verdict line of what was said: both sides after their keyword, or the keyword for nothing where no rule
+  /// applies and none is spent.
+  pub fn verdict(&self) -> String {
+    let words = &REFERENCE.verdicts;
+
+    if self.applies.is_empty() && self.spent.is_empty() {
+      words.nothing.clone()
+    } else {
+      verdict_line(&format!("{}: {}", words.matched, self.label()))
+    }
   }
 }
 
@@ -268,8 +280,14 @@ impl Probe for SituationProbe {
   }
 }
 
-/// One call's prompt: the rules it may answer about, then the situation to judge them against.
-pub fn request(system: &str, candidates: &[Candidate], message_lines: &[String]) -> GateRequest {
+/// One call's prompt: the rules it may answer about, then the situation to judge them against, and the answer
+/// file closing them where there is one.
+pub fn request(
+  system: &str,
+  answer: &str,
+  candidates: &[Candidate],
+  message_lines: &[String],
+) -> GateRequest {
   let mut lines = vec!["RULES:".to_owned()];
 
   lines.extend(
@@ -280,6 +298,10 @@ pub fn request(system: &str, candidates: &[Candidate], message_lines: &[String])
   lines.push(String::new());
   lines.push("SITUATION:".to_owned());
   lines.extend(message_lines.iter().cloned());
+
+  if !answer.is_empty() {
+    lines.extend([String::new(), answer.to_owned()]);
+  }
 
   let mut asked = GateRequest::new(system, lines.join("\n"));
 
@@ -344,7 +366,8 @@ pub async fn judge(
 
     async move {
       let started = std::time::Instant::now();
-      let mut asked = request(&system.map_err(GateError::Fault)?, candidates, message_lines);
+      let answer_file = prompts::answer(STAGE).unwrap_or_default();
+      let mut asked = request(&system.map_err(GateError::Fault)?, answer_file, candidates, message_lines);
 
       asked.chat_id = Some(chat_id);
       asked.message_id = message_id;
@@ -353,11 +376,7 @@ pub async fn judge(
 
       let answer = stages.runs.run(STAGE, &asked).await?;
       let parsed = answer.as_deref().and_then(|answer| parse_answer(answer, &slugs));
-      let verdict = match (&answer, &parsed) {
-        (None, _) => "(failed or timed out)".to_owned(),
-        (Some(answer), None) => verdict_line(&answer.replace('\n', ", ")),
-        (Some(_), Some(parsed)) => verdict_line(&parsed.label()),
-      };
+      let verdict = run_verdict(answer.as_deref(), parsed.as_ref(), Verdicts::verdict);
 
       records::judgement(
         db,
@@ -437,7 +456,7 @@ pub async fn judge(
       chat_id,
       message_id,
       stage: STAGE,
-      verdict: &verdict_line(&decided.verdict.label()),
+      verdict: &decided.verdict.verdict(),
       detail: Some(&detail),
       ms: Some(started.elapsed().as_millis() as i64),
       round,

@@ -620,7 +620,8 @@ async fn asked(reference: &Reference, one: &CutRun, gates: &[road::Gate], timing
     .collect();
   let started = std::time::Instant::now();
   let answers = join_all(asked.iter().map(|(gate, candidates)| async move {
-    let request = pick::picker_request(&gate.system, &index_text_of(candidates), &one.message_lines);
+    let request =
+      pick::picker_request(&gate.system, &gate.answer, &index_text_of(candidates), &one.message_lines);
 
     match reference.stages.runs.run(&gate.stage, &request).await {
       Ok(answer) => answer,

@@ -256,11 +256,16 @@ pub fn named_of(selection: Option<Selection>, candidates: &[String]) -> Option<S
 /// Whether a picker thinks: picking slugs out of an index needs no thinking.
 pub const THINKS: bool = false;
 
-/// The request a picker's model is asked: its instructions, the index, and the turn's lines.
-pub fn picker_request(system: &str, index: &str, message_lines: &[String]) -> GateRequest {
+/// The request a picker's model is asked: its instructions, the index, the turn's lines, and its answer file
+/// closing them where it has one.
+pub fn picker_request(system: &str, answer: &str, index: &str, message_lines: &[String]) -> GateRequest {
   let mut lines = vec!["INDEX:".to_owned(), index.to_owned(), String::new(), "MESSAGES:".to_owned()];
 
   lines.extend(message_lines.iter().cloned());
+
+  if !answer.is_empty() {
+    lines.extend([String::new(), answer.to_owned()]);
+  }
 
   let mut request = GateRequest::new(system, lines.join("\n"));
 
@@ -398,6 +403,30 @@ pub fn verdict_line(answer: &str) -> String {
   records::verdict_line(answer, 200)
 }
 
+/// The verdict line of one run of a gate's model (`docs/gates.md`, 「What a turn records」): what it read, as
+/// `read` writes it; the keyword for an answer not in the shape it was asked for; the keyword for no answer. The
+/// answer itself is the judgement's detail, never its verdict.
+pub fn run_verdict<T>(answer: Option<&str>, parsed: Option<&T>, read: impl FnOnce(&T) -> String) -> String {
+  let words = &REFERENCE.verdicts;
+
+  match (answer, parsed) {
+    (None, _) => words.no_answer.clone(),
+    (Some(_), None) => words.unreadable.clone(),
+    (Some(_), Some(parsed)) => read(parsed),
+  }
+}
+
+/// A selection's verdict line: the slugs it named after their keyword, or the keyword for nothing.
+pub fn selection_verdict(selection: &Selection) -> String {
+  let words = &REFERENCE.verdicts;
+
+  if selection.none || selection.slugs.is_empty() {
+    words.nothing.clone()
+  } else {
+    verdict_line(&format!("{}: {}", words.picked, selection.slugs.join(", ")))
+  }
+}
+
 /// How a picker reads its model's answer: the strict verdict per candidate, or the slugs it named.
 #[derive(Clone, Copy, Debug)]
 pub enum Reads {
@@ -414,10 +443,10 @@ impl Reads {
   }
 }
 
-/// What one picker is: the room, the agent and the round it picks for, the gate it runs as, its instructions,
-/// its libraries, the turn's lines it reads, how its answer is read, the most slugs and characters it takes, its
-/// Laya probe, and whether it writes down what it judged — a picker over work whose words are kept nowhere writes
-/// nothing of them.
+/// What one picker is: the room, the agent and the round it picks for, the gate it runs as, its instructions and
+/// the answer file its request closes on, its libraries, the turn's lines it reads, how its answer is read, the
+/// most slugs and characters it takes, its Laya probe, and whether it writes down what it judged — a picker over
+/// work whose words are kept nowhere writes nothing of them.
 pub struct Picker {
   pub chat_id: i64,
   pub message_id: Option<i64>,
@@ -425,6 +454,7 @@ pub struct Picker {
   pub round: Option<String>,
   pub stage: String,
   pub system: String,
+  pub answer: String,
   pub libraries: Vec<Library>,
   pub message_lines: Vec<String>,
   pub reads: Reads,
@@ -599,7 +629,7 @@ pub async fn pick(reference: &Reference, picker: Picker) -> Result<Picked, GateE
         .collect::<Vec<_>>()
         .join("\n\n");
       let started = std::time::Instant::now();
-      let mut request = picker_request(&picker.system, &index, &picker.message_lines);
+      let mut request = picker_request(&picker.system, &picker.answer, &index, &picker.message_lines);
 
       request.chat_id = Some(picker.chat_id);
       request.message_id = picker.message_id;
@@ -612,13 +642,7 @@ pub async fn pick(reference: &Reference, picker: Picker) -> Result<Picked, GateE
       let parsed = answer.as_deref().and_then(|answer| picker.reads.read(answer, &slugs));
 
       if picker.records {
-        let verdict = match (&answer, &parsed) {
-          (None, _) => "(failed or timed out)".to_owned(),
-          (Some(answer), None) => verdict_line(&answer.replace('\n', ", ")),
-          (Some(_), Some(parsed)) => {
-            verdict_line(&if parsed.none { "none".to_owned() } else { parsed.slugs.join(", ") })
-          }
-        };
+        let verdict = run_verdict(answer.as_deref(), parsed.as_ref(), selection_verdict);
 
         records::judgement(
           db,
@@ -704,11 +728,7 @@ pub async fn pick(reference: &Reference, picker: Picker) -> Result<Picked, GateE
       laya::DecidedBy::Llm => fill_marks(&REFERENCE.decided.by_fallback, &[("failure", failure)]),
       laya::DecidedBy::Default => fill_marks(&REFERENCE.decided.nothing_attached, &[("failure", failure)]),
     };
-    let verdict = verdict_line(&if decided.verdict.none {
-      "none".to_owned()
-    } else {
-      decided.verdict.slugs.join(", ")
-    });
+    let verdict = selection_verdict(&decided.verdict);
 
     if picker.records {
       records::judgement(

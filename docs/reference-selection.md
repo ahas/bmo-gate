@@ -217,8 +217,17 @@ flowchart TB
   recorded as a rejection rather than as an absence.
 - **Everything answered yes attaches**, up to the safety line. Nothing is ranked and no count limits
   how many pieces one turn may carry.
+- **The answer's shape is the last thing a gate is told.** Its instructions are the system prompt; the
+  request carries its index and the turn's messages, and closes on the gate's own answer file
+  (`prompts/<gate>/answer.md`): the messages named as what the gate judges rather than something to answer,
+  and the shape it answers in said once more. A road whose program sets a prompt of its own around the gate's
+  instructions still has the shape follow the messages, so its model judges the index rather than answering
+  the room. The person-book search and the situation-rule matcher close their requests the same way, each in
+  its own shape.
 - **An answer that does not cover its candidates is not read at all.** A candidate left unanswered, a
-  slug that was never a candidate, or one candidate answered twice makes the whole answer a failure.
+  slug that was never a candidate, one candidate answered twice, or any line that is not a verdict — a
+  sentence, a preamble, a code fence — makes the whole answer a failure, and the judgement reads
+  `UNREADABLE` with the answer as its detail (`docs/gates.md`, 「What a turn records」).
 - **A failed gate hands over its own index instead.** No answer, a timeout and an unreadable answer
   all attach that one library's index, written out of the same narrowed rows it was asked about, so the session still sees what
   it could have asked for — that gate's index alone, the others untouched. It is attached under the

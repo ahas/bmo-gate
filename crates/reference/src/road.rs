@@ -323,15 +323,16 @@ pub fn instruction_line(text: &str) -> String {
 }
 
 /// One picker of a room for one agent's turn: its key, its libraries before any turn narrows them, how a turn of
-/// the bot's own lines asks it, whether it reads the message a turn follows on from, its instructions, how its
-/// answer is read, the most slugs and characters it takes, where its picks stand when the turn is over its
-/// total, and the probe Laya asks it through.
+/// the bot's own lines asks it, whether it reads the message a turn follows on from, its instructions and the
+/// answer file its request closes on, how its answer is read, the most slugs and characters it takes, where its
+/// picks stand when the turn is over its total, and the probe Laya asks it through.
 pub struct Gate {
   pub stage: String,
   pub libraries: Vec<Library>,
   pub bot_lines_alone: BotLinesAlone,
   pub reads_answered: bool,
   pub system: String,
+  pub answer: String,
   pub reads: Reads,
   pub cap: Option<usize>,
   pub budget: usize,
@@ -377,6 +378,7 @@ async fn reference_gate(
     bot_lines_alone: declared.bot_lines_alone,
     reads_answered: declared.reads_answered,
     system: instructions(&declared.stage)?,
+    answer: answer_file(&declared.stage),
     reads: Reads::Verdicts,
     cap: None,
     budget: declared.budget,
@@ -390,6 +392,11 @@ fn instructions(stage: &str) -> Result<String, GateError> {
   prompts::instructions(stage)
     .map(str::to_owned)
     .ok_or_else(|| GateError::Fault(format!("{stage}: its instructions are not among the prompts")))
+}
+
+// The answer file a gate's request closes on, as its prompts write it; nothing where it has none.
+fn answer_file(stage: &str) -> String {
+  prompts::answer(stage).map(str::to_owned).unwrap_or_default()
 }
 
 // The probe Laya asks a gate's candidates through: its own question, and the word a candidate is named by.
@@ -422,7 +429,9 @@ pub async fn gates_of(
   }
 
   let people = &REFERENCE.people;
-  let system = prompts::render(&instructions(&people.stage)?, &[("selectionCap", &people.cap.to_string())]);
+  let cap = people.cap.to_string();
+  let system = prompts::render(&instructions(&people.stage)?, &[("selectionCap", &cap)]);
+  let answer = prompts::render(&answer_file(&people.stage), &[("selectionCap", &cap)]);
 
   gates.push(Gate {
     stage: people.stage.clone(),
@@ -430,6 +439,7 @@ pub async fn gates_of(
     bot_lines_alone: people.bot_lines_alone,
     reads_answered: people.reads_answered,
     system,
+    answer,
     reads: Reads::Named,
     cap: Some(people.cap),
     budget: people.budget,
@@ -594,6 +604,7 @@ fn picker(turn: &Turn, agent: &str, gate: &Gate, libraries: Vec<Library>) -> Pic
     round: turn.round.clone(),
     stage: gate.stage.clone(),
     system: gate.system.clone(),
+    answer: gate.answer.clone(),
     libraries,
     message_lines: gate.lines(turn),
     reads: gate.reads,
@@ -885,6 +896,7 @@ async fn work_knowledge(
       round: None,
       stage: gate.stage.clone(),
       system: gate.system.clone(),
+      answer: gate.answer.clone(),
       libraries,
       message_lines: lines.to_vec(),
       reads: gate.reads,

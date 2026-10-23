@@ -5,6 +5,7 @@
 
 use std::collections::HashSet;
 
+use gate_policy::prompts;
 use gate_ports::brain::Sheet;
 use gate_reference::road::{Turn, select, select_knowledge};
 use gate_reference::{Entry, Source};
@@ -154,6 +155,32 @@ async fn a_turns_reference_stands_its_memories_and_sheets_first_then_what_each_g
     scratch.count("SELECT count(*) FROM gate_roads WHERE round = 'round-1'", vec![]).await,
     4
   );
+  assert_eq!(
+    scratch
+      .texts("SELECT stage || ' ' || verdict FROM judgements ORDER BY stage", vec![])
+      .await,
+    [
+      "library-knowledge PICK: deploy-notes",
+      "people-search PICK: c5-told",
+      "room-rules PICK: greeting",
+      "system-documents PICK: structure"
+    ]
+  );
+
+  // Every picker's request closes on its own answer file, right after the turn's messages.
+  let asked = ground.gateway.asked.lock().unwrap();
+
+  for (stage, cap) in [
+    ("system-documents", ""),
+    ("room-rules", ""),
+    ("library-knowledge", ""),
+    ("people-search", "4"),
+  ] {
+    let answer = prompts::render(prompts::answer(stage).unwrap(), &[("selectionCap", cap)]);
+    let closing = format!("how do deploys go?\n\n{answer}");
+
+    assert!(asked.iter().any(|ask| ask.input.ends_with(&closing)), "{stage}");
+  }
 }
 
 #[tokio::test]
@@ -208,6 +235,40 @@ async fn a_gate_with_no_reading_hands_over_its_index() {
   assert_eq!(paths(&entries), [("knowledge/index.md", Source::Knowledge)]);
   assert_eq!(entries[0].text, "- deploy-notes \u{2014} how a deploy goes");
   assert!(ground.brain.hits.lock().unwrap().is_empty());
+  assert_eq!(
+    ground
+      .scratch
+      .texts(
+        "SELECT verdict || ' / ' || detail FROM judgements WHERE stage = 'library-knowledge'",
+        vec![]
+      )
+      .await,
+    ["UNREADABLE / I cannot tell."]
+  );
+}
+
+#[tokio::test]
+async fn every_picker_answering_a_sentence_writes_unreadable_with_the_answer_as_its_detail() {
+  let ground = ground("sentence", |_| Some("Deploys? They go through the testbed, boss.".into())).await;
+
+  furnish(&ground);
+  select(&ground.reference, &turn(&[])).await.unwrap();
+
+  assert_eq!(
+    ground
+      .scratch
+      .texts(
+        "SELECT stage || ' ' || verdict || ' / ' || detail FROM judgements ORDER BY stage",
+        vec![]
+      )
+      .await,
+    [
+      "library-knowledge UNREADABLE / Deploys? They go through the testbed, boss.",
+      "people-search UNREADABLE / Deploys? They go through the testbed, boss.",
+      "room-rules UNREADABLE / Deploys? They go through the testbed, boss.",
+      "system-documents UNREADABLE / Deploys? They go through the testbed, boss."
+    ]
+  );
 }
 
 #[tokio::test]

@@ -155,6 +155,23 @@
 
 - **Every gate a turn asks leaves its judgement** under the message it was asked for, which the console shows
   as the turn's verdict chip (`GET /judgements?roomId=`).
+- **A judgement's verdict opens with its keyword:** one upper-case word, which the console reads the chip's
+  colour and the end of judging by (the web unit's `docs/web.md`, 「Room screen」), and after it, past a colon,
+  what was decided. What the model answered, or why it gave nothing, stands in the judgement's detail and never
+  as its verdict. The reference gates (`system-documents`, `room-rules`, `library-knowledge`), `people-search`
+  and `situation-rules` write these, on every road alike:
+
+  | Verdict | When |
+  |---|---|
+  | `PICK: <slug>, <slug>` | a picker's answer was read and named these: answered yes, or for `people-search` named |
+  | `MATCH: applies=<slugs> spent=<slugs>` | the matcher's answer was read and at least one rule applies or is spent; an empty side reads `none` |
+  | `NONE` | the answer was read and picks or matches nothing |
+  | `UNREADABLE` | an answer came, but not in the shape the gate was asked for, so it is not read (`docs/reference-selection.md`, 「What the three reference gates are asked, and what they answer」) |
+  | `NO-ANSWER` | the road gave no answer: it failed, or the gate's wait ran out |
+  | `SKIP: no candidates` | the gate was on but not asked (below) |
+
+  A decision on Laya is written the same way whoever settled it — Laya, the fallback LLM or the default — and
+  its detail says which (`docs/laya.md`, 「A gate whose provider is Laya」).
 - **A reference gate, `people-search` or `situation-rules` that is on for the turn but has no candidate left
   once the code has narrowed them** — a room with no rulebook, an agent with no knowledge of its own, a turn
   no situation rule of the room is open for — is not asked, and leaves the judgement `SKIP: no candidates` in

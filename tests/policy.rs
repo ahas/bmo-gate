@@ -131,6 +131,21 @@ fn each_line_names_the_marks_it_is_filled_with() {
 
   assert_eq!(REFERENCE.decided.no_candidates, "SKIP: no candidates");
 
+  let verdicts = &REFERENCE.verdicts;
+
+  for keyword in [
+    &verdicts.picked,
+    &verdicts.matched,
+    &verdicts.nothing,
+    &verdicts.unreadable,
+    &verdicts.no_answer,
+  ] {
+    assert!(
+      !keyword.is_empty() && keyword.chars().all(|c| c.is_ascii_uppercase() || c == '-'),
+      "{keyword}"
+    );
+  }
+
   for mark in ["{id}", "{type}", "{written}", "{moved}", "{for}", "{from}", "{action}"] {
     assert!(MEMORIES.entry.line.contains(mark), "{mark}");
   }

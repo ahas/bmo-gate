@@ -220,11 +220,13 @@ verdict are kept ninety days: the service sweeps both tables as it starts and on
 - **The gate order** — which gates stand, the part and step each takes against a turn, and each gate's profile
   (whether it may be switched off, its Laya probe and default mode, its answer floor) — is the gate's, and
   `GET /gates` serves it.
-- **The instructions,** sixteen files in thirteen folders, one folder a gate: `sanitizer`, `situation-rules`,
-  `document-seek`, `system-documents`, `room-rules`, `library-knowledge`, `people-search`, `people-standing`,
-  `translator` (three), `output-gate/telegram-html`, `session-summary` (two), `voice-reading` and
-  `voice-polish`. A prompt told its own ceiling (the person-book search's and the document seeker's) is rendered
-  with the ceiling the gate's run holds to.
+- **The instructions,** twenty-one files in thirteen folders, one folder a gate: `sanitizer`, `situation-rules`
+  (two), `document-seek`, `system-documents` (two), `room-rules` (two), `library-knowledge` (two),
+  `people-search` (two), `people-standing`, `translator` (three), `output-gate/telegram-html`, `session-summary`
+  (two), `voice-reading` and `voice-polish`. The second file of a reference gate, the person-book search and the
+  situation-rule matcher is the answer file its request closes on (`docs/reference-selection.md`, 「What the
+  three reference gates are asked, and what they answer」). A prompt told its own ceiling (the person-book
+  search's and the document seeker's) is rendered with the ceiling the gate's run holds to.
 
 ### The policy it reads
 
