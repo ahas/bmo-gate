@@ -45,11 +45,12 @@ export function parseConnection(text: string): NodeConnection | null {
   }
   const said = value as Record<string, unknown>;
 
-  // The node unit's protocol names a node reached through a hub by the hub's program.
-  if (said.kind === "jake") {
-    const agent = wordAt(said, "agent");
-    const hubUrl = wordAt(said, "hubUrl");
-    const tokenFile = wordAt(said, "tokenFile");
+  // A node reached through a hub: the node unit's target names the hub's address, the file its control
+  // token is kept in and the agent's name (the node unit's `docs/api.md`, 「The target」).
+  if (said.kind === "hub") {
+    const agent = wordAt(said, "agentName");
+    const hubUrl = wordAt(said, "hubAddress");
+    const tokenFile = wordAt(said, "hubTokenFile");
 
     return agent === null || hubUrl === null || tokenFile === null ? null : { kind: "console", agent, hubUrl, tokenFile, role: wordAt(said, "role") };
   }

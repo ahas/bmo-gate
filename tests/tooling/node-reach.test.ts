@@ -16,7 +16,7 @@ describe("a node's connection, read from the node unit's node list", () => {
     expect(parseConnection('{"kind":"ssh","host":"203.0.113.82","port":22,"user":"owner","keyPath":"/keys/id_node"}')).toEqual(HOME_PC);
     expect(parseConnection('{"kind":"ssh","host":"box","port":2222,"user":"me","keyPath":null}'))
       .toEqual({ kind: "ssh", host: "box", port: 2222, user: "me", keyPath: null, shell: "posix", role: null });
-    expect(parseConnection('{"kind":"jake","hubUrl":"http://127.0.0.1:8791","tokenFile":"~/hub.env","agent":"lab_box","role":"engine"}'))
+    expect(parseConnection('{"kind":"hub","hubAddress":"http://127.0.0.1:8791","hubTokenFile":"~/hub.env","agentName":"lab_box","role":"engine"}'))
       .toEqual({ kind: "console", agent: "lab_box", hubUrl: "http://127.0.0.1:8791", tokenFile: "~/hub.env", role: "engine" });
   });
 
@@ -29,7 +29,7 @@ describe("a node's connection, read from the node unit's node list", () => {
   });
 
   test("an answer that is not a whole connection is none", () => {
-    for (const text of ["", "no node named x", '{"kind":"ssh","host":"box"}', '{"kind":"jake","agent":"a"}', '{"kind":"rdp"}']) {
+    for (const text of ["", "no node named x", '{"kind":"ssh","host":"box"}', '{"kind":"hub","agentName":"a"}', '{"kind":"rdp"}']) {
       expect(parseConnection(text)).toBeNull();
     }
   });
