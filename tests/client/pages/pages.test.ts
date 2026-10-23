@@ -1,36 +1,49 @@
 import { describe, expect, test } from "bun:test";
 
-// The gate trial page, read off the file the bundle ships: what it asks of the host, and where it reads and writes.
+// The gates' pages, read off the files the bundle ships: one source serves the module the gate answers and the layer
+// a host extends, so each page imports what it uses and reads the gate through the console's relay alone.
 
-const source = await Bun.file(new URL("../../../client/app/pages/gates/[stage].vue", import.meta.url)).text();
-const template = source.slice(0, source.indexOf("<script"));
+const pages = {
+  order: await Bun.file(new URL("../../../client/app/pages/gates/index.vue", import.meta.url)).text(),
+  trials: await Bun.file(new URL("../../../client/app/pages/gates/[stage].vue", import.meta.url)).text()
+};
 
-describe("this gate's own settings", () => {
-  test("stand behind one button beside the gate's name", () => {
-    const trailing = template.slice(template.indexOf("<template #trailing>"), template.indexOf("<template #right>"));
+// The components a template names, as `<UButton` or `<ContentSkeleton`.
+function componentsOf(source: string): string[] {
+  const template = source.slice(0, source.indexOf("<script"));
 
-    expect(trailing).toContain(`<UTooltip :text="$t('gates.action.settings')">`);
-    expect(trailing).toContain(`:aria-label="$t('gates.action.settings')"`);
+  return [...new Set([...template.matchAll(/<([A-Z][A-Za-z]+)/g)].map((found) => found[1]!))];
+}
+
+describe.each(Object.entries(pages))("the %s page", (_name, source) => {
+  test("imports every component it draws", () => {
+    for (const component of componentsOf(source)) {
+      expect(source).toMatch(new RegExp(`import ${component} from "(?:@nuxt/ui/components|bmo-ui/app/components)/[A-Za-z]+\\.vue";`));
+    }
   });
 
-  test("are the host's gate settings dialog for this gate, not an editor of this page's own", () => {
-    expect(template).toContain('<GateSettingsDialog v-model:open="settingsOpen" :gate="stage" />');
-    expect(source).not.toContain("/api/fallback");
-    expect(source).not.toContain("/api/model-tiers");
+  test("leans on no auto-import, no compiler macro and no host's own component", () => {
+    expect(source).toContain('from "vue";');
+    expect(source).toContain('import { useI18n } from "vue-i18n";');
+    expect(source).not.toContain("definePageMeta");
+    expect(source).not.toContain("$t(");
+    expect(source).not.toMatch(/from "(?:~|@|#shared|#imports|#app)\//);
+  });
+
+  test("reads the gate at the relay's address for its screen routes alone", () => {
+    // What each call is handed as its address: the argument up to its first comma, a call within it whole.
+    const calls = [...source.matchAll(/\$fetch<\w+>\(((?:[^,()]|\([^()]*\))+)/g)].map((found) => found[1]);
+
+    expect(calls.length).toBeGreaterThan(0);
+
+    for (const call of calls) {
+      expect(call).toMatch(/^gateAddress\("\/(?:gates|laya|trials)"\)$/);
+    }
   });
 });
 
-describe("what the page reads and writes", () => {
-  test("goes through the bundle's own server routes alone", () => {
-    const calls = source.split("$fetch<").slice(1);
-
-    expect(calls).toHaveLength(3);
-    expect(calls[0]).toStartWith('Trial>("/api/gate", { method: "POST"');
-    expect(calls[1]).toStartWith("Trial[]>(`/api/gate/${encodeURIComponent(stage)}`)");
-    expect(calls[2]).toStartWith('LayaView>("/api/laya")');
-  });
-
-  test("reaches no file of the host's by its aliases", () => {
-    expect(source).not.toMatch(/from "(?:~|@|#shared)\//);
+describe("the trial page", () => {
+  test("puts a trial with the gate and the prompt alone, the reader being the console's to name", () => {
+    expect(pages.trials).toContain('$fetch<Trial>(gateAddress("/trials"), { method: "POST", body: { gateName, prompt } })');
   });
 });

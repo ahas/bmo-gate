@@ -1,7 +1,7 @@
 //! The service's contract tests: the router served on the loopback over a scratch database of the test's own, the
 //! agency, the brain, the receiver and bmo-job stood in, and every route driven with the bodies its callers send —
-//! bmo-receiver's, bmo-job's, bmo-brain's, bmo-artifact's, the voice unit's and the console's — and the watches
-//! beside them as the agency sees them.
+//! bmo-receiver's, bmo-job's, bmo-brain's, bmo-artifact's, the voice unit's and the console's — the console bundle
+//! the gate serves behind its guard, and the watches beside them as the agency sees them.
 
 #[path = "../runs/fakes.rs"]
 mod agency;
@@ -13,6 +13,7 @@ mod scratch;
 mod stub;
 
 mod brain;
+mod bundle;
 mod console;
 mod receiver;
 mod watches;
@@ -27,6 +28,7 @@ use gate_ports::gateway::Ask;
 use gate_reference::Reference;
 use gate_runs::Runs;
 use gate_server::App;
+use gate_server::console::ConsoleBundle;
 use gate_stages::document_translation::Queue;
 use gate_stages::laya::Side;
 use gate_stages::{Reading, Stages};
@@ -58,6 +60,15 @@ pub struct Ground {
 
 /// The ground with every gate's model answering as `answer` makes it.
 pub async fn ground(test: &str, answer: impl Fn(&Ask) -> Option<String> + Send + Sync + 'static) -> Ground {
+  ground_serving(test, None, answer).await
+}
+
+/// The ground serving `console` as its console bundle, every gate's model answering as `answer` makes it.
+pub async fn ground_serving(
+  test: &str,
+  console: Option<ConsoleBundle>,
+  answer: impl Fn(&Ask) -> Option<String> + Send + Sync + 'static,
+) -> Ground {
   let scratch = Scratch::new().await;
   let agency = Arc::new(FakeAgency::default());
   let gateway = Arc::new(AnsweringGateway {
@@ -107,6 +118,7 @@ pub async fn ground(test: &str, answer: impl Fn(&Ask) -> Option<String> + Send +
     token: TOKEN.to_owned(),
     owner_room: 1,
     data_root: PathBuf::from(&data_root),
+    console,
   });
   let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
   let address = format!("http://{}", listener.local_addr().unwrap());

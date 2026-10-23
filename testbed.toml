@@ -63,3 +63,10 @@ health = "cd ~/.local/share/bmo-gate/deploy && bin/bmo-gate health"
 id = "tooling-packages"
 phase = "before-flip"
 command = "cd training/tooling && bun install --frozen-lockfile"
+
+# The console bundle, built into the release's client/dist, the folder the deployed settings' [console] names
+# (docs/layout.md, 「The console plugin bundle」).
+[[deploy.step]]
+id = "console-bundle"
+phase = "before-flip"
+command = "cd client && bun install --frozen-lockfile && bun run bundle"

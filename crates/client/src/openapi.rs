@@ -464,6 +464,114 @@ pub fn document() -> Value {
     &["unauthorized", "failed"],
   );
 
+  route(
+    &mut paths,
+    &mut generator,
+    "get",
+    "/console-manifest",
+    "console_manifest",
+    "Console",
+    "The console bundle's manifest, in the shape bmo-ui's console-manifest module states.",
+    vec![],
+    None,
+    None,
+    &[(200, "the manifest", Some(made::<ConsoleManifest>))],
+    &["unauthorized", "not-found", "failed"],
+  );
+  route(
+    &mut paths,
+    &mut generator,
+    "get",
+    "/console/words",
+    "console_words",
+    "Console",
+    "The console bundle's words: each locale's tree under the locale's code.",
+    vec![],
+    None,
+    None,
+    &[(200, "the words", Some(made::<serde_json::Map<String, Value>>))],
+    &["unauthorized", "not-found"],
+  );
+  route(
+    &mut paths,
+    &mut generator,
+    "get",
+    "/console/bundle/{file}",
+    "console_bundle_file",
+    "Console",
+    "The console bundle's module or stylesheet, named by the digest of its bytes; the reader's role is read.",
+    vec![("file", "string")],
+    None,
+    None,
+    &[(200, "the module as JavaScript or the stylesheet as CSS", None)],
+    &["unauthorized", "forbidden", "not-found"],
+  );
+  route(
+    &mut paths,
+    &mut generator,
+    "get",
+    "/console/gates",
+    "console_gates",
+    "Console",
+    "The gate order, as GET /gates answers it; the reader's role is read.",
+    vec![],
+    None,
+    None,
+    &[(200, "the gate order", Some(made::<Page<Gate>>))],
+    &["unauthorized", "forbidden", "failed"],
+  );
+  route(
+    &mut paths,
+    &mut generator,
+    "get",
+    "/console/laya",
+    "console_laya",
+    "Console",
+    "Laya, as GET /laya answers it; the reader's role is read.",
+    vec![],
+    None,
+    None,
+    &[(200, "Laya's health and each probed gate", Some(made::<LayaView>))],
+    &["unauthorized", "forbidden", "failed"],
+  );
+  route(
+    &mut paths,
+    &mut generator,
+    "get",
+    "/console/trials",
+    "console_trials",
+    "Console",
+    "A page of trials, as GET /trials answers it; the reader's role is read.",
+    vec![],
+    Some(query_of::<TrialQuery>),
+    None,
+    &[(200, "a page of trials", Some(made::<Page<Trial>>))],
+    &["unauthorized", "forbidden", "bad-request", "no-gate", "failed"],
+  );
+  route(
+    &mut paths,
+    &mut generator,
+    "post",
+    "/console/trials",
+    "console_trial_add",
+    "Console",
+    "Put one prompt to one gate as a turn would, kept under the reader's owner key; the reader's role is read.",
+    vec![],
+    None,
+    Some(made::<ConsoleTrial>),
+    &[(201, "the trial as it was kept", Some(made::<Trial>))],
+    &[
+      "unauthorized",
+      "forbidden",
+      "bad-request",
+      "no-gate",
+      "too-large",
+      "stopped",
+      "failed",
+      "upstream-failed",
+    ],
+  );
+
   let error = made::<ErrorBody>(&mut generator).to_value();
   let definitions = generator.take_definitions(true);
   let mut document = Map::new();
@@ -476,7 +584,7 @@ pub fn document() -> Value {
       "description": "The gate stage of a turn: sanitising words on their way into a model's context, choosing \
         the reference a turn is handed, checking an answer on its way out, translating, seeking documents, \
         judging person-book sheets and reading voice lines. Every answer is data in the common wire format; \
-        a screen's words are the console's language pack.",
+        the console bundle carries its screens' words.",
     }),
   );
   document.insert("servers".into(), json!([{ "url": "/", "description": "the gate service" }]));
@@ -512,6 +620,7 @@ pub fn document() -> Value {
       "Trials",
       "Documents",
       "Events",
+      "Console",
     ]),
   );
 

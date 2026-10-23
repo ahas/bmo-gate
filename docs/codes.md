@@ -54,3 +54,9 @@ the camelCase keys.
 |---|---|---|
 | `document-unknown` | 422 | a document name that is no root and path |
 | `language-unknown` | 422 | a target language the translator does not take |
+
+## The console's routes
+
+| Code | Status | When |
+|---|---|---|
+| `forbidden` | 403 | a call under `/console/` whose `Owner-Role` is missing or does not allow the screen's role (`docs/api.md`, 「Console」) |

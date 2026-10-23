@@ -6,6 +6,6 @@
     "types": ["bun"],
     "typeRoots": ["../../client/node_modules/@types"]
   },
-  "include": ["./**/*", "../../client/.nuxt/nuxt.d.ts", "../../client/host/server.d.ts"],
+  "include": ["./**/*", "../../client/.nuxt/nuxt.d.ts"],
   "exclude": []
 }

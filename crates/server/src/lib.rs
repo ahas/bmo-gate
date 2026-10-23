@@ -3,6 +3,7 @@
 //! Laya's health asked once a minute, and the attachments counted every hour.
 
 pub mod answer;
+pub mod console;
 pub mod routes;
 pub mod settings;
 pub mod watches;
@@ -31,10 +32,12 @@ use sea_orm::DatabaseConnection;
 use sea_orm_migration::MigratorTrait;
 
 use crate::answer::Refused;
+use crate::console::ConsoleBundle;
 use crate::settings::{Settings, Unread};
 
 /// Everything a route stands on: the gates and the reference road, bmo-job for the rows the gate raises, the
-/// document translations' queue, the token every caller presents, the owner's room, and the data root.
+/// document translations' queue, the token every caller presents, the owner's room, the data root, and the console
+/// bundle where the settings name one.
 pub struct App {
   pub stages: Arc<Stages>,
   pub reference: Arc<Reference>,
@@ -43,6 +46,7 @@ pub struct App {
   pub token: String,
   pub owner_room: i64,
   pub data_root: PathBuf,
+  pub console: Option<ConsoleBundle>,
 }
 
 async fn bearer(State(app): State<Arc<App>>, request: Request, next: Next) -> Response {
@@ -146,6 +150,12 @@ pub async fn stand(settings: &Settings) -> Result<Arc<App>, Unread> {
   let token = settings
     .token(&settings.token_file)?
     .ok_or_else(|| Unread("the gate's token file is empty".into()))?;
+  let console = settings
+    .console
+    .as_ref()
+    .map(|console| ConsoleBundle::read(&console.folder))
+    .transpose()
+    .map_err(Unread)?;
 
   Ok(Arc::new(App {
     stages,
@@ -155,6 +165,7 @@ pub async fn stand(settings: &Settings) -> Result<Arc<App>, Unread> {
     token,
     owner_room: settings.owner_room,
     data_root: settings.data_root.clone(),
+    console,
   }))
 }
 

@@ -24,7 +24,7 @@ Every other unit is reached through standard APIs alone, and of other repositori
 | Folder | What it holds |
 |---|---|
 | `.graph/` | The code dependency graph: one node per feature, with the files it is made of and what it reads, read and written by `bmo graph`. Its area files are generated in the checkout and untracked, so a fresh checkout builds them again, while `settings.toml` is the repository's configuration and stays tracked |
-| `client/` | The console plugin bundle: the gates' trial page and its server routes, a Nuxt layer on bmo-ui and a Bun project of its own |
+| `client/` | The console plugin bundle: the gate order and a gate's trial page, built into the ES module the gate serves and packed as a Nuxt layer on bmo-ui, a Bun project of its own |
 | `crates/` | The Rust crates the root package is built from: the contract and its client, the store, the codes, the ports to the other units, the policy, the words, the markup, the gate runs, the gates, the reference road, the service's routes, the unit command's nouns and the Laya relay |
 | `deploy/` | The service units the testbed's deployment keeps on the operations machine |
 | `docs/` | The documents, which come before the code: start with `docs/layout.md`, and read `docs/api.md` for the public API and `docs/openapi.json` for its machine form |

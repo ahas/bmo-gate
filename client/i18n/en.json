@@ -1,0 +1,57 @@
+{
+  "gates": {
+    "title": {
+      "gates": "Gates"
+    },
+    "part": {
+      "pre": "Before the turn",
+      "post": "After the turn",
+      "apart": "Apart from a turn"
+    },
+    "label": {
+      "message": "Put a prompt to this gate",
+      "session_summary": "Session summary",
+      "system_documents": "System documents classifier",
+      "room_rules": "Room rules classifier",
+      "library_knowledge": "Library knowledge classifier",
+      "people_search": "People search",
+      "situation_rules": "Situation rules matcher",
+      "sanitizer": "Sanitiser",
+      "output_format": "Output format gate",
+      "people_standing": "People standing",
+      "document_seek": "Document seeker",
+      "translator": "Translator",
+      "voice_polish": "Voice polish",
+      "voice_reading": "Voice reading"
+    },
+    "laya_mode": {
+      "off": "off",
+      "shadow": "shadow",
+      "filter": "filter",
+      "asymmetric": "asymmetric"
+    },
+    "status": {
+      "gates_loading": "Reading the gate order…",
+      "no_gates": "No gate stands.",
+      "records_loading": "Reading the trials…",
+      "no_trials": "No trial yet. Put a prompt to this gate below.",
+      "no_answer": "No answer.",
+      "judging": "Judging…"
+    },
+    "action": {
+      "read_again": "Read again",
+      "copy_answer": "Copy the answer"
+    },
+    "error": {
+      "call_failed": "The gate could not be asked.",
+      "records_failed": "The trials could not be read.",
+      "gates_failed": "The gate order could not be read.",
+      "copy_failed": "Could not copy.",
+      "no_gate": "The gate order holds no such gate.",
+      "too_large": "The prompt is longer than a turn takes.",
+      "stopped": "The run was stopped.",
+      "forbidden": "This screen is for administrators.",
+      "upstream_failed": "A unit the gate needs did not answer."
+    }
+  }
+}

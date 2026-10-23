@@ -1,13 +1,13 @@
 {
-  // Nuxt's own project configs carry the layer's code. The page is read again with the components the host owes
-  // declared, and the server routes with the host's sign-in declared, so those two take the place of Nuxt's app
-  // and server configs; the tests under tests/client are a project of their own beside them.
+  // Nuxt's own project configs carry the layer's code; the console bundle's entry and its build configuration are
+  // read beside them, and the tests under tests/client are a project of their own.
   "files": [],
   "references": [
+    { "path": "./.nuxt/tsconfig.app.json" },
     { "path": "./.nuxt/tsconfig.shared.json" },
     { "path": "./.nuxt/tsconfig.node.json" },
-    { "path": "./host" },
-    { "path": "./host/tsconfig.server.json" },
+    { "path": "./console" },
+    { "path": "./console/tsconfig.node.json" },
     { "path": "../tests/client" }
   ]
 }

@@ -10,6 +10,7 @@ export type { components, paths };
 type Schemas = components["schemas"];
 
 export type Gate = Schemas["Gate"];
+export type GatePage = Schemas["GatePage"];
 export type GateOptions = Schemas["GateOptions"];
 export type GateRoute = Schemas["GateRoute"];
 export type GateOptionChange = Schemas["GateOptionChange"];

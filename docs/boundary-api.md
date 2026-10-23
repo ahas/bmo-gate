@@ -33,6 +33,7 @@ each release links to the data root's `env/gate.toml`. It names:
 | `[gateway]` | the agency's model gateway: its `address`, and the `key_file` under `env/` |
 | `[laya]` | the gate's own Laya relay, where one stands: its `address`, and the `token_file` under `env/` |
 | `[shipped]` | `folder`, under which the shipped pieces' bodies are read — the system's reference documents, as the deployment places them — a row's path read relative to it |
+| `[console]` | `folder`, the folder the console bundle is built into (`docs/layout.md`, 「The console plugin bundle」): its module `bundle.js`, its stylesheet `bundle.css` and its words `words.json`, a relative folder read from the folder the settings file stands in. Absent, the gate serves no console bundle (`docs/api.md`, 「Console」) |
 | `[reading]` | what the translator's checks read a text by: `set_aside`, the words the English test reads past — the names of people and agents and the marks a note's strands open with — and `wording`, the file the owner's banned words are read from, where the deployment keeps one |
 
 No address, port, host, path or name of a deployment is written in the code; every one is read from here.
@@ -41,7 +42,8 @@ No address, port, host, path or name of a deployment is written in the code; eve
 
 `docs/api.md` states every route the gate serves, one section per resource, in the common wire format: camelCase
 keys, epoch milliseconds, signed 64-bit ids, `{code, error}` on a non-2xx answer, and a page of `items` and
-`more`. No section of that document is written for one caller, and no route names one.
+`more`. No section of that document is written for one caller, and no route names one: its 「Console」 is bmo-ui's
+console plugin contract, which every console keeps alike.
 
 - **Records.** `bmo-gate records <table>` prints every row of one of the gate's own tables, from the database the
   settings name or the one `--db` names, one JSON object a line with every column under its own name, in the

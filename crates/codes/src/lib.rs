@@ -30,11 +30,12 @@ pub enum Code {
   NeedsTau,
   DocumentUnknown,
   LanguageUnknown,
+  Forbidden,
 }
 
 impl Code {
   /// Every code, in the order `docs/codes.md` lists them.
-  pub const ALL: [Code; 26] = [
+  pub const ALL: [Code; 27] = [
     Code::BadRequest,
     Code::Unauthorized,
     Code::NoRoute,
@@ -61,6 +62,7 @@ impl Code {
     Code::NeedsTau,
     Code::DocumentUnknown,
     Code::LanguageUnknown,
+    Code::Forbidden,
   ];
 
   /// The code as the wire spells it: kebab-case.
@@ -92,6 +94,7 @@ impl Code {
       Code::NeedsTau => "needs-tau",
       Code::DocumentUnknown => "document-unknown",
       Code::LanguageUnknown => "language-unknown",
+      Code::Forbidden => "forbidden",
     }
   }
 
@@ -100,6 +103,7 @@ impl Code {
     match self {
       Code::BadRequest | Code::NothingToChange => 400,
       Code::Unauthorized => 401,
+      Code::Forbidden => 403,
       Code::NoRoute | Code::NotFound | Code::NoGate => 404,
       Code::Conflict | Code::Stopped => 409,
       Code::TooLarge => 413,

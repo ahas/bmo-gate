@@ -121,6 +121,11 @@ impl GateClient {
     answer(self.get(&["health"])).await
   }
 
+  /// The console bundle's manifest (`docs/api.md`, 「Console」).
+  pub async fn console_manifest(&self) -> Result<ConsoleManifest, ClientFailure> {
+    answer(self.get(&["console-manifest"])).await
+  }
+
   /// The gate order.
   pub async fn gates(&self) -> Result<Page<Gate>, ClientFailure> {
     answer(self.get(&["gates"])).await

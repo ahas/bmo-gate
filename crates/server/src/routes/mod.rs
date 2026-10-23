@@ -1,5 +1,6 @@
 //! Every route the contract states (`docs/api.md`), one module a resource.
 
+pub mod console;
 pub mod documents;
 pub mod events;
 pub mod formats;
@@ -47,4 +48,7 @@ pub fn all() -> Router<Arc<App>> {
     .route("/documents/translations/parts", get(documents::parts))
     .route("/events", get(events::stream))
     .route("/health", get(health::health))
+    .route("/console-manifest", get(console::manifest))
+    .route("/console/words", get(console::words))
+    .nest(crate::console::API_PREFIX, console::screens())
 }

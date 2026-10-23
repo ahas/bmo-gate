@@ -2,52 +2,16 @@
   <UDashboardPanel id="gate" :ui="{ body: 'p-0 sm:p-0 overscroll-none' }">
     <template #header>
       <UDashboardNavbar :title="label" :icon="GATE_ICON">
-        <!-- What belongs to this gate alone stands beside its name; the right end keeps what every
-             screen carries. -->
+        <!-- The gate's Laya mode and how often Laya agrees with it, beside its name. -->
         <template #trailing>
-          <div class="flex min-w-0 items-center gap-2">
-            <!-- The gate's Laya mode and how often Laya agrees with it, which lead to where the mode
-                 is set: this gate's settings. -->
-            <UButton
-              v-if="layaLine !== ''"
-              class="hidden min-w-0 tabular-nums sm:inline-flex"
-              size="sm"
-              color="neutral"
-              variant="ghost"
-              :label="layaLine"
-              :aria-label="layaName"
-              @click="settingsOpen = true"
-            />
-
-            <UTooltip :text="$t('gates.action.view_log')">
-              <UButton
-                :to="`/agents/${stage}`"
-                size="sm"
-                color="neutral"
-                variant="ghost"
-                icon="i-material-symbols-description-outline"
-                :aria-label="$t('gates.action.view_log')"
-              />
-            </UTooltip>
-
-            <!-- This gate's own row of the agent management screen's gate table, the host's dialog. -->
-            <UTooltip :text="$t('gates.action.settings')">
-              <UButton size="sm" color="neutral" variant="ghost" icon="i-material-symbols-settings-outline" :aria-label="$t('gates.action.settings')" @click="settingsOpen = true" />
-            </UTooltip>
-          </div>
-        </template>
-
-        <template #right>
-          <DeployMark />
-          <TodoOpenButton />
-          <UsageMeters />
+          <span v-if="laya !== ''" class="hidden min-w-0 truncate text-sm text-muted tabular-nums sm:inline">{{ laya }}</span>
         </template>
       </UDashboardNavbar>
     </template>
 
     <template #body>
       <UContainer ref="feed" class="flex-1 flex flex-col gap-4 sm:gap-6 py-4 sm:py-6">
-        <ContentSkeleton v-if="pending && trials.length === 0" :rows="4" listClass="flex flex-col gap-4 sm:gap-6" :label="$t('gates.status.records_loading')">
+        <ContentSkeleton v-if="pending && trials.length === 0" :rows="4" listClass="flex flex-col gap-4 sm:gap-6" :label="t('gates.status.records_loading')">
           <div class="w-4/5 max-w-lg space-y-2 rounded-lg bg-elevated/40 p-3 even:self-end">
             <SkeletonLine width="w-24" />
             <SkeletonText :lines="2" size="sm" lastWidth="w-2/3" />
@@ -55,10 +19,10 @@
         </ContentSkeleton>
         <div v-else-if="historyError" class="flex flex-col items-center gap-2 text-sm text-muted">
           <p>{{ historyError }}</p>
-          <UButton size="sm" color="neutral" variant="soft" :label="$t('gates.action.read_again')" :loading="pending" @click="loadHistory()" />
+          <UButton size="sm" color="neutral" variant="soft" :label="t('gates.action.read_again')" :loading="pending" @click="loadHistory()" />
         </div>
         <p v-if="!pending && !historyError && trials.length === 0" class="text-center text-sm text-muted">
-          {{ $t("gates.status.no_trials") }}
+          {{ t("gates.status.no_trials") }}
         </p>
 
         <!-- The scroll-to-bottom button is placed for a prompt that sits inside the scrolling
@@ -71,7 +35,7 @@
           <template v-for="trial in trials" :key="trial.id">
             <UChatMessage :id="`q${trial.id}`" role="user" side="right" variant="soft" :parts="[]">
               <template #header>
-                <span class="text-sm text-muted">{{ trial.userName }} · {{ formatClock(trial.createdAt / 1000) }}</span>
+                <span class="text-sm text-muted">{{ askedBy(trial) }}</span>
               </template>
 
               <template #content>
@@ -92,18 +56,18 @@
               </template>
 
               <template #content>
-                <MarkdownText v-if="trial.answer" :text="trial.answer" class="text-sm" />
-                <p v-else class="text-muted italic">{{ $t("gates.status.no_answer") }}</p>
+                <p v-if="trial.answer" class="whitespace-pre-wrap text-sm">{{ trial.answer }}</p>
+                <p v-else class="text-muted italic">{{ t("gates.status.no_answer") }}</p>
               </template>
 
               <template #actions>
-                <UTooltip :text="$t('common.action.copy')">
+                <UTooltip :text="t('common.action.copy')">
                   <UButton
                     size="sm"
                     color="neutral"
                     variant="ghost"
                     icon="i-material-symbols-content-copy-outline"
-                    :aria-label="$t('gates.action.copy_answer')"
+                    :aria-label="t('gates.action.copy_answer')"
                     @click="copyAnswer(trial)"
                   />
                 </UTooltip>
@@ -121,13 +85,11 @@
             :parts="[]"
           >
             <template #content>
-              <UChatShimmer :text="$t('gates.status.judging')" />
+              <UChatShimmer :text="t('gates.status.judging')" />
             </template>
           </UChatMessage>
         </UChatMessages>
       </UContainer>
-
-      <GateSettingsDialog v-model:open="settingsOpen" :gate="stage" />
     </template>
 
     <template #footer>
@@ -138,7 +100,7 @@
             @keydown.capture="enter.keydown"
             @compositionend.capture="enter.compositionend"
             :submit-on-enter="submitOnEnter"
-            :placeholder="$t('gates.label.message')"
+            :placeholder="t('gates.label.message')"
             :disabled="sending"
             color="neutral"
             variant="subtle"
@@ -155,18 +117,31 @@
 </template>
 
 <script setup lang="ts">
+import { computed, nextTick, onMounted, onScopeDispose, ref, useTemplateRef, watch } from "vue";
+import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 
+import UButton from "@nuxt/ui/components/Button.vue";
+import UChatMessage from "@nuxt/ui/components/ChatMessage.vue";
+import UChatMessages from "@nuxt/ui/components/ChatMessages.vue";
+import UChatPrompt from "@nuxt/ui/components/ChatPrompt.vue";
+import UChatPromptSubmit from "@nuxt/ui/components/ChatPromptSubmit.vue";
+import UChatShimmer from "@nuxt/ui/components/ChatShimmer.vue";
+import UContainer from "@nuxt/ui/components/Container.vue";
+import UDashboardNavbar from "@nuxt/ui/components/DashboardNavbar.vue";
+import UDashboardPanel from "@nuxt/ui/components/DashboardPanel.vue";
+import UTooltip from "@nuxt/ui/components/Tooltip.vue";
+
+import ContentSkeleton from "bmo-ui/app/components/ContentSkeleton.vue";
+import SkeletonLine from "bmo-ui/app/components/SkeletonLine.vue";
+import SkeletonText from "bmo-ui/app/components/SkeletonText.vue";
 import { useIsland } from "bmo-ui/app/domain/island";
 import { usePromptEnter } from "bmo-ui/app/domain/prompt";
 import { formatClock } from "bmo-ui/app/domain/time";
 
-import { agreementText, GATE_ICON, gateLabel, layaModeLabel, refusalText } from "../../domain/gates";
+import { GATE_ICON, gateAddress, gateLabel, layaLine, refusalText } from "../../domain/gates";
 
-import type { LayaView, Trial } from "../../../shared/gate";
-
-// Another gate is another screen.
-definePageMeta({ key: (route) => route.path });
+import type { LayaView, Trial, TrialPage } from "../../../shared/gate";
 
 const feedRef = useTemplateRef<{ $el?: HTMLElement }>("feed");
 
@@ -175,8 +150,10 @@ const { t, te } = useI18n();
 const island = useIsland(t);
 const has = (key: string): boolean => te(key);
 
-const stage = String(route.params.stage);
-const label = computed<string>(() => gateLabel(t, has, stage));
+// The gate this page puts prompts to. Another gate is read afresh, whether the router opens a new page for it or
+// hands this one the new path.
+const stage = computed<string>(() => String(route.params.stage));
+const label = computed<string>(() => gateLabel(t, has, stage.value));
 
 const trials = ref<Trial[]>([]);
 const input = ref("");
@@ -184,31 +161,21 @@ const { submitOnEnter, enter } = usePromptEnter(() => void ask());
 const pending = ref(true);
 const historyError = ref("");
 const sending = ref(false);
-const settingsOpen = ref(false);
 
-// This gate's Laya mode and agreement, where Laya is asked on it (the gate's docs/laya.md). Both are read from
-// the gate; the mode is set only in the settings the line opens.
-const laya = ref<LayaView | null>(null);
-
-const layaGate = computed(() => laya.value?.gates.find((gate) => gate.gateName === stage) ?? null);
-
-// The title bar has little room, so the line is the mode and the figure; its name says what the figure is.
-const layaLine = computed<string>(() => {
-  const gate = layaGate.value;
-
-  return gate === null ? "" : `Laya ${layaModeLabel(t, has, gate.mode)} ${agreementText(gate.agreement?.agreement)}`;
-});
-
-const layaName = computed<string>(() => {
-  const gate = layaGate.value;
-
-  return gate === null
-    ? ""
-    : t("gates.aria.laya_settings", { mode: layaModeLabel(t, has, gate.mode), agreement: agreementText(gate.agreement?.agreement) });
-});
+// Laya as the gate answers it (the gate's docs/laya.md): read for this gate's mode and agreement, set only where the
+// gate's options are set.
+const layaView = ref<LayaView | null>(null);
+const laya = computed<string>(() => layaLine(t, has, layaView.value, stage.value));
 
 function formatDuration(ms: number): string {
   return t("common.label.seconds", { n: (ms / 1000).toFixed(1) });
+}
+
+// Who asked and when; a trial put through a console names nobody, so it is its time alone.
+function askedBy(trial: Trial): string {
+  const at = formatClock(trial.createdAt / 1000);
+
+  return trial.userName === "" ? at : `${trial.userName} · ${at}`;
 }
 
 async function scrollToBottom(): Promise<void> {
@@ -226,7 +193,7 @@ async function copyAnswer(trial: Trial): Promise<void> {
   try {
     await navigator.clipboard.writeText(trial.answer ?? "");
   } catch {
-    island.say({ title: t("common.error.copy_failed"), tone: "error" });
+    island.say({ title: t("gates.error.copy_failed"), tone: "error" });
   }
 }
 
@@ -237,13 +204,19 @@ async function ask(): Promise<void> {
     return;
   }
 
+  const gateName = stage.value;
+
   sending.value = true;
   await scrollToBottom();
 
   try {
-    trials.value = [...trials.value, await $fetch<Trial>("/api/gate", { method: "POST", body: { gateName: stage, prompt } })];
-    input.value = "";
-    await scrollToBottom();
+    const trial = await $fetch<Trial>(gateAddress("/trials"), { method: "POST", body: { gateName, prompt } });
+
+    if (gateName === stage.value) {
+      trials.value = [...trials.value, trial];
+      input.value = "";
+      await scrollToBottom();
+    }
   } catch (error) {
     island.say({ title: refusalText(t, has, error, t("gates.error.call_failed")), tone: "error" });
   } finally {
@@ -260,9 +233,9 @@ async function loadHistory(): Promise<void> {
   pending.value = true;
 
   try {
-    const answer = await $fetch<Trial[]>(`/api/gate/${encodeURIComponent(stage)}`);
+    const answer = await $fetch<TrialPage>(gateAddress("/trials"), { query: { gateName: stage.value } });
     if (mine !== historyGeneration) return;
-    trials.value = answer;
+    trials.value = answer.items;
   } catch (error) {
     if (mine !== historyGeneration) return;
     historyError.value = refusalText(t, has, error, t("gates.error.records_failed"));
@@ -273,15 +246,21 @@ async function loadHistory(): Promise<void> {
 
 async function loadLaya(): Promise<void> {
   try {
-    laya.value = await $fetch<LayaView>("/api/laya");
+    layaView.value = await $fetch<LayaView>(gateAddress("/laya"));
   } catch {
-    // Without Laya's line the page stands all the same; the gate's settings say why where they are opened.
-    laya.value = null;
+    // Without Laya's line the page stands all the same.
+    layaView.value = null;
   }
 }
 
-onMounted(async () => {
+// The gate read in the browser, when the page opens and whenever it is handed another gate.
+async function open(): Promise<void> {
+  trials.value = [];
+  input.value = "";
   await Promise.all([loadHistory(), loadLaya()]);
   await scrollToBottom();
-});
+}
+
+watch(stage, open);
+onMounted(open);
 </script>

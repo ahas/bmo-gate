@@ -50,6 +50,7 @@ fn app_on(ground: &crate::Ground, stub: &Stub) -> Arc<App> {
     token: TOKEN.to_owned(),
     owner_room: 1,
     data_root: PathBuf::from(&ground.app.data_root),
+    console: None,
   })
 }
 

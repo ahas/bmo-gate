@@ -765,3 +765,74 @@ pub struct Health {
   /// `up`, `down` or `off`.
   pub laya: String,
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// Console
+
+/// The role a console's reader holds, the one holding more first: an administrator holds every role a member
+/// holds (bmo-ui's `docs/console-bundles.md`, "Roles and the owner key").
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum ConsoleRole {
+  Administrator,
+  Member,
+}
+
+impl ConsoleRole {
+  /// The role a console's `Owner-Role` header names, or none.
+  pub fn named(spelled: &str) -> Option<Self> {
+    match spelled {
+      "administrator" => Some(Self::Administrator),
+      "member" => Some(Self::Member),
+      _ => None,
+    }
+  }
+
+  /// Whether a reader holding this role may open a screen needing `needed`.
+  pub fn allows(self, needed: ConsoleRole) -> bool {
+    self == ConsoleRole::Administrator || self == needed
+  }
+}
+
+/// The console bundle's manifest, in the shape bmo-ui's `console-manifest` module states.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ConsoleManifest {
+  /// The bundle's name, in kebab-case: its words' namespace.
+  pub name: String,
+  /// The key, in the bundle's words, of the name a console's menu gives the screen.
+  pub title: String,
+  /// The icon drawn beside that name, as the component library names an icon.
+  pub icon: String,
+  /// The path the bundle's screens stand under.
+  pub screen_path: String,
+  /// The service's name, which a console relays it under.
+  pub service_name: String,
+  /// The path of the gate's API the bundle's module is answered at.
+  pub bundle: String,
+  /// The path of the gate's API the bundle's stylesheet is answered at.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub stylesheet: Option<String>,
+  /// The path of the gate's API the bundle's words are answered at.
+  pub words: String,
+  /// The path of the gate's API every call the screens make stands under.
+  pub api_prefix: String,
+  /// The least role a reader holds to open the screen.
+  pub role: ConsoleRole,
+  /// Whether every call the screens make needs the reader's owner key.
+  pub owner_key: bool,
+  /// Whether the screens read the gate's event stream through the console.
+  pub events: bool,
+  /// Whether the screens open a WebSocket to the gate through the console.
+  pub websocket: bool,
+  /// The gate's event kinds a console may raise as a notice to a reader not on the screen.
+  pub push_kinds: Vec<String>,
+}
+
+/// A trial put through the console: the gate and the prompt, the reader being the console's to name.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ConsoleTrial {
+  pub gate_name: String,
+  pub prompt: String,
+}

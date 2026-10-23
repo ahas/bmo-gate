@@ -17,7 +17,7 @@ its own, so a change to one never builds or tests the others.
 | `weights/` | The declarations of Laya's weights: each service's card declaration, in the card master's own format, and where the checkpoints are found, `checkpoints.toml`. The weights themselves are runtime data and never stand in the repository |
 | `deploy/` | The service units the testbed's deployment keeps |
 | `package/` | The TypeScript client generated from `docs/openapi.json`, which the console bundle and any other TypeScript caller use |
-| `client/` | The console plugin bundle: the gates' screen, a Nuxt layer on the base UI library |
+| `client/` | The console plugin bundle: the gates' screens, the ES module the gate serves and a Nuxt layer on the base UI library |
 | `docs/` | The documents, which come before the code |
 | `tests/` | Every test of the repository, whatever its language |
 
@@ -33,44 +33,46 @@ stands, and no other.
   a Bun project's tests stand under `tests/` in a folder named for the project; the Laya suites stand under
   `tests/laya/` and are run by a Cargo test of their own.
 - **Korean stands only in `prompts/`.** A gate's instructions, Laya's questions, the evaluation set's briefs and
-  the words the training tooling hands its writers and judges and the stand-ins and placeholders its rows carry, under `prompts/tooling/`, are worded as the models read them, and the sanitiser's trigger words as the rooms write them; every other file is English, and the Korean a test feeds the code, a pattern reads or a bench sends as a sample state is written by its unicode escapes and recorded in `korean-ledger.json`, which the testbed's language check reads.
+  the words the training tooling hands its writers and judges and the stand-ins and placeholders its rows carry, under `prompts/tooling/`, are worded as the models read them, and the sanitiser's trigger words as the rooms write them; every other file is English, and the Korean a test feeds the code, a pattern reads, a bench sends as a sample state or the console bundle's Korean words (`client/i18n/ko.json`, the piece of a console's language pack the bundle carries) hold is written by its unicode escapes and recorded in `korean-ledger.json`, which the testbed's language check reads.
 - **No weights, datasets or run output in git.** They are runtime data under the data root the settings name;
   the repository holds only the declarations that say where they are read from.
 
 ## The console plugin bundle
 
-`client/` is the gates' screen as the web unit's console takes it: a Bun project of its own, its manifest, its
-lockfile and its Nuxt configuration one level below the root, and its tests under `tests/client/`.
+`client/` is the gates' screens as a console takes them under bmo-ui's console plugin contract (bmo-ui's
+`docs/console-bundles.md`): a Bun project of its own, its manifest, its lockfile and its configurations one level
+below the root, and its tests under `tests/client/`.
 
-- **A Nuxt layer on bmo-ui.** It extends bmo-ui and adds the gate trial page, `/gates/<gate>`, its domain modules
-  and three server routes. A host extends it the way it extends bmo-ui. bmo-ui is a peer at the one version the
-  bundle is built against; for the bundle's own install a packed copy under `client/vendor/` is a development
-  dependency, and bmo-ui's patch stands under `client/patches/`.
-- **Its own files by relative path.** In a host `~`, `@` and `#shared` are the host's folders, so no file of the
-  bundle reaches another through them, and bmo-ui's modules are imported by the package's path.
-- **The page** puts a prompt to one gate as a turn would and lists the gate's trials, oldest first, each with who
-  asked, the answer and how long it took. Beside the gate's name stand its Laya mode and how often Laya agrees
-  with it, and the button that opens the gate's settings. Every word is a key of the host's language pack: the
-  `gates.*` keys, `common.action.copy`, `common.error.copy_failed` and `common.label.seconds`. A gate's name is
-  the key `gates.label.<gate>` with its hyphens as underscores, and the gate's own name where the pack holds no
-  such key; a Laya mode is `gates.laya_mode.<mode>`, the mode's own word where the pack has none.
-- **The server routes** call the gate (`docs/api.md`) through the generated TypeScript client under `package/`,
-  at the address and with the token the host's runtime configuration gives under `gate`, from
-  `NUXT_GATE_ADDRESS` and `NUXT_GATE_TOKEN`:
-  - `POST /api/gate` with `gateName` and `prompt` puts a trial, the signed-in user's name as `userName`;
-  - `GET /api/gate/<gate>?limit=` reads the gate's trials;
-  - `GET /api/laya` reads Laya's health and each gate's mode and agreement.
-  Each refuses a request with no signed-in user, and hands a refusal of the gate's on with its status, its code
-  and its sentence. Their own codes are `question-empty` (a trial asking nothing), `no-gate-address` (the host
-  names no gate), `gate-unreachable` (the gate did not answer) and `gate-refused` (a refusal with no code). The
-  page shows a refusal as the pack's `gates.error.<code>` where the pack has it, and its own fallback otherwise.
-- **What the host owes,** beside what bmo-ui asks of it:
-  - its i18n module and a language pack answering the keys above;
-  - its sign-in, as `nuxt-auth-utils`'s `requireUserSession`, which the server routes call;
-  - the components the page stands on: the console's title bar pieces `DeployMark`, `TodoOpenButton` and
-    `UsageMeters`, its markdown text `MarkdownText`, and the gate's settings dialog `GateSettingsDialog`, the
-    gate's row of the agents screen's gate table.
-  `client/host/` declares each by what the page and the routes hand it, so the bundle's typecheck holds them to it.
+- **One set of pages, two forms.** The pages under `app/pages/` are built into the ES module the gate serves, and
+  are as well a Nuxt layer on bmo-ui that `bun pm pack` packs for a host that extends it. `bun run bundle` builds
+  the module from `console/`'s entry and configuration, once the install has prepared the layer's `.nuxt/` whose
+  theme the stylesheet is built against, into `dist/`: `bundle.js`, `bundle.css` and `words.json`,
+  the folder the settings' `[console]` names (`docs/boundary-api.md`, 「Configuration」), which the gate answers
+  as its manifest, its module, its stylesheet and its words (`docs/api.md`, 「Console」).
+- **The module** default-exports `{ routes }`, the routes of the two pages under the screen path `/gates`. It
+  leaves every import of `vue`, `vue-router`, `vue-i18n`, `nuxt/app`, `@nuxt/ui` and `bmo-ui` unbundled, written as
+  the package's own path, and carries the rest itself. Its stylesheet is the utility classes the pages use, on the
+  layer's tokens, which the console's copy defines.
+- **Every import is written out.** A page imports what it uses by the package's path: Vue's and the router's
+  functions, the i18n's `useI18n`, `@nuxt/ui`'s components and bmo-ui's components and domain modules; it leans on
+  no auto-import and on no component of a host's, so one file reads alike in the module and in the layer. The
+  bundle's own files are reached by relative path.
+- **The pages.** `/gates` is the gate order, each gate in its part and step, with its Laya mode and how often
+  Laya agrees with it where Laya is asked on it, each leading to the gate's own page. `/gates/<gate>` puts a
+  prompt to one gate as a turn would and lists the gate's trials, oldest first, each with who asked where the
+  trial names it, the answer as the gate wrote it and how long it took; beside the gate's name stand its Laya
+  mode and agreement. Another gate's page reads that gate afresh.
+- **The calls** go to the gate's screen routes under `/console` at the address bmo-ui's `relay` module answers
+  for the service `gate`, through the app's fetcher. A refusal is shown as the words' `gates.error.<code>`, the
+  code's hyphens as underscores, where they hold it, and the page's own fallback otherwise.
+- **The words** are `i18n/<locale>.json`, each a tree under `gates`, beside the layer's own `common.*` keys. A
+  gate's name is the key `gates.label.<gate>` with its hyphens as underscores, and the gate's own name where the
+  words hold no such key; a Laya mode is `gates.laya_mode.<mode>`, the mode's own word where they hold none.
+- **bmo-ui** is a peer at the one version the bundle is built against; for the bundle's own install a packed copy
+  under `client/vendor/` is a development dependency, and bmo-ui's patch stands under `client/patches/`.
+- **What a host owes** is what the contract asks of a console: its copies of the shared libraries, the relay of
+  the service `gate` for the API prefix, the module and the stylesheet, the reader's role on every relayed call,
+  and the bundle's words merged into its pack. A host extending the layer brings its i18n module with those words.
 
 ## The deployment
 
@@ -83,7 +85,8 @@ The testbed deploys the repository as `testbed.toml` declares it (the testbed's 
 - **Two files each release links to the data root's `env/`:** its `settings.toml`, the service's settings
   (`docs/boundary-api.md`, 「Configuration」), to `env/gate.toml`, and the training tooling's
   `training/tooling/tooling.toml` (`docs/training.md`, 「The tooling and its settings」) to `env/gate-tooling.toml`.
-  The tooling's packages are installed into the release before it is put live.
+  The tooling's packages are installed into the release before it is put live, and the console bundle is built
+  into the release's `client/dist/`, the folder the deployed settings' `[console]` names.
 - **The units are `deploy/`'s,** each saying how the deployment keeps it:
   - `bmo-gate-server.service`, the service, is the one the deployment waits on, through `bmo-gate health`;
   - `bmo-laya-relay.service`, the relay, is restarted where its binary changed;

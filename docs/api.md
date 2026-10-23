@@ -12,6 +12,7 @@ written for one caller.
 ## Common rules
 
 - **Auth.** Every route takes `Authorization: Bearer <token>`; a missing or wrong token is 401 `unauthorized`.
+  The console's routes read the reader's role beside it (「Console」).
 - **Keys** are camelCase. **Times** are one integer of epoch milliseconds. **Ids** are signed 64-bit integers:
   a room is `roomId`, a message `messageId`, a person `personId`.
 - **Pages** are `{"items": [...], "more": boolean}`. A list takes one cursor, `before` or `after`, and
@@ -210,6 +211,40 @@ characters; a longer one is 413 `too-large`.
 `id` field its number; its data is `{"id", "kind", "at", "data"}`, the inner `data` being the member the
 event tells of. The kinds are `judgement.created`, `document-translation.changed` and `laya.changed`. A
 reader that falls behind loses what it missed and reads the collections again.
+
+## Console
+
+The gate keeps bmo-ui's console plugin contract (bmo-ui's `docs/console-bundles.md`): its screens are a console
+bundle the gate serves, and a console attaches them by the gate's manifest alone. The contract is every
+console's, so nothing here names one.
+
+| Route | Request | Answer |
+|---|---|---|
+| `GET /console-manifest` | | the manifest, in the shape bmo-ui's `console-manifest` module states |
+| `GET /console/words` | | the bundle's words: each locale's tree under the locale's code, every key under `gates` |
+| `GET /console/bundle/{file}` | | the bundle's module or its stylesheet, as the manifest names it |
+| `GET /console/gates` | | as `GET /gates` |
+| `GET /console/laya` | | as `GET /laya` |
+| `GET /console/trials` | as `GET /trials` | as `GET /trials` |
+| `POST /console/trials` | `gateName`, `prompt` | 201, the trial |
+
+- **The manifest** names the bundle `gates`, its menu name the words' `gates.title.gates`, its icon
+  `i-material-symbols-balance`, its screen path `/gates`, the service `gate` and the API prefix `/console`, and
+  asks for the `administrator` role. It asks for no owner key, no event stream, no socket and no notices.
+- **The module and the stylesheet** stand under `/console/bundle/`, each named by the digest of its bytes, so
+  either path changes whenever its bytes do. Each is answered as an immutable file a year long; a name that is not
+  the current digest is 404 `not-found`.
+- **Where they are read from.** The manifest, the words and the two files are answered from the folder the
+  settings' `[console]` names (`docs/boundary-api.md`, 「Configuration」). Where the settings name none, those four
+  routes are 404 `not-found`, and a console leaves the gate out.
+- **The guard.** Every route here takes the gate's token. Every route under `/console/` but the words, the module
+  and the stylesheet among them, also reads `Owner-Role`, the role the console sets from its signed-in reader: a
+  call with none, or with a role that does not allow `administrator`, is 403 `forbidden`. The manifest and the
+  words are answered on the token alone.
+- **The screen's reads** under `/console/` answer as their routes outside it do. Since the API prefix is
+  `/console`, a console relays a browser nothing of the gate but them, the module and the stylesheet.
+- **A trial put through the console** is kept with no user name, under the reader's `Owner-Key`, the account
+  service's user id, where the call carries one; the trial answers its `userName` empty.
 
 ## The document
 

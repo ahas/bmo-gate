@@ -1,14 +1,21 @@
 {
   "name": "bmo-gate-client",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "license": "MIT",
   "type": "module",
   "main": "./nuxt.config.ts",
-  "files": ["nuxt.config.ts", "app", "server", "shared", "patches"],
+  "files": [
+    "nuxt.config.ts",
+    "app",
+    "shared",
+    "i18n",
+    "patches"
+  ],
   "scripts": {
     "prepare": "bun x nuxi prepare",
-    "check": "nuxi typecheck"
+    "check": "nuxi typecheck",
+    "bundle": "vite build --config console/vite.config.ts"
   },
   "dependencies": {
     "@nuxt/ui": "^4.11.2",
@@ -18,19 +25,25 @@
   },
   "peerDependencies": {
     "@nuxtjs/i18n": "^10.6.0",
-    "bmo-ui": "0.2.0",
+    "bmo-ui": "0.1.0-rev.7",
     "nuxt": "^4.5.2",
     "vue-i18n": "^11.4.8"
   },
   "peerDependenciesMeta": {
-    "bmo-ui": { "optional": true }
+    "bmo-ui": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@nuxtjs/i18n": "^10.6.0",
+    "@tailwindcss/vite": "^4.3.3",
     "@types/bun": "^1.3.4",
-    "bmo-ui": "file:vendor/bmo-ui-0.2.0.tgz",
+    "@vitejs/plugin-vue": "^6.0.10",
+    "bmo-ui": "file:vendor/bmo-ui-0.1.0-rev.7.tgz",
     "nuxt": "^4.5.2",
+    "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
+    "vite": "^8.3.4",
     "vue-i18n": "^11.4.8",
     "vue-tsc": "^3.2.0"
   },
