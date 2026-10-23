@@ -737,6 +737,9 @@ pub struct DocumentPart {
   pub part: i64,
   pub text: Option<String>,
   pub failed: bool,
+  /// What the last answer of a part kept as failed lost, as a sentence; none for a part that did not fail.
+  #[serde(default)]
+  pub failure: Option<String>,
 }
 
 /// Which document's translation parts to read.

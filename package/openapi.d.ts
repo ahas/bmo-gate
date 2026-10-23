@@ -455,6 +455,11 @@ export interface components {
         /** @description One part of a document's translation. */
         DocumentPart: {
             failed: boolean;
+            /**
+             * @description What the last answer of a part kept as failed lost, as a sentence; none for a part that did not fail.
+             * @default null
+             */
+            failure: string | null;
             /** Format: int64 */
             part: number;
             text: string | null;

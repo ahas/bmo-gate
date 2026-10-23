@@ -1,15 +1,15 @@
 //! A document's translation, ordered by the web unit's document viewer (`docs/boundary-api.md`, `POST
 //! /documents/translations`): the parts it wants translated of one version, queued and answered at once, a few out
 //! at the translator at a time, each part written as a row of the document's translation once it comes back with
-//! its structure kept — asked once more where it lost it, and kept as failed where it lost it twice — and a word to
-//! the screens as each part ends. A newer order for the same document and language drops the older version's parts
-//! still waiting, and its own go first.
+//! its structure kept — asked once more where it lost it, and kept as failed where it lost it twice, with what the
+//! last answer lost — and a word to the screens as each part ends. A newer order for the same document and language
+//! drops the older version's parts still waiting, and its own go first.
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::future::Future;
 use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
-use gate_policy::prompts;
+use gate_policy::{fill_marks, prompts};
 use gate_runs::records::now;
 use gate_runs::{GateError, GateRequest, Piece, Split, route};
 use gate_words::translation as words;
@@ -18,7 +18,8 @@ use sea_orm::TransactionTrait;
 use serde_json::json;
 
 use crate::Stages;
-use crate::markdown::{halve_text, heading_shape, inline_code, paragraph_count};
+use crate::markdown::{halve_text, heading_shape, inline_code};
+use crate::markdown_shape::block_shape;
 use crate::sql::{one, run};
 
 /// The gate's key, the worker translation's own.
@@ -95,33 +96,120 @@ impl Split for Halves {
   }
 }
 
-/// What one part came to: its translation, its structure lost twice, or no answer.
+/// What one part came to: its translation, its structure lost twice with what the last answer lost, or no answer.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 #[serde(tag = "kind", content = "text", rename_all = "camelCase")]
 pub enum Outcome {
   Translated(String),
-  Mismatch,
+  Mismatch(Lost),
   Unanswered,
+}
+
+/// What an answer lost of its part's structure, said as a sentence where a part is kept as failed.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(into = "String")]
+pub enum Lost {
+  /// Its headings at each depth, as `heading_shape` writes them.
+  Headings { source: String, translated: String },
+  /// As many blocks as the part has.
+  Blocks { source: usize, translated: usize },
+  /// A block of the part's kind in its place, counted from 1.
+  Block {
+    at: usize,
+    source: &'static str,
+    translated: &'static str,
+  },
+  /// An inline code span of the part, marks and all.
+  Code(String),
+}
+
+impl std::fmt::Display for Lost {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let said = match self {
+      Self::Headings { source, translated } => fill_marks(
+        words::LOST_HEADINGS,
+        &[("source", none_if_empty(source)), ("translated", none_if_empty(translated))],
+      ),
+      Self::Blocks { source, translated } => fill_marks(
+        words::LOST_BLOCKS,
+        &[("source", &source.to_string()), ("translated", &translated.to_string())],
+      ),
+      Self::Block {
+        at,
+        source,
+        translated,
+      } => fill_marks(
+        words::LOST_BLOCK,
+        &[("at", &at.to_string()), ("source", source), ("translated", translated)],
+      ),
+      Self::Code(span) => fill_marks(words::LOST_CODE, &[("span", span)]),
+    };
+
+    f.write_str(&said)
+  }
+}
+
+impl From<Lost> for String {
+  fn from(lost: Lost) -> Self {
+    lost.to_string()
+  }
+}
+
+// A heading shape as a sentence names it: no headings at all is said so.
+fn none_if_empty(shape: &str) -> &str {
+  if shape.is_empty() { "none" } else { shape }
 }
 
 /// What of its part's structure an answer must keep to stand as its translation, by what its reader checks itself.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kept {
-  /// As many headings at each depth, as many paragraphs, and every inline code span word for word. The gate's own
-  /// words beside the translation (a line introducing it, a separator, a remark after it) add paragraphs, and words
-  /// in its place (a refusal, a question back, a summary) lose paragraphs or code, so neither passes for a
-  /// translation (the web unit's `docs/documents-viewer.md`, 「Translation goes in parts」).
+  /// Its headings at each depth, its blocks in their order, and every inline code span word for word
+  /// (`docs/api.md`, 「Documents」). The gate's own words beside the translation (a line introducing it, a
+  /// separator, a remark after it) add blocks, and words in its place (a refusal, a question back, a summary) lose
+  /// blocks or code, so neither passes for a translation; a blank line added or dropped beside a heading or a list
+  /// moves no block, so a translation laid out anew still passes.
   Whole,
   /// Its headings alone, for a reader that checks the rest with its own faults and asks again naming them.
   Headings,
 }
 
 impl Kept {
-  fn by(self, source: &str, translated: &str) -> bool {
-    heading_shape(translated) == heading_shape(source)
-      && (self == Self::Headings
-        || (paragraph_count(translated) == paragraph_count(source)
-          && inline_code(source).iter().all(|span| translated.contains(span.as_str()))))
+  /// What `translated` lost of what `source` must keep, or none where it kept it all.
+  pub fn lost(self, source: &str, translated: &str) -> Option<Lost> {
+    let (headings, translated_headings) = (heading_shape(source), heading_shape(translated));
+
+    if headings != translated_headings {
+      return Some(Lost::Headings {
+        source: headings,
+        translated: translated_headings,
+      });
+    }
+
+    if self == Self::Headings {
+      return None;
+    }
+
+    let (blocks, translated_blocks) = (block_shape(source), block_shape(translated));
+
+    if blocks.len() != translated_blocks.len() {
+      return Some(Lost::Blocks {
+        source: blocks.len(),
+        translated: translated_blocks.len(),
+      });
+    }
+
+    if let Some(at) = blocks.iter().zip(&translated_blocks).position(|(one, other)| one != other) {
+      return Some(Lost::Block {
+        at: at + 1,
+        source: blocks[at],
+        translated: translated_blocks[at],
+      });
+    }
+
+    inline_code(source)
+      .into_iter()
+      .find(|span| !translated.contains(span.as_str()))
+      .map(Lost::Code)
   }
 }
 
@@ -137,18 +225,20 @@ where
   F: Fn(GateRequest) -> Fut,
   Fut: Future<Output = Option<String>>,
 {
-  for _ in 0..2 {
+  let mut asked = 1;
+
+  loop {
     let Some(answer) = run(request(text, target, system)).await else {
       return Outcome::Unanswered;
     };
     let translated = unwrap(&answer, text);
 
-    if kept.by(text, &translated) {
-      return Outcome::Translated(translated);
+    match kept.lost(text, &translated) {
+      None => return Outcome::Translated(translated),
+      Some(lost) if asked >= 2 => return Outcome::Mismatch(lost),
+      Some(_) => asked += 1,
     }
   }
-
-  Outcome::Mismatch
 }
 
 /// Why a document's translation last stopped short, with the road it was asked on where one stood.
@@ -340,12 +430,16 @@ impl Queue {
         Some(words::UNANSWERED.to_owned())
       }
       Some(outcome) => {
-        let (text, failed) = match outcome {
-          Outcome::Translated(text) => (Some(text), false),
-          _ => (None, true),
+        let (text, failure) = match outcome {
+          Outcome::Translated(text) => (Some(text), None),
+          Outcome::Mismatch(lost) => {
+            eprintln!("translator: {} part {} is kept as failed: {lost}", part.document, part.part);
+            (None, Some(lost.to_string()))
+          }
+          Outcome::Unanswered => (None, Some(words::UNANSWERED.to_owned())),
         };
 
-        match save(stages, &part, text, failed).await {
+        match save(stages, &part, text, failure).await {
           Ok(()) => None,
           Err(why) => {
             eprintln!("translator: {} part {} failed: {why}", part.document, part.part);
@@ -384,22 +478,23 @@ impl Queue {
   }
 }
 
-// One part written as the translator finished it; once every part of this version stands, the rows of the
-// document's other versions in this language go.
+// One part written as the translator finished it, or as failed with why; once every part of this version stands,
+// the rows of the document's other versions in this language go.
 async fn save(
   stages: &Stages,
   part: &Part,
   text: Option<String>,
-  failed: bool,
+  failure: Option<String>,
 ) -> Result<(), sea_orm::DbErr> {
   let unit = stages.runs.db.begin().await?;
 
   run(
     &unit,
-    r#"INSERT INTO "document_translations" ("document", "version", "target", "part", "parts", "text", "failed", "translated_at")
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    r#"INSERT INTO "document_translations" ("document", "version", "target", "part", "parts", "text", "failed", "translated_at", "failure")
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT ("document", "target", "version", "part") DO UPDATE SET
-         "parts" = excluded."parts", "text" = excluded."text", "failed" = excluded."failed", "translated_at" = excluded."translated_at""#,
+         "parts" = excluded."parts", "text" = excluded."text", "failed" = excluded."failed", "translated_at" = excluded."translated_at",
+         "failure" = excluded."failure""#,
     vec![
       part.document.clone().into(),
       part.version.clone().into(),
@@ -407,8 +502,9 @@ async fn save(
       part.part.into(),
       part.parts.into(),
       text.into(),
-      i64::from(failed).into(),
+      i64::from(failure.is_some()).into(),
       now().into(),
+      failure.into(),
     ],
   )
   .await?;

@@ -114,6 +114,7 @@ pub async fn parts(
         part: row.part,
         text: row.text,
         failed: row.failed != 0,
+        failure: row.failure,
       })
       .collect(),
     false,

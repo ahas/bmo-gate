@@ -192,7 +192,7 @@ impl<'a> Record<'a> {
           .await;
       let korean = match outcome {
         Outcome::Translated(text) => without_dashes(&text, false),
-        Outcome::Mismatch => return Err("the gate's answer lost the part's headings".to_owned()),
+        Outcome::Mismatch(lost) => return Err(lost.to_string()),
         Outcome::Unanswered => return Err("the gate did not answer".to_owned()),
       };
       let faults = self.faults_of(part, &korean);

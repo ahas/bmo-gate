@@ -1,8 +1,10 @@
 //! What a translation has to keep of a markdown text beyond its headings (`crate::markdown` counts those): its
-//! lists, and its prose a block at a time. A record put into the owner's language is checked by both, to tell a
-//! rendering that is whole from one whose numbered lines ran into a paragraph or whose paragraphs came back as they
-//! went. Both are read by a CommonMark reader with GitHub's extensions, as mdast holds them: a tight list's item
-//! holds its words as a paragraph there.
+//! blocks in their order, its lists, and its prose a block at a time. A document's part is held to its blocks, so a
+//! blank line the translator adds or drops beside a heading or a list is no lost structure while a line of its own
+//! is; a record put into the owner's language is checked by its lists and its prose, to tell a rendering that is
+//! whole from one whose numbered lines ran into a paragraph or whose paragraphs came back as they went. Each is read
+//! by a CommonMark reader with GitHub's extensions, as mdast holds them: a tight list's item holds its words as a
+//! paragraph there.
 
 use markdown::mdast::Node;
 use markdown::{ParseOptions, to_mdast};
@@ -12,6 +14,36 @@ fn tree(source: &str) -> Vec<Node> {
     Ok(Node::Root(root)) => root.children,
     _ => vec![],
   }
+}
+
+/// The blocks of a text in their order, each by its kind: a heading, a paragraph, a list item followed by the
+/// blocks it holds, a table, a block quote followed by the blocks it holds, a code block, a break, and any other
+/// block by a kind of its own. Blank lines between blocks and the way a paragraph's lines are wrapped are not part
+/// of it.
+pub fn block_shape(source: &str) -> Vec<&'static str> {
+  kinds_of(&tree(source))
+}
+
+fn kinds_of(nodes: &[Node]) -> Vec<&'static str> {
+  nodes
+    .iter()
+    .flat_map(|node| match node {
+      Node::Heading(_) => vec!["heading"],
+      Node::Paragraph(_) => vec!["paragraph"],
+      Node::List(list) => list
+        .children
+        .iter()
+        .flat_map(|item| {
+          std::iter::once("list item").chain(kinds_of(item.children().map_or(&[][..], Vec::as_slice)))
+        })
+        .collect(),
+      Node::Table(_) => vec!["table"],
+      Node::Blockquote(quote) => std::iter::once("block quote").chain(kinds_of(&quote.children)).collect(),
+      Node::Code(_) => vec!["code block"],
+      Node::ThematicBreak(_) => vec!["break"],
+      _ => vec!["other block"],
+    })
+    .collect()
 }
 
 /// The list items of a text, in order and nested as they stand, as one string two texts with the same items

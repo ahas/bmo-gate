@@ -19,6 +19,9 @@ pub struct Model {
   pub failed: i64,
   pub translated_at: i64,
   pub rowid: i64,
+  /// Why a part kept as failed is so, as a sentence; none for a part that did not fail.
+  #[sea_orm(column_type = "Text", nullable)]
+  pub failure: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

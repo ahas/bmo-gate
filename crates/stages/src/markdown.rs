@@ -120,25 +120,6 @@ fn fenced_lines(source: &str) -> Vec<(String, bool)> {
     .collect()
 }
 
-/// How many paragraphs a text has: runs of lines parted by a blank line outside any code block, a fenced block
-/// counting with the lines it stands among.
-pub fn paragraph_count(source: &str) -> usize {
-  let mut count = 0;
-  let mut within = false;
-
-  for (line, fenced) in fenced_lines(source) {
-    let blank = !fenced && line.trim().is_empty();
-
-    if !blank && !within {
-      count += 1;
-    }
-
-    within = !blank;
-  }
-
-  count
-}
-
 /// Every inline code span of a text outside its fenced blocks, marks and all, in order.
 pub fn inline_code(source: &str) -> Vec<String> {
   fenced_lines(source)

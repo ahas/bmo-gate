@@ -3,6 +3,7 @@
 //! other's way.
 
 mod m20261019_000001_tables;
+mod m20261023_000001_translation_failures;
 
 use sea_orm_migration::prelude::*;
 
@@ -32,7 +33,10 @@ pub struct Migrator;
 #[async_trait::async_trait]
 impl MigratorTrait for Migrator {
   fn migrations() -> Vec<Box<dyn MigrationTrait>> {
-    vec![Box::new(m20261019_000001_tables::Migration)]
+    vec![
+      Box::new(m20261019_000001_tables::Migration),
+      Box::new(m20261023_000001_translation_failures::Migration),
+    ]
   }
 
   fn migration_table_name() -> DynIden {

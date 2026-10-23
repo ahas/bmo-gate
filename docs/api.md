@@ -190,10 +190,17 @@ characters; a longer one is 413 `too-large`.
 | `POST /documents/sought` | `question`, `entries` (each `slug`, `line`, `group?`) | `picks`, the slugs chosen; 502 `no-answer` where the seeker gave none |
 | `POST /documents/translations` | `document`, `version`, `target`, `partCount`, `wanted` (each `part` and `text`) | 202 with `taken`, the parts queued |
 | `GET /documents/translations/state` | `document`, `target` | `pending`, `failure` (`reason`, `provider`, `model`) or null |
-| `GET /documents/translations/parts` | `document`, `version`, `target` | a page of `part`, `text` and `failed` |
+| `GET /documents/translations/parts` | `document`, `version`, `target` | a page of `part`, `text`, `failed` and `failure` |
 
 - **A translation of a document** is queued part by part; each part is kept once it comes back with its
-  structure kept, asked once more where it lost it, and kept as failed where it lost it twice.
+  structure kept, asked once more where it lost it, and kept as failed where it lost it twice, its `failure`
+  saying in a sentence what the last answer lost; a part that did not fail has no `failure`.
+- **A part's structure** is its headings at each depth, its blocks in their order and every inline code span
+  word for word. The blocks are what a CommonMark reader with GitHub's extensions finds: each heading,
+  paragraph, list item, table, block quote, code block and break. A blank line added or dropped between a
+  heading or a list and the words beside it leaves the blocks as they were, and a paragraph's lines wrapped
+  anew leave it one paragraph; a line of the translator's own beside the translation, a block dropped or two
+  run into one does not. A worker's text read into English (「Translations」) is held to the same structure.
 - A document name is a root and a path, a `/` between them; anything else is 422 `document-unknown`. A target
   the translator does not take is 422 `language-unknown`.
 

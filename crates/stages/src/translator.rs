@@ -178,7 +178,11 @@ async fn part_into(
     Reader::Worker => {
       match translate_part(part, language, worker, Kept::Whole, |request| ask(request)).await {
         Outcome::Translated(text) => Some(text),
-        _ => None,
+        Outcome::Mismatch(lost) => {
+          eprintln!("{STAGE}: a part stays in its original: {lost}");
+          None
+        }
+        Outcome::Unanswered => None,
       }
     }
     Reader::Record => match record.korean_part(part, None).await {

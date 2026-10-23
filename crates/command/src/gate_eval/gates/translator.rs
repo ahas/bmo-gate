@@ -248,7 +248,7 @@ impl Member for Translator {
       // A mismatch is an answer that lost the part's structure twice; the translation itself is not kept.
       let text = match outcome {
         Outcome::Translated(text) => text,
-        Outcome::Mismatch => return unanswered(Some(""), "structure changed"),
+        Outcome::Mismatch(lost) => return unanswered(Some(""), &format!("structure changed: {lost}")),
         Outcome::Unanswered => return unanswered(None, "no answer"),
       };
       let mut checks = Checks::default();

@@ -318,6 +318,8 @@ Statements here that a sibling's document does not yet match, each for that sibl
   receiver reads, and it is to send false for a room whose tone reads no lore.
 - **bmo-job serves no route for a row another unit raises;** the gate makes `POST /todos/raised` as written
   above, and bmo-job refuses it until it adds the route.
+- **The document viewer counts a part kept as failed and says no more:** the parts page answers each such part's
+  `failure` (`docs/api.md`, 「Documents」), for the web unit to show beside the count.
 - **The web unit's console** shows the gates' screen, Laya and the gate order as unavailable; its server routes
   are to hand the gates' screen to `client/` and call the console's routes above.
 - **The voice unit serves no reading of a line's script:** the evaluation set's voice members read an item as the

@@ -165,7 +165,10 @@ async fn a_translation_keeps_its_structure_and_meets_its_key() {
 
   let flat = translator.run(&ground.stages, &input, &key, &answering(Some("Steps: run make"))).await;
 
-  assert_eq!(flat.misses, ["structure changed"]);
+  assert_eq!(
+    flat.misses,
+    ["structure changed: The translation did not keep the part's headings: 2:1 became none."]
+  );
   assert!(flat.answered);
   assert_eq!(
     translator

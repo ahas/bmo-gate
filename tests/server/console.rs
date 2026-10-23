@@ -3,7 +3,7 @@
 
 use gate_runs::records::now;
 use reqwest::StatusCode;
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::{ROOM, ground, refused};
 
@@ -234,6 +234,54 @@ async fn the_seeker_picks_the_documents_a_question_calls_for() {
 
   assert_eq!(status, StatusCode::BAD_GATEWAY);
   refused(&body, "no-answer");
+}
+
+#[tokio::test]
+async fn a_part_kept_as_failed_is_read_back_with_why_and_one_laid_out_anew_is_not() {
+  let source = "## Deploys\nHow a deploy goes.";
+  let ground = ground("document-failure", |ask| {
+    Some(if ask.input.contains("first") {
+      "Here is the translation:\n\n## Deploys\nHow a deploy goes.".into()
+    } else {
+      "## Deploys, rendered\n\nHow a deploy goes, rendered.".into()
+    })
+  })
+  .await;
+  let (status, body) = ground
+    .post(
+      "/documents/translations",
+      json!({ "document": "docs/deploys.md", "version": "v2", "target": "ko", "partCount": 2, "wanted": [
+        { "part": 0, "text": format!("{source} The first.") },
+        { "part": 1, "text": source },
+      ] }),
+    )
+    .await;
+
+  assert_eq!(status, StatusCode::ACCEPTED, "{body}");
+
+  let mut parts = Value::Null;
+
+  for _ in 0..200 {
+    let (_, body) = ground
+      .get("/documents/translations/parts?document=docs/deploys.md&version=v2&target=ko")
+      .await;
+
+    parts = body["items"].clone();
+
+    if parts.as_array().is_some_and(|items| items.len() == 2) {
+      break;
+    }
+
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+  }
+
+  assert_eq!(
+    parts,
+    json!([
+      { "part": 0, "text": null, "failed": true, "failure": "The translation has 3 blocks where the part has 2." },
+      { "part": 1, "text": "## Deploys, rendered\n\nHow a deploy goes, rendered.", "failed": false, "failure": null },
+    ])
+  );
 }
 
 #[tokio::test]

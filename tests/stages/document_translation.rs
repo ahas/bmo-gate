@@ -1,11 +1,12 @@
-//! A document's translation: the gate's own words in place of a translation are none, a part asked again where its
-//! first answer lost the structure, and an order queued, each part written as a row and told to the screens.
+//! A document's translation: the gate's own words in place of a translation are none, a translation laid out anew is
+//! one, what an answer lost is said, a part asked again where its first answer lost the structure, and an order
+//! queued, each part written as a row — or kept as failed with why — and told to the screens.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use gate_stages::document_translation::{Kept, Order, Outcome, Queue, translate_part};
+use gate_stages::document_translation::{Kept, Lost, Order, Outcome, Queue, translate_part};
 
 use crate::fakes::completion;
 use crate::ground;
@@ -26,7 +27,7 @@ async fn the_gates_own_words_are_no_translation() {
     let outcome =
       translate_part(order, "en", &system, Kept::Whole, |_| async { Some(answer.clone()) }).await;
 
-    assert_eq!(outcome, Outcome::Mismatch, "{answer}");
+    assert!(matches!(outcome, Outcome::Mismatch(_)), "{answer}");
   }
 
   let asked = AtomicUsize::new(0);
@@ -39,6 +40,81 @@ async fn the_gates_own_words_are_no_translation() {
   .await;
 
   assert_eq!(outcome, Outcome::Translated(order.to_owned()));
+}
+
+// A part with its headings directly above their words, a paragraph wrapped over two lines and a list straight under
+// the line that opens it.
+const PLAN: &str = "## Plan\nWe walk to the lake at noon\nand bring water.\n\nWhat to take:\n- a hat\n- a map\n\n## Later\nRest by the lake, then read `notes.md`.";
+
+#[test]
+fn a_translation_laid_out_anew_keeps_the_parts_structure() {
+  let laid_out = "## Plan, rendered\n\nWe walk to the lake at noon and bring water.\n\nWhat to take:\n\n- a hat, rendered\n\n- a map, rendered\n\n## Later, rendered\n\nRest by the lake, then read `notes.md`, rendered.";
+
+  assert_eq!(Kept::Whole.lost(PLAN, laid_out), None);
+}
+
+#[test]
+fn what_an_answer_lost_of_the_parts_structure_is_said() {
+  let introduced = format!("Here is the translation:\n\n{PLAN}");
+  let lost = Kept::Whole.lost(PLAN, &introduced).unwrap();
+
+  assert_eq!(
+    lost,
+    Lost::Blocks {
+      source: 9,
+      translated: 10
+    }
+  );
+  assert_eq!(lost.to_string(), "The translation has 10 blocks where the part has 9.");
+  assert_eq!(
+    Kept::Whole.lost(PLAN, &PLAN.replace("`notes.md`", "the notes")),
+    Some(Lost::Code("`notes.md`".into()))
+  );
+  assert_eq!(
+    Kept::Whole.lost(PLAN, &PLAN.replace("## Later\n", "")).map(|lost| lost.to_string()),
+    Some("The translation did not keep the part's headings: 2:2 became 2:1.".into())
+  );
+  assert_eq!(
+    Kept::Whole.lost("Intro.\n\n- one", "Intro.\n\n> one"),
+    Some(Lost::Block {
+      at: 2,
+      source: "list item",
+      translated: "block quote"
+    })
+  );
+  assert_eq!(Kept::Headings.lost(PLAN, &introduced), None);
+}
+
+#[tokio::test]
+async fn a_part_that_lost_its_structure_twice_is_kept_as_failed_with_why() {
+  let ground = ground("document-failed", None, Default::default()).await;
+  let queue = Queue::default();
+  let mut heard = ground.stages.events.subscribe();
+  let introduced = format!("Here is the translation:\n\n{PLAN}");
+
+  ground.gateway.answers(vec![completion(&introduced), completion(&introduced)]);
+  queue.order(
+    &ground.stages,
+    Order {
+      document: "docs/plan.md".into(),
+      version: "v1".into(),
+      target: "ko".into(),
+      parts: 1,
+      wanted: vec![(0, PLAN.into())],
+    },
+  );
+  tokio::time::timeout(Duration::from_secs(10), heard.recv()).await.unwrap().unwrap();
+
+  assert_eq!(
+    ground
+      .scratch
+      .texts(
+        "SELECT failure FROM document_translations WHERE document = 'docs/plan.md' AND failed = 1 AND text IS NULL",
+        vec![]
+      )
+      .await,
+    ["The translation has 10 blocks where the part has 9."]
+  );
 }
 
 #[tokio::test]
