@@ -330,7 +330,7 @@ Measured on a service node and its RTX 4070. Five gates served (`output-decide`,
 What Laya's maker recommends for training data, training and evaluation, read in its own materials:
 the repository's README, `BENCHMARKS.md` and `docs/` (`finetune.md`, `finetune_browser_agent.md`,
 `evals.md`, `questions-and-answers.md`), the Kaggle notebook and the script beside it, the releases up
-to 0.4.2, the model cards of `laya` and `laya-multilingual`, the dataset card of
+to 0.4.13, the model cards of `laya` and `laya-multilingual`, the dataset card of
 `LocalLLaMA/typed-decisions`, and the issues on training (#320, #377, #741, #887, #963). There is no
 paper and no wiki. Each point says where this repository stands against it.
 
@@ -362,19 +362,36 @@ paper and no wiki. Each point says where this repository stands against it.
   - Here: four epochs for every gate, three seeds for a gate put in service, and the update count of
     each run in its `train_meta.json`.
 - **The loop** is RLCD — policy gradients over noised logits rewarded by proper scoring rules, plus
-  soft cross-entropy — at 4 epochs, an effective batch of 64, AdamW 2.5e-5 and 1e-4, a cosine
-  schedule and a clip of 1.0. An open issue (#741) measured soft cross-entropy alone as good or better
-  on the benchmark; the recipe has not changed for it.
-  - Here: the same loop and settings, at micro-batch 4 and bf16 (below).
-- **The loop ships in the package from 0.4.0** (`laya.train`, `laya-train`).
-  - Here: laya is pinned at 0.3.5 with this repository's own `finetune.py` and `calibrate.py`, which
-    reproduce the package's figures on its benchmark (below).
-- **Calibration** fits one temperature per question type by LBFGS on a held-out slice (400 items or a
-  tenth), and the inherited per-option-count temperatures are removed on export, since they would
-  mask the fit. `laya-multilingual` ships uncalibrated. A type with no calibration items is left at
-  1.2.
-  - Here: one temperature per question type and option count, fitted on the calibration split, the
-    inherited ones replaced.
+  soft cross-entropy, both against the gold distribution — at 4 epochs, an effective batch of 64,
+  AdamW 2.5e-5 and 1e-4 with a weight decay of 0.01, a cosine schedule and a clip of 1.0. The
+  package's loop offers soft cross-entropy alone as `soft-ce`, which an open issue (#741) measured as
+  good or better on the benchmark; its default is RLCD.
+  - Here: the same loop and settings, RLCD included, at micro-batch 4 and bf16 (below).
+- **The loop ships in the package** (`laya.train`, `laya-train`).
+  - Here: laya is pinned at 0.4.13. The loop is this repository's own `finetune.py` and `calibrate.py`,
+    which reproduce the package's figures on its benchmark (below) and carry what the package's loop
+    has no part of: the resume, the giving way on the card and the balance per question. A question
+    is made into a training item by the package's own functions, so it is rendered as inference
+    renders it.
+- **The budgets are the checkpoint's own:** `laya-multilingual` reads 1,024 tokens per question,
+  256 of them for the question and its options, as its configuration says, and a run writes the
+  budgets it trained at into the configuration it saves.
+  - Here: the same, read from the configuration of the checkpoint a run starts from.
+- **A question whose options do not fit is left out,** not trained on: `options_collapsed` where the
+  question's budget cuts two options to the same tokens or leaves one without its marker, and
+  `options_beyond_max_len` where the question runs past the whole budget, so the state has no room
+  and the last options lose their markers. A question that is not well formed is left out as
+  `invalid_question`, and one whose gold does not fit its options as `invalid_target`.
+  - Here: the same reasons, counted in the training's output and its `train_meta.json`, and in what
+    the calibration prints.
+- **Calibration** fits one temperature per question type, and one per question type and option
+  count where a bucket holds enough, by LBFGS on a held-out slice (400 items or a tenth), held to
+  [0.5, 5.0], the range the loader applies. The per-option-count temperatures a checkpoint carries
+  are removed before the fitted ones are written, since an inherited one would mask the fit: the
+  loader reads a bucket's temperature before its type's. `laya-multilingual` ships uncalibrated.
+  - Here: one temperature per question type and option count, fitted on the calibration split with
+    the package's own fitter and range, the type's as the fallback; a checkpoint's inherited
+    per-option-count temperatures are dropped before the fitted ones go in.
 - **Evaluation** is held out from training and calibration, and reads accuracy, Brier and ECE side by
   side, sliced by what matters (a language, a workflow); a gate's threshold is read on the answer's
   own confidence after calibration.
@@ -414,8 +431,16 @@ run here trains one gate's model on a card of its own, so there is nothing for D
    uploaded with the data by the setup verb.
 3. **Train** with `.venv/bin/python finetune.py --data data/<name> --out checkpoints/<name>`:
    - The loop is the notebook's — RLCD policy gradients over noised logits with a proper scoring
-     reward, plus soft cross-entropy — with its settings: 4 epochs, an effective batch of 64, GRPO
-     groups of 4, a cosine schedule, encoder learning rate 2.5e-5 and head learning rate 1e-4.
+     reward, plus soft cross-entropy, both against the gold distribution — with its settings: 4
+     epochs, an effective batch of 64, GRPO groups of 4, a cosine schedule, encoder learning rate
+     2.5e-5 and head learning rate 1e-4, AdamW with a weight decay of 0.01, and gradients clipped to
+     a norm of 1.0.
+   - **Every question is made an item as the package makes it** (`laya.train`): rendered as inference
+     renders it, its row's state tokenised once for all its questions, at the budgets of the
+     checkpoint it starts from — 1,024 tokens, 256 of them for the question and its options, on
+     `laya-multilingual`. A question that cannot be trained on is left out under the package's
+     reason (「Laya's own recipe」), and how many were left out for each reason is printed with the
+     items and written into `train_meta.json`.
    - **The run settings are fixed:** micro-batches of 4 accumulated to an effective 64, bf16 and
      gradient checkpointing, on one GPU. They are the same for every gate, and a card with room to
      spare is not a reason to raise them — four is the only micro-batch measured where no seed
@@ -470,7 +495,9 @@ run here trains one gate's model on a card of its own, so there is nothing for D
      repetition the cap allows.
    - `--per-gate` also caps how many sequences one gate gives.
    - It writes a new directory, a rolling checkpoint the run can be resumed from, and
-     `train_meta.json` with the sequences per gate, each epoch's time and loss, and the peak memory.
+     `train_meta.json` with the sequences per gate, the questions left out by reason, each epoch's
+     time and loss, and the peak memory. Its configuration keeps the base's temperature per question
+     type and none per option count, since the base's were fitted to other weights.
      It never writes over a directory that exists, and `--resume` is how a killed run carries on from
      what it saved rather than starting again (`docs/training.md`, 「The resume contract」).
    - **Memory:** training alone reserves about 6.8 GB on a 4070, which never comes near its 12 GB, and
@@ -479,8 +506,13 @@ run here trains one gate's model on a card of its own, so there is nothing for D
 4. **Calibrate** with `.venv/bin/python calibrate.py --model checkpoints/<name> --data data/<name>`:
    - It fits one temperature per question type and option count — the buckets Laya's runtime reads —
      by LBFGS on the calibration split, with one per type as the fallback for a bucket of fewer than
-     ten questions, held to the range the runtime applies.
-   - `--write` puts them into the checkpoint's own configuration.
+     ten questions. The fit is the package's own (`laya.calibrate`), each option count fitted within
+     its own width, and every temperature is held to [0.5, 5.0], the range the runtime applies at load.
+   - `--write` puts them into the checkpoint's own configuration, the per-option-count temperatures it
+     carried removed first, so a bucket the fit leaves out falls back to its type's fitted temperature
+     and never to one inherited from another fit.
+   - The splits' questions are made items as the training makes them, and what it prints counts the
+     questions of each split left out, by reason.
 5. **Compare** before and after, on the test split — neither trained on nor fitted on: `calibrate.py`
    prints, overall and per gate, the calibration error and the agreement with the teacher's verdicts,
    plain and **balanced** — averaged over the answers the teacher gave, so a model that always gives a

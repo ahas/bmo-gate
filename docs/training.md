@@ -285,8 +285,10 @@ picked up rather than begun again.
 - **`finetune.py` is what runs**, launched directly. The loop is a single-GPU adaptation of the
   official notebook: each run trains one gate's model on a card of its own, so nothing is sharded and
   no process group is started.
-- **`laya` is pinned exactly at 0.3.5**, the fine-tuning reading internals that carry no promise
-  across versions. The node's venv is built by uv from the pinned project file and from nothing else.
+- **`laya` is pinned exactly at 0.4.13**, the fine-tuning reading internals that carry no promise
+  across versions: the model, the sequence and its budgets, the items and their reasons for leaving a
+  question out (`laya.train`), and the temperature fit (`laya.calibrate`). torch and transformers are
+  pinned beside it. The node's venv is built by uv from the pinned project file and from nothing else.
 - **Quality comes first, and the settings are fixed for every gate and every node:** micro-batch 4
   accumulated to an effective 64, bf16, gradient checkpointing, four epochs. They are not tuned per
   gate.

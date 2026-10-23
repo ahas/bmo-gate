@@ -5,10 +5,13 @@
 
 One temperature per (question type, option count) bucket — the buckets Laya's runtime reads — fitted
 by LBFGS on the calibration split, as the model card advises, with one per question type besides as
-the fallback for a bucket too small to fit. It prints the calibration error and the agreement with
-the LLM's verdicts on the test split, which neither the training nor the fit has seen, under the
-checkpoint's own temperatures and under the fitted ones; `--write` puts the fitted ones into the
-checkpoint's rl_agent_config.json.
+the fallback for a bucket too small to fit. The fit is the package's own (`laya.calibrate`), each
+option count within its own width and every temperature held to the range the runtime applies at load.
+It prints the calibration error and the agreement with the LLM's verdicts on the test split, which
+neither the training nor the fit has seen, under the checkpoint's own temperatures and under the fitted
+ones, and how many questions of each split were left out and why, as the training leaves them out;
+`--write` puts the fitted ones into the checkpoint's rl_agent_config.json, the per-option-count
+temperatures it carried dropped first.
 
 It also writes the machine-readable report the verification table is assembled from
 (docs/training.md, 「The tables」): per gate the agreement plain and balanced, the
@@ -31,7 +34,7 @@ import os
 import sys
 import time
 from collections import defaultdict
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 os.environ.setdefault("USE_TF", "0")
 
@@ -39,10 +42,11 @@ import numpy as np  # noqa: E402
 import torch  # noqa: E402
 
 import laya  # noqa: E402
-from laya.common import QTYPE_NAMES, TEMP_MAX, TEMP_MIN, ece_score, temp_bucket  # noqa: E402
+from laya.calibrate import fit_one_temperature  # noqa: E402
+from laya.common import QTYPE_NAMES, ece_score, temp_bucket  # noqa: E402
 
 import metrics  # noqa: E402
-from finetune import base_dir, collate, training_item  # noqa: E402
+from finetune import base_dir, collate, counted_into, row_items, without_option_temperatures  # noqa: E402
 from parking import HeldCard  # noqa: E402
 
 # The report file, written into the checkpoint itself so it travels with it.
@@ -54,42 +58,38 @@ MIN_BUCKET = 10
 
 
 def fit_one_temp(samples: List[Tuple[np.ndarray, List[float]]]) -> float:
-    """The temperature that best explains the gold distributions, fitted as the notebook fits it and
+    """The temperature that best explains the gold distributions, fitted by the package's own fitter and
     held to the range Laya's runtime will apply."""
-    kmax = max(len(z) for z, _ in samples)
-    logits = torch.full((len(samples), kmax), -1e4)
-    target = torch.zeros((len(samples), kmax))
-    for index, (z, gold) in enumerate(samples):
-        logits[index, : len(z)] = torch.tensor(z)
-        target[index, : len(gold)] = torch.tensor(gold, dtype=torch.float32)
-    log_t = torch.zeros(1, requires_grad=True)
-    optimizer = torch.optim.LBFGS([log_t], lr=0.1, max_iter=100)
-
-    def closure():
-        optimizer.zero_grad()
-        loss = -(target * torch.log_softmax(logits / log_t.exp(), -1)).sum(-1).mean()
-        loss.backward()
-        return loss
-
-    optimizer.step(closure)
-    return float(min(TEMP_MAX, max(TEMP_MIN, log_t.exp().item())))
+    return fit_one_temperature(samples, min_n=MIN_BUCKET)
 
 
-def split_logits(agent, path: str, card: HeldCard, quiet_s: float) -> List[Dict[str, Any]]:
+def calibrated_config(cfg: Dict[str, Any], temperature: List[float], by_bucket: Dict[str, float]) -> Dict[str, Any]:
+    """The checkpoint's configuration with the fitted temperatures in it. The per-option-count ones it
+    carried go first, so a bucket this fit leaves out falls back to its type's fitted temperature rather
+    than to one left by another fit."""
+    written = {**without_option_temperatures(cfg), "temperature": list(temperature)}
+    if by_bucket:
+        written["temperature_by_options"] = dict(by_bucket)
+    return written
+
+
+def split_logits(agent, path: str, card: HeldCard, quiet_s: float,
+                 skipped: Optional[Dict[str, int]] = None) -> List[Dict[str, Any]]:
     """Every question of one split with its raw logits: the question type, the logits, the gold
     distribution, the gate it came from, the question's own name and the answers it may be given. The
+    questions the training would leave out are left out here too, counted by reason into `skipped`. The
     card is given way between batches where an occupant above asks for it."""
     rows = []
     with open(path, encoding="utf-8") as handle:
         for line in handle:
             if line.strip():
                 row = json.loads(line)
-                state, questions, gold = json.loads(row["state"]), json.loads(row["questions"]), json.loads(row["gold"])
-                for qid, question in questions.items():
-                    if qid in gold:
-                        item = training_item(agent.tok, agent.cfg, state, qid, question, gold[qid])
-                        if item is not None:
-                            rows.append((item, row["gate"], qid, metrics.answer_names(question)))
+                questions = json.loads(row["questions"])
+                items, left_out = row_items(agent.tok, agent.cfg, row)
+                if skipped is not None:
+                    counted_into(skipped, left_out)
+                for qid, item in items:
+                    rows.append((item, row["gate"], qid, metrics.answer_names(questions[qid])))
     out = []
     agent.model.eval()
     with torch.no_grad():
@@ -219,8 +219,9 @@ def main() -> None:
     config_path = os.path.join(args.model, "rl_agent_config.json")
     card = HeldCard(args.card_lock, args.model)
     agent = laya.load(args.model, device="cuda")
-    fitting = split_logits(agent, os.path.join(args.data, "calibration.jsonl"), card, args.quiet_s)
-    samples = split_logits(agent, os.path.join(args.data, "test.jsonl"), card, args.quiet_s)
+    skipped: Dict[str, Dict[str, int]] = {"calibration": {}, "test": {}}
+    fitting = split_logits(agent, os.path.join(args.data, "calibration.jsonl"), card, args.quiet_s, skipped["calibration"])
+    samples = split_logits(agent, os.path.join(args.data, "test.jsonl"), card, args.quiet_s, skipped["test"])
     if not fitting:
         sys.exit("calibrate: calibration.jsonl holds nothing to calibrate on")
     if not samples:
@@ -267,6 +268,7 @@ def main() -> None:
     report = {
         "model": args.model,
         "buckets": {bucket: len(chosen) for bucket, chosen in sorted(buckets.items())},
+        "skipped": skipped,
         "temperature": [round(t, 4) for t in by_type],
         "temperature_by_options": {bucket: round(t, 4) for bucket, t in by_bucket.items()},
         "before": before,
@@ -277,9 +279,7 @@ def main() -> None:
 
     if args.write:
         with open(config_path) as handle:
-            cfg = json.load(handle)
-        cfg["temperature"] = report["temperature"]
-        cfg["temperature_by_options"] = report["temperature_by_options"]
+            cfg = calibrated_config(json.load(handle), report["temperature"], report["temperature_by_options"])
         with open(config_path, "w") as handle:
             json.dump(cfg, handle, indent=2)
         report["written"] = True

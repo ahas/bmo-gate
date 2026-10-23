@@ -10,6 +10,11 @@ DDP, bf16 instead of fp16 with a scaler, gradient accumulation to the notebook's
 and the gates' own rows in place of the typed-decisions dataset. It writes a new checkpoint directory and never
 touches the one the server is running.
 
+A question becomes a training item as the package's own loop makes one (`laya.train`): rendered as inference
+renders it, its row's state tokenised once, at the budgets the starting checkpoint's configuration gives. A
+question that cannot be trained on is left out under the package's reason — `options_collapsed`,
+`options_beyond_max_len`, `invalid_question`, `invalid_target` — and the run counts them by reason.
+
 Two memory savings can be asked for, `--freeze-embeddings` and `--optimizer adamw8bit`; neither is on
 by default, and neither is used for a checkpoint meant for service unless a run beside the unsaved one
 shows it costs nothing in agreement or calibration.
@@ -37,7 +42,7 @@ import shutil
 import sys
 import time
 from collections import defaultdict
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 os.environ.setdefault("USE_TF", "0")
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
@@ -51,7 +56,8 @@ from balance import balanced_as, balanced_items, kind_ratios_of, repeated_rare  
 from parking import HeldCard  # noqa: E402
 
 from laya.agent import _fix_tokenizer_config  # noqa: E402
-from laya.common import QTYPES, build_model, build_sequence, proper_reward, render_options  # noqa: E402
+from laya.common import build_model, build_sequence, proper_reward  # noqa: E402
+from laya.train import encode_state, make_item, target_from_gold, to_internal  # noqa: E402
 
 HUB_REPO = "convaiinnovations/laya"
 HUB_SUBFOLDER = "multilingual"
@@ -69,58 +75,90 @@ def base_dir(base: Optional[str]) -> str:
     return os.path.join(root, HUB_SUBFOLDER)
 
 
-def training_item(tok, cfg: Dict[str, Any], state: Any, qid: str, question: Dict[str, Any], gold: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """One question as a training sequence with its target distribution, as the notebook builds it,
-    named by the question it asks so the balance can be counted per question; None where the options
-    do not fit the head, which the notebook leaves out too."""
-    kind = question["type"]
-    criteria = question.get("criteria", {})
-    if kind == "choice":
-        keys = list(criteria.keys()) if isinstance(criteria, dict) else list(criteria)
-        criteria = criteria if isinstance(criteria, dict) else {key: None for key in criteria}
-        target = [gold["probabilities"].get(key, 0.0) for key in keys]
-    elif kind == "noul":
-        target = [gold["probabilities"].get("false", 0.5), gold["probabilities"].get("true", 0.5)]
-    elif kind == "score":
-        levels = len(criteria) if isinstance(criteria, list) else 4
-        target = [gold["probabilities"].get(str(level), 0.0) for level in range(levels)]
-    else:
-        return None
-    total = sum(target)
-    target = [value / total for value in target] if total > 0 else [1.0 / len(target)] * len(target)
-    internal = {"t": kind, "ins": question["instructions"], "crit": criteria}
-    sequence, markers = build_sequence(tok, state, internal, cfg["max_len"], cfg["head_max_len"])
-    if len(markers) != len(render_options(internal)):
-        return None
-    return {"ids": sequence, "markers": markers, "qtype": QTYPES[kind], "target": target, "label": target.index(max(target)), "question": qid}
+def training_item(tok, cfg: Dict[str, Any], state_ids: List[int], qid: str, question: Dict[str, Any],
+                  gold: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """One question as a training sequence with its target distribution, built by the package's own
+    item functions at the checkpoint's budgets, and named by the question it asks so the balance can be
+    counted per question. `state_ids` is the row's state tokenised once for all its questions.
+
+    Either the item and None, or None and the package's reason for leaving the question out: a
+    question that is not well formed, a gold that does not fit its options, options the question's
+    budget cuts to the same tokens, or a question that leaves no room within the whole budget."""
+    try:
+        internal = to_internal(qid, question)
+    except (ValueError, TypeError, KeyError):
+        return None, "invalid_question"
+    try:
+        target = target_from_gold(internal, gold)
+    except (ValueError, TypeError, KeyError):
+        return None, "invalid_target"
+    made, reason = make_item(tok, internal, target, state_ids, cfg["head_max_len"], cfg["max_len"])
+    if made is None:
+        return None, reason
+    sequence, markers = build_sequence(tok, None, internal, cfg["max_len"], cfg["head_max_len"], state_ids=state_ids)
+    target = made["target"]
+    return {"ids": sequence, "markers": markers, "qtype": made["qtype"], "target": target,
+            "label": target.index(max(target)), "question": qid}, None
+
+
+def row_items(tok, cfg: Dict[str, Any], row: Dict[str, Any], qid_of=None) -> Tuple[List[Tuple[str, Dict[str, Any]]], Dict[str, int]]:
+    """Every question of one dataset row that the row's gold answers, as `(question, item)` pairs, and
+    how many were left out by reason. The row carries its state, its questions and its gold as JSON
+    strings, as the dataset tooling writes them; the state is tokenised once, capped at the budget.
+    `qid_of` names a question for its item, the question's own name where it is not given."""
+    state, questions, gold = json.loads(row["state"]), json.loads(row["questions"]), json.loads(row["gold"])
+    state_ids = encode_state(tok, state, cfg["max_len"])
+    items: List[Tuple[str, Dict[str, Any]]] = []
+    skipped: Dict[str, int] = {}
+    for qid, question in questions.items():
+        if qid not in gold:
+            continue
+        item, reason = training_item(tok, cfg, state_ids, qid_of(qid) if qid_of else qid, question, gold[qid])
+        if item is None:
+            skipped[reason] = skipped.get(reason, 0) + 1
+        else:
+            items.append((qid, item))
+    return items, skipped
+
+
+def counted_into(total: Dict[str, int], more: Dict[str, int]) -> None:
+    for reason, count in more.items():
+        total[reason] = total.get(reason, 0) + count
+
+
+def without_option_temperatures(cfg: Dict[str, Any]) -> Dict[str, Any]:
+    """The configuration without its temperatures per option count. Laya's loader reads a bucket's
+    temperature before its type's, so a bucket carried over from a fit of other weights would mask
+    whatever is fitted to these."""
+    return {key: value for key, value in cfg.items() if key != "temperature_by_options"}
 
 
 def read_items(path: str, tok, cfg: Dict[str, Any], per_gate: Optional[int], ratio: Optional[float], seed: int,
-               repeat_cap: int = 0, kind_ratios: Optional[Dict[str, float]] = None) -> Dict[str, List[Dict[str, Any]]]:
+               repeat_cap: int = 0, kind_ratios: Optional[Dict[str, float]] = None) -> Tuple[Dict[str, List[Dict[str, Any]]], Dict[str, int]]:
     """Every question of every row, grouped by the gate it came from; each group balanced over its
     answers question by question, a question counted within the kind of input its row names — the
     common answer cut to `ratio` times the rarest, or with a `repeat_cap` every sequence kept and the
     rarer answers repeated toward it, a kind of input named in `kind_ratios` held to its own ratio — and
     then cut to `per_gate` sequences drawn at random, so neither one answer nor one gate that asks many
-    questions per row can drown the rest."""
+    questions per row can drown the rest. Beside the groups, how many questions were left out, by
+    reason, before any balance."""
     by_gate: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    skipped: Dict[str, int] = {}
     with open(path, encoding="utf-8") as handle:
         for line in handle:
             if not line.strip():
                 continue
             row = json.loads(line)
-            state, questions, gold = json.loads(row["state"]), json.loads(row["questions"]), json.loads(row["gold"])
-            for qid, question in questions.items():
-                if qid in gold:
-                    item = training_item(tok, cfg, state, balanced_as(qid, row), question, gold[qid])
-                    if item is not None:
-                        by_gate[row["gate"]].append({**item, "kind": row.get("stratum")})
+            items, left_out = row_items(tok, cfg, row, lambda qid: balanced_as(qid, row))
+            counted_into(skipped, left_out)
+            for _, item in items:
+                by_gate[row["gate"]].append({**item, "kind": row.get("stratum")})
     rng = random.Random(seed)
     for gate, items in by_gate.items():
         items = repeated_rare(items, ratio, repeat_cap, rng) if repeat_cap > 0 and ratio else balanced_items(items, ratio, rng, kind_ratios)
         rng.shuffle(items)
         by_gate[gate] = items if per_gate is None else items[:per_gate]
-    return dict(by_gate)
+    return dict(by_gate), skipped
 
 
 def collate(items: List[Dict[str, Any]], pad_id: int) -> Dict[str, torch.Tensor]:
@@ -268,11 +306,15 @@ def main() -> None:
 
     train_path = os.path.join(args.data, "train.jsonl")
     kind_ratios = kind_ratios_of(args.kind_ratio)
-    by_gate = read_items(train_path, tok, cfg, args.per_gate, args.balance_ratio or None, args.seed, args.repeat_cap, kind_ratios)
+    by_gate, skipped = read_items(train_path, tok, cfg, args.per_gate, args.balance_ratio or None, args.seed, args.repeat_cap, kind_ratios)
     items = [item for group in by_gate.values() for item in group]
+    print("left out: " + (", ".join(f"{reason} {count}" for reason, count in sorted(skipped.items())) or "none"), flush=True)
     if not items:
         sys.exit("finetune: train.jsonl holds nothing to train on")
     print(f"items: {len(items)} — " + ", ".join(f"{gate} {len(group)}" for gate, group in sorted(by_gate.items())), flush=True)
+
+    # The checkpoints this run saves carry the base's per-type temperatures and none per option count.
+    trained_cfg = {**without_option_temperatures(cfg), "fine_tuned": True}
 
     # What a resume has to find unchanged. The items are read afresh on every run, so the digest of the
     # file they came from and their count are what say the order is the one the saved step left off in.
@@ -412,7 +454,7 @@ def main() -> None:
             # a resumed run starts on is a whole accumulation window and not the middle of one.
             consumed = start + args.micro_batch
             if stepped and args.save_every > 0 and optimizer_steps % args.save_every == 0 and consumed < len(items):
-                written = save_step(model, tok, {**cfg, "fine_tuned": True}, optimizer, scheduler, out, optimizer_steps,
+                written = save_step(model, tok, trained_cfg, optimizer, scheduler, out, optimizer_steps,
                                     trainer_state(epoch, consumed, total_loss, batches, epoch_started, {"epochs": epochs}),
                                     args.keep_checkpoints)
                 print(f"  saved {os.path.basename(written)} — epoch {epoch + 1}/{args.epochs}, item {consumed}/{len(items)}", flush=True)
@@ -423,12 +465,13 @@ def main() -> None:
         print(f"epoch {epoch + 1}/{args.epochs}: {seconds:.1f}s, loss {total_loss / max(1, batches):.4f}", flush=True)
         # A step checkpoint at every epoch's end as well, so a run cut short keeps a whole epoch even
         # where the interval above has not come round.
-        save_step(model, tok, {**cfg, "fine_tuned": True}, optimizer, scheduler, out, optimizer_steps,
+        save_step(model, tok, trained_cfg, optimizer, scheduler, out, optimizer_steps,
                   trainer_state(epoch + 1, 0, 0.0, 0, epoch_started, {"epochs": epochs}), args.keep_checkpoints)
 
     meta = {
         "base": source,
         "items": {gate: len(group) for gate, group in by_gate.items()},
+        "skipped": skipped,
         "epochs": epochs,
         "seconds": round(carried_seconds + time.time() - started, 1),
         "steps": optimizer_steps,
@@ -451,8 +494,8 @@ def main() -> None:
         "peak_reserved_bytes": max(carried_peaks[1], torch.cuda.max_memory_reserved(device)),
     }
     # The temperatures are calibrate.py's to fit on the held-out rows; until then the checkpoint
-    # carries the base's, and says it was fine-tuned.
-    save_checkpoint(model, tok, {**cfg, "fine_tuned": True, "model_name": "laya-bmo-ko"}, out, meta)
+    # carries the base's per type, and says it was fine-tuned.
+    save_checkpoint(model, tok, {**trained_cfg, "model_name": "laya-bmo-ko"}, out, meta)
     # The marker goes in last, after the checkpoint it speaks for stands whole: it is what tells a
     # finished run from one that stopped, and a directory holding only step checkpoints has neither.
     resume_state.mark_complete(out, {

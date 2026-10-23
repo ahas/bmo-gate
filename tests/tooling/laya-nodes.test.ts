@@ -298,7 +298,7 @@ describe("whether a node can take a gate", () => {
   test("the pin is read from the project file rather than kept beside it", () => {
     expect(pinnedLaya('[project]\ndependencies = [\n  "laya==0.3.5",\n  "torch>=2.14",\n]')).toBe("0.3.5");
     expect(pinnedLaya('[project]\ndependencies = ["torch>=2.14"]')).toBeNull();
-    expect(pinnedLaya(readFileSync(nodeFileSource(REPOSITORY_ROOT, "pyproject.toml"), "utf8"))).toBe("0.3.5");
+    expect(pinnedLaya(readFileSync(nodeFileSource(REPOSITORY_ROOT, "pyproject.toml"), "utf8"))).toBe("0.4.13");
   });
 });
 
