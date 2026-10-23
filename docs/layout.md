@@ -33,7 +33,9 @@ stands, and no other.
 - **Tests live in `tests/`,** never beside the code they test. A Rust test is a Cargo test of the root package;
   a Bun project's tests stand under `tests/` in a folder named for the project; the Laya suites stand under
   `tests/laya/` and are run by a Cargo test of their own.
-- **Korean stands only in `prompts/`.** A gate's instructions, Laya's questions, the evaluation set's briefs and
+- **Korean stands only in `prompts/`.** A gate's instructions are English, and Korean stands in them only as data:
+  the words of a room's messages the gate must recognise, the marks, names and terms it must leave as written, and
+  the words its answer is to be written in. Laya's questions, the evaluation set's briefs and
   the words the training tooling hands its writers and judges and the stand-ins and placeholders its rows carry, under `prompts/tooling/`, are worded as the models read them, and the sanitiser's trigger words as the rooms write them; every other file is English, and the Korean a test feeds the code, a pattern reads, a bench sends as a sample state or the console bundle's Korean words (`client/i18n/ko.json`, the piece of a console's language pack the bundle carries) hold is written by its unicode escapes and recorded in `korean-ledger.json`, which the testbed's language check reads.
 - **No weights, datasets or run output in git.** They are runtime data under the data root the settings name;
   the repository holds only the declarations that say where they are read from.

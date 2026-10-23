@@ -29,7 +29,9 @@ These rules hold every change to this repository.
 - Everything in this repository is English: code, comments, strings, tests, documents, commit messages
   and branch names, with one exception below. The gate answers in English sentences and snake_case codes;
   words a person reads in another language are a console's language pack.
-- `prompts/` is the one folder Korean stands in: what the gates are told, the questions Laya is asked and
+- `prompts/` is the one folder Korean stands in: in what the gates are told only as data (the words of a room's
+  messages a gate recognises, the marks and terms it leaves as written, the words its answer is written in), the
+  instructions themselves being English; the questions Laya is asked and
   the briefs the evaluation set's items are written from, the words the training tooling hands its writers and
   judges and the stand-ins its rows carry (`prompts/tooling/`), worded as the models read them, and the words the
   sanitiser's pre-filter matches, as the rooms write them. Nothing else holds Korean: the repository test holds every file outside

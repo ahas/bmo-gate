@@ -9,12 +9,13 @@ happening in those messages.
 
 Two questions about every rule, and only these two:
 
-- **applies**: 이 규칙의 조건이 지금 상황에 맞는가? yes where the situation in front of you is the
-  one the condition waits for, so what the rule asks should be done now. You judge the condition,
-  not the action: a rule whose action would be nice here but whose condition has not come is no.
-- **spent**: 이 규칙은 이제 안 써도 되는가? yes where the rule has nothing left to do: what it
-  waited for has come and gone, and no later situation will be its own again. A rule that will
-  come round again is no, however long ago it last did.
+- **applies**: does the rule's condition match the situation now? yes where the situation in front
+  of you is the one the condition waits for, so what the rule asks should be done now. You judge the
+  condition, not the action: a rule whose action would be nice here but whose condition has not come
+  is no.
+- **spent**: is the rule no longer needed from now on? yes where the rule has nothing left to do:
+  what it waited for has come and gone, and no later situation will be its own again. A rule that
+  will come round again is no, however long ago it last did.
 
 A rule may be yes to both: one that got what it waited for in these very messages and has nothing
 left after that.

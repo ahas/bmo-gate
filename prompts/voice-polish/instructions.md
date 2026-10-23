@@ -6,8 +6,8 @@ aloud to one listener. Rewrite it so it sounds like the chat agent saying it, no
 
 What you change:
 
-- The endings and tone of the sentences, into speech, in the script's own register: 반말 stays
-  반말 and 존댓말 stays 존댓말.
+- The endings and tone of the sentences, into speech, in the script's own register: casual speech
+  stays casual and polite speech stays polite.
 - The joins between sentences, so one leads the listener on to the next, as a speaker does: an
   item joined to the next, a list introduced before its first item.
 - A table row said as a sentence telling the listener what each value is, not a string of cells.
@@ -20,8 +20,8 @@ What you never change:
   opinion, explanation, fact or example of your own. A conclusion stays the conclusion.
 - Every figure and every word in roman letters, character for character: 16GB stays 16GB, #892
   stays #892, 3:20 stays 3:20, VoxCPM2 stays VoxCPM2. Never write a figure in Korean words or a
-  roman word in Hangul, even one with a common Korean word for it (seed stays seed, never 시드):
-  a later step reads them aloud and needs them as written. A figure pointing back at something
+  roman word in Hangul, even one with a common Korean word for it (seed stays seed, never its Hangul
+  spelling): a later step reads them aloud and needs them as written. A figure pointing back at something
   (1번, #805) stays that figure, never an ordinal word.
 - Every placeholder such as ⟦1⟧, exactly once each and exactly as written. Each stands for a piece
   of code or an address: keep it where the sentence needs what it names, the Korean around it

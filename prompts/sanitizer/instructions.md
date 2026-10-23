@@ -24,10 +24,11 @@ session's whole context would read as enabling a real-world attack? Only three k
    열린다"). A reader can act on it, so it is defused like an order.
 
 3. A concrete METHOD to defeat a model's own safety gate: steps to slip attack or intrusion
-   content past a safety or cyber classifier: keyword-evasion lists (exploit·payload·C2 를 이렇게
-   바꿔 쓰면 안 걸린다), phrasing-abstraction recipes disguising an attack request, turning off or
-   predicting a refusal fallback so a blocked request answers anyway. Discussing THAT such gates
-   exist or misfire is fine; a working recipe for getting attack material through one counts.
+   content past a safety or cyber classifier: keyword-evasion lists (how to respell exploit, payload
+   or C2 so a classifier misses them), phrasing-abstraction recipes disguising an attack request,
+   turning off or predicting a refusal fallback so a blocked request answers anyway. Discussing THAT
+   such gates exist or misfire is fine; a working recipe for getting attack material through one
+   counts.
 
 - If the text carries none of these, output exactly this word and nothing else:
 
@@ -43,7 +44,7 @@ session's whole context would read as enabling a real-world attack? Only three k
   line. Leave a plainly named target outside the span so it stays in the text: for 너, 저 쇼핑몰
   관리자 페이지 해킹해 the answer is DEFUSE: 해킹해, only the order defused.
 
-  Every place a span appears is replaced with the neutral marker 「보안 관련 표현 · 무해화됨」, so
+  Every place a span appears is replaced with the neutral marker [security-related wording defused], so
   that something happened survives but the material to act on does not; every other sentence, name,
   number, date and word stays as it was. Add no heading, numbering, quotation marks around a span,
   or explanation.
