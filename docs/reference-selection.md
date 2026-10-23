@@ -175,7 +175,8 @@ flowchart TB
 - **`room-memories`** — the memory picker: the room's standing memories that are not attached as due, one
   candidate a row, in the order the brain lists them. A candidate's slug is `memory-<row id>` and its index
   line the row's kind as its bracket and the first line of its words, cut to the policy's 120 characters with
-  `…`. A row is narrowed as a fragment row is, by the item it was left open by and the person it is for (below).
+  `…`. A row is narrowed as a fragment row is (below): by the item it was left open by, its words, and the
+  person it is for where the turn names them.
   - **It is a picker of the three's shape and not one of them:** it is asked one yes or no per candidate, in
     their answer shape, reads the message the turn follows on from, and on a turn of the chat agent's own
     lines alone asks as `room-rules` does; its picks join the memories entry rather than each standing as a
@@ -221,11 +222,12 @@ flowchart TB
   gate is asked only about what is left. The same narrowing picks the pieces an editor is handed
   whole before it writes (the brain's `docs/fragments.md`).
 - **What the narrowing reads:** the turn's messages, who sent them, the message the turn follows on from
-  where the gate reads that, and the rows' own columns — owner, items, keywords, slug, title, the body
-  where the library carries it, status, confirmed day and when the brain last handed the row out. It asks
-  no model.
+  where the gate reads that, the rows' own columns — owner, items, keywords, slug, title, the body where
+  the library carries it, status and confirmed day — and what the gate attached in the room in the last
+  thirty minutes, out of its own verdict record. It asks no model.
 - **A message is read for what was said.** The head of a line — its sender's name and number, the
-  words that open a quiet instruction — is no word of the turn, since it stands on every line.
+  words that open a quiet instruction — is no word of the turn and names nobody, since it stands on
+  every line.
 - **What keeps a candidate**, in the order they are tried:
   1. **item** — the piece is tied to an item number the messages name (`#758`, or the number with the
      room language's counter word after it).
@@ -242,17 +244,20 @@ flowchart TB
        any other script but Latin counts from two letters and is matched as it stands.
      - A word standing in more than one row in eight of the gate's rows, and in three at least, names
        what the library is about rather than what one piece is, and keeps nothing.
-  4. **person** — on a piece about somebody, that person spoke this turn or the messages name them,
-     by their id, their display name or a name their Address piece carries; and the piece is open,
-     or its matter ended in the last three days — a matter that just finished is still talked about.
-  5. **recent** — the brain handed the piece out in the last thirty minutes, so a conversation still on
-     a piece is asked about it again without saying its words again. At most two pieces a gate are kept
-     this way, the latest handed out first.
+  4. **person** — on a piece about somebody, the messages name them, by their id, their display name or a
+     name their Address piece carries, or, on a gate that declares its speakers keep its pieces, they
+     spoke this turn; and the piece is open, or its matter ended in the last three days — a matter that
+     just finished is still talked about. `people-search` declares it, so a speaker is always among its
+     candidates; the reference gates and the memory picker do not, since a room's own speaker is in
+     every turn and would keep everything about them on every one.
+  5. **recent** — the gate attached the piece in this room in the last thirty minutes, so a conversation
+     still on a piece is asked about it again without saying its words again. At most two pieces a gate
+     are kept this way, the latest attached first. A piece of work beyond a turn has no recent pieces.
 - **Over the chat agent's own lines alone, a gate that declares it is narrowed by the item rule
   alone** (above, 「What a turn's lines are」): a keyword, a word or a name in those lines keeps nothing.
 - **What drops a candidate:** nothing kept it. A piece about nobody in particular — a lore piece, a shared
   piece of knowledge, a memory for nobody — reaches a gate only when the turn names its item, carries its
-  words or has just been talking about it; a piece about somebody neither speaking nor named, and a piece
+  words or has just been talking about it; a piece about somebody the turn does not name, and a piece
   whose matter is done, only when the turn names their item or their words.
 - **At most twelve candidates a gate.** Where the rules keep more, the ones kept by an item stand first, then
   by a keyword, then the ones sharing the most words with the messages, then by a person, then the recent

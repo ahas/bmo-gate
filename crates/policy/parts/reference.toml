@@ -1,7 +1,7 @@
 # The gates that pick a turn's reference out of an index (docs/reference-selection.md): each reference gate in the
 # order its picks stand in a prompt — what it may attach, how long its pieces hold when the turn is over its
-# total, when the bot's own lines alone ask it, and whether it reads the message the turn follows on from — and
-# the person-book search beside them, with how the road writes down what a turn's gate decided. The question
+# total, when the bot's own lines alone ask it, whether it reads the message the turn follows on from, and whether
+# a piece about a person who spoke is offered for that alone — and the person-book search beside them, with how the road writes down what a turn's gate decided. The question
 # Laya asks of each gate's candidates stands with Laya's other questions, in `prompts/laya/questions.toml`.
 
 # What a turn may carry on these gates' word together, in characters.
@@ -16,7 +16,8 @@ sheet_chars = 14000
 sheet_lines = 8
 
 # When the bot's own lines alone ask a gate: "never"; "own turn", on a turn they open but not in a push; or "own
-# turn, named items", on such a turn over what the item rule alone keeps.
+# turn, named items", on such a turn over what the item rule alone keeps. A gate whose speakers keep its pieces
+# is offered a piece about a person who spoke for that alone; on any other, a piece about somebody needs them named.
 
 [[gates]]
 stage = "system-documents"
@@ -24,6 +25,7 @@ budget = 24000
 hold = 2
 bot_lines_alone = "never"
 reads_answered = false
+speakers_keep = false
 
 [[gates]]
 stage = "room-rules"
@@ -31,6 +33,7 @@ budget = 12000
 hold = 3
 bot_lines_alone = "own turn"
 reads_answered = true
+speakers_keep = false
 
 [[gates]]
 stage = "library-knowledge"
@@ -38,6 +41,7 @@ budget = 12000
 hold = 1
 bot_lines_alone = "own turn"
 reads_answered = true
+speakers_keep = false
 
 # The person-book search: the most pieces it takes, which its instructions are told as their selection cap, and
 # what they may come to, in the order it ranks them.
@@ -47,6 +51,7 @@ cap = 4
 budget = 18000
 bot_lines_alone = "own turn, named items"
 reads_answered = true
+speakers_keep = true
 
 # The memory picker: the room's standing memories it is offered as an index and picks out of, what the rows it
 # picks may come to, how many due rows attach with no pick, how long a row's index line runs, and when it is asked.
@@ -57,6 +62,7 @@ due = 3
 index_chars = 120
 bot_lines_alone = "own turn"
 reads_answered = true
+speakers_keep = false
 
 # The situation-rule matcher: what it may attach in one turn, and how a decision on Laya where neither Laya nor
 # its fallback gave one is written down.

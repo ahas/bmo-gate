@@ -1,6 +1,6 @@
 //! The narrowing's readings of a turn: the items it names, the words it carries, and the day a finished piece
 //! still counts from; and what it keeps of a library — a piece whose words the turn carries, a piece about a person in
-//! the turn, a piece just handed out, and no more than a gate's cap. Hangul is written by its escapes.
+//! the turn, a piece the gate just attached, and no more than a gate's cap. Hangul is written by its escapes.
 
 use std::collections::HashMap;
 
@@ -46,7 +46,7 @@ fn said(text: &str) -> Turn {
     speakers: vec![],
     names: HashMap::new(),
     recent_since: Some(recent_since_of(NOW)),
-    now: NOW,
+    attached: HashMap::new(),
     rules: None,
   }
 }
@@ -132,15 +132,15 @@ fn a_piece_about_somebody_is_kept_while_they_are_in_the_turn() {
 }
 
 #[test]
-fn the_pieces_just_handed_out_are_kept_two_at_most_the_latest_first() {
-  let handed = |slug: &str, ago_minutes: i64| {
-    let mut row = piece(slug, slug);
-
-    row.last_hit_at = Some(NOW - ago_minutes * 60_000);
-    row
+fn the_pieces_just_attached_are_kept_two_at_most_the_latest_first() {
+  let rows = ["apple", "banana", "cherry", "damson"].map(|slug| piece(slug, slug));
+  let turn = Turn {
+    attached: [("apple", 5), ("banana", 1), ("cherry", 3)]
+      .map(|(slug, ago_minutes)| (slug.to_owned(), NOW - ago_minutes * 60_000))
+      .into(),
+    ..said("good morning")
   };
-  let rows = [handed("apple", 5), handed("banana", 1), handed("cherry", 3), handed("damson", 90)];
-  let narrowed = narrow(&rows, &said("good morning"));
+  let narrowed = narrow(&rows, &turn);
 
   assert_eq!(slugs(&narrowed.rows), ["banana", "cherry"]);
   assert_eq!(narrowed.kept.recent, 2);

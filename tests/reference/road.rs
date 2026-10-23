@@ -631,3 +631,42 @@ async fn the_pickers_are_asked_at_once() {
     pause * 5
   );
 }
+
+#[tokio::test]
+async fn a_memory_for_the_speaker_is_not_offered_for_that_alone_but_a_piece_the_gate_just_attached_is() {
+  let ground = ground("memories-speaker", picking(&[])).await;
+  let mut theirs = memory(51, "followup", "", "Bring the umbrella.");
+
+  theirs.for_user = Some(5);
+  ground.brain.standing.lock().unwrap().push(theirs);
+  ground.brain.fragments.lock().unwrap().push(fragment(
+    "library-knowledge",
+    "kittens",
+    "the office cat",
+    None,
+    None,
+  ));
+  ground
+    .scratch
+    .run(
+      "INSERT INTO reference_verdicts (stage, chat_id, message_id, slug, llm, attached, created_at) \
+       VALUES ('library-knowledge', 7, 3, 'kittens', 1, 1, $1)",
+      vec![gate_runs::records::now().into()],
+    )
+    .await
+    .unwrap();
+
+  select(&ground.reference, &turn(&[])).await.unwrap();
+
+  assert_eq!(
+    ground
+      .scratch
+      .texts(
+        "SELECT stage || ' ' || verdict FROM judgements WHERE stage IN ('room-memories', 'library-knowledge') \
+         ORDER BY stage",
+        vec![]
+      )
+      .await,
+    ["library-knowledge NONE", "room-memories SKIP: no candidates"]
+  );
+}

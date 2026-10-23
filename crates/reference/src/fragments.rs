@@ -15,7 +15,7 @@ use regex::Regex;
 use sea_orm::{DatabaseConnection, DbErr};
 
 use crate::Reference;
-use gate_stages::sql::run;
+use gate_stages::sql::{all, run};
 
 /// One fragment row as a gate is offered it, under a number the road tells it apart by within a turn.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -38,8 +38,6 @@ pub struct Fragment {
   pub written_on: Option<String>,
   pub confirmed_on: Option<String>,
   pub status: String,
-  /// When the brain last handed the row out, in epoch milliseconds.
-  pub last_hit_at: Option<i64>,
   /// The row's whole text where its library carries it rather than reading it through the brain.
   pub body: Option<String>,
 }
@@ -67,7 +65,6 @@ impl Fragment {
       written_on: row.written_on,
       confirmed_on: row.confirmed_on,
       status: row.status,
-      last_hit_at: row.last_hit_at,
       body: None,
     }
   }
@@ -241,6 +238,30 @@ static SINCE_SWEEP: AtomicUsize = AtomicUsize::new(0);
 
 /// The verdicts written, each side filled in where it says something; one that cannot be written is said and
 /// lost.
+/// The slugs a gate attached in a room since a moment in epoch milliseconds, each with the latest moment it did.
+pub async fn attached_since(
+  db: &DatabaseConnection,
+  stage: &str,
+  chat_id: i64,
+  since: i64,
+) -> Result<std::collections::HashMap<String, i64>, DbErr> {
+  let rows = all(
+    db,
+    r#"SELECT "slug", max("created_at") AS "at" FROM "reference_verdicts"
+       WHERE "stage" = $1 AND "chat_id" = $2 AND "attached" = 1 AND "created_at" >= $3
+       GROUP BY "slug""#,
+    vec![stage.into(), chat_id.into(), since.into()],
+  )
+  .await?;
+
+  Ok(
+    rows
+      .iter()
+      .filter_map(|row| Some((row.try_get::<String>("", "slug").ok()?, row.try_get::<i64>("", "at").ok()?)))
+      .collect(),
+  )
+}
+
 pub async fn record_verdicts(db: &DatabaseConnection, rows: &[Verdict]) {
   if rows.is_empty() {
     return;

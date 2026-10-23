@@ -341,14 +341,16 @@ pub fn spoken(line: &str) -> &str {
 }
 
 /// One picker of a room for one agent's turn: its key, its libraries before any turn narrows them, how a turn of
-/// the bot's own lines asks it, whether it reads the message a turn follows on from, its instructions and the
-/// answer file its request closes on, how its answer is read, the most slugs and characters it takes, where its
-/// picks stand when the turn is over its total, and the probe Laya asks it through.
+/// the bot's own lines asks it, whether it reads the message a turn follows on from, whether a piece about a person
+/// who spoke is offered for that alone, its instructions and the answer file its request closes on, how its answer
+/// is read, the most slugs and characters it takes, where its picks stand when the turn is over its total, and the
+/// probe Laya asks it through.
 pub struct Gate {
   pub stage: String,
   pub libraries: Vec<Library>,
   pub bot_lines_alone: BotLinesAlone,
   pub reads_answered: bool,
+  pub speakers_keep: bool,
   pub system: String,
   pub answer: String,
   pub reads: Reads,
@@ -395,6 +397,7 @@ async fn reference_gate(
     libraries,
     bot_lines_alone: declared.bot_lines_alone,
     reads_answered: declared.reads_answered,
+    speakers_keep: declared.speakers_keep,
     system: instructions(&declared.stage)?,
     answer: answer_file(&declared.stage),
     reads: Reads::Verdicts,
@@ -458,6 +461,7 @@ pub async fn gates_of(
     libraries: people_libraries,
     bot_lines_alone: people.bot_lines_alone,
     reads_answered: people.reads_answered,
+    speakers_keep: people.speakers_keep,
     system,
     answer,
     reads: Reads::Named,
@@ -496,27 +500,33 @@ pub struct Narrowing {
   pub rules: Option<Vec<KeptBy>>,
 }
 
-// Some libraries as the narrowing leaves them for a turn's text, what its lines said and its speakers, by these
-// rules.
-async fn narrowed(
-  reference: &Reference,
-  libraries: &[Library],
-  text: String,
-  lines: &[String],
+// What a turn hands the narrowing beside its text: what its lines said, who spoke as far as the gate counts them,
+// what the gate attached in the room a moment ago, and the rules a row may be kept by.
+struct Read<'a> {
+  lines: &'a [String],
   speakers: Vec<i64>,
+  attached: HashMap<String, i64>,
   rules: Option<Vec<KeptBy>>,
-) -> Narrowing {
+}
+
+// What some lines said, one to a line, their heads left off.
+fn said_in(lines: &[String]) -> String {
+  lines.iter().map(|line| spoken(line)).collect::<Vec<_>>().join("\n")
+}
+
+// Some libraries as the narrowing leaves them for what a turn's own lines said and what the turn hands it beside.
+async fn narrowed(reference: &Reference, libraries: &[Library], text: String, read: Read<'_>) -> Narrowing {
   let rows: Vec<Fragment> = libraries.iter().flat_map(|library| library.rows.iter().cloned()).collect();
-  let at = now();
+  let rules = read.rules;
   let narrowed = narrow::narrow(
     &rows,
     &narrow::Turn {
       text,
-      said: lines.iter().map(|line| spoken(line)).collect::<Vec<_>>().join("\n"),
-      speakers,
+      said: said_in(read.lines),
+      speakers: read.speakers,
       names: owner_names(reference, &rows).await,
-      recent_since: Some(narrow::recent_since_of(at)),
-      now: at,
+      recent_since: Some(narrow::recent_since_of(now())),
+      attached: read.attached,
       rules: rules.clone(),
     },
   );
@@ -533,20 +543,35 @@ async fn narrowed(
 }
 
 /// A gate's libraries, less what the round already holds, as the narrowing leaves them for a turn — its words read in
-/// the lines the gate reads — by the rules the turn asks it by; nothing of it written down.
+/// the lines the gate reads, its speakers where the gate counts them, and what the gate attached in the room a moment
+/// ago — by the rules the turn asks it by; nothing of it written down.
 pub async fn narrowing(
   reference: &Reference,
   turn: &Turn,
   gate: &Gate,
   holds: &HashSet<String>,
 ) -> Narrowing {
+  let since = now() - narrow::RECENT_MS;
+  let attached =
+    match fragments::attached_since(&reference.stages.runs.db, &gate.stage, turn.chat_id, since).await {
+      Ok(attached) => attached,
+      Err(why) => {
+        eprintln!("reference: what {} attached a moment ago could not be read: {why}", gate.stage);
+        HashMap::new()
+      }
+    };
+  let lines = gate.lines(turn);
+
   narrowed(
     reference,
     &unheld(&gate.libraries, holds),
-    turn.message_lines.join("\n"),
-    &gate.lines(turn),
-    turn.speaker_ids.clone(),
-    rules_of(gate.bot_lines_alone, turn.people_spoke),
+    said_in(&turn.message_lines),
+    Read {
+      lines: &lines,
+      speakers: if gate.speakers_keep { turn.speaker_ids.clone() } else { vec![] },
+      attached,
+      rules: rules_of(gate.bot_lines_alone, turn.people_spoke),
+    },
   )
   .await
 }
@@ -707,6 +732,7 @@ pub fn memory_gate(chat_id: i64, rows: &[MemoryRow]) -> Result<Gate, GateError> 
     libraries: memories::library(chat_id, rows).into_iter().collect(),
     bot_lines_alone: declared.bot_lines_alone,
     reads_answered: declared.reads_answered,
+    speakers_keep: declared.speakers_keep,
     system: instructions(&declared.stage)?,
     answer: answer_file(&declared.stage),
     reads: Reads::Verdicts,
@@ -971,7 +997,13 @@ pub async fn work_narrowing(
   }
 
   let gate = reference_gate(reference, chat_id, agent, false, declared).await?;
-  let narrowing = narrowed(reference, &gate.libraries, lines.join("\n"), lines, vec![], None).await;
+  let read = Read {
+    lines,
+    speakers: vec![],
+    attached: HashMap::new(),
+    rules: None,
+  };
+  let narrowing = narrowed(reference, &gate.libraries, said_in(lines), read).await;
 
   Ok(Some((gate, narrowing)))
 }

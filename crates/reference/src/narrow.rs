@@ -1,8 +1,8 @@
 //! What the code keeps of a library before any gate is asked about it (`docs/reference-selection.md`, 「What the
 //! code narrows before a gate is asked」): the pieces a turn's text, its speakers and the rows' own columns say
 //! it can be about, by the first of five rules each meets — an item the text names, a keyword it carries, a
-//! content word of the piece's own it carries, a person in the turn on a piece still current, or a piece the brain
-//! handed out a moment ago — and no more than a gate's cap of them. A writer about to write is handed whole the
+//! content word of the piece's own it carries, a person in the turn on a piece still current, or a piece the gate
+//! attached in the room a moment ago — and no more than a gate's cap of them. A writer about to write is handed whole the
 //! rows a batch names by an item or a word, as many as its cap allows.
 
 use std::collections::HashSet;
@@ -17,10 +17,11 @@ use crate::fragments::{Fragment, Kept};
 // How long a finished matter is still a speaker's own business, in days.
 const RECENT_DAYS: i64 = 3;
 
-// How long after the brain handed a piece out a turn is still taken to be on it, in milliseconds; and how many
-// pieces a gate is asked about for that alone.
-const HANDED_OUT_MS: i64 = 30 * 60 * 1000;
-const HANDED_OUT_KEPT: usize = 2;
+/// How long after a gate attached a piece in a room a turn there is still taken to be on it, in milliseconds.
+pub const RECENT_MS: i64 = 30 * 60 * 1000;
+
+// How many pieces a gate is asked about for having just attached them alone.
+const RECENT_KEPT: usize = 2;
 
 /// The most candidates a gate is asked about on one turn.
 pub const GATE_CAP: usize = 12;
@@ -303,15 +304,15 @@ fn common_words(of_rows: &[HashSet<Word>]) -> HashSet<Word> {
 
 /// A turn as the narrowing reads it: its text, what its messages and the message it follows on from said with their
 /// heads left off, who spoke, the names the receiver knows each person by, the earliest confirmed day a finished
-/// piece may carry and still count, the moment it is read at in epoch milliseconds, and the rules that may keep a
-/// row where fewer than all of them may.
+/// piece may carry and still count, the slugs the gate attached in the room in the last `RECENT_MS` with when it
+/// last did, and the rules that may keep a row where fewer than all of them may.
 pub struct Turn {
   pub text: String,
   pub said: String,
   pub speakers: Vec<i64>,
   pub names: std::collections::HashMap<i64, Vec<String>>,
   pub recent_since: Option<String>,
-  pub now: i64,
+  pub attached: std::collections::HashMap<String, i64>,
   pub rules: Option<Vec<KeptBy>>,
 }
 
@@ -350,7 +351,7 @@ fn named_people(rows: &[Fragment], turn: &Turn) -> HashSet<i64> {
 }
 
 /// The rows a gate is asked about, in the order they came in: every one a rule keeps, where the turn allows that
-/// rule, the recent rule keeping the latest handed out alone, and no more than the gate's cap of them.
+/// rule, the recent rule keeping the latest attached alone, and no more than the gate's cap of them.
 pub fn narrow(rows: &[Fragment], turn: &Turn) -> Narrowed {
   let asked: HashSet<i64> = items_asked(&turn.text).into_iter().collect();
   let present: HashSet<i64> = turn.speakers.iter().copied().chain(named_people(rows, turn)).collect();
@@ -360,7 +361,7 @@ pub fn narrow(rows: &[Fragment], turn: &Turn) -> Narrowed {
   let said = Said::of(&turn.said);
   // Each row a rule keeps: where it stands, the rule, and how many of its words the turn carries.
   let mut found: Vec<(usize, KeptBy, usize)> = vec![];
-  let mut handed_out: Vec<(usize, i64)> = vec![];
+  let mut recent: Vec<(usize, i64)> = vec![];
 
   for (at, row) in rows.iter().enumerate() {
     let items = row.items.iter().filter(|item| asked.contains(item)).count();
@@ -378,19 +379,15 @@ pub fn narrow(rows: &[Fragment], turn: &Turn) -> Narrowed {
     .into_iter()
     .find(|(by, meets)| *meets && allowed(*by));
 
-    match (kept, row.last_hit_at) {
+    match (kept, turn.attached.get(&row.slug)) {
       (Some((by, _)), _) => found.push((at, by, shared)),
-      (None, Some(hit))
-        if allowed(KeptBy::Recent) && hit <= turn.now && turn.now - hit <= HANDED_OUT_MS =>
-      {
-        handed_out.push((at, hit));
-      }
+      (None, Some(when)) if allowed(KeptBy::Recent) => recent.push((at, *when)),
       _ => {}
     }
   }
 
-  handed_out.sort_by(|left, right| right.1.cmp(&left.1).then(left.0.cmp(&right.0)));
-  found.extend(handed_out.into_iter().take(HANDED_OUT_KEPT).map(|(at, _)| (at, KeptBy::Recent, 0)));
+  recent.sort_by(|left, right| right.1.cmp(&left.1).then(left.0.cmp(&right.0)));
+  found.extend(recent.into_iter().take(RECENT_KEPT).map(|(at, _)| (at, KeptBy::Recent, 0)));
 
   found.sort_by(|left, right| left.1.cmp(&right.1).then(right.2.cmp(&left.2)).then(left.0.cmp(&right.0)));
 

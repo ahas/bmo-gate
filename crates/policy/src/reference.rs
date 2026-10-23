@@ -24,6 +24,7 @@ pub struct ReferenceGate {
   pub hold: u8,
   pub bot_lines_alone: BotLinesAlone,
   pub reads_answered: bool,
+  pub speakers_keep: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -34,6 +35,7 @@ pub struct PeopleSearch {
   pub budget: usize,
   pub bot_lines_alone: BotLinesAlone,
   pub reads_answered: bool,
+  pub speakers_keep: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -45,6 +47,7 @@ pub struct MemoryPicker {
   pub index_chars: usize,
   pub bot_lines_alone: BotLinesAlone,
   pub reads_answered: bool,
+  pub speakers_keep: bool,
 }
 
 #[derive(Debug, Deserialize)]
