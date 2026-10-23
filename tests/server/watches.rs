@@ -159,7 +159,7 @@ async fn the_receivers_draft_rows_are_written_as_the_draft_stage_under_the_round
   let count = || ground.scratch.count(r#"SELECT count(*) FROM judgements WHERE stage = 'draft'"#, vec![]);
   let mut waited = Duration::ZERO;
 
-  while count().await < 4 && waited < Duration::from_secs(10) {
+  while count().await < 5 && waited < Duration::from_secs(10) {
     tokio::time::sleep(Duration::from_millis(50)).await;
     waited += Duration::from_millis(50);
   }
@@ -177,6 +177,7 @@ async fn the_receivers_draft_rows_are_written_as_the_draft_stage_under_the_round
   assert_eq!(
     verdicts,
     [
+      "ROUND 0 turn: answered",
       "ROUND 1 intent: answered",
       "ROUND 2 final: answered",
       "ROUND 3 length: answered",
@@ -184,20 +185,20 @@ async fn the_receivers_draft_rows_are_written_as_the_draft_stage_under_the_round
     ]
   );
   assert!(items.iter().all(|item| item["messageId"] == 40 && item["round"] == "round-1"), "{page}");
-  assert_eq!(items[0]["detail"], "answerChars=40 changed=true ms=1001");
-  assert_eq!(items[1]["detail"], "answerChars=80 changed=false ms=1002");
-  assert_eq!(items[3]["detail"], "answerChars=160 changed=false ms=1004; */*/*");
-  assert_eq!(items[3]["ms"], 1004);
+  assert_eq!(items[1]["detail"], "answerChars=40 changed=true ms=1001");
+  assert_eq!(items[2]["detail"], "answerChars=80 changed=false ms=1002");
+  assert_eq!(items[4]["detail"], "answerChars=160 changed=false ms=1004; */*/*");
+  assert_eq!(items[4]["ms"], 1004);
   let told = std::iter::from_fn(|| heard.try_recv().ok())
     .filter(|event| event.kind == "judgement.created")
     .count();
 
-  assert_eq!(told, 4);
+  assert_eq!(told, 5);
   assert_eq!(receiver.one("/events").bearer().as_deref(), Some("the-receiver-token"));
 }
 
 #[tokio::test]
-async fn a_draft_row_is_written_once_and_a_round_with_no_message_stands_under_none() {
+async fn a_draft_row_is_written_once_whatever_its_kind_and_a_round_with_no_message_stands_under_none() {
   let ground = ground("draft-once", |_| None).await;
   let agency = Stub::start().await;
   let app = app_on(&ground, &agency, Arc::new(FakeReceiver::default()));
@@ -205,16 +206,19 @@ async fn a_draft_row_is_written_once_and_a_round_with_no_message_stands_under_no
 
   gate_server::watches::write_drafted(&app, &skipped).await;
   gate_server::watches::write_drafted(&app, &skipped).await;
-  gate_server::watches::write_drafted(&app, &drafted(0, "", "turn", "answered", None)).await;
+  gate_server::watches::write_drafted(&app, &drafted(5, "", "a-kind-to-come", "answered", None)).await;
 
   let rows = ground
     .scratch
     .texts(
       r#"SELECT verdict || '|' || coalesce(message_id::text, 'none') || '|' || round FROM judgements
-         WHERE stage = 'draft'"#,
+         WHERE stage = 'draft' ORDER BY id"#,
       vec![],
     )
     .await;
 
-  assert_eq!(rows, ["ROUND 1 intent: skip|none|round-1"]);
+  assert_eq!(
+    rows,
+    ["ROUND 1 intent: skip|none|round-1", "ROUND 5 a-kind-to-come: answered|none|round-1"]
+  );
 }

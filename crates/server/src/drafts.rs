@@ -12,15 +12,16 @@ use sea_orm::{DatabaseConnection, DbErr};
 /// The stage the rows are written under.
 pub const STAGE: &str = "draft";
 
-/// The verdict a row is written with, or none where the row is the round's own turn, which leaves no judgement.
-pub fn verdict(drafted: &Drafted) -> Option<String> {
-  match drafted.kind.as_str() {
-    "question" | "item" | "check" => {
-      Some(format!("ROUND {} {}: {}", drafted.number, drafted.question, drafted.outcome))
-    }
-    "end" => Some(format!("END: {}", drafted.outcome)),
-    _ => None,
+/// The verdict a row is written with: the process's end as its outcome, and every other row, whatever its kind, as
+/// its number, its name and its outcome, the kind standing for the name where the row names no question.
+pub fn verdict(drafted: &Drafted) -> String {
+  if drafted.kind == "end" {
+    return format!("END: {}", drafted.outcome);
   }
+
+  let name = if drafted.question.is_empty() { &drafted.kind } else { &drafted.question };
+
+  format!("ROUND {} {name}: {}", drafted.number, drafted.outcome)
 }
 
 /// The row's detail: the answer's length, whether it changed and the turn's time, then what the receiver said of
@@ -36,12 +37,10 @@ pub fn detail(drafted: &Drafted) -> String {
 }
 
 /// The row written as a judgement of its round, under the message one of the round's judgements already stands
-/// under; none where the row leaves no judgement or the same judgement stands already, as it does when the
-/// stream replays a row the gate has read before.
+/// under; none where the same judgement stands already, as it does when the stream replays a row the gate has read
+/// before.
 pub async fn write(db: &DatabaseConnection, drafted: &Drafted) -> Result<Option<judgements::Model>, DbErr> {
-  let Some(verdict) = verdict(drafted) else {
-    return Ok(None);
-  };
+  let verdict = verdict(drafted);
   let round = || sea_orm::Value::from(drafted.round.clone());
   let standing = sql::one(
     db,

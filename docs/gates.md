@@ -189,12 +189,12 @@
 - **A round's draft process is the `draft` stage** (the receiver's `docs/drafting.md`): the gate writes one
   judgement for each row of it the receiver tells (`docs/boundary-api.md`, 「bmo-receiver」), and judges nothing of
   what was asked or answered. `draft` is no gate: it stands in no part of the gate order, runs no model and has no
-  options. The round's own turn, whose answer is the draft, leaves no row of the stage; each question, item and
-  check asked after it leaves one, and the process's end one more:
+  options. Every row the receiver tells leaves one judgement, whatever its kind and whatever its number, and no
+  row is waited for or taken to stand before another:
 
   | Verdict | Row |
   |---|---|
-  | `ROUND <number> <name>: <outcome>` | a question, an item or a check: its number in the process, its name, and `answered`, `skip` or `failed` |
+  | `ROUND <number> <name>: <outcome>` | any row but the end — a turn, a question, an item or a check: its number in the process, its question's name, or its kind where it names none, and how it ended (`answered`, `skip` or `failed`) |
   | `END: <outcome>` | the end: `message`, `skip`, `withheld`, `ceiling-message` or `ceiling-skip` |
 
   Its detail is `answerChars=<n> changed=<true|false> ms=<n>`, and after it, past a semicolon, what the receiver
