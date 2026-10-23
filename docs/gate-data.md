@@ -130,6 +130,9 @@ Every label is made afresh, on a road, against the gate exactly as it stands.
 
 - **The gate's own questions ride on the row**, so the judge is shown the question in the gate's own
   words and nothing restates them.
+- **What the judge is told is English** (`prompts/tooling/gate-judge.toml`); the state it reads stays in
+  the language the rooms wrote it in. Its words reach no row: a row carries the gate's questions and the
+  gold over the answers they name, so rewording the judge's instructions leaves every judged row standing.
 - **The judge reads the whole where the gate is shown a reduction.** A gate whose state is a
   reduction of a longer text — the output format gate, shown a message's opening, closing and counts —
 

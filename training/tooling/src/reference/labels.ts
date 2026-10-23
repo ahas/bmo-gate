@@ -15,8 +15,8 @@ export function isReferenceGate(gate: string): gate is ReferenceGate {
   return (referenceGates as readonly string[]).includes(gate);
 }
 
-// The words a label is judged with. Their definitions are the judge's, in the room language and word for word
-// as the labels were judged by, so they stand in the reference judge's data file rather than here
+// The words a label is judged with. Their definitions are the rule the labels were judged by, so they stand
+// in the reference judge's data file beside the rest of what the judge is told rather than here
 // (docs/reference-data.md, 「The judgement」); the file must define exactly these words, in this order.
 export const attachedWordNames = ["used", "related", "unused"] as const;
 export const offeredWordNames = ["needed", "not-needed"] as const;

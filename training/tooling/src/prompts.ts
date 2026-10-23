@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { repositoryRoot } from "./roots";
 import { settingText } from "./settings";
 
-// The words the tooling hands a model in the rooms' own language, which stand in the repository's
+// The words the tooling hands a model and the words its rows carry, which stand in the repository's
 // `prompts/tooling/` folder rather than in the code (docs/layout.md, 「The rules the layout keeps」). Each
 // file is TOML, read by Bun's own TOML reading the first time it is asked for and held after.
 //

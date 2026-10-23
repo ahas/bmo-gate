@@ -32,9 +32,8 @@ These rules hold every change to this repository.
 - `prompts/` is the one folder Korean stands in: in what the gates are told only as data (the words of a room's
   messages a gate recognises, the marks and terms it leaves as written, the words its answer is written in), the
   instructions themselves being English; the questions Laya is asked and what the training tooling tells the
-  model writing a gate's rows, English with Korean standing in them only as conversation; the briefs the
-  evaluation set's items are written from, the words the training tooling hands its judges, the stand-ins its
-  rows carry and the earlier wordings of Laya's questions they may ask (`prompts/tooling/`), worded as the models
+  model writing a gate's rows and its judges, English with Korean standing in them only as conversation; the
+  briefs the evaluation set's items are written from, the stand-ins its rows carry and the earlier wordings of Laya's questions they may ask (`prompts/tooling/`), worded as the models
   read them or the rows hold them, and the words the sanitiser's pre-filter matches, as the rooms write them. Nothing else holds Korean: the repository test holds every file outside
   `prompts/`, and the testbed's `korean` check every code file, to `korean-ledger.json`, which allows none.
   Korean a test feeds the code is written by its unicode escapes.

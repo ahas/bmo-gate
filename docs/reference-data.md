@@ -137,8 +137,10 @@ with its one login and tier (`docs/gate-data.md`, 「The claude road」).
   document, and that a piece is needed where the work had to rest on what only that piece holds.
 - **An attached piece is answered with one of three words.** A piece is attached where the turn run's
   context lines or the reference record say it reached the prompt. Each word's definition stands in the
-  judge's instructions in the room language, word for word as the labels were judged by, in the reference
-  data's judge data, `prompts/tooling/reference-judge.toml`, and the code's prompt carries them unchanged. In English they say:
+  judge's instructions, in English like the rest of what the judge is told, in the reference data's judge
+  data, `prompts/tooling/reference-judge.toml`, and the code's prompt carries them unchanged. A definition
+  is the rule its labels were judged by: reworded with its meaning standing, it judges by the same rule and
+  the labels stand; one whose meaning moves has its word judged again (「Judging a word again」). They say:
   - `used` — the answer actually took up content found only in this document: a fact, a figure, a name,
     a procedure or a rule;
   - `related` — the document touches the answer's subject, but the answer would have been the same
