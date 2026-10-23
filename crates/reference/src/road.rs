@@ -6,8 +6,9 @@
 //! what the turn attached handed to the brain to count.
 
 use std::collections::{HashMap, HashSet};
+use std::sync::LazyLock;
 
-use futures_util::future::join_all;
+use futures_util::future::{join_all, try_join_all};
 use gate_markup::js;
 use gate_policy::laya::QUESTIONS;
 use gate_policy::prompts;
@@ -15,6 +16,7 @@ use gate_policy::reference::{BotLinesAlone, REFERENCE, ReferenceGate};
 use gate_ports::brain::MemoryRow;
 use gate_runs::GateError;
 use gate_runs::records::{self, Judgement, now};
+use regex::Regex;
 
 use crate::fragments::{self, Fragment, Offer, Verdict};
 use crate::narrow::{self, KeptBy};
@@ -91,7 +93,7 @@ async fn system_libraries(
   agent: &str,
   lore: bool,
 ) -> Result<Vec<Library>, GateError> {
-  let mut libraries: Vec<Library> = library(
+  let shipped = library(
     reference,
     agent,
     chat_id,
@@ -99,16 +101,16 @@ async fn system_libraries(
     "docs/reference-index.md".to_owned(),
     Source::Document,
     Body::Shipped,
-  )
-  .await?
-  .into_iter()
-  .collect();
+  );
+  let lore_rows = async {
+    if !lore {
+      return Ok(vec![]);
+    }
 
-  if !lore {
-    return Ok(libraries);
-  }
-
-  let rows = fragments::rows(reference, agent, chat_id, LORE).await.map_err(fault)?;
+    fragments::rows(reference, agent, chat_id, LORE).await.map_err(fault)
+  };
+  let (shipped, rows) = tokio::try_join!(shipped, lore_rows)?;
+  let mut libraries: Vec<Library> = shipped.into_iter().collect();
   let mut sections: Vec<(String, Vec<Fragment>)> = vec![];
 
   for row in rows {
@@ -318,9 +320,24 @@ pub fn message_line(sender_name: &str, sender_id: Option<i64>, text: &str) -> St
   )
 }
 
+// The words a quiet instruction's line opens on.
+const INSTRUCTION_HEAD: &str = "quiet instruction from the bot: ";
+
 /// A quiet instruction as one of the turn's lines.
 pub fn instruction_line(text: &str) -> String {
-  format!("quiet instruction from the bot: {text}")
+  format!("{INSTRUCTION_HEAD}{text}")
+}
+
+static MESSAGE_HEAD: LazyLock<Regex> =
+  LazyLock::new(|| Regex::new(r"^[^\n]*?\(id [^)\n]*\): ").expect("a message line's head"));
+
+/// What a turn's line said: its text, without the head that names its sender or opens a quiet instruction.
+pub fn spoken(line: &str) -> &str {
+  if let Some(said) = line.strip_prefix(INSTRUCTION_HEAD) {
+    return said;
+  }
+
+  MESSAGE_HEAD.find(line).map_or(line, |head| &line[head.end()..])
 }
 
 /// One picker of a room for one agent's turn: its key, its libraries before any turn narrows them, how a turn of
@@ -416,19 +433,21 @@ fn probe(stage: &str) -> Result<ReferenceProbe, GateError> {
 const KNOWLEDGE_GATE: &str = "library-knowledge";
 
 /// Every picker of a room for one agent's turn: the three reference gates in their order, then the person-book
-/// search.
+/// search, their libraries read at once.
 pub async fn gates_of(
   reference: &Reference,
   chat_id: i64,
   agent: &str,
   lore: bool,
 ) -> Result<Vec<Gate>, GateError> {
-  let mut gates = vec![];
-
-  for declared in &REFERENCE.gates {
-    gates.push(reference_gate(reference, chat_id, agent, lore, declared).await?);
-  }
-
+  let declared = try_join_all(
+    REFERENCE
+      .gates
+      .iter()
+      .map(|declared| reference_gate(reference, chat_id, agent, lore, declared)),
+  );
+  let (mut gates, people_libraries) =
+    tokio::try_join!(declared, people_libraries(reference, chat_id, agent))?;
   let people = &REFERENCE.people;
   let cap = people.cap.to_string();
   let system = prompts::render(&instructions(&people.stage)?, &[("selectionCap", &cap)]);
@@ -436,7 +455,7 @@ pub async fn gates_of(
 
   gates.push(Gate {
     stage: people.stage.clone(),
-    libraries: people_libraries(reference, chat_id, agent).await?,
+    libraries: people_libraries,
     bot_lines_alone: people.bot_lines_alone,
     reads_answered: people.reads_answered,
     system,
@@ -477,22 +496,27 @@ pub struct Narrowing {
   pub rules: Option<Vec<KeptBy>>,
 }
 
-// Some libraries as the narrowing leaves them for a turn's text and speakers, by these rules.
+// Some libraries as the narrowing leaves them for a turn's text, what its lines said and its speakers, by these
+// rules.
 async fn narrowed(
   reference: &Reference,
   libraries: &[Library],
   text: String,
+  lines: &[String],
   speakers: Vec<i64>,
   rules: Option<Vec<KeptBy>>,
 ) -> Narrowing {
   let rows: Vec<Fragment> = libraries.iter().flat_map(|library| library.rows.iter().cloned()).collect();
+  let at = now();
   let narrowed = narrow::narrow(
     &rows,
     &narrow::Turn {
       text,
+      said: lines.iter().map(|line| spoken(line)).collect::<Vec<_>>().join("\n"),
       speakers,
       names: owner_names(reference, &rows).await,
-      recent_since: Some(narrow::recent_since_of(now())),
+      recent_since: Some(narrow::recent_since_of(at)),
+      now: at,
       rules: rules.clone(),
     },
   );
@@ -508,8 +532,8 @@ async fn narrowed(
   }
 }
 
-/// A gate's libraries, less what the round already holds, as the narrowing leaves them for a turn, read by the
-/// rules the turn asks it by; nothing of it written down.
+/// A gate's libraries, less what the round already holds, as the narrowing leaves them for a turn — its words read in
+/// the lines the gate reads — by the rules the turn asks it by; nothing of it written down.
 pub async fn narrowing(
   reference: &Reference,
   turn: &Turn,
@@ -520,6 +544,7 @@ pub async fn narrowing(
     reference,
     &unheld(&gate.libraries, holds),
     turn.message_lines.join("\n"),
+    &gate.lines(turn),
     turn.speaker_ids.clone(),
     rules_of(gate.bot_lines_alone, turn.people_spoke),
   )
@@ -538,13 +563,21 @@ async fn offered_to(
     narrowed,
     rules,
   } = narrowing(reference, turn, gate, holds).await;
+  let slugs: Vec<String> =
+    pick::candidates(&libraries).into_iter().map(|candidate| candidate.slug).collect();
+
+  println!(
+    "reference: chat {} {} asked about {} of {} candidates",
+    turn.chat_id,
+    gate.stage,
+    slugs.len(),
+    narrowed.held
+  );
 
   if !turn.records {
     return libraries;
   }
 
-  let slugs: Vec<String> =
-    pick::candidates(&libraries).into_iter().map(|candidate| candidate.slug).collect();
   let rule_words: Option<Vec<&str>> = rules.map(|rules| rules.iter().map(|rule| rule.word()).collect());
   let written = fragments::record_offer(
     &reference.stages.runs.db,
@@ -701,14 +734,28 @@ fn picked_rows<'a>(gate: &Gate, picked: &Picked, rows: &'a [MemoryRow]) -> Vec<&
 
 /// The turn's reference composed as `select` composes it, with what it attached handed back rather than counted.
 pub async fn compose(reference: &Reference, turn: &Turn) -> Result<Composed, GateError> {
-  let woken = match &turn.situation {
-    Some(situation) => situation::event_entries(reference, situation).await,
-    None => vec![],
-  };
   let agent = turn.agent(reference);
-  let standing = memories::standing(reference, turn.chat_id, agent).await;
+  let woken = async {
+    match &turn.situation {
+      Some(situation) => situation::event_entries(reference, situation).await,
+      None => vec![],
+    }
+  };
+  // Every picker's libraries are read beside the rest, but on a turn with no line, which asks none of them.
+  let gates = async {
+    if turn.message_lines.is_empty() {
+      return Ok(vec![]);
+    }
+
+    gates_of(reference, turn.chat_id, agent, turn.lore).await
+  };
+  let (woken, standing, sheets, gates) = tokio::join!(
+    woken,
+    memories::standing(reference, turn.chat_id, agent),
+    standing_entries(reference, turn.chat_id, &turn.speaker_ids, agent),
+    gates
+  );
   let (due, undue) = memories::due_first(&standing);
-  let sheets = standing_entries(reference, turn.chat_id, &turn.speaker_ids, agent).await;
   let holds = turn.holds.clone().unwrap_or_default();
   let on = |gate: &str| !turn.off.iter().any(|off| off == gate);
   let matched = async {
@@ -766,12 +813,9 @@ pub async fn compose(reference: &Reference, turn: &Turn) -> Result<Composed, Gat
   }
 
   let in_round = turn.holds.is_some();
-  let mut gates = gates_of(reference, turn.chat_id, agent, turn.lore).await?;
+  let mut gates = gates?;
   let people = gates.pop().expect("the person-book search");
   let remembering = memory_gate(turn.chat_id, &undue)?;
-  let people_libraries = offered(reference, turn, &people, &holds, in_round, on(&people.stage)).await;
-  let memory_libraries =
-    offered(reference, turn, &remembering, &holds, in_round, on(&remembering.stage)).await;
   let picks = gates.iter().map(|gate| {
     let holds = &holds;
     let asked = on(&gate.stage);
@@ -787,18 +831,22 @@ pub async fn compose(reference: &Reference, turn: &Turn) -> Result<Composed, Gat
     }
   });
   let pieces = async {
-    if people_libraries.is_empty() {
+    let libraries = offered(reference, turn, &people, &holds, in_round, on(&people.stage)).await;
+
+    if libraries.is_empty() {
       return Ok(Picked::nothing(&people.stage));
     }
 
-    pick::pick(reference, picker(turn, agent, &people, people_libraries.clone())).await
+    pick::pick(reference, picker(turn, agent, &people, libraries)).await
   };
   let recalled = async {
-    if memory_libraries.is_empty() {
+    let libraries = offered(reference, turn, &remembering, &holds, in_round, on(&remembering.stage)).await;
+
+    if libraries.is_empty() {
       return Ok(Picked::nothing(&remembering.stage));
     }
 
-    pick::pick(reference, picker(turn, agent, &remembering, memory_libraries.clone())).await
+    pick::pick(reference, picker(turn, agent, &remembering, libraries)).await
   };
   let (picked, pieces, recalled, rules) = tokio::join!(join_all(picks), pieces, recalled, matched);
   let picked: Vec<Picked> = picked.into_iter().collect::<Result<_, _>>()?;
@@ -923,7 +971,7 @@ pub async fn work_narrowing(
   }
 
   let gate = reference_gate(reference, chat_id, agent, false, declared).await?;
-  let narrowing = narrowed(reference, &gate.libraries, lines.join("\n"), vec![], None).await;
+  let narrowing = narrowed(reference, &gate.libraries, lines.join("\n"), lines, vec![], None).await;
 
   Ok(Some((gate, narrowing)))
 }

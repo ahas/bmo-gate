@@ -167,7 +167,7 @@ async fn a_rooms_judgements_come_a_page_at_a_time_with_their_roads_and_offers() 
   assert_eq!(older["roads"][0]["tokens"]["inputTokens"], 120);
   assert_eq!(
     older["offers"],
-    json!([{ "gateName": "library-knowledge", "held": 4, "asked": 2, "kept": { "item": 0, "keyword": 2, "person": 0 }, "capped": 0, "rules": ["keyword"] }])
+    json!([{ "gateName": "library-knowledge", "held": 4, "asked": 2, "kept": { "item": 0, "keyword": 2, "word": 0, "person": 0, "recent": 0 }, "capped": 0, "rules": ["keyword"] }])
   );
 
   let (status, body) = ground.get(&format!("/judgements?roomId={ROOM}&limit=many")).await;

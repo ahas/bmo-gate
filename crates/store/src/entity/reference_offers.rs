@@ -25,6 +25,8 @@ pub struct Model {
   pub round: Option<String>,
   #[sea_orm(column_type = "Text")]
   pub rules: Option<String>,
+  pub by_word: i64,
+  pub by_recent: i64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

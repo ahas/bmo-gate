@@ -275,8 +275,10 @@ pub fn estimated_tokens(text: &str) -> usize {
   (other as f64 + ascii as f64 * 0.35).ceil() as usize
 }
 
-// The calls this service sends go one at a time.
-static LINE: LazyLock<tokio::sync::Mutex<()>> = LazyLock::new(tokio::sync::Mutex::default);
+// The calls this service sends go one at a time; the line holds the address its latest call found out of reach and
+// when that call gave up, so a call to the same address that waited behind it is not sent.
+static LINE: LazyLock<tokio::sync::Mutex<Option<(String, Instant)>>> =
+  LazyLock::new(tokio::sync::Mutex::default);
 
 fn probability(value: Option<&serde_json::Value>) -> Option<f64> {
   value.and_then(serde_json::Value::as_f64).filter(|value| (0.0..=1.0).contains(value))
@@ -456,11 +458,21 @@ pub async fn ask(side: &Side, gate: &str, request: &Request, wait: Duration) -> 
   let mut answers = vec![];
 
   for part in request.parts() {
-    let Ok(_turn) = tokio::time::timeout_at(until.into(), LINE.lock()).await else {
+    let Ok(mut turn) = tokio::time::timeout_at(until.into(), LINE.lock()).await else {
       return Err("timeout");
     };
 
-    answers.extend(ask_part(&url, &token, gate, &part, until).await?);
+    if turn.as_ref().is_some_and(|(door, turned_away)| *door == url && *turned_away > started) {
+      return Err("unreachable");
+    }
+
+    let answered = ask_part(&url, &token, gate, &part, until).await;
+
+    if matches!(answered, Err("unreachable")) {
+      *turn = Some((url.clone(), Instant::now()));
+    }
+
+    answers.extend(answered?);
   }
 
   Ok(Reply {

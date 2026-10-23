@@ -38,6 +38,8 @@ pub struct Fragment {
   pub written_on: Option<String>,
   pub confirmed_on: Option<String>,
   pub status: String,
+  /// When the brain last handed the row out, in epoch milliseconds.
+  pub last_hit_at: Option<i64>,
   /// The row's whole text where its library carries it rather than reading it through the brain.
   pub body: Option<String>,
 }
@@ -65,6 +67,7 @@ impl Fragment {
       written_on: row.written_on,
       confirmed_on: row.confirmed_on,
       status: row.status,
+      last_hit_at: row.last_hit_at,
       body: None,
     }
   }
@@ -169,7 +172,9 @@ pub fn index_entries(text: &str) -> Vec<IndexEntry> {
 pub struct Kept {
   pub item: i64,
   pub keyword: i64,
+  pub word: i64,
   pub person: i64,
+  pub recent: i64,
 }
 
 /// What one gate was offered for a turn, once the narrowing ran.
@@ -189,8 +194,8 @@ pub async fn record_offer(db: &DatabaseConnection, offer: &Offer<'_>) -> Result<
   run(
     db,
     r#"INSERT INTO "reference_offers"
-         ("stage", "chat_id", "message_id", "held", "asked", "by_item", "by_keyword", "by_person", "capped", "slugs", "created_at", "round", "rules")
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)"#,
+         ("stage", "chat_id", "message_id", "held", "asked", "by_item", "by_keyword", "by_word", "by_person", "by_recent", "capped", "slugs", "created_at", "round", "rules")
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)"#,
     vec![
       offer.stage.into(),
       offer.chat_id.into(),
@@ -199,7 +204,9 @@ pub async fn record_offer(db: &DatabaseConnection, offer: &Offer<'_>) -> Result<
       (offer.slugs.len() as i64).into(),
       offer.kept.item.into(),
       offer.kept.keyword.into(),
+      offer.kept.word.into(),
       offer.kept.person.into(),
+      offer.kept.recent.into(),
       offer.capped.into(),
       serde_json::to_string(offer.slugs).unwrap_or_default().into(),
       now().into(),

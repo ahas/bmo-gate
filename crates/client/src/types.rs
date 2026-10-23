@@ -277,7 +277,9 @@ pub struct Road {
 pub struct KeptCounts {
   pub item: i64,
   pub keyword: i64,
+  pub word: i64,
   pub person: i64,
+  pub recent: i64,
 }
 
 /// What a round's gates were offered.

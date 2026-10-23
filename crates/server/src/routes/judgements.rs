@@ -55,7 +55,9 @@ fn offer_of(offer: &reference_offers::Model) -> Offer {
     kept: KeptCounts {
       item: offer.by_item,
       keyword: offer.by_keyword,
+      word: offer.by_word,
       person: offer.by_person,
+      recent: offer.by_recent,
     },
     capped: offer.capped,
     rules: offer.rules.as_deref().and_then(|rules| serde_json::from_str(rules).ok()),

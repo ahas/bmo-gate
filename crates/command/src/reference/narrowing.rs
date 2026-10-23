@@ -56,7 +56,9 @@ pub struct Measured {
 pub struct Kept {
   pub item: i64,
   pub keyword: i64,
+  pub word: i64,
   pub person: i64,
+  pub recent: i64,
 }
 
 impl Kept {
@@ -64,7 +66,9 @@ impl Kept {
     Self {
       item: kept.item,
       keyword: kept.keyword,
+      word: kept.word,
       person: kept.person,
+      recent: kept.recent,
     }
   }
 }
@@ -220,13 +224,16 @@ pub fn lines(rooms: &[i64], measured: &[Measured]) -> Vec<String> {
       let sum = |kept: fn(&Kept) -> i64| of_stage.iter().map(|one| kept(&one.kept)).sum::<i64>();
 
       lines.push(format!(
-        "  {stage}: held {held} \u{b7} asked {}~{} (middle {}) \u{b7} kept by item {}, keyword {}, person {} \u{b7} asked in more than one Laya call on {over} turns",
+        "  {stage}: held {held} \u{b7} asked {}~{} (middle {}) \u{b7} kept by item {}, keyword {}, word {}, person {}, recent {} \u{b7} capped {} \u{b7} asked in more than one Laya call on {over} turns",
         asked[0],
         asked[asked.len() - 1],
         asked[asked.len() / 2],
         sum(|kept| kept.item),
         sum(|kept| kept.keyword),
+        sum(|kept| kept.word),
         sum(|kept| kept.person),
+        sum(|kept| kept.recent),
+        of_stage.iter().map(|one| one.capped).sum::<i64>(),
       ));
     }
   }

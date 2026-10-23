@@ -80,6 +80,10 @@ the gates' client is written against.
   in the line waits on its own gate's patience alone: one whose patience runs out while it waits
   leaves the line as `timeout`, and a call ahead of it running out of patience ends nothing but that
   call.
+- **A call that waited behind an `unreachable` one is not sent.** It leaves the line as `unreachable`
+  the moment its turn comes, since the door that turned the call ahead of it away turned it away while it
+  waited; so the gates of one turn wait for one failed call while the server is out of reach, not for
+  one each. A call that joins the line after that failure is sent as any call is.
 - **A request is asked in parts.** The client cuts its questions, in their order, into parts that each
   hold at most 128 questions and at most 32,768 tokens of input — every question counted with the
   state beside it, as the card lays it out — each part carrying the same state. At a full state that is

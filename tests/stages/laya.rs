@@ -222,3 +222,27 @@ async fn on_lays_road_its_label_is_the_verdict_and_its_failure_falls_to_the_fall
     ["room-rules road laya UNSAFE - -", "room-rules road llm - SAFE unreachable"]
   );
 }
+
+#[tokio::test]
+async fn a_call_that_waited_behind_one_turned_away_is_not_sent() {
+  let stub = Stub::start().await;
+  let ground = ground("turned-away", Some(&stub), Default::default()).await;
+  let request = YesNo.question(&"x".to_owned()).unwrap();
+  let wait = std::time::Duration::from_secs(5);
+
+  stub.answer(Method::POST, "/decide", 503, json!({}));
+
+  let (first, second) = tokio::join!(
+    laya::ask(&ground.stages.laya, "room-rules", &request, wait),
+    laya::ask(&ground.stages.laya, "library-knowledge", &request, wait)
+  );
+
+  assert_eq!((first.err(), second.err()), (Some("unreachable"), Some("unreachable")));
+  assert_eq!(stub.seen().iter().filter(|seen| seen.path == "/decide").count(), 1);
+
+  // A call that joins the line after the door turned one away is sent.
+  relay_answers(&stub, 0.9);
+
+  assert!(laya::ask(&ground.stages.laya, "room-rules", &request, wait).await.is_ok());
+  assert_eq!(stub.seen().iter().filter(|seen| seen.path == "/decide").count(), 2);
+}

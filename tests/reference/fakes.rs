@@ -392,3 +392,18 @@ impl Gateway for AnsweringGateway {
     })
   }
 }
+
+/// A gateway answering as another does, each answer a pause after it was asked.
+pub struct PausingGateway {
+  pub inner: std::sync::Arc<AnsweringGateway>,
+  pub pause: std::time::Duration,
+}
+
+impl Gateway for PausingGateway {
+  fn complete<'a>(&'a self, ask: &'a Ask) -> BoxFuture<'a, Answer<Completion>> {
+    Box::pin(async move {
+      tokio::time::sleep(self.pause).await;
+      self.inner.complete(ask).await
+    })
+  }
+}

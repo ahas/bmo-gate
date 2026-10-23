@@ -24,7 +24,8 @@ the road that decides which of them a turn carries.
   - **Only its closing 300 characters are read,** opened by `…` where it was cut: a short answer
     answers what a message ends on — its question or its proposal — and a whole answer of the chat agent's
     would push the turn's own words out of what Laya reads.
-  - **The narrowing never reads it.** A piece is kept for what the turn says; an item or a keyword
+  - **The narrowing reads it for words alone.** A piece whose own words stand in it is kept as one whose
+    words stand in the turn is (below), since a short answer is about what it answers; an item or a keyword
     the message before it named keeps nothing.
   - **A turn of the chat agent's own lines alone has none,** since it answers nobody.
   - **Each gate declares whether it reads it,** and `system-documents` does not: the line moves what
@@ -196,6 +197,10 @@ flowchart TB
 - **They run side by side** in the gate's reference selection, each with its own instructions,
   route row and time limit. One failing costs the others nothing, and the provider chosen for one
   never moves another.
+  - **Side by side from the first read:** every picker's library is read from the brain at once, each is
+    narrowed and asked at once, and the turn waits for the slowest of them rather than for their sum. What
+    still goes one at a time is Laya's line, which every probe of the service shares (`docs/laya.md`, 「The
+    client」).
 - **Their seed:** each is seeded on the registry's provider — the registration its tier maps to there —
   with Haiku (`claude-haiku-4-5-20251001`) as its Claude model, one road each (the agency's `docs/own-llm.md`),
   thinking off: picking slugs needs none, and a run that thinks takes ten to fifty seconds instead
@@ -215,35 +220,53 @@ flowchart TB
 - **No gate is handed a whole library.** The rows a room may see are narrowed by code first, and a
   gate is asked only about what is left. The same narrowing picks the pieces an editor is handed
   whole before it writes (the brain's `docs/fragments.md`).
-- **What the narrowing reads:** the turn's messages, who sent them, and the rows' own columns —
-  owner, items, keywords, status and confirmed day. It asks no model.
+- **What the narrowing reads:** the turn's messages, who sent them, the message the turn follows on from
+  where the gate reads that, and the rows' own columns — owner, items, keywords, slug, title, the body
+  where the library carries it, status, confirmed day and when the brain last handed the row out. It asks
+  no model.
+- **A message is read for what was said.** The head of a line — its sender's name and number, the
+  words that open a quiet instruction — is no word of the turn, since it stands on every line.
 - **What keeps a candidate**, in the order they are tried:
   1. **item** — the piece is tied to an item number the messages name (`#758`, or the number with the
      room language's counter word after it).
   2. **keyword** — one of the keywords the piece's writer gave stands in the messages. A Latin word
      is matched whole, a word of a script that joins its particles to the word, Korean among them, as it
-     stands in the text. A title is never matched word by word:
-     it says what the piece is and when it is needed, which is the gate's to read, and the words
-     every turn carries would keep a piece on every turn.
-  3. **person** — on a piece about somebody, that person spoke this turn or the messages name them,
+     stands in the text.
+  3. **word** — a content word of the piece's own line — its slug and its title — or of its body where
+     its library carries one stands in the messages or in the message the turn follows on from.
+     - A Latin word counts from three letters, and is matched as the start of a word of the messages, so
+       its plural or its past form keeps it too; the common words of English — articles, pronouns,
+       prepositions, auxiliaries — are no content words.
+     - A Korean word counts from two syllables, and is matched as it stands in the text; one of three
+       syllables or more is matched without its last, where its particle or its ending joins it. A word of
+       any other script but Latin counts from two letters and is matched as it stands.
+     - A word standing in more than one row in eight of the gate's rows, and in three at least, names
+       what the library is about rather than what one piece is, and keeps nothing.
+  4. **person** — on a piece about somebody, that person spoke this turn or the messages name them,
      by their id, their display name or a name their Address piece carries; and the piece is open,
      or its matter ended in the last three days — a matter that just finished is still talked about.
-     A piece about nobody in particular passes this rule on the same terms.
+  5. **recent** — the brain handed the piece out in the last thirty minutes, so a conversation still on
+     a piece is asked about it again without saying its words again. At most two pieces a gate are kept
+     this way, the latest handed out first.
 - **Over the chat agent's own lines alone, a gate that declares it is narrowed by the item rule
-  alone** (above, 「What a turn's lines are」): a keyword or a name in those lines keeps nothing.
-- **What drops a candidate:** nothing kept it. So a piece about somebody neither speaking nor named,
-  and a piece whose matter is done, reach a gate only when the turn names their item or their words.
-- **No count caps what a gate is asked about.** Every candidate the rules keep is asked about: Laya
-  asks in as many calls as it takes (`docs/laya.md`, 「The client」), and a gate's own model reads
-  the whole narrowed index.
+  alone** (above, 「What a turn's lines are」): a keyword, a word or a name in those lines keeps nothing.
+- **What drops a candidate:** nothing kept it. A piece about nobody in particular — a lore piece, a shared
+  piece of knowledge, a memory for nobody — reaches a gate only when the turn names its item, carries its
+  words or has just been talking about it; a piece about somebody neither speaking nor named, and a piece
+  whose matter is done, only when the turn names their item or their words.
+- **At most twelve candidates a gate.** Where the rules keep more, the ones kept by an item stand first, then
+  by a keyword, then the ones sharing the most words with the messages, then by a person, then the recent
+  ones, a tie going to the earlier in the index; the rest are dropped and counted as capped. A gate reads
+  twelve lines and Laya answers them in one call.
 - **The narrowed set keeps the index's order:** the gate reads its candidates in the order their
   entries stand.
 - **A gate the narrowing leaves nothing is not asked**, the same as a gate with no library.
 - **What is recorded:** one row per gate narrowed for in the offers record — the gate, the room,
   the message, the round, how many candidates the libraries held, how many were asked about, how
-  many each rule kept, how many a cap dropped — always none, since no cap holds a gate — the slugs
-  asked about in order, and the rules a candidate could be kept by where fewer than all of them
-  could. It is kept and swept the way the verdict record is.
+  many each rule kept, how many the cap dropped, the slugs asked about in order, and the rules a
+  candidate could be kept by where fewer than all of them could. It is kept and swept the way the
+  verdict record is. The gate's log names for every turn, recorded or not, how many candidates each
+  gate's libraries held and how many it is asked about.
   - **A gate the narrowing leaves nothing has its row too,** asked about none and with no slugs, so
     the `SKIP: no candidates` it leaves can say how many candidates there were before the narrowing and
     by which rules it narrowed: the console stands both on that verdict (the web unit's `docs/web.md`).

@@ -17,6 +17,7 @@ mod situation;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use gate_policy::profiles::PROFILES;
 use gate_ports::gateway::Ask;
@@ -27,7 +28,7 @@ use gate_stages::{Reading, Stages};
 use serde_json::json;
 
 use crate::agency::{FakeAgency, mapping, provider};
-use crate::fakes::{AnsweringGateway, FakeBrain, FakeReceiver};
+use crate::fakes::{AnsweringGateway, FakeBrain, FakeReceiver, PausingGateway};
 use crate::scratch::Scratch;
 
 /// A migrated store, the stand-ins, a wait of thirty seconds for every gate, a folder of the test's own for the
@@ -42,6 +43,15 @@ pub struct Ground {
 }
 
 pub async fn ground(test: &str, answer: impl Fn(&Ask) -> Option<String> + Send + Sync + 'static) -> Ground {
+  paused_ground(test, answer, Duration::ZERO).await
+}
+
+/// The same ground, each gate's model answering a pause after it is asked.
+pub async fn paused_ground(
+  test: &str,
+  answer: impl Fn(&Ask) -> Option<String> + Send + Sync + 'static,
+  pause: Duration,
+) -> Ground {
   let scratch = Scratch::new().await;
   let agency = Arc::new(FakeAgency::default());
   let gateway = Arc::new(AnsweringGateway {
@@ -51,7 +61,10 @@ pub async fn ground(test: &str, answer: impl Fn(&Ask) -> Option<String> + Send +
   let runs = Runs::new(
     scratch.db().clone(),
     agency.clone(),
-    gateway.clone(),
+    Arc::new(PausingGateway {
+      inner: gateway.clone(),
+      pause,
+    }),
     "the-chat-agent",
     "/a/session/folder",
   );

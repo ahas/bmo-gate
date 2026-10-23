@@ -4,6 +4,7 @@
 //! over its index, and the knowledge a piece of work is handed.
 
 use std::collections::HashSet;
+use std::time::{Duration, Instant};
 
 use gate_policy::prompts;
 use gate_policy::reference::REFERENCE;
@@ -13,7 +14,7 @@ use gate_reference::road::{Turn, held_sheet, select, select_knowledge};
 use gate_reference::{Entry, Source};
 
 use crate::fakes::{fragment, memory};
-use crate::{Ground, ground, offered_slugs};
+use crate::{Ground, ground, offered_slugs, paused_ground};
 
 fn turn(off: &[&str]) -> Turn {
   Turn {
@@ -64,10 +65,16 @@ fn furnish(ground: &Ground) {
   let brain = &ground.brain;
 
   brain.fragments.lock().unwrap().extend([
-    fragment("system-document", "structure", "the system's large structure", None, None),
-    fragment("room-rule", "greeting", "how this room greets", Some(7), None),
+    fragment(
+      "system-document",
+      "structure",
+      "the system's large structure deploys run on",
+      None,
+      None,
+    ),
+    fragment("room-rule", "greeting", "how this room greets Robin", Some(7), None),
     fragment("library-knowledge", "deploy-notes", "how a deploy goes", None, None),
-    fragment("library-knowledge", "kittens", "the office cat", None, None),
+    fragment("library-knowledge", "kittens", "the office cat Robin keeps", None, None),
     fragment("person-book", "person-5", "Owner", Some(7), Some(5)),
     fragment("person-book", "person-6", "Robin", Some(7), Some(6)),
     fragment("person-book", "person-8", "Sam", Some(7), Some(8)),
@@ -342,7 +349,11 @@ fn furnish_lore(ground: &Ground) {
 }
 
 fn reading_lore(lore: bool) -> Turn {
-  Turn { lore, ..turn(&[]) }
+  Turn {
+    lore,
+    message_lines: vec!["Owner (id 5): how is the weather by the harbour?".into()],
+    ..turn(&[])
+  }
 }
 
 #[tokio::test]
@@ -472,8 +483,20 @@ fn furnish_memories(ground: &Ground, words: &str) {
     })
     .collect();
 
-  rows.extend((51..=54).map(|id| memory(id, "followup", "", &format!("{words} {id}."))));
+  rows.extend(
+    (51..=54)
+      .zip(["lamp", "door", "desk", "roof"])
+      .map(|(id, thing)| memory(id, "followup", "", &format!("{words} {thing} {id}."))),
+  );
   *ground.brain.standing.lock().unwrap() = rows;
+}
+
+// A turn whose words name each of the room's memories.
+fn remembering() -> Turn {
+  Turn {
+    message_lines: vec!["Owner (id 5): the lamp, the door, the desk, the roof, and the job?".into()],
+    ..turn(&[])
+  }
 }
 
 // The numbers of the rows an entry carries, in its order.
@@ -497,7 +520,7 @@ async fn due_memories_attach_unpicked_and_the_rest_only_where_the_memory_picker_
 
   furnish_memories(&ground, "Follow up on matter");
 
-  let entries = select(&ground.reference, &turn(&[])).await.unwrap();
+  let entries = select(&ground.reference, &remembering()).await.unwrap();
   let entry = memories_of(&entries).expect("the memories entry");
   let due = REFERENCE.memories.due as i64;
   let mut expected: Vec<i64> = (1..=due).rev().map(|at| 40 + at).collect();
@@ -544,10 +567,10 @@ async fn what_the_memory_picker_picks_is_held_to_its_allowance() {
 
   furnish_memories(&ground, &words);
 
-  let entries = select(&ground.reference, &turn(&[])).await.unwrap();
+  let entries = select(&ground.reference, &remembering()).await.unwrap();
   let picked: Vec<i64> =
     carried(memories_of(&entries).unwrap()).into_iter().filter(|id| *id > 50).collect();
-  let line = memory_line(&memory(51, "followup", "", &format!("{words} 51.")));
+  let line = memory_line(&memory(51, "followup", "", &format!("{words} lamp 51.")));
 
   assert_eq!(picked.len(), REFERENCE.memories.budget / gate_markup::js::units(&line));
   assert_eq!(picked, [51, 52][..picked.len()]);
@@ -586,4 +609,25 @@ async fn a_turn_with_no_line_carries_the_due_memories_and_asks_no_picker() {
 
   assert_eq!(carried(memories_of(&entries).unwrap()).len(), REFERENCE.memories.due);
   assert!(ground.gateway.asked.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn the_pickers_are_asked_at_once() {
+  let pause = Duration::from_millis(500);
+  let ground = paused_ground("at-once", picking(&[]), pause).await;
+
+  furnish(&ground);
+
+  let started = Instant::now();
+
+  select(&ground.reference, &turn(&[])).await.unwrap();
+
+  let took = started.elapsed();
+
+  assert_eq!(ground.gateway.asked.lock().unwrap().len(), 5);
+  assert!(
+    took < pause * 3,
+    "five pickers asked one after another would take {:?}; it took {took:?}",
+    pause * 5
+  );
 }
