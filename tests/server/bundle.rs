@@ -1,12 +1,13 @@
 //! The console bundle the gate serves (`docs/api.md`, 「Console」): its manifest, read through bmo-ui's own reading,
-//! its words, its module and stylesheet named by the digest of their bytes, and the guard on every route its screens
-//! use.
+//! its words, its module and stylesheet named by the digest of their bytes, the guard on every route its screens
+//! use, and the translations it relays outside its prefix with their bounds.
 
 use std::path::PathBuf;
 use std::process::Command;
 
 use gate_server::console::ConsoleBundle;
-use reqwest::header::{CACHE_CONTROL, CONTENT_TYPE, HeaderMap};
+use gate_stages::translator::{BUSY_WAIT_SECONDS, CALL_ORIGINALS, STANDING_ORIGINALS};
+use reqwest::header::{CACHE_CONTROL, CONTENT_TYPE, HeaderMap, RETRY_AFTER};
 use reqwest::{Method, StatusCode};
 use serde_json::{Map, Value, json};
 
@@ -144,6 +145,7 @@ async fn the_manifest_is_answered_on_the_token_alone_and_keeps_the_contract() {
     (&manifest["events"], &manifest["websocket"], &manifest["pushKinds"]),
     (&json!(false), &json!(false), &json!([]))
   );
+  assert_eq!(manifest["relays"], json!([{ "method": "POST", "path": "/translations" }]));
   assert!(manifest["bundle"].as_str().unwrap().starts_with("/console/bundle/"), "{manifest}");
   assert!(manifest["bundle"].as_str().unwrap().ends_with(".js"), "{manifest}");
   assert!(manifest["stylesheet"].as_str().unwrap().ends_with(".css"), "{manifest}");
@@ -262,36 +264,79 @@ async fn the_screens_reads_answer_as_their_routes_behind_the_readers_role() {
 }
 
 #[tokio::test]
-async fn the_translator_through_the_console_answers_as_its_route_behind_the_readers_role() {
+async fn the_relayed_translations_answer_a_console_within_the_readers_role_and_a_unit_on_the_token() {
   let ground = serving("translations").await;
   let asked = json!({ "language": "en", "originals": ["Already in English.", ""] });
 
-  let (status, _, bytes) =
-    ask(&ground, &CONSOLE, Method::POST, "/console/translations", Some(asked.clone())).await;
-  let outside = ground
-    .client
-    .post(format!("{}/translations", ground.address))
-    .bearer_auth(TOKEN)
-    .json(&asked)
-    .send()
-    .await
-    .unwrap();
+  let (status, _, unit) = ask(&ground, &NO_ROLE, Method::POST, "/translations", Some(asked.clone())).await;
 
   assert_eq!(status, StatusCode::OK);
-  assert_eq!(json_of(&bytes), outside.json::<Value>().await.unwrap());
-  assert_eq!(json_of(&bytes)["readings"][0]["text"], "Already in English.");
+  assert_eq!(json_of(&unit)["readings"][0]["text"], "Already in English.");
+
+  let (status, _, console) =
+    ask(&ground, &CONSOLE, Method::POST, "/translations", Some(asked.clone())).await;
+
+  assert_eq!(status, StatusCode::OK);
+  assert_eq!(json_of(&console), json_of(&unit));
+
+  let unknown = Caller {
+    token: true,
+    role: Some("owner"),
+    owner: None,
+  };
 
   for (caller, status, code) in [
     (&NO_TOKEN, StatusCode::UNAUTHORIZED, "unauthorized"),
-    (&NO_ROLE, StatusCode::FORBIDDEN, "forbidden"),
     (&MEMBER, StatusCode::FORBIDDEN, "forbidden"),
+    (&unknown, StatusCode::FORBIDDEN, "forbidden"),
   ] {
     let (answered, _, bytes) =
-      ask(&ground, caller, Method::POST, "/console/translations", Some(asked.clone())).await;
+      ask(&ground, caller, Method::POST, "/translations", Some(asked.clone())).await;
 
     assert_eq!(answered, status, "{code}");
     refused(&json_of(&bytes), code);
   }
+
+  let (status, _, bytes) =
+    ask(&ground, &CONSOLE, Method::POST, "/console/translations", Some(asked.clone())).await;
+
+  assert_eq!(status, StatusCode::NOT_FOUND);
+  refused(&json_of(&bytes), "no-route");
+}
+
+#[tokio::test]
+async fn a_translation_carries_at_most_its_bound_and_one_past_the_standing_bound_is_busy_with_a_wait() {
+  let ground = serving("translations-bounds").await;
+  let many: Vec<String> = (0..=CALL_ORIGINALS).map(|at| format!("Line {at}.")).collect();
+
+  let (status, _, bytes) = ask(
+    &ground,
+    &NO_ROLE,
+    Method::POST,
+    "/translations",
+    Some(json!({ "language": "en", "originals": many })),
+  )
+  .await;
+
+  assert_eq!(status, StatusCode::BAD_REQUEST);
+  refused(&json_of(&bytes), "too-many-originals");
+
+  let standing: Vec<_> = (0..STANDING_ORIGINALS / CALL_ORIGINALS)
+    .map(|_| ground.app.translations.admit(CALL_ORIGINALS).ok().unwrap())
+    .collect();
+  let asked = json!({ "language": "en", "originals": ["Already in English."] });
+  let (status, headers, bytes) =
+    ask(&ground, &NO_ROLE, Method::POST, "/translations", Some(asked.clone())).await;
+
+  assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+  refused(&json_of(&bytes), "translator-busy");
+  assert_eq!(headers.get(RETRY_AFTER).unwrap(), &BUSY_WAIT_SECONDS.to_string());
+
+  drop(standing);
+
+  let (status, _, _) = ask(&ground, &NO_ROLE, Method::POST, "/translations", Some(asked)).await;
+
+  assert_eq!(status, StatusCode::OK);
 }
 
 #[tokio::test]

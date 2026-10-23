@@ -15,6 +15,7 @@ use gate_runs::Runs;
 use gate_server::App;
 use gate_stages::document_translation::Queue;
 use gate_stages::laya::Side;
+use gate_stages::translator::Intake;
 use gate_stages::{Reading, Stages};
 use reqwest::StatusCode;
 use serde_json::json;
@@ -50,6 +51,7 @@ fn app_on(ground: &crate::Ground, stub: &Stub, receiver: Arc<dyn Receiver>) -> A
     }),
     job: Arc::new(FakeJob::default()),
     queue: Queue::default(),
+    translations: Intake::of_policy(),
     token: TOKEN.to_owned(),
     owner_room: 1,
     data_root: PathBuf::from(&ground.app.data_root),

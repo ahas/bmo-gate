@@ -72,23 +72,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/console/translations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Translate originals into one language, as POST /translations does; the reader's role is read. */
-        post: operations["console_translations"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/console/trials": {
         parameters: {
             query?: never;
@@ -458,7 +441,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Translate originals into one language, in the order given, keeping each whole reading. */
+        /** Translate at most 16 originals into one language, in the order given, keeping each whole reading; a call naming a reader's role is a console's and is held to the manifest's role. */
         post: operations["translations"];
         delete?: never;
         options?: never;
@@ -562,6 +545,8 @@ export interface components {
             ownerKey: boolean;
             /** @description The gate's event kinds a console may raise as a notice to a reader not on the screen. */
             pushKinds: string[];
+            /** @description The gate's own routes outside the API prefix a console relays as well. */
+            relays: components["schemas"]["ConsoleRelay"][];
             /** @description The least role a reader holds to open the screen. */
             role: components["schemas"]["ConsoleRole"];
             /** @description The path the bundle's screens stand under. */
@@ -576,6 +561,11 @@ export interface components {
             websocket: boolean;
             /** @description The path of the gate's API the bundle's words are answered at. */
             words: string;
+        };
+        /** @description A route of the gate's own that a console relays outside the API prefix: its method and its whole path. */
+        ConsoleRelay: {
+            method: string;
+            path: string;
         };
         /**
          * @description The role a console's reader holds, the one holding more first: an administrator holds every role a member
@@ -1167,31 +1157,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LayaView"];
-                };
-            };
-            default: components["responses"]["Error"];
-        };
-    };
-    console_translations: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TranslationAsk"];
-            };
-        };
-        responses: {
-            /** @description one reading for each original */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Readings"];
                 };
             };
             default: components["responses"]["Error"];

@@ -30,12 +30,14 @@ pub enum Code {
   NeedsTau,
   DocumentUnknown,
   LanguageUnknown,
+  TooManyOriginals,
+  TranslatorBusy,
   Forbidden,
 }
 
 impl Code {
   /// Every code, in the order `docs/codes.md` lists them.
-  pub const ALL: [Code; 27] = [
+  pub const ALL: [Code; 29] = [
     Code::BadRequest,
     Code::Unauthorized,
     Code::NoRoute,
@@ -62,6 +64,8 @@ impl Code {
     Code::NeedsTau,
     Code::DocumentUnknown,
     Code::LanguageUnknown,
+    Code::TooManyOriginals,
+    Code::TranslatorBusy,
     Code::Forbidden,
   ];
 
@@ -94,6 +98,8 @@ impl Code {
       Code::NeedsTau => "needs-tau",
       Code::DocumentUnknown => "document-unknown",
       Code::LanguageUnknown => "language-unknown",
+      Code::TooManyOriginals => "too-many-originals",
+      Code::TranslatorBusy => "translator-busy",
       Code::Forbidden => "forbidden",
     }
   }
@@ -101,7 +107,7 @@ impl Code {
   /// The status the code goes out under.
   pub fn status(self) -> u16 {
     match self {
-      Code::BadRequest | Code::NothingToChange => 400,
+      Code::BadRequest | Code::NothingToChange | Code::TooManyOriginals => 400,
       Code::Unauthorized => 401,
       Code::Forbidden => 403,
       Code::NoRoute | Code::NotFound | Code::NoGate => 404,
@@ -122,7 +128,7 @@ impl Code {
       | Code::LanguageUnknown => 422,
       Code::Failed => 500,
       Code::UpstreamFailed | Code::NoAnswer => 502,
-      Code::NotReady => 503,
+      Code::NotReady | Code::TranslatorBusy => 503,
     }
   }
 

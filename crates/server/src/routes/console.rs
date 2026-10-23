@@ -1,5 +1,6 @@
-//! The console's routes (`docs/api.md`, 「Console」): the manifest and the words on the gate's token alone, and the
-//! screens' routes under the API prefix, their module and stylesheet among them, behind the reader's role as well.
+//! The console's routes (`docs/api.md`, 「Console」): the manifest and the words on the gate's token alone, the
+//! screens' routes under the API prefix, their module and stylesheet among them, behind the reader's role as well,
+//! and the guard of a route the manifest relays, which holds a console's call to the reader's role.
 
 use std::sync::Arc;
 
@@ -9,15 +10,15 @@ use axum::extract::{Path, Request, State};
 use axum::http::header::{CACHE_CONTROL, CONTENT_TYPE};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post};
+use axum::routing::get;
 use bmo_gate_client::{ConsoleManifest, ConsoleRole};
 use gate_codes::Code;
 use serde_json::{Map, Value};
 
 use crate::App;
 use crate::answer::{Answered, Refused};
-use crate::console::{ConsoleBundle, OWNER_ROLE, ROLE};
-use crate::routes::{gates, translations, trials};
+use crate::console::{ConsoleBundle, OWNER_ROLE, RELAYS, ROLE};
+use crate::routes::{gates, trials};
 
 fn served(app: &App) -> Answered<&ConsoleBundle> {
   app
@@ -66,6 +67,32 @@ async fn reader_role(request: Request, next: Next) -> Response {
   }
 }
 
+/// The guard of every route the manifest relays: a call to one that names a reader's role is a console's for that
+/// reader and is refused where the role does not allow the manifest's; a call naming none is a unit's own on the
+/// token. A call to any other route passes as it came.
+pub async fn relayed_role(request: Request, next: Next) -> Response {
+  let relayed = RELAYS
+    .iter()
+    .any(|(method, path)| request.method().as_str() == *method && request.uri().path() == *path);
+
+  if !relayed {
+    return next.run(request).await;
+  }
+
+  let named = request
+    .headers()
+    .get(OWNER_ROLE)
+    .map(|value| value.to_str().ok().and_then(ConsoleRole::named));
+
+  match named {
+    None => next.run(request).await,
+    Some(Some(role)) if role.allows(ROLE) => next.run(request).await,
+    Some(_) => {
+      Refused::new(Code::Forbidden, "the reader's role does not open the gates' screens").into_response()
+    }
+  }
+}
+
 /// The screens' routes under the API prefix, each behind the reader's role.
 pub fn screens() -> Router<Arc<App>> {
   Router::new()
@@ -73,6 +100,5 @@ pub fn screens() -> Router<Arc<App>> {
     .route("/gates", get(gates::gates))
     .route("/laya", get(gates::laya))
     .route("/trials", get(trials::list).post(trials::add_from_console))
-    .route("/translations", post(translations::translate))
     .layer(middleware::from_fn(reader_role))
 }

@@ -4,7 +4,7 @@
 
 use std::path::Path;
 
-use bmo_gate_client::{ConsoleManifest, ConsoleRole};
+use bmo_gate_client::{ConsoleManifest, ConsoleRelay, ConsoleRole};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 
@@ -16,6 +16,10 @@ pub const API_PREFIX: &str = "/console";
 
 /// The least role a reader holds to open the screens, the floor of every route under the API prefix.
 pub const ROLE: ConsoleRole = ConsoleRole::Administrator;
+
+/// The gate's own routes outside the API prefix a console relays as well, each its method and its path: the
+/// translations, which every other caller reaches on the token alone.
+pub const RELAYS: [(&str, &str); 1] = [("POST", "/translations")];
 
 /// The header a console names the reader's role in.
 pub const OWNER_ROLE: &str = "owner-role";
@@ -103,6 +107,13 @@ impl ConsoleBundle {
       events: false,
       websocket: false,
       push_kinds: Vec::new(),
+      relays: RELAYS
+        .iter()
+        .map(|(method, path)| ConsoleRelay {
+          method: (*method).to_owned(),
+          path: (*path).to_owned(),
+        })
+        .collect(),
     }
   }
 

@@ -5,8 +5,9 @@
 use axum::Json;
 use axum::body::Bytes;
 use axum::extract::{FromRequest, FromRequestParts, Request};
-use axum::http::StatusCode;
+use axum::http::header::RETRY_AFTER;
 use axum::http::request::Parts;
+use axum::http::{HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use bmo_gate_client::ErrorBody;
 use gate_codes::Code;
@@ -14,11 +15,13 @@ use gate_runs::GateError;
 use gate_runs::options::Refusal;
 use serde::de::DeserializeOwned;
 
-/// A refusal: its code and the English sentence beside it.
+/// A refusal: its code and the English sentence beside it, and the seconds a caller waits before asking again
+/// where the refusal names them.
 #[derive(Debug)]
 pub struct Refused {
   pub code: Code,
   pub error: String,
+  pub retry_after: Option<u64>,
 }
 
 impl Refused {
@@ -26,6 +29,15 @@ impl Refused {
     Self {
       code,
       error: error.into(),
+      retry_after: None,
+    }
+  }
+
+  /// The same refusal, naming the seconds to wait in `Retry-After`.
+  pub fn retry_after(self, seconds: u64) -> Self {
+    Self {
+      retry_after: Some(seconds),
+      ..self
     }
   }
 
@@ -58,8 +70,13 @@ impl IntoResponse for Refused {
       code: self.code.as_str().to_owned(),
       error: self.error,
     };
+    let mut response = (status, Json(body)).into_response();
 
-    (status, Json(body)).into_response()
+    if let Some(seconds) = self.retry_after {
+      response.headers_mut().insert(RETRY_AFTER, HeaderValue::from(seconds));
+    }
+
+    response
   }
 }
 

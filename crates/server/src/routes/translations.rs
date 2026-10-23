@@ -9,7 +9,7 @@ use bmo_gate_client::{
   KeepTranslation, KeptQuery, KeptTranslation, Page, Reading, Readings, TranslationAsk,
 };
 use gate_codes::Code;
-use gate_stages::translator::{self, Reader};
+use gate_stages::translator::{self, BUSY_WAIT_SECONDS, CALL_ORIGINALS, Reader, Turned};
 
 use crate::App;
 use crate::answer::{Answered, Body, Query, Refused};
@@ -25,8 +25,21 @@ pub async fn translate(
 ) -> Answered<Json<Readings>> {
   reader(&asked.language)?;
 
+  // The originals stand in the intake until the answer goes, so a call turned away for a full intake is turned
+  // away before anything of it is read.
+  let _admitted = app.translations.admit(asked.originals.len()).map_err(|turned| match turned {
+    Turned::TooMany => Refused::new(
+      Code::TooManyOriginals,
+      format!("one translation carries at most {CALL_ORIGINALS} originals"),
+    ),
+    Turned::Full => Refused::new(
+      Code::TranslatorBusy,
+      "the translator holds as many originals as it queues; ask again later",
+    )
+    .retry_after(BUSY_WAIT_SECONDS),
+  })?;
   let ask = translator::by_gate(app.stages.clone());
-  let read = translator::readings(&app.stages, &asked.language, &asked.originals, &ask)
+  let read = translator::readings(&app.stages, &app.translations, &asked.language, &asked.originals, &ask)
     .await
     .ok_or_else(|| Refused::new(Code::LanguageUnknown, format!("no reader takes {}", asked.language)))?;
 

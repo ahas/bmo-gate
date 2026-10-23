@@ -796,6 +796,16 @@ pub struct ConsoleManifest {
   pub websocket: bool,
   /// The gate's event kinds a console may raise as a notice to a reader not on the screen.
   pub push_kinds: Vec<String>,
+  /// The gate's own routes outside the API prefix a console relays as well.
+  pub relays: Vec<ConsoleRelay>,
+}
+
+/// A route of the gate's own that a console relays outside the API prefix: its method and its whole path.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ConsoleRelay {
+  pub method: String,
+  pub path: String,
 }
 
 /// A trial put through the console: the gate and the prompt, the reader being the console's to name.

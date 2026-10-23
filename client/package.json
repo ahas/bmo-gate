@@ -1,6 +1,6 @@
 {
   "name": "bmo-gate-client",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -25,7 +25,7 @@
   },
   "peerDependencies": {
     "@nuxtjs/i18n": "^10.6.0",
-    "bmo-ui": "0.1.0-rev.7",
+    "bmo-ui": "0.1.0-rev.10",
     "nuxt": "^4.5.2",
     "vue-i18n": "^11.4.8"
   },
@@ -39,7 +39,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "@types/bun": "^1.3.4",
     "@vitejs/plugin-vue": "^6.0.10",
-    "bmo-ui": "file:vendor/bmo-ui-0.1.0-rev.7.tgz",
+    "bmo-ui": "file:vendor/bmo-ui-0.1.0-rev.10.tgz",
     "nuxt": "^4.5.2",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",

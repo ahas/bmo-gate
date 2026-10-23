@@ -133,7 +133,15 @@ It answers `entries`, each `path`, `text` and `source` (`document`, `person`, `r
 - **Translating** answers one reading for each original, in the order given: an original with no part in
   another language stands as it is; any other has its parts in another language translated, each part
   standing beside the rest as it did, and is kept; a part the translator could not render stays in its
-  original, the reading is not `whole`, and nothing is kept for it.
+  original, the reading is not `whole`, and nothing is kept for it. The answer is the whole call's, given once
+  every original is read.
+- **One call carries at most 16 originals;** more is 400 `too-many-originals`, and a caller with more asks again
+  for the rest.
+- **The translator's work is queued, not refused.** The parts in another language of every call standing go to
+  the translator together, no more at once than the translator's pool bound (`docs/gates.md`, 「How many runs
+  stand at once」), and a part waits its turn behind those asked before it, whichever call it came in.
+  At most 64 originals stand at once across the calls, read or waiting; a call that would take the count past
+  that is 503 `translator-busy`, with `Retry-After` naming the seconds to wait, 5, and nothing of it is read.
 - **Keeping a translation** keeps `text` as the reading of `original` in the language, in place of any kept
   before.
 
@@ -225,11 +233,11 @@ console's, so nothing here names one.
 | `GET /console/laya` | | as `GET /laya` |
 | `GET /console/trials` | as `GET /trials` | as `GET /trials` |
 | `POST /console/trials` | `gateName`, `prompt` | 201, the trial |
-| `POST /console/translations` | as `POST /translations` | as `POST /translations` |
 
 - **The manifest** names the bundle `gates`, its menu name the words' `gates.title.gates`, its icon
   `i-material-symbols-balance`, its screen path `/gates`, the service `gate` and the API prefix `/console`, and
-  asks for the `administrator` role. It asks for no owner key, no event stream, no socket and no notices.
+  asks for the `administrator` role. It asks for no owner key, no event stream, no socket and no notices. Under
+  `relays` it names `POST /translations` (「Translations」), the one route outside the prefix a console relays.
 - **The module and the stylesheet** stand under `/console/bundle/`, each named by the digest of its bytes, so
   either path changes whenever its bytes do. Each is answered as an immutable file a year long; a name that is not
   the current digest is 404 `not-found`.
@@ -242,10 +250,12 @@ console's, so nothing here names one.
   words are answered on the token alone.
 - **The screen's reads** under `/console/` answer as their routes outside it do. Since the API prefix is
   `/console`, a console relays a browser nothing of the gate but them, the module and the stylesheet.
-- **The translator through the console.** `POST /console/translations` translates as `POST /translations` does
-  (「Translations」), behind the same role as every route here. It is the route a console names as its translator
-  (bmo-ui's `docs/console-bundles.md`, 「Translation」), and another bundle's screens reach it where their manifest
-  names the service `gate` under `calls`.
+- **A relayed route.** `POST /translations` is the gate's own route for every caller, and the route a console
+  names as its translator (bmo-ui's `docs/console-bundles.md`, 「Translation」); a console relays it because the
+  manifest names it under `relays`, and another bundle's screens reach it where their manifest names the service
+  `gate` under `calls`. A call to it that names a reader's role in `Owner-Role` is a console's call for that
+  reader and is answered only where the role allows `administrator`, else 403 `forbidden`; a call naming none is
+  a unit's own, on the token alone.
 - **A trial put through the console** is kept with no user name, under the reader's `Owner-Key`, the account
   service's user id, where the call carries one; the trial answers its `userName` empty.
 
@@ -260,9 +270,10 @@ protocol」), a process a call.
 |---|---|---|---|
 | `gate/translate` | `gate.translate` | `call`: it is read-only | Translates `texts` into `language` through `POST /translations` (「Translations」) and answers the readings |
 
-- **Its input** is `language`, a language tag, and `texts`, one text or several, at most twenty. It is handed on to
-  the gate as the translation's `language` and `originals`, so a translation kept before is answered without the
-  translator, and every translation made is kept.
+- **Its input** is `language`, a language tag, and `texts`, one text or several, at most sixteen, the most one
+  translation carries (「Translations」). It is handed on to the gate as the translation's `language` and
+  `originals`, so a translation kept before is answered without the translator, and every translation made is
+  kept.
 - **Its answer** is the gate's: `readings`, one for each text in the order given, each `text` and `whole`. It stands
   as the result's structured content and, the same JSON, as its one text piece.
 - **A refusal** is a result marked `isError` whose text names the status, the code and the gate's sentence, as for a

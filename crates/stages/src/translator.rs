@@ -1,5 +1,6 @@
 //! The translator's readings (`docs/boundary-api.md`, 「For bmo-job」): a text read in a language its reader takes,
-//! its parts in another language alone put into it by the translator gate a few at a time, each part standing beside
+//! its parts in another language alone put into it by the translator gate, no more out at once across every reading
+//! standing than the translator's pool bound (`docs/api.md`, 「Translations」), each part standing beside
 //! the rest as it did in the original, and the reading kept under the digest of the original exactly as written, so
 //! the same original is never translated twice into one language. A text the translator could not render whole has
 //! every part that came back read and the rest in its original, and nothing is kept for it, so the next reading asks
@@ -12,9 +13,11 @@
 use std::sync::Arc;
 
 use futures_util::future::BoxFuture;
+use gate_policy::profiles::PROFILES;
 use gate_policy::translation::{TRANSLATION, Translation};
 use gate_runs::GateRequest;
 use sha2::{Digest, Sha256};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 use crate::Stages;
 use crate::document_translation::{Kept, Outcome, translate_part};
@@ -25,8 +28,64 @@ use crate::sql::{one, run};
 /// The gate's key.
 pub const STAGE: &str = "translator";
 
-/// How many parts are out at the translator at once.
-pub const LANES: usize = 3;
+/// The most originals one reading carries.
+pub const CALL_ORIGINALS: usize = 16;
+
+/// The most originals standing at once across the readings, read or waiting for the translator.
+pub const STANDING_ORIGINALS: usize = 64;
+
+/// The seconds a caller turned away for a full intake waits before asking again.
+pub const BUSY_WAIT_SECONDS: u64 = 5;
+
+/// Where the readings queue for the translator: the places of the parts out at once, shared by every reading
+/// standing and taken in the order asked, and the count of originals standing, read or waiting.
+pub struct Intake {
+  lanes: Semaphore,
+  standing: Arc<Semaphore>,
+}
+
+/// Why a reading was not taken in.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Turned {
+  /// It carries more originals than one reading takes.
+  TooMany,
+  /// The originals standing would pass their bound.
+  Full,
+}
+
+/// A reading's originals standing in the intake until it is dropped.
+pub struct Admitted(#[allow(dead_code)] Option<OwnedSemaphorePermit>);
+
+impl Intake {
+  /// An intake of so many parts out at once and so many originals standing.
+  pub fn new(lanes: usize, standing: usize) -> Self {
+    Self {
+      lanes: Semaphore::new(lanes.max(1)),
+      standing: Arc::new(Semaphore::new(standing)),
+    }
+  }
+
+  /// The intake the policy bounds: as many parts out as the translator's pool, and `STANDING_ORIGINALS`.
+  pub fn of_policy() -> Self {
+    Self::new(PROFILES.of(STAGE).map_or(1, |profile| profile.pool_bound()), STANDING_ORIGINALS)
+  }
+
+  /// The originals of one reading taken in, or why not: never more than `CALL_ORIGINALS`, and never past the
+  /// bound of those standing.
+  pub fn admit(&self, originals: usize) -> Result<Admitted, Turned> {
+    if originals > CALL_ORIGINALS {
+      return Err(Turned::TooMany);
+    }
+    if originals == 0 {
+      return Ok(Admitted(None));
+    }
+
+    Arc::clone(&self.standing)
+      .try_acquire_many_owned(originals as u32)
+      .map(|permit| Admitted(Some(permit)))
+      .map_err(|_| Turned::Full)
+  }
+}
 
 /// What a part is asked of: the translator gate, or whatever stands in for it.
 pub type Ask = Arc<dyn Fn(GateRequest) -> BoxFuture<'static, Option<String>> + Send + Sync>;
@@ -208,10 +267,12 @@ async fn part_into(
 }
 
 /// Every original read in `language`, in the order given: one with no part in another language as it stands, one
-/// with a reading kept as that, and every other its parts in another language put into it now, a few at a time,
-/// and kept where every part came back. None where the language is none a reader takes.
+/// with a reading kept as that, and every other its parts in another language put into it now, each waiting for a
+/// place among the intake's lanes, and kept where every part came back. None where the language is none a reader
+/// takes.
 pub async fn readings(
   stages: &Stages,
+  intake: &Intake,
   language: &str,
   originals: &[String],
   ask: &Ask,
@@ -267,7 +328,7 @@ pub async fn readings(
     Reader::Worker => String::new(),
   };
   let glossary = stages.reading.glossary();
-  let lanes = tokio::sync::Semaphore::new(LANES);
+  let lanes = &intake.lanes;
   let mut asking = Vec::new();
 
   // Only the parts in another language are asked for; a part already in the language stands as its own reading.
@@ -279,7 +340,7 @@ pub async fn readings(
         continue;
       }
 
-      let (lanes, worker, system, glossary, english) = (&lanes, &worker, &system, &glossary, &english);
+      let (worker, system, glossary, english) = (&worker, &system, &glossary, &english);
 
       asking.push(async move {
         let _lane = lanes.acquire().await.ok();

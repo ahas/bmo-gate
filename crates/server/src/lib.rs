@@ -29,6 +29,7 @@ use gate_reference::Reference;
 use gate_runs::Runs;
 use gate_stages::document_translation::Queue;
 use gate_stages::laya::Side;
+use gate_stages::translator::Intake;
 use gate_stages::{Reading, Stages};
 use sea_orm::DatabaseConnection;
 use sea_orm_migration::MigratorTrait;
@@ -38,13 +39,14 @@ use crate::console::ConsoleBundle;
 use crate::settings::{Settings, Unread};
 
 /// Everything a route stands on: the gates and the reference road, bmo-job for the rows the gate raises, the
-/// document translations' queue, the token every caller presents, the owner's room, the data root, and the console
-/// bundle where the settings name one.
+/// document translations' queue, the translations' intake, the token every caller presents, the owner's room, the
+/// data root, and the console bundle where the settings name one.
 pub struct App {
   pub stages: Arc<Stages>,
   pub reference: Arc<Reference>,
   pub job: Arc<dyn Job>,
   pub queue: Queue,
+  pub translations: Intake,
   pub token: String,
   pub owner_room: i64,
   pub data_root: PathBuf,
@@ -69,11 +71,12 @@ async fn absent() -> Refused {
   Refused::new(Code::NoRoute, "no route answers this method and path")
 }
 
-/// Every route, behind the bearer check.
+/// Every route, behind the bearer check, a route the manifest relays behind the reader's role as well.
 pub fn router(app: Arc<App>) -> Router {
   routes::all()
     .fallback(absent)
     .method_not_allowed_fallback(absent)
+    .layer(middleware::from_fn(routes::console::relayed_role))
     .layer(middleware::from_fn_with_state(app.clone(), bearer))
     .with_state(app)
 }
@@ -164,6 +167,7 @@ pub async fn stand(settings: &Settings) -> Result<Arc<App>, Unread> {
     reference,
     job: Arc::new(HttpJob::new(peer(&settings.job.address, settings.unit_token(&settings.job)?)?)),
     queue: Queue::default(),
+    translations: Intake::of_policy(),
     token,
     owner_room: settings.owner_room,
     data_root: settings.data_root.clone(),

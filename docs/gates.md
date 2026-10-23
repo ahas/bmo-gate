@@ -12,8 +12,10 @@
   of the same gate never stand at the road together while different gates do. A gate whose road is a
   provider's program takes as many runs at once as its pool's bound (「How many runs stand at once」 below). A
   caller that bounds how many of its own requests are out at once marks each request to stand beside the
-  gate's other runs instead, and the bound is then the caller's alone — the translator, which keeps three parts
-  out at a time (the web unit's `docs/documents-viewer.md`).
+  gate's other runs instead, and the bound is then the caller's alone — the translator's: a document's
+  translation keeps three parts out at a time (the web unit's `docs/documents-viewer.md`), and the translations
+  route keeps no more parts out than the translator's pool bound across every call standing (`docs/api.md`,
+  「Translations」).
 - A gate whose caller has a way of its own without it declares so in its profile, and only such a gate may
   be switched off for the whole deployment: its switch is its row of the gate options table (the agency's
   `docs/own-llm.md`, 「Per-gate time limit」), and a gate switched off is never asked. Apart from that, each
@@ -55,8 +57,8 @@
 ### How many runs stand at once
 
 - **A gate stands no more runs at once than its pool's bound:** the default in the gate's `gate-pool`
-  policy, three, or the bound the gate's own profile names. The translator, whose caller keeps several parts
-  out at once, names four.
+  policy, three, or the bound the gate's own profile names. The translator names four, the most parts the
+  translations route has out at once.
 - **No run free:** while every place of a full pool is taken, the judgement waits for one to come free until
   the gate's own wait (its gate options row) runs out. The gate then has no answer, its road records
   `timeout`, and its caller's own way without it stands (the agency's `docs/own-llm.md`, 「A gate that did

@@ -238,18 +238,22 @@ pub fn document() -> Value {
     "/translations",
     "translations",
     "Translations",
-    "Translate originals into one language, in the order given, keeping each whole reading.",
+    "Translate at most 16 originals into one language, in the order given, keeping each whole reading; a call \
+     naming a reader's role is a console's and is held to the manifest's role.",
     vec![],
     None,
     Some(made::<TranslationAsk>),
     &[(200, "one reading for each original", Some(made::<Readings>))],
     &[
       "unauthorized",
+      "forbidden",
       "bad-request",
+      "too-many-originals",
       "language-unknown",
       "stopped",
       "failed",
       "upstream-failed",
+      "translator-busy",
     ],
   );
   route(
@@ -551,29 +555,6 @@ pub fn document() -> Value {
       "bad-request",
       "no-gate",
       "too-large",
-      "stopped",
-      "failed",
-      "upstream-failed",
-    ],
-  );
-
-  route(
-    &mut paths,
-    &mut generator,
-    "post",
-    "/console/translations",
-    "console_translations",
-    "Console",
-    "Translate originals into one language, as POST /translations does; the reader's role is read.",
-    vec![],
-    None,
-    Some(made::<TranslationAsk>),
-    &[(200, "one reading for each original", Some(made::<Readings>))],
-    &[
-      "unauthorized",
-      "forbidden",
-      "bad-request",
-      "language-unknown",
       "stopped",
       "failed",
       "upstream-failed",

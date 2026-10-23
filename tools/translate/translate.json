@@ -10,7 +10,7 @@
       "type": "array",
       "items": { "type": "string" },
       "minItems": 1,
-      "maxItems": 20,
+      "maxItems": 16,
       "description": "The texts to translate, one or several; each is answered by one reading, in this order."
     }
   },

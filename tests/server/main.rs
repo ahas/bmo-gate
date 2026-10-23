@@ -31,6 +31,7 @@ use gate_server::App;
 use gate_server::console::ConsoleBundle;
 use gate_stages::document_translation::Queue;
 use gate_stages::laya::Side;
+use gate_stages::translator::Intake;
 use gate_stages::{Reading, Stages};
 use reqwest::{Method, StatusCode};
 use serde_json::{Value, json};
@@ -115,6 +116,7 @@ pub async fn ground_serving(
     reference,
     job: job.clone(),
     queue: Queue::default(),
+    translations: Intake::of_policy(),
     token: TOKEN.to_owned(),
     owner_room: 1,
     data_root: PathBuf::from(&data_root),
