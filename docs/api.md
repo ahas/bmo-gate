@@ -204,16 +204,6 @@ characters; a longer one is 413 `too-large`.
 event tells of. The kinds are `judgement.created`, `document-translation.changed` and `laya.changed`. A
 reader that falls behind loses what it missed and reads the collections again.
 
-## Hooks
-
-The gate answers the agency's `session-summariser` hook point. It registers `POST /hooks` with `point`
-`session-summariser`, its own address for the point and its token as it starts, and answers this route:
-
-`POST /hooks/session-summariser` is asked `{point, ask}`, where `ask` is `kind` (`chat`, `worker` or
-`switch`), `mode`, `sessionId?`, `cwd`, `account?`, `transcript?`, `ownNote?` and `chatId?`. It answers
-`{answer}`: the whole note the next run is handed, or null. A summariser that fails answers null, and nothing
-is carried over.
-
 ## The document
 
 `docs/openapi.json` is the machine form of this contract: every route, its body, its query, its answers and

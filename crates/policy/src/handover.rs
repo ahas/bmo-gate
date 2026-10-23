@@ -1,5 +1,5 @@
-//! What passes from a closed session to the one that replaces it: how much of the old conversation the
-//! summariser reads, what it is asked, how long its summary may be, and the note the next run is handed.
+//! The session summariser's reading: how much of a session's conversation it reads, what it is asked, and how
+//! long its summary may be.
 
 use serde::Deserialize;
 
@@ -11,15 +11,6 @@ pub struct Block {
   pub close: String,
 }
 
-/// The note a session is handed: the one carrying a summary, which ends on the summary's heading, and the one
-/// saying nothing was recovered.
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Notes {
-  pub carried: Vec<String>,
-  pub lost: Vec<String>,
-}
-
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Handover {
@@ -28,9 +19,6 @@ pub struct Handover {
   pub summary_heading: String,
   pub room_speaker: String,
   pub conversation: Vec<Block>,
-  pub chat: Notes,
-  pub worker: Notes,
-  pub switch: Notes,
 }
 
 crate::part!(pub HANDOVER: Handover = "handover.toml");

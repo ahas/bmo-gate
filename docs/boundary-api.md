@@ -20,7 +20,7 @@ each release links to the data root's `env/gate.toml`. It names:
 | Key | What it is |
 |---|---|
 | `listen` | the address the service answers at |
-| `address` | the base address the service is reached at, which it hands the agency for its hook |
+| `address` | the base address the service is reached at, which its `health` asks |
 | `token_file` | the name of the file under the data root's `env/` holding the bearer token every caller presents |
 | `database` | the address of the gate's own database, holding the tables under 「What the gate owns」 and nothing else |
 | `data_root` | where the gate's runtime data lives: Laya's checkpoints, datasets and run output, and the gate's run files |
@@ -32,7 +32,6 @@ each release links to the data root's `env/gate.toml`. It names:
 | `[arbiter]` | the card master's `address` |
 | `[gateway]` | the agency's model gateway: its `address`, and the `key_file` under `env/` |
 | `[laya]` | the gate's own Laya relay, where one stands: its `address`, and the `token_file` under `env/` |
-| `[records]` | where the session summariser reads a closed session's record: `claude`, Claude Code's configuration folders searched in order, and `codex`, Codex's sessions folder |
 | `[shipped]` | `folder`, under which the shipped pieces' bodies are read — the system's reference documents, as the deployment places them — a row's path read relative to it |
 | `[reading]` | what the translator's checks read a text by: `set_aside`, the words the English test reads past — the names of people and agents and the marks a note's strands open with — and `wording`, the file the owner's banned words are read from, where the deployment keeps one |
 
@@ -133,7 +132,8 @@ In the agency's conventions (its `docs/api.md`): camelCase, the agency's control
 | a turn | `POST /sessions/{sessionId}/turns` | `prompt`, and the `gate` part: `system`, the gate's whole system prompt; `thinking`, whether the run thinks; and `model`, `effort` and `answerTokens`, the mapping its tier resolved to |
 | a session ended | `DELETE /sessions/{sessionId}` | a run of the gate's somebody stopped, its turn cut short |
 | the events | `GET /events?kinds=road-walked` | the road each conversational turn walked, which the gate writes into its road records |
-| a hook registered | `PUT /hooks/{point}` | `point` `session-summariser`, `url`, `token` |
+
+The gate registers no hook at any of the agency's hook points and answers none.
 
 The training tooling's claude road hands a batch to the agency's command for a run apart, as the tooling's settings
 name it (`docs/gate-data.md`, 「The claude road」), with `--model`, `--effort`, `--config-dir`, `--system-file`,
@@ -233,7 +233,7 @@ verdict are kept ninety days: the service sweeps both tables as it starts and on
 | the output gate's folding dialects and checks | the gate | its own policy file |
 | the reference gates' libraries, caps and rules | the gate | its own policy file |
 | the memory rows a turn is handed: their caps and order | the gate | its own policy file |
-| the session summariser's note: its length and parts | the gate | its own policy file |
+| the session summariser's transcript and summary: their lengths and the line the transcript rides under | the gate | its own policy file |
 | the gate order and the gates' profiles | the gate | its own policy file, served by `GET /gates` |
 | the prompt ceilings | the gate | its own policy file |
 | a work key's tier, mapping and run mode | the agency | `POST /routes/resolve`, `GET /fallback` |
@@ -281,9 +281,11 @@ patch.
 
 Statements here that a sibling's document does not yet match, each for that sibling to take up:
 
-- **The agency's session summariser hook** hands a Claude Code or Codex session by its id alone, with no
-  `transcript`; the summariser reads the session's record from the folders its `[records]` settings name, on
-  the machine both run on, until the agency hands the transcript itself.
+- **The agency names the gate among the registrants of its `turn-submitting` hook point** (the agency's
+  `docs/api.md`, 「hooks」); the gate registers no hook (「bmo-agency」 above), for the agency to drop the name.
+- **No unit asks the session summariser:** the agency keeps no session summary (its `docs/sessions.md`) and
+  resolves no road for the `session-summary` work key, so the gate's `session-summary` stands in the gate order
+  and the evaluation set and runs only there, until the owner retires it or a unit asks it again.
 - **The brain's layers are listed by position but paged after the last id seen,** so a page boundary can
   pass over a layer whose id is lower than one already read. The gate reads the layers at the route's
   ceiling of a page and asks each later page after the largest id it has read, until the brain pages its

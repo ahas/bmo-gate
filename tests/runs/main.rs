@@ -13,7 +13,6 @@ mod tried;
 
 use std::sync::Arc;
 
-use gate_runs::RecordFolders;
 use serde_json::json;
 
 use crate::fakes::{FakeAgency, FakeGateway};
@@ -29,7 +28,7 @@ pub async fn wait(runs: &gate_runs::Runs, stage: &str, ms: i64) {
   gate_runs::options::change(runs, stage, &json!({ "timeoutMs": ms }), 1).await.unwrap();
 }
 
-/// The runs over a ground, with no record folders.
+/// The runs over a ground.
 pub fn runs_of(scratch: &Scratch, agency: &Arc<FakeAgency>, gateway: &Arc<FakeGateway>) -> gate_runs::Runs {
-  fakes::runs(scratch.db(), agency, gateway, RecordFolders::default())
+  fakes::runs(scratch.db(), agency, gateway)
 }

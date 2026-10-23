@@ -15,7 +15,7 @@ use gate_ports::agency::{
 };
 use gate_ports::gateway::{Ask, Completion, Gateway};
 use gate_ports::http::Answer;
-use gate_runs::{RecordFolders, Runs};
+use gate_runs::Runs;
 use sea_orm::DatabaseConnection;
 use serde_json::{Map, Value, json};
 
@@ -205,15 +205,6 @@ impl Agency for FakeAgency {
   fn roads_walked(&self) -> BoxFuture<'_, Answer<BoxStream<'static, Answer<RoadWalked>>>> {
     Box::pin(async move { unanswered("road-walked") })
   }
-
-  fn register_hook<'a>(
-    &'a self,
-    _point: &'a str,
-    _url: &'a str,
-    _token: Option<&'a str>,
-  ) -> BoxFuture<'a, Answer<()>> {
-    Box::pin(async move { unanswered("a hook registered") })
-  }
 }
 
 /// The stand-in gateway: the answers it gives in turn, and every request it was asked.
@@ -262,18 +253,6 @@ pub fn completion(text: &str) -> Answer<Completion> {
 }
 
 /// The runs over a database and the stand-ins, the chat agent named `the-chat-agent`.
-pub fn runs(
-  db: &DatabaseConnection,
-  agency: &Arc<FakeAgency>,
-  gateway: &Arc<FakeGateway>,
-  records: RecordFolders,
-) -> Runs {
-  Runs::new(
-    db.clone(),
-    agency.clone(),
-    gateway.clone(),
-    "the-chat-agent",
-    "/a/session/folder",
-    records,
-  )
+pub fn runs(db: &DatabaseConnection, agency: &Arc<FakeAgency>, gateway: &Arc<FakeGateway>) -> Runs {
+  Runs::new(db.clone(), agency.clone(), gateway.clone(), "the-chat-agent", "/a/session/folder")
 }

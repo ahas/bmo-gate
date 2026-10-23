@@ -1,6 +1,7 @@
 //! The service's contract tests: the router served on the loopback over a scratch database of the test's own, the
 //! agency, the brain, the receiver and bmo-job stood in, and every route driven with the bodies its callers send —
-//! bmo-receiver's, bmo-job's, bmo-brain's, bmo-artifact's, the agency's hook, the voice unit's and the console's.
+//! bmo-receiver's, bmo-job's, bmo-brain's, bmo-artifact's, the voice unit's and the console's — and the watches
+//! beside them as the agency sees them.
 
 #[path = "../runs/fakes.rs"]
 mod agency;
@@ -8,11 +9,13 @@ mod agency;
 mod fakes;
 #[path = "../support/scratch.rs"]
 mod scratch;
+#[path = "../support/stub.rs"]
+mod stub;
 
 mod brain;
 mod console;
-mod hooks;
 mod receiver;
+mod watches;
 mod wire;
 mod work;
 
@@ -22,7 +25,7 @@ use std::sync::{Arc, Mutex};
 use gate_policy::profiles::PROFILES;
 use gate_ports::gateway::Ask;
 use gate_reference::Reference;
-use gate_runs::{RecordFolders, Runs};
+use gate_runs::Runs;
 use gate_server::App;
 use gate_stages::document_translation::Queue;
 use gate_stages::laya::Side;
@@ -67,7 +70,6 @@ pub async fn ground(test: &str, answer: impl Fn(&Ask) -> Option<String> + Send +
     gateway.clone(),
     "the-chat-agent",
     "/a/session/folder",
-    RecordFolders::default(),
   );
 
   agency.providers.lock().unwrap().push(provider("registry", true));

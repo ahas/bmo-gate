@@ -1,7 +1,7 @@
 //! What the service keeps going beside its routes: the agency's `road-walked` events written into the road records,
-//! the session summariser's hook registered again every few minutes so an agency started since finds it, Laya's
-//! health asked once a minute and told to the screens where its state or model moved, the attachments counted
-//! every hour, and the bounded tables swept as the service starts and once a day after.
+//! Laya's health asked once a minute and told to the screens where its state or model moved, the attachments
+//! counted every hour, and the bounded tables swept as the service starts and once a day after. None of them
+//! registers a hook at the agency.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -19,19 +19,12 @@ use crate::App;
 /// How long a dropped event stream waits before it is opened again.
 const REOPEN: Duration = Duration::from_secs(5);
 
-/// How often the hook is registered again, and how often a registration that failed is tried again.
-const REGISTER_EVERY: Duration = Duration::from_secs(300);
-const REGISTER_RETRY: Duration = Duration::from_secs(30);
-
 /// How often Laya's health is asked, and how often the attachments are counted.
 const HEALTH_EVERY: Duration = Duration::from_secs(60);
 const ATTACHMENTS_EVERY: Duration = Duration::from_secs(3_600);
 
 /// How often the bounded tables are swept.
 const SWEEP_EVERY: Duration = Duration::from_secs(24 * 3_600);
-
-/// The point the session summariser answers.
-pub const SUMMARISER: &str = "session-summariser";
 
 /// One road the agency walked, written as a road record.
 pub async fn write_walked(db: &DatabaseConnection, road: &RoadWalked) {
@@ -79,22 +72,6 @@ async fn road_walked(app: Arc<App>) {
     }
 
     tokio::time::sleep(REOPEN).await;
-  }
-}
-
-async fn hook(app: Arc<App>, url: String) {
-  let agency = app.stages.runs.agency.clone();
-
-  loop {
-    let wait = match agency.register_hook(SUMMARISER, &url, Some(&app.token)).await {
-      Ok(()) => REGISTER_EVERY,
-      Err(why) => {
-        eprintln!("gate-server: the {SUMMARISER} hook could not be registered: {why}");
-        REGISTER_RETRY
-      }
-    };
-
-    tokio::time::sleep(wait).await;
   }
 }
 
@@ -154,10 +131,9 @@ async fn sweeps(app: Arc<App>) {
   }
 }
 
-/// Every watch started beside the routes, the hook registered at `url`.
-pub fn start(app: Arc<App>, url: String) {
+/// Every watch started beside the routes.
+pub fn start(app: Arc<App>) {
   tokio::spawn(road_walked(app.clone()));
-  tokio::spawn(hook(app.clone(), url));
   tokio::spawn(health(app.clone()));
   tokio::spawn(attachments(app.clone()));
   tokio::spawn(sweeps(app));

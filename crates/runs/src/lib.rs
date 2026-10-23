@@ -13,7 +13,6 @@ pub mod session;
 pub mod summary;
 pub mod tried;
 
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
@@ -27,17 +26,8 @@ use self::pool::Pools;
 use self::records::{Outcome, Road};
 use self::route::{Route, Way};
 
-/// Where the session summariser reads a closed session's record: Claude Code's configuration folders, searched
-/// in order, and Codex's sessions folder.
-#[derive(Clone, Debug, Default)]
-pub struct RecordFolders {
-  pub claude: Vec<PathBuf>,
-  pub codex: Option<PathBuf>,
-}
-
 /// What every run of this service stands on: the gate's database, the agency and its model gateway, the chat
-/// agent whose options stand outside any turn, the folder a thrown-away session is started in, and where a
-/// closed session's record is read.
+/// agent whose options stand outside any turn, and the folder a thrown-away session is started in.
 pub struct Runs {
   pub db: DatabaseConnection,
   pub agency: Arc<dyn Agency>,
@@ -47,7 +37,6 @@ pub struct Runs {
   /// from the chat agent's, whose turns a gate run would otherwise stand over.
   pub run_agent: Option<String>,
   pub session_folder: String,
-  pub records: RecordFolders,
   pools: Pools,
 }
 
@@ -181,7 +170,6 @@ impl Runs {
     gateway: Arc<dyn Gateway>,
     chat_agent: impl Into<String>,
     session_folder: impl Into<String>,
-    records: RecordFolders,
   ) -> Self {
     Self {
       db,
@@ -190,7 +178,6 @@ impl Runs {
       chat_agent: chat_agent.into(),
       run_agent: None,
       session_folder: session_folder.into(),
-      records,
       pools: Pools::default(),
     }
   }

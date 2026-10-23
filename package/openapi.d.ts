@@ -140,23 +140,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/hooks/session-summariser": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** The agency's session-summariser point, asked with `{point, ask}` and answered `{answer}`. */
-        post: operations["session_summariser"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/judgements": {
         parameters: {
             query?: never;
@@ -613,15 +596,6 @@ export interface components {
             ready: boolean;
             reason: string | null;
             version: string;
-        };
-        /** @description The agency's session-summariser hook as the gate answers it. */
-        HookAnswer: {
-            answer: string | null;
-        };
-        /** @description The agency's session-summariser hook as it asks it. */
-        HookAsk: {
-            ask?: unknown;
-            point: string;
         };
         /** @description A decision written into a room's log. */
         Judgement: {
@@ -1167,31 +1141,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Health"];
-                };
-            };
-            default: components["responses"]["Error"];
-        };
-    };
-    session_summariser: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["HookAsk"];
-            };
-        };
-        responses: {
-            /** @description the note the next run is handed, or none */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HookAnswer"];
                 };
             };
             default: components["responses"]["Error"];

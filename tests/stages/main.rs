@@ -27,7 +27,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use gate_policy::profiles::PROFILES;
-use gate_runs::RecordFolders;
 use gate_stages::laya::Side;
 use gate_stages::{Reading, Stages};
 use serde_json::json;
@@ -62,7 +61,7 @@ pub async fn ground(test: &str, laya: Option<&Stub>, reading: Reading) -> Ground
   let scratch = Scratch::new().await;
   let agency = Arc::new(FakeAgency::default());
   let gateway = Arc::new(FakeGateway::default());
-  let runs = fakes::runs(scratch.db(), &agency, &gateway, RecordFolders::default());
+  let runs = fakes::runs(scratch.db(), &agency, &gateway);
 
   agency.providers.lock().unwrap().push(provider("registry", true));
   agency

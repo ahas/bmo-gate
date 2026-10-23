@@ -750,7 +750,7 @@ pub struct DocumentPartsQuery {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// Health and the agency's hook
+// Health
 
 /// Readiness, version and Laya's last state.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -761,20 +761,4 @@ pub struct Health {
   pub version: String,
   /// `up`, `down` or `off`.
   pub laya: String,
-}
-
-/// The agency's session-summariser hook as it asks it.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct HookAsk {
-  pub point: String,
-  #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub ask: Option<Value>,
-}
-
-/// The agency's session-summariser hook as the gate answers it.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct HookAnswer {
-  pub answer: Option<String>,
 }

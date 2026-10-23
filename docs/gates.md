@@ -26,10 +26,9 @@
   - The turn's agent travels with the work: a companion's turn asks its reference selection as that
     agent's turn, and every gate asked from inside reads that agent's row. A gate asked outside any agent's
     turn reads the chat agent's.
-- The session summariser runs at the place the gate order gives it and is called like a gate, but it is a
-  recollector, not a gate: the agent menu and the catalogue group it with the digest and the person-book
-  writer (the agency's `docs/agent-ownership.md`, 「The recollectors」). The agency asks it through its
-  `session-summariser` hook (`docs/boundary-api.md`).
+- The session summariser stands at the place the gate order gives it and is called like a gate, but it is a
+  recollector, not a gate. No unit asks it: the agency keeps no session summary (its `docs/sessions.md`), so
+  it runs under the evaluation set alone (`docs/boundary-api.md`, 「Contract gaps」).
 - What each gate runs on is its route, kept with every other work key's by the agency (the agency's
   `docs/own-llm.md`, 「A gate has one road」). What each one is asked is in its own document: the output gate
   in `docs/output-gate.md`, the reference gates in `docs/reference-selection.md`.

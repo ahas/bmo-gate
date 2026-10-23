@@ -27,14 +27,6 @@ pub struct Arbiter {
   pub address: String,
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Records {
-  #[serde(default)]
-  pub claude: Vec<PathBuf>,
-  pub codex: Option<PathBuf>,
-}
-
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Shipped {
@@ -71,8 +63,6 @@ pub struct Settings {
   pub arbiter: Option<Arbiter>,
   pub gateway: Gateway,
   pub laya: Option<Unit>,
-  #[serde(default)]
-  pub records: Records,
   pub shipped: Option<Shipped>,
   #[serde(default)]
   pub reading: Reading,

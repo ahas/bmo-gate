@@ -1,6 +1,6 @@
 [package]
 name = "gate-policy"
-description = "The gate's own policy: the gate order and each gate's profile, the reference gates' caps, the output gate's lines, the summariser's note, and the questions Laya is asked."
+description = "The gate's own policy: the gate order and each gate's profile, the reference gates' caps, the output gate's lines, the summariser's reading, and the questions Laya is asked."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

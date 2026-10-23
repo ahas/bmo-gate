@@ -463,20 +463,6 @@ pub fn document() -> Value {
     &[(200, "the event stream", None)],
     &["unauthorized", "failed"],
   );
-  route(
-    &mut paths,
-    &mut generator,
-    "post",
-    "/hooks/session-summariser",
-    "session_summariser",
-    "Hooks",
-    "The agency's session-summariser point, asked with `{point, ask}` and answered `{answer}`.",
-    vec![],
-    None,
-    Some(made::<HookAsk>),
-    &[(200, "the note the next run is handed, or none", Some(made::<HookAnswer>))],
-    &[],
-  );
 
   let error = made::<ErrorBody>(&mut generator).to_value();
   let definitions = generator.take_definitions(true);
@@ -526,7 +512,6 @@ pub fn document() -> Value {
       "Trials",
       "Documents",
       "Events",
-      "Hooks",
     ]),
   );
 

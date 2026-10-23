@@ -1,7 +1,6 @@
 //! The gate's service (`docs/boundary-api.md`): every route the boundary states, behind the gate's bearer token,
 //! and the watches the service keeps going beside them — the agency's road events written into the road records,
-//! the session summariser's hook kept registered, Laya's health asked once a minute, and the attachments counted
-//! every hour.
+//! Laya's health asked once a minute, and the attachments counted every hour.
 
 pub mod answer;
 pub mod routes;
@@ -24,7 +23,7 @@ use gate_ports::gateway::HttpGateway;
 use gate_ports::job::{HttpJob, Job};
 use gate_ports::receiver::HttpReceiver;
 use gate_reference::Reference;
-use gate_runs::{RecordFolders, Runs};
+use gate_runs::Runs;
 use gate_stages::document_translation::Queue;
 use gate_stages::laya::Side;
 use gate_stages::{Reading, Stages};
@@ -99,10 +98,6 @@ pub fn stages(settings: &Settings, db: DatabaseConnection) -> Result<Arc<Stages>
     gateway,
     settings.chat_agent.clone(),
     settings.session_folder.clone(),
-    RecordFolders {
-      claude: settings.records.claude.clone(),
-      codex: settings.records.codex.clone(),
-    },
   );
 
   runs.run_agent = settings.run_agent.clone();
@@ -170,10 +165,7 @@ pub async fn serve(settings: Settings) -> Result<(), Unread> {
     .await
     .map_err(|why| Unread(format!("{}: {why}", settings.listen)))?;
 
-  watches::start(
-    app.clone(),
-    format!("{}/hooks/session-summariser", settings.address.trim_end_matches('/')),
-  );
+  watches::start(app.clone());
   println!("gate-server: answering at {}", settings.listen);
 
   axum::serve(listener, router(app)).await.map_err(|why| Unread(why.to_string()))

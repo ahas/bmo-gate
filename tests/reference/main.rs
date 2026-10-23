@@ -21,7 +21,7 @@ use std::sync::{Arc, Mutex};
 use gate_policy::profiles::PROFILES;
 use gate_ports::gateway::Ask;
 use gate_reference::Reference;
-use gate_runs::{RecordFolders, Runs};
+use gate_runs::Runs;
 use gate_stages::laya::Side;
 use gate_stages::{Reading, Stages};
 use serde_json::json;
@@ -54,7 +54,6 @@ pub async fn ground(test: &str, answer: impl Fn(&Ask) -> Option<String> + Send +
     gateway.clone(),
     "the-chat-agent",
     "/a/session/folder",
-    RecordFolders::default(),
   );
 
   agency.providers.lock().unwrap().push(provider("registry", true));

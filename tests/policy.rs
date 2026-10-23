@@ -137,14 +137,9 @@ fn each_line_names_the_marks_it_is_filled_with() {
 }
 
 #[test]
-fn every_note_names_the_new_session_and_a_summary_has_its_heading() {
-  for notes in [&HANDOVER.chat, &HANDOVER.worker, &HANDOVER.switch] {
-    assert!(notes.carried.first().is_some_and(|line| line.contains("new one")));
-    assert!(notes.lost.first().is_some_and(|line| line.contains("new one")));
-    assert!(notes.carried.last().is_some_and(|line| line.ends_with(':')));
-  }
-
+fn the_summariser_reads_two_conversation_blocks_under_a_heading() {
   assert_eq!(HANDOVER.conversation.len(), 2);
+  assert!(HANDOVER.summary_heading.ends_with(':'));
 }
 
 #[test]

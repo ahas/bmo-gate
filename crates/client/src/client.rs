@@ -287,11 +287,6 @@ impl GateClient {
     });
     Ok(stream)
   }
-
-  /// Answer the agency's session-summariser hook.
-  pub async fn session_summariser(&self, ask: &HookAsk) -> Result<HookAnswer, ClientFailure> {
-    answer(self.post(&["hooks", "session-summariser"]).json(ask)).await
-  }
 }
 
 async fn checked(response: Response) -> Result<Response, ClientFailure> {

@@ -1,7 +1,7 @@
 //! The agency port (`docs/boundary-api.md`, 「bmo-agency」 and 「How a gate run reaches a model」): the agents and
 //! the shared rulebooks, the providers, a work key's route and mapping, the stand-in, a thrown-away session and
-//! its one turn, a run stopped, the roads a turn walked, and the gate's hook registered. Bodies are camelCase,
-//! but for a turn's work parts, which go by the snake-case names a job's runner sends them.
+//! its one turn, a run stopped, and the roads a turn walked. Bodies are camelCase, but for a turn's work parts,
+//! which go by the snake-case names a job's runner sends them.
 
 use futures_util::future::BoxFuture;
 use futures_util::stream::BoxStream;
@@ -194,14 +194,6 @@ pub trait Agency: Send + Sync {
 
   /// The roads conversational turns walk, from the moment the stream opens.
   fn roads_walked(&self) -> BoxFuture<'_, Answer<BoxStream<'static, Answer<RoadWalked>>>>;
-
-  /// The gate's address registered at a hook point, in place of any before.
-  fn register_hook<'a>(
-    &'a self,
-    point: &'a str,
-    url: &'a str,
-    token: Option<&'a str>,
-  ) -> BoxFuture<'a, Answer<()>>;
 }
 
 /// The agency over HTTP.
@@ -318,13 +310,6 @@ struct GateSend<'a> {
   effort: Option<&'a str>,
   #[serde(skip_serializing_if = "Option::is_none")]
   answer_tokens: Option<i64>,
-}
-
-#[derive(Serialize)]
-struct Hook<'a> {
-  url: &'a str,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  token: Option<&'a str>,
 }
 
 /// The code the agency answers a read of nothing held with.
@@ -488,20 +473,6 @@ impl Agency for HttpAgency {
         });
 
       Ok(roads.boxed())
-    })
-  }
-
-  fn register_hook<'a>(
-    &'a self,
-    point: &'a str,
-    url: &'a str,
-    token: Option<&'a str>,
-  ) -> BoxFuture<'a, Answer<()>> {
-    Box::pin(async move {
-      self
-        .caller
-        .done("hook registered", Method::PUT, &["hooks", point], &Hook { url, token })
-        .await
     })
   }
 }

@@ -5,7 +5,6 @@ pub mod events;
 pub mod formats;
 pub mod gates;
 pub mod health;
-pub mod hooks;
 pub mod judgements;
 pub mod knowledge;
 pub mod reference;
@@ -47,6 +46,5 @@ pub fn all() -> Router<Arc<App>> {
     .route("/documents/translations/state", get(documents::state))
     .route("/documents/translations/parts", get(documents::parts))
     .route("/events", get(events::stream))
-    .route("/hooks/session-summariser", post(hooks::summariser))
     .route("/health", get(health::health))
 }

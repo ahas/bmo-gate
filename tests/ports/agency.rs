@@ -180,24 +180,15 @@ async fn a_gate_run_is_a_conversation_and_one_turn_carrying_the_whole_system_pro
 }
 
 #[tokio::test]
-async fn a_session_is_ended_and_the_hook_registered() {
+async fn a_session_is_ended() {
   let stub = Stub::start().await;
   let agency = HttpAgency::new(peer(&stub, "t"));
 
   stub.canned(Method::DELETE, "/sessions/s-3", 204, "application/json", String::new());
-  stub.canned(Method::PUT, "/hooks/session-summariser", 200, "application/json", json!({}).to_string());
 
   agency.stop("s-3", "the caller left").await.unwrap();
-  agency
-    .register_hook("session-summariser", "http://gate.example/hooks/session-summariser", Some("gate-token"))
-    .await
-    .unwrap();
 
   assert_eq!(stub.one("/sessions/s-3").method, Method::DELETE);
-  assert_eq!(
-    stub.one("/hooks/session-summariser").json(),
-    json!({ "url": "http://gate.example/hooks/session-summariser", "token": "gate-token" })
-  );
 }
 
 #[tokio::test]

@@ -660,34 +660,6 @@
         ],
         "type": "object"
       },
-      "HookAnswer": {
-        "description": "The agency's session-summariser hook as the gate answers it.",
-        "properties": {
-          "answer": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "answer"
-        ],
-        "type": "object"
-      },
-      "HookAsk": {
-        "description": "The agency's session-summariser hook as it asks it.",
-        "properties": {
-          "ask": true,
-          "point": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "point"
-        ],
-        "type": "object"
-      },
       "Judgement": {
         "description": "A decision written into a room's log.",
         "properties": {
@@ -1915,7 +1887,7 @@
   "info": {
     "description": "The gate stage of a turn: sanitising words on their way into a model's context, choosing the reference a turn is handed, checking an answer on its way out, translating, seeking documents, judging person-book sheets and reading voice lines. Every answer is data in the common wire format; a screen's words are the console's language pack.",
     "title": "bmo-gate",
-    "version": "0.2.1"
+    "version": "0.3.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -2222,41 +2194,6 @@
           "failed",
           "not-ready"
         ]
-      }
-    },
-    "/hooks/session-summariser": {
-      "post": {
-        "operationId": "session_summariser",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/HookAsk"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HookAnswer"
-                }
-              }
-            },
-            "description": "the note the next run is handed, or none"
-          },
-          "default": {
-            "$ref": "#/components/responses/Error"
-          }
-        },
-        "summary": "The agency's session-summariser point, asked with `{point, ask}` and answered `{answer}`.",
-        "tags": [
-          "Hooks"
-        ],
-        "x-codes": []
       }
     },
     "/judgements": {
@@ -3135,7 +3072,6 @@
     "Formats",
     "Trials",
     "Documents",
-    "Events",
-    "Hooks"
+    "Events"
   ]
 }
