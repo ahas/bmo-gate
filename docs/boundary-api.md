@@ -108,32 +108,35 @@ attached.
 
 ### bmo-receiver
 
-The receiver's routes in the common conventions, which the gate reads its room facts through, and its event
-stream, which the gate reads the rows of each round's draft process off.
+The receiver's fixed API in the common format (the receiver's `docs/api.md`), which the gate reads its room facts
+through, and its event stream, which the gate reads the rows of each round's draft process off.
 
-| Call | Route | Body | Answer |
+| Call | Route | Body or query | Answer |
 |---|---|---|---|
-| room titles | `/rooms/titles` | none | `rooms`: `chatId`, `title`, `senders` |
-| roads | `/rooms/roads` | `chatId` | `kind` (`owner` or `group`), `oneToOne` |
-| spoke between | `/rooms/spoke-between` | `chatId`, `person`, `from`, `to` | `spoke` |
-| owner spoke | `/rooms/owner-spoke` | `chatId`, `person`, `before`, `seconds` | `owner`, `spoke` |
-| display names | `/people/names` | `people` | `names`: `person`, `name` |
-| waits on a happening | `/promises/waits` | `text` | `waits` |
-| own number | `/rooms/own-number` | `agent`, `chatId` | `number`: the sender the agent's words stand under in the room, or null |
-| owner notice | `/owner/notice` | `code` and its fields | `ok` |
+| room titles | `GET /rooms` | none | a page of `Room`: `id`, `title`, `senders` |
+| roads | `GET /rooms/{roomId}/roads` | none | `kind` (`owner` or `group`), `oneToOne` |
+| spoke between | `GET /rooms/{roomId}/spoke-between` | `person`, `from`, `to` | `spoke` |
+| owner spoke | `GET /rooms/{roomId}/owner-spoke` | `person`, `before`, `windowMs` | `owner`, `spoke` |
+| display names | `GET /people` | `ids`, comma-separated | a page of `Person`: `id`, `name` |
+| waits on a happening | `POST /promise-readings` | `text` | `waits` |
+| own number | `GET /rooms/{roomId}/own-number` | `agentName` | `number`: the sender the agent's words stand under in the room, or null |
+| owner notice | `POST /owner/notices` | `code` and its fields | 201, `id` |
+| a message | `GET /rooms/{roomId}/messages/{messageId}` | none | a `Message`: `senderId?`, `senderName`, `sentAt`, `text`; 404 where the receiver keeps no such message |
 | draft rows | `GET /events`, held open | none | the receiver's event stream; the gate takes the frames whose data's `type` is `draft` and lets every other go |
 
-The reference nouns of the unit command (「The unit command」) read a stored turn's message through the route the
-receiver serves bmo-job, in its snake_case: `GET /rooms/{chat}/messages/{message}`, answering `sender?`,
-`sender_name?`, `sent_at` and `text`, and 404 where the receiver keeps no such message.
+The reference nouns of the unit command (「The unit command」) read a stored turn's message through the message
+read above.
 
-A `draft` frame is one row of a round's draft process as the receiver's round log keeps it (the receiver's
-`docs/drafting.md`, 「The round log」): `chatId`, `round`, `agentName`, `number` (0 the round's own turn), `question`,
-`kind` (`turn`, `question`, `item`, `check` or `end`), `answerChars`, `changed`, `outcome` and `detail`, and never
-the answer itself. The gate writes each into its judgements as the `draft` stage (`docs/gates.md`, 「What a turn
-records」). The stream replays the receiver's ring of recent events each time it is opened, and the gate opens it
-again five seconds after it drops; a row the gate has written already is not written twice, and a row that left the
-ring while the stream was down is not written at all.
+A `draft` frame of a row is one row of a round's draft process as the receiver's round log keeps it (the
+receiver's `docs/drafting.md`, 「The round log」): `chatId`, `round`, `agentName`, `number` (from 1, the round's own
+turn being the first question's row), `question`, `kind` (`turn`, `question`, `item`, `check` or `end`),
+`answerChars`, `changed`, `outcome`, `detail`, `ms` and `at`, and never the answer itself. A `draft` frame of kind
+`start` is no row: it tells a question as it starts, with `number`, `count` and `question` and none of a row's
+answer fields, and the gate lets it go by its `kind` before it reads a row. The gate writes each row into its
+judgements as the `draft` stage (`docs/gates.md`, 「What a turn records」). The stream replays the receiver's ring
+of recent events each time it is opened, and the gate opens it again five seconds after it drops; a row the gate
+has written already is not written twice, and a row that left the ring while the stream was down is not written
+at all.
 
 The owner notice tells the chat agent in the owner's room a fact the gate raised, as a code and its fields:
 `attachment-alarm` (`row`, `stage`, `piece`, `share`) where the attachments watch filed a row
