@@ -63,6 +63,18 @@ units = ["deploy/*.service", "deploy/*.timer"]
 health = "cd ~/.local/share/bmo-gate/deploy && bin/bmo-gate health"
 
 # The training tooling's packages, which a release's tooling units run on.
+# The unit command, linked into the folder holding `bmo`, the first folder `bmo` looks for unit commands in. The
+# link names this repository's deploy tree, whose own link stands across releases; a link made to the release
+# being deployed would dangle once a later deployment prunes that release (docs/layout.md, 「The deployment」).
+[[deploy.step]]
+id = "link-unit-command"
+phase = "before-flip"
+command = '''
+set -eu
+bmo_dir="$(dirname "$(command -v bmo)")"
+ln -sfn "$HOME/.local/share/bmo-gate/deploy/bin/bmo-gate" "$bmo_dir/bmo-gate"
+'''
+
 [[deploy.step]]
 id = "tooling-packages"
 phase = "before-flip"

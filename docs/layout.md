@@ -100,6 +100,9 @@ The testbed deploys the repository as `testbed.toml` declares it (the testbed's 
     and a training pass, are linked and started by hand. No unit builds the sanitiser gate's rows or runs the
     downgrade harvest: their code is not carried (`docs/gate-data.md`, 「Not carried」).
   Each tooling unit runs in the release's `training/tooling/`, under the data root `BMO_DATA_DIR` names.
+- **The unit command stands beside `bmo`:** before the release is put live, `bmo-gate` is linked into the folder
+  holding `bmo`, the first folder `bmo` looks for unit commands in (`docs/boundary-api.md`, 「The unit command」). The
+  link names the deploy tree's own link, which stands across releases, so it names whichever release is live.
 - **The translator's tool is placed with the tool host** before the release is put live: its executable,
   `gate-translate-tool`, a fourth binary of the release's `bin/`, is copied beside its manifest, schemas and manual,
   and the folder is put with `bmo pocket put` as the gate's own, allowing the capability its entry asks for
