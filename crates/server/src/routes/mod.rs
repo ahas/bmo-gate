@@ -27,6 +27,7 @@ pub fn all() -> Router<Arc<App>> {
     .route("/gates", get(gates::gates))
     .route("/options/{gateName}", get(gates::options).post(gates::change))
     .route("/options/copied", post(gates::copy))
+    .route("/options/{gateName}/agents/{agentName}", post(gates::change_for))
     .route("/laya", get(gates::laya))
     .route("/judgements", get(judgements::list).post(judgements::add))
     .route("/judgements/attached", post(judgements::attached))

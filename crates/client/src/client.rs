@@ -145,6 +145,16 @@ impl GateClient {
     answer(self.post(&["options", gate_name]).json(change)).await
   }
 
+  /// Change one gate's options for one agent, leaving every other agent's as they stand.
+  pub async fn change_agent_gate_options(
+    &self,
+    gate_name: &str,
+    agent_name: &str,
+    change: &GateOptionChange,
+  ) -> Result<GateOptionsChanged, ClientFailure> {
+    answer(self.post(&["options", gate_name, "agents", agent_name]).json(change)).await
+  }
+
   /// Copy the chat agent's rows under a companion's name.
   pub async fn copy_options(&self, copied: &OptionsCopied) -> Result<(), ClientFailure> {
     empty(self.post(&["options", "copied"]).json(copied)).await

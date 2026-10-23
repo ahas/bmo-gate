@@ -36,11 +36,15 @@ the Laya relay's last answer; `busy` where it answers but its card was taken for
 | `GET /gates` | | a page of the gate order, each `gateName`, `part` (`pre`, `post` or `apart`), `step`, `condition` or null, `switchable`, `layaProbe`, `defaultLayaMode` and `answerTokens` |
 | `GET /options/{gateName}` | | `timeoutMs`, `layaMode`, `layaTau`, `layaProbe`, `switchable`, `enabled`, `layaFallback`, `effective` (`thinking`, `answerTokens`, `timeoutMs`, `layaMode`, `layaTau`) and `defaults` |
 | `POST /options/{gateName}` | any of `timeoutMs`, `layaMode`, `layaTau`, `enabled`, `layaFallback`; a Laya field sent null goes back to the default | `gateName` and `options`, the gate's route as a run reads it (`provider`, `model`, `laya`, `timeoutMs`, `setAt`) |
+| `POST /options/{gateName}/agents/{agentName}` | as `POST /options/{gateName}` | as `POST /options/{gateName}`, its wait the agent's |
 | `POST /options/copied` | `agentName` (the companion), `fromAgentName` (the chat agent) | 204 |
 
 - **A gate's options** are its wait, its switch where its profile lets it be switched off, its Laya mode, τ
   and fallback LLM (`docs/laya.md`). What it thinks and how much it may answer are its tier's on its road; a
   change naming either is refused `own-llm`.
+- **A change names whose options it writes.** `POST /options/{gateName}` writes the chat agent's row of the gate;
+  `POST /options/{gateName}/agents/{agentName}` writes the named agent's, with the same fields and refusals, and
+  no other agent's row is touched by either.
 - **Copying options** writes the `fromAgentName` agent's rows under `agentName` as they stand, so the
   companion's gates run on the same options from its first turn. An agent with no rows copies nothing and is
   no refusal.

@@ -231,6 +231,11 @@ pub struct RouteView {
 }
 
 pub async fn route_view(runs: &Runs, key: &str) -> Result<RouteView, Refusal> {
+  route_view_for(runs, key, &runs.chat_agent).await
+}
+
+/// A gate's route as a run reads it for one agent, its wait that agent's.
+pub async fn route_view_for(runs: &Runs, key: &str, agent: &str) -> Result<RouteView, Refusal> {
   profile(key)?;
 
   let road = route::read(runs, key).await.map_err(Refusal::unit)?;
@@ -241,7 +246,7 @@ pub async fn route_view(runs: &Runs, key: &str) -> Result<RouteView, Refusal> {
     provider: road.provider.clone(),
     model: road.model().to_owned(),
     laya: road.laya,
-    timeout_ms: timeout_ms(&runs.db, key, &runs.chat_agent).await.map_err(Refusal::database)?,
+    timeout_ms: timeout_ms(&runs.db, key, agent).await.map_err(Refusal::database)?,
     set_at,
   })
 }
@@ -323,10 +328,16 @@ fn whole(value: &Value) -> Option<i64> {
     .or_else(|| value.as_f64().filter(|number| number.fract() == 0.0).map(|number| number as i64))
 }
 
-/// One gate's wait, switch, Laya mode, tau and fallback LLM for the chat agent, each written where it is sent and
-/// left as the row had it otherwise; a Laya field sent as null goes back to the profile's default, and the wait
-/// is never cleared. A mode is taken only where the gate can run in it.
+/// One gate's options for the chat agent, as `change_for` writes them.
 pub async fn change(runs: &Runs, key: &str, body: &Value, at: i64) -> Result<(), Refusal> {
+  change_for(runs, key, &runs.chat_agent, body, at).await
+}
+
+/// One gate's wait, switch, Laya mode, tau and fallback LLM for one agent, each written into that agent's row
+/// where it is sent and left as the row had it otherwise; a Laya field sent as null goes back to the profile's
+/// default, and the wait is never cleared. A mode is taken only where the gate can run in it. No other agent's
+/// row is touched.
+pub async fn change_for(runs: &Runs, key: &str, agent: &str, body: &Value, at: i64) -> Result<(), Refusal> {
   let profile = profile(key)?;
   let sent = |field: &str| body.get(field);
 
@@ -404,7 +415,6 @@ pub async fn change(runs: &Runs, key: &str, body: &Value, at: i64) -> Result<(),
 
   // What the row would say once written.
   let db = &runs.db;
-  let agent = runs.chat_agent.as_str();
   let current = row(db, key, agent).await.map_err(Refusal::database)?.unwrap_or_default();
   let chosen_mode = match mode {
     None => current.laya_mode.clone(),

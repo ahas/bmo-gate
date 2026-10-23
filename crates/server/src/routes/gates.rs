@@ -98,13 +98,35 @@ pub async fn change(
   Path(gate_name): Path<String>,
   Body(change): Body<bmo_gate_client::GateOptionChange>,
 ) -> Answered<Json<GateOptionsChanged>> {
+  let agent = app.stages.runs.chat_agent.clone();
+
+  changed(&app, gate_name, &agent, &change).await
+}
+
+/// One gate's options changed for the agent the path names, and for no other.
+pub async fn change_for(
+  State(app): State<Arc<App>>,
+  Path((gate_name, agent_name)): Path<(String, String)>,
+  Body(change): Body<bmo_gate_client::GateOptionChange>,
+) -> Answered<Json<GateOptionsChanged>> {
+  changed(&app, gate_name, &agent_name, &change).await
+}
+
+async fn changed(
+  app: &App,
+  gate_name: String,
+  agent: &str,
+  change: &bmo_gate_client::GateOptionChange,
+) -> Answered<Json<GateOptionsChanged>> {
   let runs = &app.stages.runs;
-  let body = serde_json::to_value(&change)
+  let body = serde_json::to_value(change)
     .map_err(|why| Refused::new(Code::BadRequest, format!("the change could not be read: {why}")))?;
 
-  options::change(runs, &gate_name, &body, now()).await.map_err(Refused::of_options)?;
+  options::change_for(runs, &gate_name, agent, &body, now())
+    .await
+    .map_err(Refused::of_options)?;
 
-  let options = options::route_view(runs, &gate_name).await.map_err(Refused::of_options)?;
+  let options = options::route_view_for(runs, &gate_name, agent).await.map_err(Refused::of_options)?;
 
   Ok(Json(GateOptionsChanged {
     gate_name,

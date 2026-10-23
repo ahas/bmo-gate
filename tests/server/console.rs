@@ -67,6 +67,46 @@ async fn a_gates_options_are_read_and_changed() {
 }
 
 #[tokio::test]
+async fn one_agent_s_options_are_changed_and_no_other_agent_s() {
+  let ground = ground("one-agent", |_| None).await;
+  let (status, body) = ground
+    .post("/options/sanitizer/agents/a-companion", json!({ "timeoutMs": 25_000 }))
+    .await;
+
+  assert_eq!(status, StatusCode::OK, "{body}");
+  assert_eq!(body["gateName"], "sanitizer");
+  assert_eq!(body["options"]["timeoutMs"], 25_000);
+
+  let companion = ground
+    .scratch
+    .count(
+      "SELECT count(*) FROM gate_options WHERE key = 'sanitizer' AND agent = 'a-companion' AND timeout_ms = 25000",
+      vec![],
+    )
+    .await;
+  let others = ground
+    .scratch
+    .count(
+      "SELECT count(*) FROM gate_options WHERE timeout_ms = 25000 AND agent <> 'a-companion'",
+      vec![],
+    )
+    .await;
+
+  assert_eq!((companion, others), (1, 0));
+
+  let (status, body) = ground.get("/options/sanitizer").await;
+
+  assert_eq!(status, StatusCode::OK);
+  assert_eq!(body["timeoutMs"], 30_000);
+
+  let (status, body) =
+    ground.post("/options/sanitizer/agents/a-companion", json!({ "thinking": true })).await;
+
+  assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+  refused(&body, "own-llm");
+}
+
+#[tokio::test]
 async fn a_mode_the_gate_cannot_run_in_is_refused_with_its_reason() {
   let ground = ground("mode", |_| None).await;
   let (status, body) =

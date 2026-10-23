@@ -1,7 +1,7 @@
-//! The receiver port (`docs/boundary-api.md`, 「bmo-receiver」): the room facts the gate reads, through the
-//! receiver's routes in the brain's family — camelCase bodies, every call a `POST` — the owner notice the gate
-//! hands a fact to the chat agent by, one stored message, read through the route the receiver serves bmo-job
-//! in its snake_case, and the rows of each round's draft process, read off the receiver's event stream.
+//! The receiver port (`docs/boundary-api.md`, 「bmo-receiver」): the room facts the gate reads, the owner notice
+//! the gate hands a fact to the chat agent by and one stored message, through the receiver's fixed API in the
+//! common format — camelCase keys, times in epoch milliseconds, a list answered as a page — and the rows of each
+//! round's draft process, read off the receiver's event stream.
 
 use futures_util::future::BoxFuture;
 use futures_util::stream::BoxStream;
@@ -36,10 +36,12 @@ pub struct OwnerSpoke {
   pub spoke: bool,
 }
 
-/// One message the receiver keeps: who sent it where it knows, the name it went under, when, and its words.
+/// One message the receiver keeps: who sent it where it knows, the name it went under, when in epoch
+/// milliseconds, and its words.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Message {
-  #[serde(default)]
+  #[serde(default, rename = "senderId")]
   pub sender: Option<i64>,
   #[serde(default)]
   pub sender_name: Option<String>,
@@ -85,13 +87,13 @@ pub trait Receiver: Send + Sync {
   /// Whether the person sent a message in the room between the two moments, both included.
   fn spoke_between(&self, chat: i64, person: i64, from: i64, to: i64) -> BoxFuture<'_, Answer<bool>>;
 
-  /// Whether the person is the owner, and whether the owner spoke in the room in the span before `before`.
+  /// Whether the person is the owner, and whether the owner spoke in the room in the `window_ms` before `before`.
   fn owner_spoke(
     &self,
     chat: i64,
     person: i64,
     before: i64,
-    seconds: i64,
+    window_ms: i64,
   ) -> BoxFuture<'_, Answer<OwnerSpoke>>;
 
   /// The names the people's latest messages went under.
@@ -128,27 +130,18 @@ impl HttpReceiver {
   }
 }
 
-#[derive(Serialize)]
-struct Nothing {}
-
+/// A list the receiver answers, one page of it.
 #[derive(Deserialize)]
-struct Titles {
-  rooms: Vec<RoomTitle>,
+struct Page<T> {
+  items: Vec<T>,
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
+/// A room as the receiver's room list answers it, of which the gate reads its number, title and senders.
+#[derive(Deserialize)]
 struct Room {
-  chat_id: i64,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct Between {
-  chat_id: i64,
-  person: i64,
-  from: i64,
-  to: i64,
+  id: i64,
+  title: Option<String>,
+  senders: Vec<i64>,
 }
 
 #[derive(Deserialize)]
@@ -156,23 +149,10 @@ struct Spoke {
   spoke: bool,
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct Before {
-  chat_id: i64,
-  person: i64,
-  before: i64,
-  seconds: i64,
-}
-
-#[derive(Serialize)]
-struct People<'a> {
-  people: &'a [i64],
-}
-
 #[derive(Deserialize)]
-struct Names {
-  names: Vec<Name>,
+struct Person {
+  id: i64,
+  name: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -185,52 +165,51 @@ struct Waits {
   waits: bool,
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct AgentRoom<'a> {
-  agent: &'a str,
-  chat_id: i64,
-}
-
 #[derive(Deserialize)]
 struct Number {
   number: Option<i64>,
 }
 
 #[derive(Deserialize)]
-struct Ok {
+struct Queued {
   #[allow(dead_code)]
-  ok: bool,
+  id: i64,
 }
 
 impl Receiver for HttpReceiver {
   fn titles(&self) -> BoxFuture<'_, Answer<Vec<RoomTitle>>> {
     Box::pin(async move {
-      let titles: Titles = self.caller.post("room titles", &["rooms", "titles"], &Nothing {}).await?;
+      let rooms: Page<Room> = self.caller.get("room titles", &["rooms"], &[]).await?;
 
-      Ok(titles.rooms)
+      Ok(
+        rooms
+          .items
+          .into_iter()
+          .map(|room| RoomTitle {
+            chat_id: room.id,
+            title: room.title,
+            senders: room.senders,
+          })
+          .collect(),
+      )
     })
   }
 
   fn roads(&self, chat: i64) -> BoxFuture<'_, Answer<Roads>> {
     Box::pin(
-      async move { self.caller.post("room roads", &["rooms", "roads"], &Room { chat_id: chat }).await },
+      async move { self.caller.get("room roads", &["rooms", &chat.to_string(), "roads"], &[]).await },
     )
   }
 
   fn spoke_between(&self, chat: i64, person: i64, from: i64, to: i64) -> BoxFuture<'_, Answer<bool>> {
     Box::pin(async move {
+      let (person, from, to) = (person.to_string(), from.to_string(), to.to_string());
       let spoke: Spoke = self
         .caller
-        .post(
+        .get(
           "spoke between",
-          &["rooms", "spoke-between"],
-          &Between {
-            chat_id: chat,
-            person,
-            from,
-            to,
-          },
+          &["rooms", &chat.to_string(), "spoke-between"],
+          &[("person", &person), ("from", &from), ("to", &to)],
         )
         .await?;
 
@@ -243,20 +222,17 @@ impl Receiver for HttpReceiver {
     chat: i64,
     person: i64,
     before: i64,
-    seconds: i64,
+    window_ms: i64,
   ) -> BoxFuture<'_, Answer<OwnerSpoke>> {
     Box::pin(async move {
+      let (person, before, window_ms) = (person.to_string(), before.to_string(), window_ms.to_string());
+
       self
         .caller
-        .post(
+        .get(
           "owner spoke",
-          &["rooms", "owner-spoke"],
-          &Before {
-            chat_id: chat,
-            person,
-            before,
-            seconds,
-          },
+          &["rooms", &chat.to_string(), "owner-spoke"],
+          &[("person", &person), ("before", &before), ("windowMs", &window_ms)],
         )
         .await
     })
@@ -264,17 +240,30 @@ impl Receiver for HttpReceiver {
 
   fn names<'a>(&'a self, people: &'a [i64]) -> BoxFuture<'a, Answer<Vec<Name>>> {
     Box::pin(async move {
-      let names: Names =
-        self.caller.post("display names", &["people", "names"], &People { people }).await?;
+      if people.is_empty() {
+        return Ok(Vec::new());
+      }
 
-      Ok(names.names)
+      let ids = people.iter().map(i64::to_string).collect::<Vec<_>>().join(",");
+      let found: Page<Person> = self.caller.get("display names", &["people"], &[("ids", &ids)]).await?;
+
+      Ok(
+        found
+          .items
+          .into_iter()
+          .map(|person| Name {
+            person: person.id,
+            name: person.name,
+          })
+          .collect(),
+      )
     })
   }
 
   fn waits<'a>(&'a self, text: &'a str) -> BoxFuture<'a, Answer<bool>> {
     Box::pin(async move {
       let waits: Waits =
-        self.caller.post("waits on a happening", &["promises", "waits"], &Text { text }).await?;
+        self.caller.post("waits on a happening", &["promise-readings"], &Text { text }).await?;
 
       Ok(waits.waits)
     })
@@ -284,14 +273,7 @@ impl Receiver for HttpReceiver {
     Box::pin(async move {
       let number: Number = self
         .caller
-        .post(
-          "own number",
-          &["rooms", "own-number"],
-          &AgentRoom {
-            agent,
-            chat_id: chat,
-          },
-        )
+        .get("own number", &["rooms", &chat.to_string(), "own-number"], &[("agentName", agent)])
         .await?;
 
       Ok(number.number)
@@ -320,7 +302,7 @@ impl Receiver for HttpReceiver {
 
       body.insert("code".to_owned(), Value::String(code.to_owned()));
 
-      let _: Ok = self.caller.post("owner notice", &["owner", "notice"], &body).await?;
+      let _: Queued = self.caller.post("owner notice", &["owner", "notices"], &body).await?;
 
       Ok(())
     })
@@ -329,8 +311,12 @@ impl Receiver for HttpReceiver {
   fn drafts(&self) -> BoxFuture<'_, Answer<BoxStream<'static, Answer<Drafted>>>> {
     Box::pin(async move {
       let events = self.caller.events("draft rows", &["events"], &[]).await?;
+      // A `draft` frame of kind `start` tells a question as it starts and carries none of a row's answer
+      // fields, so it is let go by its kind before a row is read.
       let drafts = events
-        .try_filter(|(_, data)| futures_util::future::ready(data["type"] == "draft"))
+        .try_filter(|(_, data)| {
+          futures_util::future::ready(data["type"] == "draft" && data["kind"] != "start")
+        })
         .and_then(|(_, data)| {
           futures_util::future::ready(serde_json::from_value(data).map_err(|why| PortError::Malformed {
             unit: "bmo-receiver",
