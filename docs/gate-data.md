@@ -809,7 +809,9 @@ the road, the model and the effort that wrote it; and the wall time.
 A model is given what a gate asks and writes the inputs and the answers together, against
 `docs/laya-gates.md` — the split gates, each with its input, its question, its answers and its
 asymmetry, and the language mix and answer balance its rows are drawn to. The shape it writes is the
-shape the training reads.
+shape the training reads. The rows keep the languages the gates meet: a question's wording as the
+gate asks it, the conversation in the rooms' own mix, and a candidate's slug and index line in English,
+since those come from the brain, which holds its table of contents in English.
 
 **The one use of it today is topping up a rarer answer.** A gate the rooms fill with its common
 answer can still hold its rarer one a few times in a hundred, and a checkpoint trained on that

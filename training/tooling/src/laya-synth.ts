@@ -497,7 +497,7 @@ export function synthPrefix(gate: GateSynthesis): string {
   }
 
   if (gate.perCandidate) {
-    said.push("", say("candidates", { min: gate.candidates!.min, max: gate.candidates!.max }), say("slug_shape"));
+    said.push("", say("candidates", { min: gate.candidates!.min, max: gate.candidates!.max }), say("slug_shape"), say("candidate_language"));
   }
 
   if (gate.transcript !== null) {
