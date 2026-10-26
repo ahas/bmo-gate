@@ -399,11 +399,6 @@ pub struct ReferenceAsk {
   pub people_spoke: bool,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub answered: Option<String>,
-  /// The gates switched off for the agent.
-  #[serde(default)]
-  pub off_gates: Vec<String>,
-  #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub lore: Option<bool>,
   pub records: bool,
 }
 

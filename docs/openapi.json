@@ -1289,26 +1289,12 @@
             },
             "type": "array"
           },
-          "lore": {
-            "type": [
-              "boolean",
-              "null"
-            ]
-          },
           "messageId": {
             "format": "int64",
             "type": [
               "integer",
               "null"
             ]
-          },
-          "offGates": {
-            "default": [],
-            "description": "The gates switched off for the agent.",
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
           },
           "peopleSpoke": {
             "type": "boolean"
@@ -1349,7 +1335,6 @@
           "lines",
           "speakerIds",
           "peopleSpoke",
-          "offGates",
           "records"
         ],
         "type": "object"

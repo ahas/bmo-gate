@@ -97,8 +97,6 @@ An agreement carries `gateName`, `unit` (`pair` or `question`), `pairs`, `failur
 | `round?` | the round the turn belongs to |
 | `peopleSpoke` | whether anyone spoke |
 | `answered?` | the answer already sent, where one was |
-| `offGates` | the gates switched off for the agent |
-| `lore?` | whether the room reads the lore, true where absent |
 | `records` | whether the turn's offers and verdicts are written |
 
 It answers `entries`, each `path`, `text` and `source` (`document`, `person`, `rule`, `situation`,

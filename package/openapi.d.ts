@@ -751,14 +751,8 @@ export interface components {
             answered?: string | null;
             holds?: string[] | null;
             lines: string[];
-            lore?: boolean | null;
             /** Format: int64 */
             messageId?: number | null;
-            /**
-             * @description The gates switched off for the agent.
-             * @default []
-             */
-            offGates: string[];
             peopleSpoke: boolean;
             records: boolean;
             /** Format: int64 */

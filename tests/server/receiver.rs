@@ -23,7 +23,6 @@ async fn a_turn_is_handed_only_what_no_gate_picks_and_no_model_is_asked() {
         "speakerIds": [5],
         "round": "round-1",
         "peopleSpoke": true,
-        "offGates": [],
         "records": true,
       }),
     )
@@ -111,8 +110,6 @@ async fn a_turn_with_a_situation_and_holds_is_read_with_them() {
         "holds": ["quiet"],
         "peopleSpoke": true,
         "answered": "Good morning.",
-        "offGates": [],
-        "lore": false,
         "records": false,
       }),
     )
