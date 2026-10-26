@@ -60,6 +60,46 @@ fn one_line(part: &str, korean: &str, line: Option<&str>) -> String {
   }
 }
 
+// The note a part is asked for again under: the last answer, and each thing wrong with it.
+fn correction(korean: &str, faults: &PartFaults) -> String {
+  let mut lines = vec![
+    "Your last translation of this part was:".to_owned(),
+    String::new(),
+    korean.to_owned(),
+    String::new(),
+  ];
+
+  if faults.lists_lost {
+    lines.push("It did not keep the lists: every numbered or bulleted item of the source stays an item of its own, on its own line, with its own number or marker.".to_owned());
+  }
+
+  if !faults.left_english.is_empty() {
+    lines.push("It left these in English; translate them too:".to_owned());
+    lines.extend(faults.left_english.iter().map(|block| format!("- {block}")));
+  }
+
+  if faults.fences_changed {
+    lines.push("It changed a fenced block. Every fenced block of the source stays exactly as written, byte for byte, its opening and closing lines included, in the same order, and no fenced block is added.".to_owned());
+  }
+
+  if !faults.banned.is_empty() {
+    lines.push(format!(
+      "It used words the owner has set aside: {}. Write each as its replacement says.",
+      banned_terms_line(&faults.banned)
+    ));
+  }
+
+  lines.push("Translate the part again, whole.".to_owned());
+  lines.join("\n")
+}
+
+// The note a one-line text is asked under: one short line, with no full stop the English does not have.
+fn line_note(line: &str) -> String {
+  format!(
+    "This text is the item's {line}: answer one short line in the plain written style, with no full stop the English does not have."
+  )
+}
+
 /// One record's reading under way: the glossary the rendering is held to, the English test, what each part is asked
 /// of, and what the log says of it — which part stayed in its original and why, and a banned term a rendering kept.
 pub struct Record<'a> {
@@ -119,11 +159,20 @@ impl<'a> Record<'a> {
 
     let attempts = TRANSLATION.record_attempts.max(1);
     let ask = Arc::clone(&self.ask);
+    let own = line.map(line_note);
+    let mut note = own.clone();
     let mut attempt = 1;
 
     loop {
-      let outcome =
-        translate_part(part, &TRANSLATION.owner_language, Purpose::Record, Kept::Headings, &ask).await;
+      let outcome = translate_part(
+        part,
+        &TRANSLATION.owner_language,
+        Purpose::Record,
+        Kept::Headings,
+        note.as_deref(),
+        &ask,
+      )
+      .await;
       let korean = match outcome {
         Outcome::Translated(text) => one_line(part, &without_dashes(&text, false), line),
         Outcome::Mismatch(lost) => return Err(lost.to_string()),
@@ -159,6 +208,9 @@ impl<'a> Record<'a> {
         return Ok(korean);
       }
 
+      let wrong = correction(&korean, &faults);
+
+      note = Some(own.as_ref().map_or_else(|| wrong.clone(), |own| format!("{own}\n\n{wrong}")));
       attempt += 1;
     }
   }

@@ -134,9 +134,9 @@ impl Agency for FakeAgency {
         return Err(PortError::Refused {
           unit: "bmo-agency",
           call: "translation run",
-          status: 502,
-          code: "no-answer".to_owned(),
-          error: "the request is past the model's context window".to_owned(),
+          status: 413,
+          code: "too-large".to_owned(),
+          error: "the part is longer than the model's window takes".to_owned(),
         });
       }
 

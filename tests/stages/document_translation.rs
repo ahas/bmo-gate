@@ -35,13 +35,14 @@ async fn the_gates_own_words_are_no_translation() {
 
   for answer in &own {
     let outcome =
-      translate_part(order, "en", Purpose::Document, Kept::Whole, &line(vec![answer.clone(); 2])).await;
+      translate_part(order, "en", Purpose::Document, Kept::Whole, None, &line(vec![answer.clone(); 2]))
+        .await;
 
     assert!(matches!(outcome, Outcome::Mismatch(_)), "{answer}");
   }
 
   let answers = vec![own[0].clone(), order.to_owned()];
-  let outcome = translate_part(order, "en", Purpose::Document, Kept::Whole, &line(answers)).await;
+  let outcome = translate_part(order, "en", Purpose::Document, Kept::Whole, None, &line(answers)).await;
 
   assert_eq!(outcome, Outcome::Translated(order.to_owned()));
 }
@@ -196,5 +197,34 @@ async fn a_part_past_the_lines_window_is_asked_in_halves_and_joined() {
       )
       .await,
     ["First, in Korean.\n\nSecond, in Korean."]
+  );
+}
+
+#[tokio::test]
+async fn a_part_asked_again_carries_a_note_naming_what_its_last_answer_lost() {
+  let order = "Item #7 Keep the report on the item.\n\nRead it with `todo --show 7`.";
+  let notes = Arc::new(std::sync::Mutex::new(Vec::<Option<String>>::new()));
+  let held = Arc::clone(&notes);
+  let answers = [format!("Here it is:\n\n{order}"), order.to_owned()];
+  let asked = Arc::new(AtomicUsize::new(0));
+  let ask: Ask = Arc::new(move |request| {
+    held.lock().unwrap().push(request.note.clone());
+    let answer = answers.get(asked.fetch_add(1, Ordering::SeqCst)).cloned();
+
+    Box::pin(async move { answer.map_or_else(|| Ran::Unanswered("none left".to_owned()), Ran::Translated) })
+  });
+
+  let outcome = translate_part(order, "en", Purpose::Document, Kept::Whole, None, &ask).await;
+
+  assert_eq!(outcome, Outcome::Translated(order.to_owned()));
+
+  let notes = notes.lock().unwrap().clone();
+
+  assert_eq!(notes[0], None, "the first ask carries no note");
+  assert!(
+    notes[1]
+      .as_deref()
+      .is_some_and(|note| note.contains("did not keep its structure") && note.contains("blocks")),
+    "{notes:?}"
   );
 }

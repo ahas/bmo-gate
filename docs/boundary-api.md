@@ -132,7 +132,7 @@ In the agency's conventions (its `docs/api.md`): camelCase, the agency's control
 | a session ended | `DELETE /sessions/{sessionId}` | a run of the gate's somebody stopped, its turn cut short |
 | a session's loads | `GET /session-loads/{sessionId}` | `documents`, each `path` and `version`: what the session was handed in full, which the index counts read |
 | a session's loads kept | `PUT /session-loads/{sessionId}` | `documents`, every load the session now holds, the piece just read added at its version |
-| a translation | `POST /translation-runs` | `purpose` (`document`, `worker` or `record`), `language` (the target's name as the policy names it) and `text`, one part: answered with `text`, the part translated whole, and the `provider` and `model` it went out on (「The translation line」) |
+| a translation | `POST /translation-runs` | `purpose` (`document`, `worker` or `record`), `language` (the target's name as the policy names it), `text`, one part, and `note` where the gate has a word on that part: answered with `text`, the part translated whole, and the `provider` and `model` it went out on; 413 `too-large` for a part past the model's window (「The translation line」) |
 | the events | `GET /events?kinds=road-walked` | the road each conversational turn walked, which the gate writes into its road records |
 
 The gate registers no hook at any of the agency's hook points and answers none.
@@ -146,9 +146,14 @@ The gate registers no hook at any of the agency's hook points and answers none.
   and `record` for a worker's record read into the owner's language.
 - **What stays the gate's:** the translations route, the kept translations, a document's queue, the cutting into
   parts, the structure each answer is held to and the asks again, how many parts stand out at once, and the
-  halving of a part too large for the line's road: a part the line refuses as past its road's window is cut in
-  two, at a paragraph else a line, each half asked on its own and the two joined in order, a half with no answer
-  leaving the part unanswered. Any other refusal leaves the part unanswered.
+  halving of a part too large for the line's road: a part the line refuses 413 `too-large` is cut in two, at a
+  paragraph else a line, each half asked on its own and the two joined in order, a half with no answer leaving
+  the part unanswered. Any other refusal leaves the part unanswered.
+- **The gate's word on a part goes as its `note`,** which the line carries into the run untranslated: where an
+  answer lost its part's structure, or a record's rendering ran its lists together, left English, changed a
+  fenced block or used a banned term, the ask again names what was wrong with the last answer; and a record's
+  one-line text — a title, a state line — is asked as one short line with no full stop the English does not
+  have. A part the gate has no word on goes with no note.
 - **What is the agency's:** the road each translation walked and what it spent, kept in the agency's ledger; the
   gate keeps of a document's translation only its rows and, where a part failed, why.
 

@@ -166,6 +166,9 @@ pub struct TranslationAsk {
   pub purpose: String,
   pub language: String,
   pub text: String,
+  /// The gate's word on this one part, carried into the run untranslated.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub note: Option<String>,
 }
 
 /// A part translated whole by the agency's translation line, with the road it went out on.

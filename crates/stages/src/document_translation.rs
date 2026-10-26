@@ -48,13 +48,14 @@ fn unwrap(answer: &str, source: &str) -> String {
   }
 }
 
-/// A part's answer from the line: its translation; where the line refuses it as past its road's window, the part cut in
-/// two at a paragraph else a line, each half asked on its own and the two joined in order, a half with no answer
-/// leaving the whole unanswered; none where the line gave no answer.
+/// A part's answer from the line: its translation; where the line refuses it `too-large`, the part cut in two at a
+/// paragraph else a line, each half asked on its own under the same note and the two joined in order, a half with
+/// no answer leaving the whole unanswered; none where the line gave no answer.
 fn answered<'a>(
   text: &'a str,
   target: &'a str,
   purpose: Purpose,
+  note: Option<&'a str>,
   ask: &'a Ask,
 ) -> BoxFuture<'a, Option<String>> {
   Box::pin(async move {
@@ -62,6 +63,7 @@ fn answered<'a>(
       purpose,
       target: target.to_owned(),
       text: text.to_owned(),
+      note: note.map(str::to_owned),
     };
 
     match ask(asked).await {
@@ -71,7 +73,7 @@ fn answered<'a>(
         let mut joined = Vec::with_capacity(halves.len());
 
         for half in &halves {
-          joined.push(answered(half, target, purpose, ask).await?);
+          joined.push(answered(half, target, purpose, note, ask).await?);
         }
 
         Some(joined.join(joint))
@@ -201,20 +203,33 @@ impl Kept {
   }
 }
 
-/// One part translated through `ask` for `purpose`, its answer standing where it keeps what `kept` names: asked
-/// once more where it lost it.
-pub async fn translate_part(text: &str, target: &str, purpose: Purpose, kept: Kept, ask: &Ask) -> Outcome {
+/// One part translated through `ask` for `purpose`, under `note` where the caller has a word on it, its answer
+/// standing where it keeps what `kept` names: asked once more where it lost it, the note then naming what was lost.
+pub async fn translate_part(
+  text: &str,
+  target: &str,
+  purpose: Purpose,
+  kept: Kept,
+  note: Option<&str>,
+  ask: &Ask,
+) -> Outcome {
   let mut asked = 1;
+  let mut said = note.map(str::to_owned);
 
   loop {
-    let Some(translated) = answered(text, target, purpose, ask).await else {
+    let Some(translated) = answered(text, target, purpose, said.as_deref(), ask).await else {
       return Outcome::Unanswered;
     };
 
     match kept.lost(text, &translated) {
       None => return Outcome::Translated(translated),
       Some(lost) if asked >= 2 => return Outcome::Mismatch(lost),
-      Some(_) => asked += 1,
+      Some(lost) => {
+        let again = fill_marks(words::ASK_AGAIN, &[("lost", &lost.to_string())]);
+
+        said = Some(note.map_or_else(|| again.clone(), |note| format!("{note}\n\n{again}")));
+        asked += 1;
+      }
     }
   }
 }
@@ -361,7 +376,8 @@ impl Queue {
 
   async fn translate(&self, stages: &Arc<Stages>, part: Part) {
     let ask = crate::translator::by_agency(Arc::clone(stages));
-    let outcome = translate_part(&part.text, &part.target, Purpose::Document, Kept::Whole, &ask).await;
+    let outcome =
+      translate_part(&part.text, &part.target, Purpose::Document, Kept::Whole, None, &ask).await;
     // The road a part walked is the agency's ledger's: a part with no answer is kept as such, with no road named.
     let detail: Option<String> = match outcome {
       Outcome::Unanswered => {

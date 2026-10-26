@@ -111,16 +111,18 @@ impl Purpose {
   }
 }
 
-/// One part asked of the line: what it is for, the target language by its tag, and the text.
+/// One part asked of the line: what it is for, the target language by its tag, the text, and the gate's word on
+/// it where it has one.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Asked {
   pub purpose: Purpose,
   pub target: String,
   pub text: String,
+  pub note: Option<String>,
 }
 
-/// What the line made of one part: its translation, a refusal saying it is past the window of the line's road, or
-/// no answer with why.
+/// What the line made of one part: its translation, a refusal saying it is past the model's window, or no answer
+/// with why.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ran {
   Translated(String),
@@ -131,19 +133,12 @@ pub enum Ran {
 /// What a part is asked of: the agency's translation line, or whatever stands in for it.
 pub type Ask = Arc<dyn Fn(Asked) -> BoxFuture<'static, Ran> + Send + Sync>;
 
-// The words a refusal of the line names a request past its road's window by.
-const PAST_WINDOW: [&str; 5] = ["context", "window", "too large", "too long", "maximum"];
+/// The code the line refuses a part past the model's window with.
+pub const TOO_LARGE: &str = "too-large";
 
-/// Whether the line refused a part as past its road's window: `no-answer`, its sentence naming the window.
+/// Whether the line refused a part as past the model's window.
 pub fn past_window(why: &PortError) -> bool {
-  match why {
-    PortError::Refused { code, error, .. } if code == "no-answer" => {
-      let said = error.to_lowercase();
-
-      PAST_WINDOW.iter().any(|word| said.contains(word))
-    }
-    _ => false,
-  }
+  matches!(why, PortError::Refused { code, .. } if code == TOO_LARGE)
 }
 
 /// Each part asked of the agency's translation line, the target named as the policy names it.
@@ -157,6 +152,7 @@ pub fn by_agency(stages: Arc<Stages>) -> Ask {
         purpose: asked.purpose.word().to_owned(),
         language,
         text: asked.text,
+        note: asked.note,
       };
 
       match stages.runs.agency.translation_run(&ask).await {
@@ -305,7 +301,7 @@ async fn part_into(
   ask: &Ask,
 ) -> Option<String> {
   match reader {
-    Reader::Worker => match translate_part(part, language, Purpose::Worker, Kept::Whole, ask).await {
+    Reader::Worker => match translate_part(part, language, Purpose::Worker, Kept::Whole, None, ask).await {
       Outcome::Translated(text) => Some(text),
       Outcome::Mismatch(lost) => {
         eprintln!("{STAGE}: a part stays in its original: {lost}");

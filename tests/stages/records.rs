@@ -13,28 +13,30 @@ use gate_stages::translator::{Ask, Purpose, Ran};
 
 use crate::{Ground, ground};
 
-// What the stand-in line was asked: the part, what for and into which language.
+// What the stand-in line was asked: the part, what for, into which language and under which note.
 struct Asked {
   part: String,
   purpose: Purpose,
   target: String,
+  note: Option<String>,
 }
 
 type Asking = Arc<Mutex<Vec<Asked>>>;
 
-// A stand-in for the agency's translation line: what each part comes back as, by the part and how many asks came
-// before it and this one, and everything it was asked.
-fn gate(answer: impl Fn(&str, usize) -> Option<String> + Send + Sync + 'static) -> (Ask, Asking) {
+// A stand-in for the agency's translation line: what each part comes back as, by the part and the note it came
+// under, and everything it was asked.
+fn gate(answer: impl Fn(&str, &str) -> Option<String> + Send + Sync + 'static) -> (Ask, Asking) {
   let asked: Asking = Arc::default();
   let held = Arc::clone(&asked);
   let ask: Ask = Arc::new(move |request| {
     let mut asked = held.lock().unwrap();
-    let answered = answer(&request.text, asked.len() + 1);
+    let answered = answer(&request.text, request.note.as_deref().unwrap_or_default());
 
     asked.push(Asked {
       part: request.text,
       purpose: request.purpose,
       target: request.target,
+      note: request.note,
     });
     Box::pin(async move {
       match answered {
@@ -179,7 +181,7 @@ async fn a_rendering_using_a_banned_term_is_asked_again() {
   let (ask, asked) = gate(move |_, _| Some(answers[calls.fetch_add(1, Ordering::SeqCst).min(1)].clone()));
 
   assert_eq!(render(&ground, ask, "Tidied the toolbar.").await.0, Ok(second));
-  assert_eq!(asked.lock().unwrap().len(), 2, "asked once more after the banned term");
+  assert!(asked.lock().unwrap()[1].note.as_deref().is_some_and(|note| note.contains(&term)));
 }
 
 #[tokio::test]
@@ -228,11 +230,9 @@ async fn a_paragraph_handed_back_in_english_is_asked_again() {
     render(&ground, ask, &format!("{summary}\n\nFixed\n1. Renders into Korean.")).await.0,
     Ok(korean)
   );
-  assert_eq!(
-    asked.lock().unwrap().len(),
-    2,
-    "asked once more after the paragraph came back in English"
-  );
+  assert!(asked.lock().unwrap()[1].note.as_deref().is_some_and(|note| {
+    note.contains(&format!("It left these in English; translate them too:\n- {summary}"))
+  }));
 }
 
 #[tokio::test]
@@ -307,10 +307,10 @@ async fn a_rendering_that_changed_a_fenced_quote_is_asked_again_and_stays_where_
   let changed = format!("{report} Changed.");
   // A line putting its own words in place of the quote, and minding the fence when asked again where the part is
   // the mended one.
-  let (ask, asked) = gate(move |part, call| {
-    let again = call == 2;
+  let (ask, asked) = gate(move |part, note| {
+    let told = note.contains("It changed a fenced block.");
 
-    Some(if again && part.ends_with("Mended.") {
+    Some(if told && part.ends_with("Mended.") {
       fences_kept(part)
     } else {
       fences_kept(part).replace(&quote, &hangul(9))
@@ -336,4 +336,21 @@ async fn a_rendering_that_keeps_the_fenced_quote_stands_at_the_first_ask() {
   assert!(written.contains(&format!("```text\n{quote}\n```")));
   assert_eq!(written, fences_kept(&report));
   assert_eq!(asked.lock().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn a_one_line_text_is_asked_as_one_short_line_under_its_note() {
+  let ground = record_ground("title", None).await;
+  let (ask, asked) = gate(|part, _| Some(format!("{}.", rendered(part))));
+  let english = ground.stages.reading.english();
+  let mut record = Record::new(&ground.stages, ground.stages.reading.glossary(), &english, ask);
+  let read = record.korean_of_record("Moved the gate run", Some("title")).await;
+
+  assert_eq!(read, Ok(rendered("Moved the gate run")), "no full stop the English does not have");
+  assert!(
+    asked.lock().unwrap()[0]
+      .note
+      .as_deref()
+      .is_some_and(|note| note.contains("the item's title") && note.contains("one short line"))
+  );
 }

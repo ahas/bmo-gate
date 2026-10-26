@@ -16,5 +16,7 @@ pub const LOST_BLOCKS: &str = "The translation has {translated} blocks where the
 /// A part kept as failed because a block of its last answer is of another kind than the part's in its place.
 pub const LOST_BLOCK: &str =
   "The translation has a {translated} where the part's block {at} is a {source}.";
+/// The note a part is asked again under once its answer lost the part's structure; `{lost}` says what it lost.
+pub const ASK_AGAIN: &str = "Your last translation of this part did not keep its structure: {lost} Translate the part again, whole, keeping every heading, block and inline code span of the part where it stands.";
 /// A part kept as failed because its last answer did not carry an inline code span of the part word for word.
 pub const LOST_CODE: &str = "The translation did not keep the inline code {span} as written.";
