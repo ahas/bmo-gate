@@ -6,11 +6,12 @@ import "./bundle.css";
 import type { ConsoleBundleModule } from "bmo-ui/shared/console-manifest";
 
 // The console bundle's module (bmo-ui's `docs/console-bundles.md`, "What a bundle is"): the routes of the gates'
-// screens, each under the screen path `/gates` the gate's manifest names. The pages are the layer's own files.
+// screens, each under the screen path `/gates` the gate's manifest names, each asking for the console's title bar.
+// The pages are the layer's own files.
 const bundle: ConsoleBundleModule = {
   routes: [
-    { path: "/gates", component: GateOrder },
-    { path: "/gates/:stage", component: GateTrials }
+    { path: "/gates", component: GateOrder, meta: { consoleTitleBar: true } },
+    { path: "/gates/:stage", component: GateTrials, meta: { consoleTitleBar: true } }
   ]
 };
 

@@ -40,6 +40,17 @@ describe("the built bundle", () => {
     expect(paths).toEqual(["/gates", "/gates/:stage"]);
   });
 
+  test("asks for the console's title bar on every route", () => {
+    const entry = readFileSync(join(CLIENT, "console/bundle.ts"), "utf8");
+    const routes = [...entry.matchAll(/\{ path: "[^"]+"[^\n]*\}/g)].map((found) => found[0]);
+
+    expect(routes.length).toBe(2);
+
+    for (const route of routes) {
+      expect(route, route).toContain("meta: { consoleTitleBar: true }");
+    }
+  });
+
   test("writes the pages' utilities and none of the theme's variables", () => {
     const stylesheet = readFileSync(join(out, "bundle.css"), "utf8");
 

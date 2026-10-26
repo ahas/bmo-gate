@@ -30,6 +30,17 @@ describe.each(Object.entries(pages))("the %s page", (_name, source) => {
     expect(source).not.toMatch(/from "(?:~|@|#shared|#imports|#app)\//);
   });
 
+  test("draws a bar of its own only where the console offers none", () => {
+    expect(source).toContain('const barOffered = inject("bmo-console-title-bar", null) !== null;');
+    expect(source).toContain('<template v-if="!barOffered" #header>');
+    const header = source.indexOf('<template v-if="!barOffered" #header>');
+    const navbars = [...source.matchAll(/<UDashboardNavbar\b/g)].map((found) => found.index);
+
+    expect(navbars.length).toBe(1);
+    expect(navbars[0]).toBeGreaterThan(header);
+    expect(navbars[0]).toBeLessThan(source.indexOf("</template>", header));
+  });
+
   test("reads the gate at the relay's address for its screen routes alone", () => {
     // What each call is handed as its address: the argument up to its first comma, a call within it whole.
     const calls = [...source.matchAll(/\$fetch<\w+>\(((?:[^,()]|\([^()]*\))+)/g)].map((found) => found[1]);

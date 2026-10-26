@@ -6,7 +6,8 @@
     "part": {
       "pre": "Before the turn",
       "post": "After the turn",
-      "apart": "Apart from a turn"
+      "apart": "Apart from a turn",
+      "shelved": "Shelved"
     },
     "label": {
       "message": "Put a prompt to this gate",

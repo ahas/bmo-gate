@@ -53,7 +53,8 @@ below the root, and its tests under `tests/client/`.
   theme the stylesheet is built against, into `dist/`: `bundle.js`, `bundle.css` and `words.json`,
   the folder the settings' `[console]` names (`docs/boundary-api.md`, 「Configuration」), which the gate answers
   as its manifest, its module, its stylesheet and its words (`docs/api.md`, 「Console」).
-- **The module** default-exports `{ routes }`, the routes of the two pages under the screen path `/gates`. It
+- **The module** default-exports `{ routes }`, the routes of the two pages under the screen path `/gates`, each
+  asking for the console's one title bar (bmo-ui's `docs/console-bundles.md`, 「The title bar」). It
   leaves every import of `vue`, `vue-router`, `vue-i18n`, `nuxt/app`, `@nuxt/ui` and `bmo-ui` unbundled, written as
   the package's own path, and carries the rest itself. Its stylesheet is the utility classes the pages use, on the
   layer's tokens, which the console's copy defines.
@@ -65,7 +66,10 @@ below the root, and its tests under `tests/client/`.
   Laya agrees with it where Laya is asked on it, each leading to the gate's own page. `/gates/<gate>` puts a
   prompt to one gate as a turn would and lists the gate's trials, oldest first, each with who asked where the
   trial names it, the answer as the gate wrote it and how long it took; beside the gate's name stand its Laya
-  mode and agreement. Another gate's page reads that gate afresh.
+  mode and agreement. Another gate's page reads that gate afresh. The shelved gates stand in a part of their own.
+- **One title bar.** Under a console that offers its title bar neither page draws a bar of its own, and neither
+  has a screen-level action to put in it; a gate's page heads its body with the gate's name and its Laya line
+  instead. Standing alone, each page draws its own bar with the same name.
 - **No page focuses an input on arrival.** The prompt on a gate's page waits to be touched, so opening the page
   on a phone raises no keyboard.
 - **The calls** go to the gate's screen routes under `/console` at the address bmo-ui's `relay` module answers

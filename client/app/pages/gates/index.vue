@@ -1,6 +1,8 @@
 <template>
   <UDashboardPanel id="gates">
-    <template #header>
+    <!-- Under a console that offers its title bar the screen draws none of its own (bmo-ui's
+         `docs/console-bundles.md`, "The title bar"). -->
+    <template v-if="!barOffered" #header>
       <UDashboardNavbar :title="t('gates.title.gates')" :icon="GATE_ICON" />
     </template>
 
@@ -40,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onScopeDispose, ref } from "vue";
+import { computed, inject, onMounted, onScopeDispose, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import UButton from "@nuxt/ui/components/Button.vue";
@@ -57,6 +59,8 @@ import { byPart, GATE_ICON, gateAddress, gateLabel, layaLine, partLabel, refusal
 import type { Gate, GatePage, LayaView } from "../../../shared/gate";
 
 const { t, te } = useI18n();
+// Whether the console this screen stands in offers its own title bar, under the key the layer names for it.
+const barOffered = inject("bmo-console-title-bar", null) !== null;
 const has = (key: string): boolean => te(key);
 
 const gates = ref<Gate[]>([]);

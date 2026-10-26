@@ -1,6 +1,8 @@
 <template>
   <UDashboardPanel id="gate" :ui="{ body: 'p-0 sm:p-0 overscroll-none' }">
-    <template #header>
+    <!-- Under a console that offers its title bar the screen draws none of its own, and the gate's name and Laya line
+         head its body instead (bmo-ui's `docs/console-bundles.md`, "The title bar"). -->
+    <template v-if="!barOffered" #header>
       <UDashboardNavbar :title="label" :icon="GATE_ICON">
         <!-- The gate's Laya mode and how often Laya agrees with it, beside its name. -->
         <template #trailing>
@@ -11,6 +13,10 @@
 
     <template #body>
       <UContainer ref="feed" class="flex-1 flex flex-col gap-4 sm:gap-6 py-4 sm:py-6">
+        <div v-if="barOffered" class="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h2 class="text-base font-semibold text-highlighted">{{ label }}</h2>
+          <span v-if="laya !== ''" class="min-w-0 truncate text-sm text-muted tabular-nums">{{ laya }}</span>
+        </div>
         <ContentSkeleton v-if="pending && trials.length === 0" :rows="4" listClass="flex flex-col gap-4 sm:gap-6" :label="t('gates.status.records_loading')">
           <div class="w-4/5 max-w-lg space-y-2 rounded-lg bg-elevated/40 p-3 even:self-end">
             <SkeletonLine width="w-24" />
@@ -118,7 +124,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onScopeDispose, ref, useTemplateRef, watch } from "vue";
+import { computed, inject, nextTick, onMounted, onScopeDispose, ref, useTemplateRef, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 
@@ -146,6 +152,8 @@ import type { LayaView, Trial, TrialPage } from "../../../shared/gate";
 
 const feedRef = useTemplateRef<{ $el?: HTMLElement }>("feed");
 
+// Whether the console this screen stands in offers its own title bar, under the key the layer names for it.
+const barOffered = inject("bmo-console-title-bar", null) !== null;
 const route = useRoute();
 const { t, te } = useI18n();
 const island = useIsland(t);
