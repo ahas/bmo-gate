@@ -1,15 +1,15 @@
-//! A turn's reference, words through the sanitiser, a room's judgements written and a round's put under its
-//! answer, and a companion's options copied.
+//! A turn's reference, a room's judgements written and a round's put under its answer, and a companion's options
+//! copied.
 
 use gate_runs::records::now;
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 
-use crate::{ROOM, ground, picking};
+use crate::{ROOM, ground};
 
 #[tokio::test]
 async fn a_turn_is_handed_only_what_no_gate_picks_and_no_model_is_asked() {
-  let ground = ground("reference", picking(&["deploy-notes"])).await;
+  let ground = ground("reference", |_| Some("yes".into())).await;
 
   ground.furnish();
 
@@ -111,7 +111,7 @@ async fn a_turn_with_a_situation_and_holds_is_read_with_them() {
         "holds": ["quiet"],
         "peopleSpoke": true,
         "answered": "Good morning.",
-        "offGates": ["library-knowledge"],
+        "offGates": [],
         "lore": false,
         "records": false,
       }),
@@ -121,20 +121,6 @@ async fn a_turn_with_a_situation_and_holds_is_read_with_them() {
   assert_eq!(status, StatusCode::OK, "{body}");
   assert!(body["entries"].is_array());
   assert_eq!(ground.scratch.count("SELECT count(*) FROM reference_offers", vec![]).await, 0);
-}
-
-#[tokio::test]
-async fn words_with_nothing_worth_judging_come_back_as_they_are() {
-  let ground = ground("sanitised", |_| None).await;
-  let (status, body) = ground
-    .post(
-      "/sanitised",
-      json!({ "text": "Plain words about lunch.", "label": "a room's message", "roomId": ROOM, "messageId": 9 }),
-    )
-    .await;
-
-  assert_eq!(status, StatusCode::OK);
-  assert_eq!(body, json!({ "text": "Plain words about lunch.", "changed": false }));
 }
 
 #[tokio::test]

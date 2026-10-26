@@ -12,7 +12,7 @@ const request = (count: number): LayaRequest => ({
 describe("layaDecide", () => {
   test("asks a request past one call in the client's parts and joins their answers", async () => {
     const asked: string[][] = [];
-    const reply = await layaDecide("room-rules", request(130), "http://laya", async (_gate, part) => {
+    const reply = await layaDecide("output-format", request(130), "http://laya", async (_gate, part) => {
       asked.push(Object.keys(part.questions));
 
       return { answers: Object.fromEntries(Object.keys(part.questions).map((id) => [id, { noul: 0.9 }])) };
@@ -24,7 +24,7 @@ describe("layaDecide", () => {
 
   test("has no answer where one part has none", async () => {
     let calls = 0;
-    const reply = await layaDecide("room-rules", request(200), "http://laya", async () => {
+    const reply = await layaDecide("output-format", request(200), "http://laya", async () => {
       calls += 1;
 
       return calls === 1 ? { answers: {} } : null;

@@ -1,6 +1,6 @@
 [package]
 name = "gate-stages"
-description = "The gates themselves: Laya and its probes, the sanitiser, the output gate, the translator and the document translation, the record reading into the owner's language, the document seeker, Laya's health and its agreement."
+description = "The gates themselves: Laya and its probes, the output gate, the translator and the document translation, the record reading into the owner's language, Laya's health and its agreement."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

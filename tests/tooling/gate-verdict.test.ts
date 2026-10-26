@@ -12,7 +12,7 @@ useToolingSettings();
 // as the audit's own shape rather than generated, so what each bar is being fed is on the page.
 function clears(change: Partial<GateAudit> = {}): GateAudit {
   return {
-    gate: "sanitizer",
+    gate: "output-format",
     known: true,
     rows: 7_000,
     splits: { train: 4_900, calibration: 1_050, test: 1_050 },
@@ -202,10 +202,10 @@ describe("the verdict over a whole dataset", () => {
   test("what is said names the gate to rebuild and nothing else", () => {
     const lines = verdictLines(verdictsFor(audit));
 
-    expect(lines[0]).toBe("sanitizer: PASS");
+    expect(lines[0]).toBe("output-format: PASS");
     expect(lines).toContain("reply-wanted: FAIL");
     expect(lines.at(-1)).toContain("reply-wanted did not clear the bars");
-    expect(lines.at(-1)).not.toContain("sanitizer");
+    expect(lines.at(-1)).not.toContain("output-format");
   });
 
   test("every gate clearing is said as such", () => {

@@ -3,7 +3,7 @@
 
 use gate_store::entity::{
   document_translations, format_cases, gate_options, gate_roads, judgements, laya_health, laya_verdicts,
-  reference_offers, reference_verdicts, sanitised_texts, web_gate_chats,
+  reference_offers, reference_verdicts, web_gate_chats,
 };
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, EntityTrait, IdenStatic, Iterable};
 
@@ -40,7 +40,6 @@ async fn every_entity_names_its_tables_columns_in_their_order() {
     entity_columns::<laya_verdicts::Entity>(),
     entity_columns::<reference_offers::Entity>(),
     entity_columns::<reference_verdicts::Entity>(),
-    entity_columns::<sanitised_texts::Entity>(),
     entity_columns::<web_gate_chats::Entity>(),
   ];
 
@@ -83,7 +82,7 @@ async fn a_row_of_every_other_table_is_written_and_read_through_its_entity() {
   let db = scratch.db();
 
   let option = gate_options::ActiveModel {
-    key: Set("sanitizer".into()),
+    key: Set("output-format".into()),
     agent: Set("chat-agent".into()),
     timeout_ms: Set(Some(30_000)),
     set_at: Set(1),
@@ -95,7 +94,7 @@ async fn a_row_of_every_other_table_is_written_and_read_through_its_entity() {
   .await
   .unwrap();
   assert_eq!(
-    gate_options::Entity::find_by_id(("sanitizer".to_owned(), "chat-agent".to_owned()))
+    gate_options::Entity::find_by_id(("output-format".to_owned(), "chat-agent".to_owned()))
       .one(db)
       .await
       .unwrap(),
@@ -103,7 +102,7 @@ async fn a_row_of_every_other_table_is_written_and_read_through_its_entity() {
   );
 
   let road = gate_roads::ActiveModel {
-    stage: Set("room-rules".into()),
+    stage: Set("output-format".into()),
     chat_id: Set(Some(7)),
     provider: Set("registered".into()),
     model: Set("a-registration".into()),
@@ -122,7 +121,7 @@ async fn a_row_of_every_other_table_is_written_and_read_through_its_entity() {
   let health = laya_health::ActiveModel {
     id: Set(1),
     state: Set("up".into()),
-    model: Set(Some("room-rules=checkpoints/room-rules/run/step-000025".into())),
+    model: Set(Some("output-format=checkpoints/output-format/run/step-000025".into())),
     checked_at: Set(Some(3)),
     ..Default::default()
   }
@@ -179,22 +178,6 @@ async fn a_row_of_every_other_table_is_written_and_read_through_its_entity() {
   .unwrap();
   assert_eq!(reference_verdicts::Entity::find_by_id(verdict.id).one(db).await.unwrap(), Some(verdict));
 
-  let sanitised = sanitised_texts::ActiveModel {
-    hash: Set("h1".into()),
-    text: Set("words as handed on".into()),
-    changed: Set(0),
-    at: Set("message".into()),
-    judged_at: Set(7),
-    ..Default::default()
-  }
-  .insert(db)
-  .await
-  .unwrap();
-  assert_eq!(
-    sanitised_texts::Entity::find_by_id("h1".to_owned()).one(db).await.unwrap(),
-    Some(sanitised)
-  );
-
   let part = document_translations::ActiveModel {
     document: Set("docs/gates.md".into()),
     version: Set("v1".into()),
@@ -237,7 +220,7 @@ async fn a_row_of_every_other_table_is_written_and_read_through_its_entity() {
   assert_eq!(format_cases::Entity::find_by_id(case.id).one(db).await.unwrap(), Some(case));
 
   let trial = web_gate_chats::ActiveModel {
-    stage: Set("document-seek".into()),
+    stage: Set("translator".into()),
     user_name: Set("a user".into()),
     prompt: Set("which heading answers this".into()),
     answer: Set(None),

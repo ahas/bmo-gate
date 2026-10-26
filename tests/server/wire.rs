@@ -3,7 +3,7 @@
 
 use futures_util::StreamExt;
 use reqwest::StatusCode;
-use serde_json::{Value, json};
+use serde_json::json;
 
 use crate::{ROOM, TOKEN, ground, refused};
 
@@ -41,7 +41,7 @@ async fn a_body_not_json_or_not_as_asked_is_refused() {
   let ground = ground("body", |_| None).await;
   let response = ground
     .client
-    .post(format!("{}/sanitised", ground.address))
+    .post(format!("{}/translations", ground.address))
     .bearer_auth(TOKEN)
     .header("content-type", "application/json")
     .body("{ not json")
@@ -52,7 +52,7 @@ async fn a_body_not_json_or_not_as_asked_is_refused() {
   assert_eq!(response.status(), StatusCode::BAD_REQUEST);
   refused(&response.json().await.unwrap(), "bad-request");
 
-  let (status, body) = ground.post("/sanitised", json!({ "label": "a room's message" })).await;
+  let (status, body) = ground.post("/translations", json!({ "originals": ["a room's message"] })).await;
 
   assert_eq!(status, StatusCode::BAD_REQUEST);
   refused(&body, "bad-request");
@@ -132,38 +132,9 @@ async fn one_run_of_a_gate_answers_on_its_road() {
   assert_eq!(body["answer"], "Read slowly.");
   assert!(body["ms"].is_i64());
 
-  let (status, body) = ground
-    .post("/stages/voice-reading/runs", json!({ "prompt": "Read this aloud.", "roomId": ROOM }))
-    .await;
-
-  assert_eq!(
-    (status, body["answer"].clone()),
-    (StatusCode::OK, Value::Null),
-    "a shelved gate is never asked"
-  );
-
   let (status, body) =
     ground.post("/stages/no-such-gate/runs", json!({ "prompt": "Read this aloud." })).await;
 
   assert_eq!(status, StatusCode::NOT_FOUND);
   refused(&body, "no-gate");
-}
-
-#[tokio::test]
-async fn a_gate_switched_off_answers_nothing_and_asks_no_road() {
-  let ground = ground("voice-off", |_| Some("Read slowly.".into())).await;
-  let (status, _) = ground.post("/options/voice-polish", json!({ "enabled": false })).await;
-
-  assert_eq!(status, StatusCode::OK);
-
-  let (status, body) = ground
-    .post(
-      "/stages/voice-polish/runs",
-      json!({ "prompt": "Polish this.", "system": "Polish it.", "thinking": false, "alongside": true }),
-    )
-    .await;
-
-  assert_eq!(status, StatusCode::OK, "{body}");
-  assert_eq!(body, json!({ "answer": null, "ms": 0 }));
-  assert!(ground.gateway.asked.lock().unwrap().is_empty());
 }

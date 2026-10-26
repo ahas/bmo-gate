@@ -33,13 +33,6 @@ pub struct Shipped {
   pub folder: PathBuf,
 }
 
-/// The console bundle the gate serves (`docs/api.md`, 「Console」): the folder it is built into.
-#[derive(Clone, Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Console {
-  pub folder: PathBuf,
-}
-
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Reading {
@@ -62,16 +55,13 @@ pub struct Settings {
   #[serde(default)]
   pub run_agent: Option<String>,
   pub session_folder: String,
-  pub owner_room: i64,
   pub agency: Unit,
   pub brain: Unit,
   pub receiver: Unit,
-  pub job: Unit,
   pub arbiter: Option<Arbiter>,
   pub gateway: Gateway,
   pub laya: Option<Unit>,
   pub shipped: Option<Shipped>,
-  pub console: Option<Console>,
   #[serde(default)]
   pub reading: Reading,
 }
@@ -87,19 +77,11 @@ impl std::fmt::Display for Unread {
 }
 
 impl Settings {
-  /// The settings a file holds, a relative console folder read from the folder the file stands in.
+  /// The settings a file holds.
   pub fn read(path: &Path) -> Result<Self, Unread> {
     let text = std::fs::read_to_string(path).map_err(|why| Unread(format!("{}: {why}", path.display())))?;
-    let mut settings: Settings =
-      toml::from_str(&text).map_err(|why| Unread(format!("{}: {why}", path.display())))?;
 
-    if let Some(console) = &mut settings.console
-      && console.folder.is_relative()
-    {
-      console.folder = path.parent().unwrap_or(Path::new("")).join(&console.folder);
-    }
-
-    Ok(settings)
+    toml::from_str(&text).map_err(|why| Unread(format!("{}: {why}", path.display())))
   }
 
   /// A file under the data root's `env/`.

@@ -272,7 +272,7 @@ impl Relay {
   }
 
   async fn decide(&self) -> (u16, HeaderMap, String) {
-    self.call("POST", "/decide", r#"{"gate":"room-rules"}"#).await
+    self.call("POST", "/decide", r#"{"gate":"output-format"}"#).await
   }
 }
 
@@ -314,21 +314,21 @@ fn node_of(headers: &HeaderMap) -> &str {
 #[tokio::test]
 async fn a_call_is_answered_by_the_first_node_which_the_answer_names() {
   let (first, second) = (Node::start("node-a").await, Node::start("node-b").await);
-  first.then(Act::Answer(200, r#"{"answers":{"room-rules":"ok"}}"#));
+  first.then(Act::Answer(200, r#"{"answers":{"output-format":"ok"}}"#));
   let relay = Relay::start(&[&first, &second]).await;
 
-  let (status, headers, body) = relay.call("POST", "/decide?trace=1", r#"{"gate":"room-rules"}"#).await;
+  let (status, headers, body) = relay.call("POST", "/decide?trace=1", r#"{"gate":"output-format"}"#).await;
 
   assert_eq!(status, 200);
   assert_eq!(node_of(&headers), "node-a");
   assert_eq!(headers.get("x-engine").unwrap(), "stand-in");
-  assert_eq!(body, r#"{"answers":{"room-rules":"ok"}}"#);
+  assert_eq!(body, r#"{"answers":{"output-format":"ok"}}"#);
   assert_eq!(
     first.asked(),
     [Asked {
       method: "POST".into(),
       target: "/decide?trace=1".into(),
-      body: r#"{"gate":"room-rules"}"#.into(),
+      body: r#"{"gate":"output-format"}"#.into(),
       auth: Some("Bearer secret-key".into()),
     }]
   );
@@ -336,7 +336,7 @@ async fn a_call_is_answered_by_the_first_node_which_the_answer_names() {
   // Nothing of a call is logged: neither its body nor its key.
   let log = relay.log();
   assert!(
-    !log.contains("room-rules") && !log.contains("secret-key"),
+    !log.contains("output-format") && !log.contains("secret-key"),
     "the relay logged a call: {log}"
   );
 }
@@ -352,7 +352,7 @@ async fn a_call_moves_on_past_a_busy_card_sending_the_same_call_again() {
 
   assert_eq!((status, node_of(&headers), body.as_str()), (200, "node-b", r#"{"answers":{"q":1}}"#));
   let bodies: Vec<String> = first.asked().into_iter().chain(second.asked()).map(|one| one.body).collect();
-  assert_eq!(bodies, [r#"{"gate":"room-rules"}"#, r#"{"gate":"room-rules"}"#]);
+  assert_eq!(bodies, [r#"{"gate":"output-format"}"#, r#"{"gate":"output-format"}"#]);
 }
 
 #[tokio::test]
@@ -481,7 +481,7 @@ async fn a_caller_that_leaves_closes_the_call_to_the_node() {
   let driving = tokio::spawn(connection);
   let request = hyper::Request::post("/decide")
     .header("host", "127.0.0.1")
-    .body(Full::new(Bytes::from_static(br#"{"gate":"room-rules"}"#)))
+    .body(Full::new(Bytes::from_static(br#"{"gate":"output-format"}"#)))
     .unwrap();
   let asking = tokio::spawn(async move { sender.send_request(request).await });
   until("the node to hold the call", || node.asked().len() == 1).await;

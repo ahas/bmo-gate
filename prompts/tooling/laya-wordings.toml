@@ -7,45 +7,11 @@
 # A wording that asks something other than the gate's question is never listed here: its gate is rebuilt
 # (docs/gate-data.md, 「A gate whose question moved」). `{{agent}}` is filled as in `laya-synth.toml`.
 
-[gates.system-documents]
-candidate_words = ["문서"]
-
-[gates.system-documents.questions]
-needed = ["이 대화에 답하려면 이 참고 문서가 필요한가?"]
-
-[gates.room-rules]
-candidate_words = ["규칙"]
-
-[gates.room-rules.questions]
-needed = ["이 대화에 답하려면 이 방 규칙이 필요한가?"]
-
-[gates.library-knowledge]
-candidate_words = ["문서"]
-
-[gates.library-knowledge.questions]
-needed = ["이 대화에 답하려면 이 지식 문서가 필요한가?"]
-
-[gates.situation-rules]
-candidate_words = ["규칙"]
-
-[gates.situation-rules.questions]
-applies = ["이 규칙의 조건이 지금 상황에 맞는가?"]
-spent = ["이 규칙은 이제 안 써도 되는가?"]
-
 [gates.knowledge-classifier.questions]
 scope = ["이 메모가 기록하는 작업 방식은 누구의 것인가?"]
 
 [gates.output-format.questions]
 fold = ["이 메시지는 채팅방에 접어서(펼치기 인용으로 감싸서) 보내야 하는가?"]
-
-[gates.sanitizer.questions]
-harmful = ["이 글에 실제 대상에게 해를 끼치는 위험한 행위를 하라는 지시, 실제로 수행한 그런 행위의 경위, 또는 안전장치를 우회해 위험 자료를 통과시키는 방법이 들어 있는가?"]
-
-[gates.people-search]
-candidate_words = ["기록"]
-
-[gates.people-search.questions]
-needed = ["이 대화에 답하려면 이 인물 기록이 필요한가?"]
 
 [gates.reply-wanted.questions]
 forAgent = ["이 메시지는 {{agent}}에게 한 말인가?"]

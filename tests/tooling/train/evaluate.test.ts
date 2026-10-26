@@ -18,12 +18,12 @@ const figures = (agreement: number, balanced: number, yes: [number, number]) => 
 
 function ledger(rehearsal = false): Ledger {
   const done = {
-    ...unfinishedRow("room-rules", "alpha", 1, { pass: "ref-1-p0001", rehearsal, beside: "room-rules/real-1-hand/step-000044" }, "t"),
+    ...unfinishedRow("output-format", "alpha", 1, { pass: "ref-1-p0001", rehearsal, beside: "output-format/real-1-hand/step-000044" }, "t"),
     state: "done" as const,
     report: {
       kind: "laya-calibration",
       gates: {
-        "room-rules": { ...figures(0.9, 0.8, [10, 7]), base: figures(0.85, 0.6, [10, 2]) },
+        "output-format": { ...figures(0.9, 0.8, [10, 7]), base: figures(0.85, 0.6, [10, 2]) },
         "reply-wanted": {},
       },
     },
@@ -36,7 +36,7 @@ function ledger(rehearsal = false): Ledger {
       gates: { "reply-wanted": { ...figures(0.9, 0.9, [50, 45]), asymmetric: [{ question: "forAgent", settles: "false", questions: 100, wanted: 50, thresholds: [{ tau: 0.9, settled: 30, coverage: 0.3, missed: 2, missed_rate: 0.04 }] }] } },
     },
   };
-  const broken = { ...unfinishedRow("library-knowledge", "charlie", 1, { pass: "ref-1-p0001", rehearsal, beside: null }, "t"), fault: "the node does not answer" };
+  const broken = { ...unfinishedRow("output-decide", "charlie", 1, { pass: "ref-1-p0001", rehearsal, beside: null }, "t"), fault: "the node does not answer" };
 
   return { pass: "ref-1-p0001", source: "ref-1", rehearsal, started: "s", ended: "e", nodes: ["alpha", "bravo", "charlie"], rows: [done, asym, broken] };
 }
@@ -45,13 +45,13 @@ describe("the before-and-after table", () => {
   test("sets the new checkpoint beside the one it was measured against, yes answers given back counted apart", () => {
     const row = gateTableRows(ledger())[0]!;
 
-    expect(row.beside).toBe("room-rules/real-1-hand/step-000044");
+    expect(row.beside).toBe("output-format/real-1-hand/step-000044");
     expect(row.before).toEqual({ agreement: 0.85, balanced: 0.6, yes: 0.2, ece: 0.05 });
     expect(row.after).toEqual({ agreement: 0.9, balanced: 0.8, yes: 0.7, ece: 0.05 });
   });
 
   test("a gate whose run left no report keeps its line and says what stopped it", () => {
-    expect(gateTableRows(ledger())[2]).toMatchObject({ gate: "library-knowledge", after: null, fault: "the node does not answer" });
+    expect(gateTableRows(ledger())[2]).toMatchObject({ gate: "output-decide", after: null, fault: "the node does not answer" });
   });
 
   test("yes given back is none where the test held no yes", () => {
@@ -69,7 +69,7 @@ describe("the missed calls", () => {
 describe("the sheet", () => {
   test("says on every line of a rehearsal's tables that it is one", () => {
     const sheet = passTables(ledger(true));
-    const lines = sheet.filter((line) => line.includes("room-rules"));
+    const lines = sheet.filter((line) => line.includes("output-format"));
 
     expect(sheet.join("\n")).toContain("A pass trained on rehearsal data.");
     expect(lines.length).toBeGreaterThan(0);

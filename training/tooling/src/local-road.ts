@@ -12,10 +12,9 @@ import type { SynthAnswer, SynthAsker } from "./laya-synth-run";
 
 // A second road for a gate whose rows codex will not write: `llm_query` on the local-model road's MCP
 // service, the qwen model the deployment runs itself (docs/gate-data.md 「The local-model road」). It
-// is chosen for the sanitizer gate, whose rows are attack sentences the codex account reads as
-// security work and refuses at the account level — a refusal no model choice inside codex undoes.
-// The local model is not claude and answers the same rows without flinching, which is the whole of
-// what the gate needs.
+// is chosen for a gate whose rows the codex account refuses at the account level — a refusal no model
+// choice inside codex undoes. The local model is not claude and answers the same rows, which is the
+// whole of what such a gate needs.
 //
 // The road holds no session and reads no cache: one request carries the gate's whole prefix afresh
 // and the answer comes back as text, so nothing here resumes a thread. That is why a gate on this

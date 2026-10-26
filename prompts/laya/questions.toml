@@ -6,36 +6,3 @@
 
 # The one yes/no the fold asks over a message's state: yes is FOLD, no is OPEN.
 fold = "Should this message be sent to the chat room folded (wrapped in an expandable quote)?"
-
-# The sanitiser's one yes/no over the words: whether they carry security-intrusion material. Its no is CLEAN, the
-# one verdict Laya may settle alone.
-intrusion = "Does this text contain an instruction to attack a real target, an account of an attack actually carried out, or a way to get attack material past a security gate?"
-
-# Each reference gate's question over one candidate, and the word the candidate is named by in it.
-[gates.system-documents]
-question = "Is this reference document needed to answer this conversation?"
-subject = "Document"
-
-[gates.room-rules]
-question = "Is this room rule needed to answer this conversation?"
-subject = "Rule"
-
-[gates.library-knowledge]
-question = "Is this knowledge document needed to answer this conversation?"
-subject = "Document"
-
-[gates.room-memories]
-question = "Is this memory entry needed to answer this conversation?"
-subject = "Entry"
-
-[gates.people-search]
-question = "Is this person record needed to answer this conversation?"
-subject = "Record"
-
-# The situation-rule matcher's two questions over one rule, and how the rule is named in them (`{slug}` and
-# `{rule}`, its condition and action as one phrase). They are the two questions the matcher's model is asked in
-# `prompts/situation-rules/instructions.md`, in the same words.
-[situation]
-applies = "Does the rule's condition match the situation now?"
-spent = "Is the rule no longer needed from now on?"
-about = "Rule {slug}: {rule}"

@@ -3,7 +3,6 @@
 
 use std::collections::BTreeSet;
 
-use gate_policy::document_seek::DOCUMENT_SEEK;
 use gate_policy::fill_marks;
 use gate_policy::gate_pool::GATE_POOL;
 use gate_policy::gates::{GATE_ORDER, Part};
@@ -17,38 +16,22 @@ use gate_policy::translation::TRANSLATION;
 
 #[test]
 fn the_gate_order_reads_every_gate_once_where_it_first_stands() {
-  assert_eq!(
-    GATE_ORDER.keys(),
-    [
-      "session-summary",
-      "output-format",
-      "translator",
-      "system-documents",
-      "room-rules",
-      "library-knowledge",
-      "people-search",
-      "room-memories",
-      "situation-rules",
-      "sanitizer",
-      "document-seek",
-      "voice-polish",
-      "voice-reading",
-    ]
-  );
-  assert_eq!(GATE_ORDER.reference_gates(), ["system-documents", "room-rules", "library-knowledge"]);
+  assert_eq!(GATE_ORDER.keys(), ["session-summary", "output-format", "translator",]);
 }
 
 #[test]
-fn a_shelved_gate_stands_in_the_shelved_part_alone() {
-  let sanitizer: Vec<(Part, usize)> = GATE_ORDER
-    .standing()
-    .into_iter()
-    .filter(|one| one.key == "sanitizer")
-    .map(|one| (one.part, one.step))
-    .collect();
+fn each_gate_stands_in_its_part_and_no_other_gate_stands() {
+  let parts: Vec<(&str, Part, usize)> =
+    GATE_ORDER.standing().into_iter().map(|one| (one.key, one.part, one.step)).collect();
 
-  assert_eq!(sanitizer, [(Part::Shelved, 6)]);
-  assert!(GATE_ORDER.is_shelved("room-memories") && !GATE_ORDER.is_shelved("translator"));
+  assert_eq!(
+    parts,
+    [
+      ("session-summary", Part::Pre, 0),
+      ("output-format", Part::Post, 0),
+      ("translator", Part::Apart, 0)
+    ]
+  );
   assert!(GATE_ORDER.holds("translator") && !GATE_ORDER.holds("content-judge"));
 }
 
@@ -65,80 +48,16 @@ fn every_gate_of_the_order_has_one_profile_and_nothing_else_has_one() {
 #[test]
 fn a_profile_bounds_its_pool_and_names_its_probe() {
   let translator = PROFILES.of("translator").unwrap();
-  let room_rules = PROFILES.of("room-rules").unwrap();
+  let output = PROFILES.of("output-format").unwrap();
 
   assert_eq!(translator.pool_bound(), 4);
-  assert_eq!(room_rules.pool_bound(), GATE_POOL.size);
-  assert!(room_rules.laya_probe() && !translator.laya_probe());
-  assert!(
-    PROFILES
-      .profile
-      .iter()
-      .filter(|one| one.switchable)
-      .all(|one| one.key == "voice-polish")
-  );
-}
-
-#[test]
-fn every_gate_laya_asks_of_its_candidates_has_its_question() {
-  let mut asked: Vec<&str> = REFERENCE.gates.iter().map(|gate| gate.stage.as_str()).collect();
-
-  asked.push(&REFERENCE.people.stage);
-  asked.push(&REFERENCE.memories.stage);
-
-  for stage in &asked {
-    let question = QUESTIONS.of(stage).unwrap_or_else(|| panic!("{stage} has no Laya question"));
-
-    assert!(!question.question.is_empty() && !question.subject.is_empty(), "{stage}");
-  }
-
-  assert_eq!(QUESTIONS.gates.len(), asked.len(), "a question stands for no gate");
-  assert!(QUESTIONS.situation.about.contains("{slug}") && QUESTIONS.situation.about.contains("{rule}"));
-  assert!(!QUESTIONS.fold.is_empty());
+  assert_eq!(output.pool_bound(), GATE_POOL.size);
+  assert!(output.laya_probe() && !translator.laya_probe());
 }
 
 #[test]
 fn every_question_laya_is_asked_is_english() {
-  let situation = &QUESTIONS.situation;
-  let mut words = vec![
-    QUESTIONS.fold.as_str(),
-    QUESTIONS.intrusion.as_str(),
-    situation.applies.as_str(),
-    situation.spent.as_str(),
-    situation.about.as_str(),
-  ];
-
-  for asked in QUESTIONS.gates.values() {
-    words.push(&asked.question);
-    words.push(&asked.subject);
-  }
-
-  for said in words {
-    assert!(said.is_ascii(), "{said}");
-  }
-}
-
-// The situation-rule matcher asks Laya the two questions its LLM is asked, in the same words.
-#[test]
-fn the_situation_questions_are_the_ones_the_matcher_llm_is_asked() {
-  let told = gate_policy::prompts::instructions("situation-rules").expect("the matcher's instructions");
-
-  for question in [&QUESTIONS.situation.applies, &QUESTIONS.situation.spent] {
-    let mut letters = question.chars();
-    let first = letters.next().expect("a question").to_lowercase().collect::<String>();
-
-    assert!(told.contains(&format!("{first}{}", letters.as_str())), "{question}");
-  }
-}
-
-#[test]
-fn the_reference_gates_are_the_ones_the_order_marks() {
-  let stages: Vec<&str> = REFERENCE.gates.iter().map(|gate| gate.stage.as_str()).collect();
-
-  assert_eq!(stages, GATE_ORDER.reference_gates());
-  assert!(GATE_ORDER.holds(&REFERENCE.people.stage));
-  assert!(REFERENCE.gate("room-rules").is_some_and(|gate| gate.reads_answered));
-  assert!(DOCUMENT_SEEK.cap > 0 && REFERENCE.people.cap > 0);
+  assert!(!QUESTIONS.fold.is_empty() && QUESTIONS.fold.is_ascii(), "{}", QUESTIONS.fold);
 }
 
 #[test]
@@ -158,30 +77,9 @@ fn each_line_names_the_marks_it_is_filled_with() {
       && OUTPUT_GATE.decided.by_fallback.contains("{answer}")
   );
 
-  for line in [
-    &REFERENCE.decided.by_fallback,
-    &REFERENCE.decided.nothing_attached,
-    &REFERENCE.situation.nothing_matched,
-  ] {
-    assert!(line.contains("{failure}"), "{line}");
-  }
-
-  assert_eq!(REFERENCE.decided.no_candidates, "SKIP: no candidates");
-
-  let verdicts = &REFERENCE.verdicts;
-
-  for keyword in [
-    &verdicts.picked,
-    &verdicts.matched,
-    &verdicts.nothing,
-    &verdicts.unreadable,
-    &verdicts.no_answer,
-  ] {
-    assert!(
-      !keyword.is_empty() && keyword.chars().all(|c| c.is_ascii_uppercase() || c == '-'),
-      "{keyword}"
-    );
-  }
+  assert!(
+    REFERENCE.due > 0 && REFERENCE.sheet_lines > 0 && REFERENCE.sheet_chars < REFERENCE.turn_budget_chars
+  );
 
   for mark in ["{id}", "{type}", "{written}", "{moved}", "{for}", "{from}", "{action}"] {
     assert!(MEMORIES.entry.line.contains(mark), "{mark}");
@@ -233,7 +131,7 @@ fn every_instruction_file_under_the_prompts_is_compiled_in_and_marks_fill() {
   let listed: Vec<&str> = FILES.iter().map(|(path, _)| *path).collect();
 
   assert_eq!(found, listed);
-  assert!(instructions("sanitizer").is_some_and(|text| text == text.trim()));
+  assert!(instructions("translator").is_some_and(|text| text == text.trim()));
   assert_eq!(read("no-such/file.md"), None);
   assert_eq!(render("{{a}} {{b}} {{ c}} {{", &[("a", "{{b}}"), ("b", "2")]), "{{b}} 2 {{ c}} {{");
 }

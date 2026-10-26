@@ -54,9 +54,9 @@ function gate(name: string): GateSynthesis {
   return found;
 }
 
-// The sanitiser's state is a free string with no transcript in it, so a stand-in can write one in
-// whichever of the three languages a batch asked for without inventing a line shape.
-const sanitizer = gate("sanitizer");
+// The output gate's state is a message's opening and closing with no transcript in them, so a stand-in can write
+// one in whichever of the three languages a batch asked for without inventing a line shape.
+const folds = gate("output-format");
 
 function textFor(language: LanguageBucket, tag: string): string {
   if (language === "english") {
@@ -77,9 +77,13 @@ function textFor(language: LanguageBucket, tag: string): string {
 
 function rowsFor(ask: SynthAsk, count: number): SynthRow[] {
   return Array.from({ length: count }, (_, index) => ({
-    state: textFor(ask.language, `${ask.seed}-${index}`),
-    questions: JSON.parse(JSON.stringify(sanitizer.example.questions)) as SynthRow["questions"],
-    gold: JSON.parse(JSON.stringify(sanitizer.example.gold)) as SynthRow["gold"],
+    state: (() => {
+      const said = textFor(ask.language, `${ask.seed}-${index}`);
+
+      return { ...(folds.example.state as Record<string, unknown>), head: said, tail: said };
+    })(),
+    questions: JSON.parse(JSON.stringify(folds.example.questions)) as SynthRow["questions"],
+    gold: JSON.parse(JSON.stringify(folds.example.gold)) as SynthRow["gold"],
   }));
 }
 
@@ -97,7 +101,7 @@ function standIn(onAsk?: (ask: SynthAsk) => void): SynthAsker {
 
 const options = (folder: string, extra: Partial<Parameters<typeof runSynthesis>[0]> = {}) => ({
   folder,
-  gates: [sanitizer],
+  gates: [folds],
   rows: 6,
   batchSize: 2,
   model: "gpt-5.6-luna",
@@ -110,8 +114,8 @@ const options = (folder: string, extra: Partial<Parameters<typeof runSynthesis>[
 
 describe("the run one batch is", () => {
   test("the gate's fixed prefix is the system prompt and the batch's ask is the prompt", () => {
-    const first = batchPrompts(sanitizer, plannedBatches(sanitizer, 4, 2)[0]!);
-    const second = batchPrompts(sanitizer, plannedBatches(sanitizer, 4, 2)[1]!);
+    const first = batchPrompts(folds, plannedBatches(folds, 4, 2)[0]!);
+    const second = batchPrompts(folds, plannedBatches(folds, 4, 2)[1]!);
 
     expect(second.system).toBe(first.system);
     expect(second.prompt).not.toBe(first.prompt);
@@ -134,44 +138,44 @@ describe("what stands behind a road's tokens", () => {
 
 describe("the batch plan", () => {
   test("is the same plan every time it is drawn", () => {
-    expect(plannedBatches(sanitizer, 100, 20)).toEqual(plannedBatches(sanitizer, 100, 20));
+    expect(plannedBatches(folds, 100, 20)).toEqual(plannedBatches(folds, 100, 20));
   });
 
   test("a top-up leans every batch on its one answer and still draws the rooms and the hard cases", () => {
-    const plan = plannedBatches(sanitizer, 200, 20, "false");
+    const plan = plannedBatches(folds, 200, 20, "false");
 
     expect(plan.every((ask) => ask.lean === false)).toBe(true);
     expect(plan.filter((ask) => ask.edge)).toHaveLength(3);
-    expect(plannedBatches(sanitizer, 200, 20).some((ask) => ask.lean === true)).toBe(true);
+    expect(plannedBatches(folds, 200, 20).some((ask) => ask.lean === true)).toBe(true);
   });
 
   test("asks for exactly the rows wanted", () => {
-    const plan = plannedBatches(sanitizer, 47, 20);
+    const plan = plannedBatches(folds, 47, 20);
 
     expect(plan.reduce((sum, ask) => sum + ask.count, 0)).toBe(47);
     expect(plan).toHaveLength(3);
   });
 
   test("draws the languages to the gate's own mix", () => {
-    const plan = plannedBatches(sanitizer, 2_000, 10);
+    const plan = plannedBatches(folds, 2_000, 10);
     const counted = Object.fromEntries(languageBuckets.map((bucket) => [
       bucket,
       plan.filter((ask) => ask.language === bucket).length / plan.length,
     ])) as Record<LanguageBucket, number>;
 
     for (const bucket of languageBuckets) {
-      expect(Math.abs(counted[bucket] - sanitizer.language[bucket])).toBeLessThan(0.05);
+      expect(Math.abs(counted[bucket] - folds.language[bucket])).toBeLessThan(0.05);
     }
   });
 
   test("interleaves the languages rather than writing them in blocks", () => {
-    const first = plannedBatches(sanitizer, 400, 10).slice(0, 12).map((ask) => ask.language);
+    const first = plannedBatches(folds, 400, 10).slice(0, 12).map((ask) => ask.language);
 
     expect(new Set(first).size).toBeGreaterThan(1);
   });
 
   test("leans on each answer in turn, so the balance is drawn rather than hoped for", () => {
-    const plan = plannedBatches(sanitizer, 200, 10);
+    const plan = plannedBatches(folds, 200, 10);
     const trues = plan.filter((ask) => ask.lean === true).length;
 
     expect(trues).toBe(plan.length - trues);
@@ -187,7 +191,7 @@ describe("the batch plan", () => {
     // Five batches is where the two lined up before: the answers alternate by parity and the
     // languages fell the same way, so every batch of one answer took one language.
     for (const batches of [4, 5, 6, 8, 10]) {
-      const plan = plannedBatches(sanitizer, batches * 10, 10);
+      const plan = plannedBatches(folds, batches * 10, 10);
       const byLean = new Map<string, Set<string>>();
 
       for (const ask of plan) {
@@ -199,7 +203,7 @@ describe("the batch plan", () => {
 
       // Every answer keeps at least one batch in the language the gate is mostly drawn to, so
       // losing a minority language costs each answer some rows and never all of them.
-      const majority = languageBuckets.reduce((best, one) => sanitizer.language[one] > sanitizer.language[best] ? one : best);
+      const majority = languageBuckets.reduce((best, one) => folds.language[one] > folds.language[best] ? one : best);
       const without = [...byLean.entries()].filter(([, seen]) => !seen.has(majority)).map(([lean]) => lean);
 
       expect({ batches, without }).toEqual({ batches, without: [] });
@@ -207,7 +211,7 @@ describe("the batch plan", () => {
   });
 
   test("carries all three room kinds and a share of edge batches", () => {
-    const plan = plannedBatches(sanitizer, 300, 10);
+    const plan = plannedBatches(folds, 300, 10);
 
     expect(new Set(plan.map((ask) => ask.room))).toEqual(new Set(["owner", "group", "ai"]));
     expect(plan.filter((ask) => ask.edge).length).toBeGreaterThan(plan.length / 4);
@@ -331,7 +335,7 @@ describe("a whole run against a stand-in", () => {
     expect(meta.road).toBe("codex");
     expect(Date.parse(meta.written)).toBeGreaterThan(0);
     expect(Date.parse(meta.started)).toBeGreaterThan(0);
-    expect(meta.gates.map((one) => one.gate)).toEqual(["sanitizer"]);
+    expect(meta.gates.map((one) => one.gate)).toEqual(["output-format"]);
   });
 
   test("the cache read is kept apart from the new input", async () => {
@@ -382,7 +386,7 @@ describe("a whole run against a stand-in", () => {
 
     // The same rows land again in a batch of their own, which is what a model repeating itself
     // across two batches of one gate comes to.
-    freezeBatch(folder, "sanitizer", 99, already);
+    freezeBatch(folder, "output-format", 99, already);
 
     const meta = freezeSplits(folder, progress);
 
@@ -460,7 +464,7 @@ describe("a run that dies", () => {
       return { text: JSON.stringify(rowsFor(ask, ask.count)), sessionId: "held", tokens: noTokens };
     })).rejects.toThrow("\uC138\uC158\uC774 \uB04A\uACBC\uC2B5\uB2C8\uB2E4");
 
-    expect(readProgress(folder)!.gates.sanitizer!.done).toBe(2);
+    expect(readProgress(folder)!.gates["output-format"]!.done).toBe(2);
     expect(readFrozenBatches(folder)).toHaveLength(4);
     expect(frozenState(folder)).toBe("in-progress");
   });
@@ -479,7 +483,7 @@ describe("a run that dies", () => {
     const seeds: string[] = [];
     const report = await runSynthesis(options(folder, { resume: true }), standIn((ask) => seeds.push(ask.seed)));
 
-    expect(seeds).toEqual(["sanitizer-3"]);
+    expect(seeds).toEqual(["output-format-3"]);
     expect(report.asked).toBe(1);
     expect(report.meta.gates[0]!.rows).toBe(6);
   });
@@ -548,7 +552,7 @@ describe("a run that dies", () => {
 });
 
 describe("resuming a gate onto a different road", () => {
-  // A gate started on codex and stopped, taken up on the local-model road — the shape of moving sanitizer off the
+  // A gate started on codex and stopped, taken up on the local-model road — the shape of moving output-format off the
   // road its rows are refused on, without rebuilding what codex already wrote.
   async function stoppedOnCodex(folder: string): Promise<void> {
     await expect(runSynthesis(options(folder, { road: "codex", model: "gpt-5.6-terra", effort: "high" }), async (spec, ask) => {
@@ -568,7 +572,7 @@ describe("resuming a gate onto a different road", () => {
     const seeds: string[] = [];
     const report = await runSynthesis(options(folder, { resume: true, road: "local", model: "qwen3.8-27b", effort: "none" }), standIn((ask) => seeds.push(ask.seed)));
 
-    expect(seeds).toEqual(["sanitizer-3"]);
+    expect(seeds).toEqual(["output-format-3"]);
     expect(report.meta.gates[0]!.rows).toBe(6);
   });
 
@@ -631,8 +635,8 @@ describe("a batch that read and kept nothing", () => {
       tokens: noTokens,
     }));
 
-    expect(existsSync(join(folder, batchesFolder, barrenAnswerName("sanitizer", 0)))).toBe(true);
-    expect(readFileSync(join(folder, batchesFolder, barrenAnswerName("sanitizer", 0)), "utf8")).toBe(refusable);
+    expect(existsSync(join(folder, batchesFolder, barrenAnswerName("output-format", 0)))).toBe(true);
+    expect(readFileSync(join(folder, batchesFolder, barrenAnswerName("output-format", 0)), "utf8")).toBe(refusable);
   });
 
   test("it is not counted as a lost batch, because nothing was lost", async () => {
@@ -644,8 +648,8 @@ describe("a batch that read and kept nothing", () => {
       tokens: noTokens,
     }));
 
-    expect(readProgress(folder)!.gates.sanitizer!.lostBatches).toBe(0);
-    expect(existsSync(join(folder, batchesFolder, lostAnswerName("sanitizer", 0)))).toBe(false);
+    expect(readProgress(folder)!.gates["output-format"]!.lostBatches).toBe(0);
+    expect(existsSync(join(folder, batchesFolder, lostAnswerName("output-format", 0)))).toBe(false);
   });
 
   test("a batch that kept something keeps no answer beside it", async () => {
@@ -653,7 +657,7 @@ describe("a batch that read and kept nothing", () => {
 
     await runSynthesis(options(folder, { rows: 2, batchSize: 2 }), standIn());
 
-    expect(existsSync(join(folder, batchesFolder, barrenAnswerName("sanitizer", 0)))).toBe(false);
+    expect(existsSync(join(folder, batchesFolder, barrenAnswerName("output-format", 0)))).toBe(false);
   });
 });
 
@@ -686,8 +690,8 @@ describe("a batch whose list came back broken", () => {
       tokens: noTokens,
     }));
 
-    expect(existsSync(join(folder, batchesFolder, mendedAnswerName("sanitizer", 0)))).toBe(true);
-    expect(readProgress(folder)!.gates.sanitizer!.mendedBatches).toBe(1);
+    expect(existsSync(join(folder, batchesFolder, mendedAnswerName("output-format", 0)))).toBe(true);
+    expect(readProgress(folder)!.gates["output-format"]!.mendedBatches).toBe(1);
   });
 });
 
@@ -701,11 +705,11 @@ describe("a batch nothing could be read out of", () => {
       tokens: noTokens,
     }));
 
-    const kept = join(folder, "batches", lostAnswerName("sanitizer", 0));
+    const kept = join(folder, "batches", lostAnswerName("output-format", 0));
 
     expect(existsSync(kept)).toBe(true);
     expect(readFileSync(kept, "utf8")).toContain("\uB9CC\uB4E4\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4");
-    expect(readProgress(folder)!.gates.sanitizer!.lostBatches).toBe(1);
+    expect(readProgress(folder)!.gates["output-format"]!.lostBatches).toBe(1);
   });
 
   test("a batch that read fine leaves no such file", async () => {
@@ -713,7 +717,7 @@ describe("a batch nothing could be read out of", () => {
 
     await runSynthesis(options(folder, { rows: 2, batchSize: 2 }), standIn());
 
-    expect(existsSync(join(folder, "batches", lostAnswerName("sanitizer", 0)))).toBe(false);
+    expect(existsSync(join(folder, "batches", lostAnswerName("output-format", 0)))).toBe(false);
   });
 });
 
@@ -735,10 +739,10 @@ describe("freezing what landed", () => {
   test("a batch with nothing in it still marks its place", () => {
     const folder = scratch();
 
-    freezeBatch(folder, "sanitizer", 0, []);
+    freezeBatch(folder, "output-format", 0, []);
 
     expect(readFrozenBatches(folder)).toEqual([]);
-    expect(existsSync(join(folder, "batches", "sanitizer-0001.jsonl"))).toBe(true);
+    expect(existsSync(join(folder, "batches", "output-format-0001.jsonl"))).toBe(true);
   });
 
   test("the batches are read back in the order they were written", () => {
@@ -747,14 +751,14 @@ describe("freezing what landed", () => {
     mkdirSync(join(folder, "batches"), { recursive: true });
 
     for (let index = 0; index < 12; index += 1) {
-      freezeBatch(folder, "sanitizer", index, [{
-        row: { id: `sanitizer:${index}`, gate: "sanitizer", split: "train", state: "{}", questions: "{}", gold: "{}" },
+      freezeBatch(folder, "output-format", index, [{
+        row: { id: `output-format:${index}`, gate: "output-format", split: "train", state: "{}", questions: "{}", gold: "{}" },
         language: "korean",
       }]);
     }
 
     expect(readFrozenBatches(folder).map((one) => one.row.id)).toEqual(
-      Array.from({ length: 12 }, (_, index) => `sanitizer:${index}`),
+      Array.from({ length: 12 }, (_, index) => `output-format:${index}`),
     );
   });
 
@@ -803,7 +807,7 @@ describe("a run killed between freezing a batch and recording it", () => {
 
     await expect(runSynthesis(options(folder), standIn())).rejects.toThrow();
 
-    expect(existsSync(join(folder, batchesFolder, batchName("sanitizer", 0)))).toBe(true);
+    expect(existsSync(join(folder, batchesFolder, batchName("output-format", 0)))).toBe(true);
 
     rmSync(join(folder, progressFile), { recursive: true });
 
@@ -811,7 +815,7 @@ describe("a run killed between freezing a batch and recording it", () => {
 
     await runSynthesis(options(folder, { resume: true }), standIn((ask) => seeds.push(ask.seed)));
 
-    expect(seeds).toEqual(["sanitizer-2", "sanitizer-3"]);
+    expect(seeds).toEqual(["output-format-2", "output-format-3"]);
   });
 
   test("a write that cannot land leaves nothing half-written behind it", async () => {
@@ -841,7 +845,7 @@ async function killedAfterFreezingBatch(folder: string, index: number): Promise<
 
   const progress = readProgress(folder)!;
 
-  progress.gates.sanitizer!.done = index;
+  progress.gates["output-format"]!.done = index;
   writeFileSync(join(folder, progressFile), `${JSON.stringify(progress, null, 2)}\n`);
 }
 
@@ -852,7 +856,11 @@ function secondPass(onAsk?: (ask: SynthAsk) => void): SynthAsker {
     onAsk?.(ask);
 
     return {
-      text: JSON.stringify(rowsFor(ask, ask.count).map((row) => ({ ...row, state: `${row.state} \uB450 \uBC88\uC9F8` }))),
+      text: JSON.stringify(rowsFor(ask, ask.count).map((row) => {
+        const state = row.state as Record<string, unknown>;
+
+        return { ...row, state: { ...state, head: `${String(state.head)} \uB450 \uBC88\uC9F8` } };
+      })),
       sessionId: "held",
       tokens: noTokens,
     } satisfies SynthAnswer;
@@ -869,7 +877,7 @@ describe("a run killed there on a batch that is not its first", () => {
 
     await runSynthesis(options(folder, { resume: true }), secondPass((ask) => seeds.push(ask.seed)));
 
-    expect(seeds).toEqual(["sanitizer-3"]);
+    expect(seeds).toEqual(["output-format-3"]);
   });
 
   test("that batch's rows stand as they were rather than being written over", async () => {
@@ -877,7 +885,7 @@ describe("a run killed there on a batch that is not its first", () => {
 
     await killedAfterFreezingBatch(folder, 1);
 
-    const landed = join(folder, batchesFolder, batchName("sanitizer", 1));
+    const landed = join(folder, batchesFolder, batchName("output-format", 1));
     const before = readFileSync(landed, "utf8");
 
     await runSynthesis(options(folder, { resume: true }), secondPass());
@@ -902,47 +910,47 @@ describe("a run killed there on a batch that is not its first", () => {
 
 describe("how far a gate got, read off the folder", () => {
   test("an untouched folder has nothing standing in it", () => {
-    expect(gateOnDisk(scratch(), "sanitizer", 3)).toEqual({ done: 0, kept: 0, lost: 0 });
+    expect(gateOnDisk(scratch(), "output-format", 3)).toEqual({ done: 0, kept: 0, lost: 0 });
   });
 
   test("counts the batches that stand and the rows in them", () => {
     const folder = scratch();
 
-    freezeBatch(folder, "sanitizer", 0, [
-      { row: { id: "a", gate: "sanitizer", split: "train", state: "{}", questions: "{}", gold: "{}" }, language: "korean" },
-      { row: { id: "b", gate: "sanitizer", split: "train", state: "{}", questions: "{}", gold: "{}" }, language: "korean" },
+    freezeBatch(folder, "output-format", 0, [
+      { row: { id: "a", gate: "output-format", split: "train", state: "{}", questions: "{}", gold: "{}" }, language: "korean" },
+      { row: { id: "b", gate: "output-format", split: "train", state: "{}", questions: "{}", gold: "{}" }, language: "korean" },
     ]);
-    freezeBatch(folder, "sanitizer", 1, [
-      { row: { id: "c", gate: "sanitizer", split: "test", state: "{}", questions: "{}", gold: "{}" }, language: "english" },
+    freezeBatch(folder, "output-format", 1, [
+      { row: { id: "c", gate: "output-format", split: "test", state: "{}", questions: "{}", gold: "{}" }, language: "english" },
     ]);
 
-    expect(gateOnDisk(folder, "sanitizer", 4)).toEqual({ done: 2, kept: 3, lost: 0 });
+    expect(gateOnDisk(folder, "output-format", 4)).toEqual({ done: 2, kept: 3, lost: 0 });
   });
 
   test("a batch that kept nothing still counts as done", () => {
     const folder = scratch();
 
-    freezeBatch(folder, "sanitizer", 0, []);
+    freezeBatch(folder, "output-format", 0, []);
 
-    expect(gateOnDisk(folder, "sanitizer", 3)).toEqual({ done: 1, kept: 0, lost: 0 });
+    expect(gateOnDisk(folder, "output-format", 3)).toEqual({ done: 1, kept: 0, lost: 0 });
   });
 
   test("a lost answer beside a batch is counted with it", () => {
     const folder = scratch();
 
-    freezeBatch(folder, "sanitizer", 0, []);
-    keepLostAnswer(folder, "sanitizer", 0, "\uC5EC\uAE30\uC5D4 \uD589 \uBAA9\uB85D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4");
+    freezeBatch(folder, "output-format", 0, []);
+    keepLostAnswer(folder, "output-format", 0, "\uC5EC\uAE30\uC5D4 \uD589 \uBAA9\uB85D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4");
 
-    expect(gateOnDisk(folder, "sanitizer", 3)).toEqual({ done: 1, kept: 0, lost: 1 });
+    expect(gateOnDisk(folder, "output-format", 3)).toEqual({ done: 1, kept: 0, lost: 1 });
   });
 
   test("it stops at the first batch that is missing rather than counting the files", () => {
     const folder = scratch();
 
-    freezeBatch(folder, "sanitizer", 0, []);
-    freezeBatch(folder, "sanitizer", 2, []);
+    freezeBatch(folder, "output-format", 0, []);
+    freezeBatch(folder, "output-format", 2, []);
 
-    expect(gateOnDisk(folder, "sanitizer", 4).done).toBe(1);
+    expect(gateOnDisk(folder, "output-format", 4).done).toBe(1);
   });
 
   test("another gate's batches in the same folder are not this gate's", () => {
@@ -950,15 +958,15 @@ describe("how far a gate got, read off the folder", () => {
 
     freezeBatch(folder, "reply-wanted", 0, []);
 
-    expect(gateOnDisk(folder, "sanitizer", 3).done).toBe(0);
+    expect(gateOnDisk(folder, "output-format", 3).done).toBe(0);
   });
 
   test("it never counts past the plan it was given", () => {
     const folder = scratch();
 
-    freezeBatch(folder, "sanitizer", 0, []);
-    freezeBatch(folder, "sanitizer", 1, []);
+    freezeBatch(folder, "output-format", 0, []);
+    freezeBatch(folder, "output-format", 1, []);
 
-    expect(gateOnDisk(folder, "sanitizer", 1).done).toBe(1);
+    expect(gateOnDisk(folder, "output-format", 1).done).toBe(1);
   });
 });

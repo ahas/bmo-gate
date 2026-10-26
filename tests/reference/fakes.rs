@@ -10,14 +10,10 @@ use futures_util::StreamExt;
 use futures_util::future::BoxFuture;
 use futures_util::stream::BoxStream;
 use gate_ports::PortError;
-use gate_ports::brain::{
-  Brain, Condition, Document, Event, Fragment, Hit, Load, MemoryRow, Reply, RoomRule, Sheet,
-};
+use gate_ports::brain::{Brain, Condition, Document, Event, Fragment, MemoryRow, Reply, Sheet};
 use gate_ports::gateway::{Ask, Completion, Gateway};
 use gate_ports::http::Answer;
-use gate_ports::job::{Job, Raised};
-use gate_ports::receiver::{Drafted, Message, Name, OwnerSpoke, Receiver, Roads, RoomTitle};
-use serde_json::{Map, Value};
+use gate_ports::receiver::{Drafted, Receiver};
 
 fn unoffered<T>(unit: &'static str, call: &'static str) -> Answer<T> {
   Err(PortError::Unreachable {
@@ -99,8 +95,6 @@ pub struct FakeBrain {
   pub documents: Mutex<HashMap<String, String>>,
   pub lore: Mutex<HashMap<String, String>>,
   pub sheets: Mutex<Vec<Sheet>>,
-  pub hits: Mutex<Vec<Hit>>,
-  pub matched: Mutex<Vec<(Vec<String>, Vec<String>)>>,
   pub events: Mutex<Vec<Event>>,
   pub knowledge_asked: Mutex<Vec<Vec<String>>>,
   pub lore_asked: Mutex<Vec<Vec<String>>>,
@@ -113,19 +107,6 @@ impl Brain for FakeBrain {
 
   fn conditions<'a>(&'a self, _agent: &'a str, _chat: i64) -> BoxFuture<'a, Answer<Vec<Condition>>> {
     Box::pin(async move { Ok(self.conditions.lock().unwrap().clone()) })
-  }
-
-  fn matched<'a>(
-    &'a self,
-    _agent: &'a str,
-    _chat: i64,
-    matched: &'a [String],
-    spent: &'a [String],
-  ) -> BoxFuture<'a, Answer<()>> {
-    Box::pin(async move {
-      self.matched.lock().unwrap().push((matched.to_vec(), spent.to_vec()));
-      Ok(())
-    })
   }
 
   fn woken<'a>(
@@ -157,13 +138,6 @@ impl Brain for FakeBrain {
           .cloned()
           .collect(),
       )
-    })
-  }
-
-  fn hits<'a>(&'a self, _agent: &'a str, _chat: i64, attached: &'a [Hit]) -> BoxFuture<'a, Answer<()>> {
-    Box::pin(async move {
-      self.hits.lock().unwrap().extend(attached.iter().cloned());
-      Ok(())
     })
   }
 
@@ -241,132 +215,21 @@ impl Brain for FakeBrain {
       )
     })
   }
-
-  fn room_rules(&self, _chat: i64) -> BoxFuture<'_, Answer<Vec<RoomRule>>> {
-    Box::pin(async move { unoffered("bmo-brain", "room rules") })
-  }
-
-  fn loads<'a>(&'a self, _session: &'a str) -> BoxFuture<'a, Answer<Vec<Load>>> {
-    Box::pin(async move { unoffered("bmo-brain", "loads") })
-  }
 }
 
 /// The stand-in receiver: the rooms it keeps, the names it knows people by, the messages it keeps by room and number,
 /// the chat agent's own number, the owner notices it was handed, and the draft rows its stream tells.
 #[derive(Default)]
 pub struct FakeReceiver {
-  pub rooms: Mutex<Vec<RoomTitle>>,
-  pub names: Mutex<HashMap<i64, String>>,
-  pub messages: Mutex<HashMap<(i64, i64), Message>>,
-  pub own: Mutex<Option<i64>>,
-  pub notices: Mutex<Vec<(String, Map<String, Value>)>>,
   pub drafted: Mutex<Vec<Drafted>>,
 }
 
 impl Receiver for FakeReceiver {
-  fn titles(&self) -> BoxFuture<'_, Answer<Vec<RoomTitle>>> {
-    Box::pin(async move { Ok(self.rooms.lock().unwrap().clone()) })
-  }
-
-  fn roads(&self, _chat: i64) -> BoxFuture<'_, Answer<Roads>> {
-    Box::pin(async move { unoffered("bmo-receiver", "roads") })
-  }
-
-  fn spoke_between(&self, _chat: i64, _person: i64, _from: i64, _to: i64) -> BoxFuture<'_, Answer<bool>> {
-    Box::pin(async move { unoffered("bmo-receiver", "spoke between") })
-  }
-
-  fn owner_spoke(
-    &self,
-    _chat: i64,
-    _person: i64,
-    _before: i64,
-    _seconds: i64,
-  ) -> BoxFuture<'_, Answer<OwnerSpoke>> {
-    Box::pin(async move { unoffered("bmo-receiver", "owner spoke") })
-  }
-
-  fn names<'a>(&'a self, people: &'a [i64]) -> BoxFuture<'a, Answer<Vec<Name>>> {
-    Box::pin(async move {
-      let names = self.names.lock().unwrap();
-
-      Ok(
-        people
-          .iter()
-          .map(|person| Name {
-            person: *person,
-            name: names.get(person).cloned(),
-          })
-          .collect(),
-      )
-    })
-  }
-
-  fn waits<'a>(&'a self, _text: &'a str) -> BoxFuture<'a, Answer<bool>> {
-    Box::pin(async move { unoffered("bmo-receiver", "waits") })
-  }
-
-  fn own_number<'a>(&'a self, _agent: &'a str, _chat: i64) -> BoxFuture<'a, Answer<Option<i64>>> {
-    Box::pin(async move { Ok(*self.own.lock().unwrap()) })
-  }
-
-  fn message(&self, chat: i64, message: i64) -> BoxFuture<'_, Answer<Option<Message>>> {
-    Box::pin(async move { Ok(self.messages.lock().unwrap().get(&(chat, message)).cloned()) })
-  }
-
-  fn owner_notice<'a>(
-    &'a self,
-    code: &'a str,
-    fields: &'a Map<String, Value>,
-  ) -> BoxFuture<'a, Answer<()>> {
-    Box::pin(async move {
-      self.notices.lock().unwrap().push((code.to_owned(), fields.clone()));
-      Ok(())
-    })
-  }
-
   fn drafts(&self) -> BoxFuture<'_, Answer<BoxStream<'static, Answer<Drafted>>>> {
     Box::pin(async move {
       let drafted: Vec<Answer<Drafted>> = self.drafted.lock().unwrap().iter().cloned().map(Ok).collect();
 
       Ok(futures_util::stream::iter(drafted).boxed())
-    })
-  }
-}
-
-/// The stand-in bmo-job: the row it answers each raise with, and every raise it was asked.
-pub struct FakeJob {
-  pub answer: Mutex<Raised>,
-  pub raised: Mutex<Vec<(String, String, i64, String)>>,
-}
-
-impl Default for FakeJob {
-  fn default() -> Self {
-    Self {
-      answer: Mutex::new(Raised {
-        id: 1900,
-        raised: true,
-      }),
-      raised: Mutex::default(),
-    }
-  }
-}
-
-impl Job for FakeJob {
-  fn raise<'a>(
-    &'a self,
-    title: &'a str,
-    judgement: &'a str,
-    chat: i64,
-    key: &'a str,
-  ) -> BoxFuture<'a, Answer<Raised>> {
-    Box::pin(async move {
-      self
-        .raised
-        .lock()
-        .unwrap()
-        .push((title.to_owned(), judgement.to_owned(), chat, key.to_owned()));
-      Ok(*self.answer.lock().unwrap())
     })
   }
 }

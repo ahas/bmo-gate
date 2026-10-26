@@ -101,14 +101,8 @@ asks (`docs/laya.md`).
   |---|---|---|
   | `output-format` | `output-format` — the gate whose provider is Laya, asked the reduced state | served (`real-2-fold`), trained on the Korean wording of the fold question and asked it (`docs/laya.md`, 「Each gate's probe」) |
   | `output-format` | `output-decide` — no gate of this repository asks it | served (`real-1-hand`) |
-  | `library-knowledge` | `library-knowledge` | not served; its checkpoint (`lkdk8-s42-p0001`, seed 42, chosen among seeds 42, 7 and 1234), trained on the input that carries the message the turn follows on from, and on the jobs and searches it is asked for with their labels distilled from a teacher, is kept on the node and in the collection |
-  | `room-rules` | `room-rules` | not served; its checkpoint (`ref895-answered-s2-p0001`), trained on the input that carries the message the turn follows on from, is kept on the node and in the collection |
-  | `situation-rules` | `situation-rules` | not served; its checkpoint (`real-1-hand`) is kept on the node and in the collection |
-  | `system-documents` | `system-documents` | not served; its checkpoint (`ref852-p0001`) is kept on the node and in the collection |
-  | `people-search` | `people-search` | not served; its checkpoint (`ref895-plain-p0001`), trained on the input that carries the message the turn follows on from, is kept on the node and in the collection |
   | `content-judge` | none — no gate asks it | not served; its checkpoint (`content-judge-1.content-judge-topup-1-p0001`) is kept in the collection and on the nodes |
   | `reply-wanted` | none — the reply-or-not gate has no code | trained, not served |
-  | `sanitizer` | `sanitizer` | not trained; its Laya work is shelved |
 
 - **A checkpoint answers only the shape it was trained on.** The state a gate's probe sends must be
   the state its training rows carry, to the character. A checkpoint asked in another shape still
@@ -276,8 +270,7 @@ installer writes it for the node's machine (`docs/llm-server.md`, 「The engine�
 
 ## Measured on the service's node
 
-Measured on a service node and its RTX 4070. Five gates served (`output-decide`, `library-knowledge`, `room-rules`, `situation-rules`,
-`system-documents`), all five on the card.
+Measured on a service node and its RTX 4070 with five checkpoints served, all five on the card.
 
 - **Loading:** 15 to 17 seconds a checkpoint from the local disk, so about a minute and a half for
   the five before the port opens.
@@ -343,9 +336,9 @@ paper and no wiki. Each point says where this repository stands against it.
   teacher is in two minds; a fresh sample against the other two agrees 0.735 of the time, which is
   the most a student can be read to reach. Which teacher, and how many samples, the materials leave
   open.
-  - Here: a reference gate's judged labels are one judgement mapped to 0.95 or 0.05 (0.5 for
+  - Here: a per-candidate gate's judged labels are one judgement mapped to 0.95 or 0.05 (0.5 for
     `related`); the knowledge gate's distilled work labels are three samples of the teacher's own
-    probability, averaged (`docs/reference-data.md`, 「Distilled work labels」). The claude road
+    probability, averaged. The claude road
     cannot set a temperature, so each sample is a call of its own.
 - **A dataset is audited before it is used:** the states are varied, the answers balanced, and the
   gold follows the input.
@@ -353,7 +346,7 @@ paper and no wiki. Each point says where this repository stands against it.
   repeats its rare operations three and four times and keeps everything else; `--label-smoothing`
   moves a share of each answer's weight to the others.
   - Here: the common answer is dropped to three times the rarer, question by question and within a
-    row's kind of input, because repetition left this repository's reference gates answering no
+    row's kind of input, because repetition left this repository's per-candidate gates answering no
     (below); the knowledge gate's distilled work, whose yes answers are plentiful, is dropped only
     to eight times.
 - **A run is sized in optimizer updates**, `epochs × ceil(ceil(items / micro-batch) / accumulation)`.
@@ -402,7 +395,7 @@ paper and no wiki. Each point says where this repository stands against it.
 - **A yes/no question returns the probability of yes, and can follow its option labels rather than
   the state,** most of all on the English checkpoint; a yes/no with no criteria renders one generic
   pair of options for every state, and criteria are advised where it must discriminate.
-  - Here: the reference gates' questions are the gates' own, a yes/no with instructions and no criteria, on the
+  - Here: a per-candidate gate's questions are the gate's own, a yes/no with instructions and no criteria, on the
     multilingual checkpoint.
 
 ## The training loop and calibration
@@ -453,10 +446,10 @@ run here trains one gate's model on a card of its own, so there is nothing for D
      cost accuracy at these settings, so neither is turned on (「What the savings cost」).
    - It starts from the hub's multilingual checkpoint unless `--base` names another.
    - **Balance:** within each question a gate asks, no answer is kept more than three times as often
-     as that question's rarest (`--balance-ratio`). A reference gate answers no to almost every
+     as that question's rarest (`--balance-ratio`). A per-candidate gate answers no to almost every
      candidate, and unbalanced data teaches Laya to answer no always, which agrees with it as often
      as a real judgement and decides nothing.
-   - **The balance is counted per question, never over the whole gate.** A reference gate's questions
+   - **The balance is counted per question, never over the whole gate.** A per-candidate gate's questions
      are its candidates, each with a rate of its own. Counted over the gate, the few candidates that
      carry most of its yes answers keep every yes and lose nearly every no, and are taught to say yes
      to every turn — the system reference `structure`, at a fifth of its turns needed, becomes
@@ -474,7 +467,7 @@ run here trains one gate's model on a card of its own, so there is nothing for D
      a kind whose yes answers are scarce needs and a kind whose yes answers are plentiful does not:
      there it lifts a piece needed one time in eight or twenty to one in four.
    - **A training on the knowledge gate's distilled folder takes `--kind-ratio work=8`.** Measured on 12 October 2026 on a training node's
-     RTX 4070 over its distilled rows (`docs/reference-data.md`, 「Distilled work labels」), seed 1234:
+     RTX 4070 over its distilled rows, seed 1234:
      at three to one for work too, the 28 hand-written work requests drew 17 pieces not needed where
      the checkpoint then serving drew 2, nearly all of them the research rule on every search; at
      eight to one they drew none. Over three seeds at eight to one the balanced agreement on the test
@@ -490,7 +483,7 @@ run here trains one gate's model on a card of its own, so there is nothing for D
      rather than dropping the common ones. It is counted per question for the same reason, the cap
      keeps a candidate with two yes answers in thousands from being taught those two sentences a
      thousand times, and a question only ever given one answer is kept as it stands.
-   - **Dropping the common answer stays the default** for a reference gate. Measured on 10 October 2026
+   - **Dropping the common answer stays the default** for a per-candidate gate. Measured on 10 October 2026
      on a training node's RTX 4070 over the knowledge gate's rows (4,468 training rows, one yes in two hundred),
      repeating the rarer answers four times, and repeating them toward three to one at most fifty
      times, each left the checkpoint answering no to 49 or 50 of the test split's 50 needed questions,

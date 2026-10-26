@@ -3,9 +3,10 @@
 The gate stage of a turn, as one service of its own. Between the moment a chat receiver has built a turn's
 envelope and the moment an agent's answer goes back into the room, the gate:
 
-- **sanitises** the words on their way into a model's context;
-- **picks the reference** a turn is handed: memory rows, room rules, situation rules, documents and the person
-  book, out of the material the brain service serves;
+- **summarises** a replaced session at the head of a fresh one;
+- **hands a turn its reference** with no pick — each speaker's sheet head, the room's due memories and the rows
+  the turn's events wake — and serves the brain's index, its pieces and a search of it, which the agent reads the
+  rest of its brain through;
 - **checks the answer** on its way out, the output gate;
 - **translates** what a worker or a document needs in another language, and keeps the translations;
 - **records** every judgement it makes, and the road each run walked;
@@ -24,12 +25,11 @@ Every other unit is reached through standard APIs alone, and of other repositori
 | Folder | What it holds |
 |---|---|
 | `.graph/` | The code dependency graph: one node per feature, with the files it is made of and what it reads, read and written by `bmo graph`. Its area files are generated in the checkout and untracked, so a fresh checkout builds them again, while `settings.toml` is the repository's configuration and stays tracked |
-| `client/` | The console plugin bundle: the gate order and a gate's trial page, built into the ES module the gate serves and packed as a Nuxt layer on bmo-ui, a Bun project of its own |
 | `crates/` | The Rust crates the root package is built from: the contract and its client, the store, the codes, the ports to the other units, the policy, the words, the markup, the gate runs, the gates, the reference road, the service's routes, the unit command's nouns and the Laya relay |
 | `deploy/` | The service units the testbed's deployment keeps on the operations machine |
 | `docs/` | The documents, which come before the code: start with `docs/layout.md`, and read `docs/api.md` for the public API and `docs/openapi.json` for its machine form |
 | `package/` | The TypeScript client generated from `docs/openapi.json` |
-| `prompts/` | What each gate is told, the questions Laya is asked, the evaluation set's briefs, the training tooling's prompts to its writers and judges, the data its rows carry and the earlier wordings they may ask, and the sanitiser's trigger words, the one folder Korean stands in |
+| `prompts/` | What each gate is told, the questions Laya is asked, the evaluation set's briefs, the training tooling's prompts to its writers and judges, the data its rows carry and the earlier wordings they may ask: the one folder Korean stands in |
 | `runtime/` | What serves Laya on its nodes: the decision server, its card turn client and the front, each a Python project of its own; and the GGUF engine's unit templates and node setup |
 | `src/` | The root package: the version, the `gate-server` and `laya-relay` binaries and the `bmo-gate` unit command |
 | `tests/` | Every test of the repository |
@@ -48,7 +48,9 @@ instead, and the check that holds it.
 
 ## Version
 
-The version stands in `VERSION` and in the workspace manifest, which hold the same number.
+The version stands in `VERSION` and in the workspace manifest, which hold the same number. It moves only at a
+release the owner declares, as bmo-chat's `docs/conventions.md` 「Versions」 states; a commit, a deploy, a fix or a
+contract change moves none, and a deployment is told apart by its commit.
 
 ## License
 

@@ -7,18 +7,17 @@ import { settingText } from "./settings";
 import type { JudgeRoad } from "./gate-judge";
 import type { SynthAnswer, SynthAsker, TokenTally } from "./laya-synth-run";
 
-// A fourth road for the sanitiser gate, whose rows codex refuses at the account level: the text model,
-// the general text model the deployment runs itself, reached as one OpenAI-compatible front (the text
-// model engine's own documents). It is not claude, and being uncensored it writes the gate's attack rows
-// without flinching — the same reason the local-model road was chosen — and it is the road the owner
-// names for this data.
+// A fourth road for a gate whose rows codex refuses at the account level: the text model, the general
+// text model the deployment runs itself, reached as one OpenAI-compatible front (the text model engine's
+// own documents). It is not claude, and it writes such rows — the same reason the local-model road was
+// chosen.
 //
 // The road holds no session and reads no cache: one chat completion carries the gate's whole prefix
 // afresh and the answer comes back as text, so nothing here resumes a thread. That is why a gate on
 // this road is a run of independent batches rather than one held conversation.
 
 // The answer slot and the wait. A batch is a long answer — twenty rows, each with its state and its
-// sanitised text, not a one-line verdict — and an answer cut off mid-list holds no rows at all, so the
+// gold, not a one-line verdict — and an answer cut off mid-list holds no rows at all, so the
 // slot is sized well past what one batch needs.
 export const textEffort = "none";
 export const textAnswerTokens = 16_384;

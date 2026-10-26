@@ -18,9 +18,9 @@
   「Translations」).
 - A gate whose caller has a way of its own without it declares so in its profile, and only such a gate may
   be switched off for the whole deployment: its switch is its row of the gate options table (the agency's
-  `docs/own-llm.md`, 「Per-gate time limit」), and a gate switched off is never asked. Apart from that, each
-  agent answering in a room has a switch of its own for every gate its turns pass (「Each agent's own
-  gates」 below).
+  `docs/own-llm.md`, 「Per-gate time limit」), and a gate switched off is never asked. No gate of the order
+  declares it, so each stands on; each agent answering in a room has a switch of its own for every gate its
+  turns pass (「Each agent's own gates」 below).
 - A gate's options are kept for each designated agent: a row of the gate options table per gate and agent,
   read for the agent whose turn the gate runs in. A companion's rows are copied from the chat agent's when
   it stands (`POST /options/copied`, the agency's `docs/agent-ownership.md`).
@@ -33,13 +33,12 @@
   A gate has no tool to look those rows up and no way to apply a judgement on them, so writing a fact is
   never a gate's run. A person's standing sheet is the brain's own rendering of those facts (the brain's
   `docs/design.md`, 「A person is a subject」), which the reference reads as it stands
-  (`docs/reference-selection.md`, 「What attaches without a gate」), so no gate summarises one either.
+  (`docs/reference-selection.md`, 「What a turn is given」), so no gate summarises one either.
 - The session summariser stands at the place the gate order gives it and is called like a gate, but it is a
   recollector, not a gate. No unit asks it: the agency keeps no session summary (its `docs/sessions.md`), so
   it runs under the evaluation set alone (`docs/boundary-api.md`, 「Contract gaps」).
 - What each gate runs on is its route, kept with every other work key's by the agency (the agency's
-  `docs/own-llm.md`, 「A gate has one road」). What each one is asked is in its own document: the output gate
-  in `docs/output-gate.md`, the reference gates in `docs/reference-selection.md`.
+  `docs/own-llm.md`, 「A gate has one road」). What the output gate is asked is in `docs/output-gate.md`.
 
 ## A gate on a provider's program
 
@@ -78,18 +77,15 @@
 
 - **The gate order** is where each gate stands against a chat turn. It is declared once, beside the list of
   gates, and the list of gates is derived from it, so a gate cannot exist without a place.
-- The gate order has four parts:
+- The gate order has three parts:
   - **the pre-gate** — the gates that run before the chat agent writes its reply;
   - **the post-gate** — the gates that run after the reply is written, before it reaches the room;
-  - **off-turn** — the gates that run outside any chat turn;
-  - **shelved** — the gates no turn and no caller asks.
+  - **off-turn** — the gates that run outside any chat turn.
 - A part is a list of steps in the order a turn passes them. A step holds one gate, or several gates the turn
-  starts together and waits on together. The shelved part is a list of gates, each marked where it is one of
-  the reference pickers.
+  starts together and waits on together.
 - A step may carry a condition: it runs only in the turns the condition names.
 - A gate that runs in both the pre-gate and the post-gate part stands in each, at the step where it does that
-  part's work. A gate never stands twice within one part, and an off-turn or a shelved gate stands in no other
-  part.
+  part's work. A gate never stands twice within one part, and an off-turn gate stands in no other part.
 - The gate order is checked against the turn by tests that drive a turn and record the order the gates are
   called in, so a turn that moves a gate fails its tests until the gate order moves with it.
 
@@ -99,8 +95,8 @@
    being let go is written before the new one is asked anything. It stands at the head of the turn, before
    every other gate.
 
-A turn's reference is asked of no gate: `POST /reference/selected` carries what no gate picks, and the agent reads
-the brain's index and its pieces itself (`docs/reference-selection.md`).
+A turn's reference is asked of no gate: `POST /reference/selected` carries what attaches with no pick, and the
+agent reads the brain's index and its pieces itself (`docs/reference-selection.md`).
 
 ### The post-gate
 
@@ -117,20 +113,6 @@ the brain's index and its pieces itself (`docs/reference-selection.md`).
 - The output gate also runs on a message the chat agent sends to a room outside any turn. That does not give
   it a place in this part: it stands where it runs within a turn.
 
-### Shelved
-
-`system-documents`, `room-rules`, `library-knowledge`, `people-search`, `room-memories`, `situation-rules`,
-`sanitizer`, `document-seek`, `voice-polish` and `voice-reading`.
-
-- **A shelved gate is never asked,** in a turn or out of one. Its profile, its options and its judgement history
-  stay readable (`GET /gates`, `GET /options/{gateName}`, `GET /judgements`), and `GET /gates` lists it under the
-  part `shelved`.
-- **What a route answers in its place:** `POST /stages/{gateName}/runs` answers null, as for a gate switched
-  off; the sanitiser's routes answer the text as it came, unchanged; the knowledge routes answer no piece; and
-  `POST /documents/sought` is 409 `shelved` (`docs/api.md`).
-- **The evaluation and replay commands** still read a shelved picker's libraries and score it on a stored turn
-  (`docs/gate-eval.md`); nothing they do reaches a turn.
-
 ### Where a gate's runs go out
 
 - **A gate's runs go out under its own work key,** the gate's name, which the agency resolves to a provider, a
@@ -144,28 +126,22 @@ the brain's index and its pieces itself (`docs/reference-selection.md`).
 ## Each agent's own gates
 
 - **Every agent that answers in a room passes the gates its own turn passes,** and the turn declares which:
-  the chat agent's turn the pre-gate and post-gate parts of the gate order above, a companion's turn the
-  gates that pick its reference and the outgoing sanitizer (the agency's `docs/companions.md`). An agent
-  that answers in no room has none.
+  the chat agent's turn the pre-gate and post-gate parts of the gate order above. An agent that answers in no
+  room has none.
 - **Each such agent has a switch of its own for each of those gates,** kept by the agency under the agent
   and the gate, which the receiver hands the gate as a turn's `off`. A gate is on for an agent until it is
   switched off there, so an agent added later starts with every gate of its turn on, and its deployment may
   start it with some off.
-- **A gate standing in both parts is one switch,** as on the console's tables: the sanitizer switched off for
-  an agent is off before its answer and after it.
+- **A gate standing in both parts is one switch,** off before the agent's answer and after it.
 - **A gate switched off for an agent is never asked in that agent's turns:** no run, no judgement and no
   tokens under it. Another agent's turn in the same room passes it as its own switch says. The turn goes on
   without it:
-  - a reference gate, `people-search` or `situation-rules` adds nothing to the turn's reference, and
-    `room-memories` leaves the memories entry to the due rows alone;
   - `session-summary` lets the replaced session go with no summary carried over;
-  - the sanitizer leaves the text as it was written, and the code's own dash replacement of the outgoing
-    clean still runs;
   - `output-format` leaves the fold to the code, as on a send that asks no gate.
 - **A gate on for the turn with nothing to ask about is not asked either, but says so** (「What a turn
   records」).
-- **What no agent's turn carries is not switched here:** the off-turn gates, and the sanitizer and the output
-  gate on a message the chat agent sends outside any turn.
+- **What no agent's turn carries is not switched here:** the off-turn gates, and the output gate on a message the
+  chat agent sends outside any turn.
 - **Where the switches are turned:** the console's agent management screen and the agent's own settings,
   through the agency's `POST /agent-gate` (the agency's `docs/api.md`).
 
@@ -176,43 +152,14 @@ the brain's index and its pieces itself (`docs/reference-selection.md`).
 - **A judgement's verdict opens with its keyword:** one upper-case word, which the console reads the chip's
   colour and the end of judging by (the web unit's `docs/web.md`, 「Room screen」), and after it, past a colon,
   what was decided. What the model answered, or why it gave nothing, stands in the judgement's detail and never
-  as its verdict. The reference gates (`system-documents`, `room-rules`, `library-knowledge`), `people-search`,
-  `room-memories` and `situation-rules` write these, on every road alike:
-
-  | Verdict | When |
-  |---|---|
-  | `PICK: <slug>, <slug>` | a picker's answer was read and named these: answered yes, or for `people-search` named |
-  | `MATCH: applies=<slugs> spent=<slugs>` | the matcher's answer was read and at least one rule applies or is spent; an empty side reads `none` |
-  | `NONE` | the answer was read and picks or matches nothing |
-  | `UNREADABLE` | an answer came, but not in the shape the gate was asked for, so it is not read (`docs/reference-selection.md`, 「What the three reference gates are asked, and what they answer」) |
-  | `NO-ANSWER` | the road gave no answer: it failed, or the gate's wait ran out |
-  | `SKIP: no candidates` | the gate was on but not asked (below) |
-
-  A decision on Laya is written the same way whoever settled it — Laya, the fallback LLM or the default — and
-  its detail says which, and where Laya gave no verdict why: its failure kind, a busy card with the reason the
-  engine gave, as `busy: the card is taken for <claim>` (`docs/laya.md`, 「A gate whose provider is Laya」).
-- **Their judgements carry the lines the model was asked of their candidates, each with what it answered of
-  it,** so the room's log shows exactly what the model read beside what it said. A line is written as the model
-  read it, character for character, in the order it read them, and its answer is null where the answer was not
-  read (`UNREADABLE`, `NO-ANSWER`):
-
-  | Judgement | Its lines | Each line's answer |
-  |---|---|---|
-  | a run of a picker's model | each candidate's index line, as the request's index carries it | `yes` or `no`; for `people-search`, `yes` for a candidate it named and `no` for one it passed over |
-  | a run of the matcher's model | each rule's line, as the request's rules carry it | `applies: <yes\|no>, spent: <yes\|no>` |
-  | a decision on Laya | each question Laya was asked: a picker's one per candidate, the matcher's two per rule (`docs/laya.md`, 「Each gate's probe」) | `yes` or `no` where Laya settled it; null where its fallback LLM or the default did, whose own run judgement carries the lines that model read |
-
-  A candidate is named in its line by the name the gate offers it under, which is the name its answer and its
-  verdict record keep. Every other judgement carries no lines.
-- **A reference gate, `people-search`, `room-memories` or `situation-rules` that is on for the turn but has no
-  candidate left once the code has narrowed them** — a room with no rulebook, an agent with no knowledge of its own, a turn
-  no situation rule of the room is open for — is not asked, and leaves the judgement `SKIP: no candidates` in
-  its place, so the chip shows every gate the turn had on and why one stood aside. A reference gate,
-  `people-search` and `room-memories` leave beside it their row of the offers record, asked about none, which is how many
-  candidates the narrowing started from and by which rules it narrowed (`docs/reference-selection.md`,
-  「What the code narrows before a gate is asked」).
-- **A gate switched off, or one the turn does not ask by its own declaration** (a turn of the chat agent's
-  own lines alone for a gate that never reads them, a turn with no text), leaves nothing.
+  as its verdict. A decision on Laya is written the same way whoever settled it — Laya, the fallback LLM or the
+  default — and its detail says which, and where Laya gave no verdict why: its failure kind, a busy card with the
+  reason the engine gave, as `busy: the card is taken for <claim>` (`docs/laya.md`, 「A gate whose provider is
+  Laya」).
+- **The history reads a judgement by its gate's name, whether the order holds that gate or not** (`GET
+  /judgements`); nothing else reads a judgement of a gate the order does not hold.
+- **A gate switched off, or one the turn does not ask by its own declaration** (a turn with no text), leaves
+  nothing.
 - **A round's draft process is the `draft` stage** (the receiver's `docs/drafting.md`): the gate writes one
   judgement for each row of it the receiver tells (`docs/boundary-api.md`, 「bmo-receiver」), and judges nothing of
   what was asked or answered. `draft` is no gate: it stands in no part of the gate order, runs no model and has no

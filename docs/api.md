@@ -12,7 +12,6 @@ written for one caller.
 ## Common rules
 
 - **Auth.** Every route takes `Authorization: Bearer <token>`; a missing or wrong token is 401 `unauthorized`.
-  The console's routes read the reader's role beside it (「Console」).
 - **Keys** are camelCase. **Times** are one integer of epoch milliseconds. **Ids** are signed 64-bit integers:
   a room is `roomId`, a message `messageId`, a person `personId`.
 - **Pages** are `{"items": [...], "more": boolean}`. A list takes one cursor, `before` or `after`, and
@@ -33,13 +32,14 @@ the Laya relay's last answer; `busy` where it answers but its card was taken for
 
 | Route | Request | Answer |
 |---|---|---|
-| `GET /gates` | | a page of the gate order, each `gateName`, `part` (`pre`, `post`, `apart` or `shelved`), `step`, `condition` or null, `switchable`, `layaProbe`, `defaultLayaMode` and `answerTokens` |
+| `GET /gates` | | a page of the gate order, each `gateName`, `part` (`pre`, `post` or `apart`), `step`, `condition` or null, `switchable`, `layaProbe`, `defaultLayaMode` and `answerTokens` |
 | `GET /options/{gateName}` | | `timeoutMs`, `layaMode`, `layaTau`, `layaProbe`, `switchable`, `enabled`, `layaFallback`, `effective` (`thinking`, `answerTokens`, `timeoutMs`, `layaMode`, `layaTau`) and `defaults` |
 | `POST /options/{gateName}` | any of `timeoutMs`, `layaMode`, `layaTau`, `enabled`, `layaFallback`; a Laya field sent null goes back to the default | `gateName` and `options`, the gate's route as a run reads it (`provider`, `model`, `laya`, `timeoutMs`, `setAt`) |
 | `POST /options/{gateName}/agents/{agentName}` | as `POST /options/{gateName}` | as `POST /options/{gateName}`, its wait the agent's |
 | `POST /options/copied` | `agentName` (the companion), `fromAgentName` (the chat agent) | 204 |
 
-- **A gate's options** are its wait, its switch where its profile lets it be switched off, its Laya mode, τ
+- **A gate's options** are its wait, its switch where its profile lets it be switched off (none of the order's
+  does), its Laya mode, τ
   and fallback LLM (`docs/laya.md`). What it thinks and how much it may answer are its tier's on its road; a
   change naming either is refused `own-llm`.
 - **A change names whose options it writes.** `POST /options/{gateName}` writes the chat agent's row of the gate;
@@ -69,9 +69,9 @@ An agreement carries `gateName`, `unit` (`pair` or `question`), `pairs`, `failur
 
 - **A judgement** is a decision written into a room's log: a round's skip, a re-ask, an answer sent. It is
   written as it comes, with the moment it was written.
-- **A judgement's `lines`** are what a picker's or the matcher's model was asked of its candidates, each `line`
-  exactly as the model read it and its `answer`, null where the answer was not read (`docs/gates.md`,
-  「What a turn records」). They are empty on every other judgement and on one written by `POST`.
+- **A judgement's `lines`** are what a gate's model was asked of its candidates, each `line` exactly as the model
+  read it and its `answer`, null where the answer was not read, where the judgement keeps them. They are empty on
+  every other judgement and on one written by `POST`.
 - **A judgement's roads** are its gate's road records of the same round, or of the same message where either
   names no round, that fall within the time the judgement took, give or take five seconds; each road goes to
   one judgement. Its `offers` are the offers record of its round. Both are empty on a judgement as `POST`
@@ -104,11 +104,10 @@ An agreement carries `gateName`, `unit` (`pair` or `question`), `pairs`, `failur
 It answers `entries`, each `path`, `text` and `source` (`document`, `person`, `rule`, `situation`,
 `knowledge`, `memory`, `room` or `archive`).
 
-- **A turn's reference** is what no gate picks (`docs/reference-selection.md`, 「What a turn is given」): the
-  head of each speaker's sheet, at most three due memories and the rows the turn's events wake. It asks no model.
-  The envelope's other fields are read for the speakers, the room, the agent and the events; `offGates`,
-  `holds`, `answered` and `lore` change nothing a turn is given. Where `records` is true what the turn attached is
-  handed to the brain to count.
+- **A turn's reference** is what attaches with no pick (`docs/reference-selection.md`, 「What a turn is
+  given」): the head of each speaker's sheet, at most three due memories and the rows the turn's events wake. It
+  asks no model. The envelope is read for the room, the speakers, the agent and the events; its other fields
+  change nothing a turn is given.
 
 | Route | Query | Answer |
 |---|---|---|
@@ -122,22 +121,6 @@ It answers `entries`, each `path`, `text` and `source` (`document`, `person`, `r
   empty `q`. An index asked with no `session` counts every entry unread. A slug its group does not hold is 404
   `not-found`. A piece read with `session` is recorded among the
   session's loads; a call on the agency that fails is 502 `upstream-failed`.
-
-## Sanitiser
-
-| Route | Request | Answer |
-|---|---|---|
-| `POST /sanitised` | `text`, `label`, `roomId?`, `messageId?` | `text`, `changed` |
-| `POST /sanitiser/documents` | `path`, `text` | `text`, the text to keep |
-
-- **The sanitiser is shelved** (`docs/gates.md`, 「Shelved」): both routes answer the text as it came, `changed`
-  false, and ask no model. What follows is what the sanitiser does where it stands in the gate order.
-- **The sanitiser** defuses the smallest spans that carry security-intrusion material and leaves the rest as
-  it was. Words with nothing worth judging come back as they are; where the sanitiser has no answer, the words
-  that made them worth judging are blanked. A verdict is kept under the message where `messageId` names one.
-- **A document's sanitising** reads the text an editor changed and answers the text to keep. A text with
-  nothing worth judging comes back as it is.
-- A run stopped by somebody is 409 `stopped`.
 
 ## Translations
 
@@ -170,16 +153,6 @@ It answers `entries`, each `path`, `text` and `source` (`document`, `person`, `r
 - **Keeping a translation** keeps `text` as the reading of `original` in the language, in place of any kept
   before.
 
-## Knowledge
-
-| Route | Request | Answer |
-|---|---|---|
-| `POST /knowledge/selected` | `agentName`, `roomId`, `lines` | `pieces`, each `path` and `text` |
-| `POST /knowledge/work` | `roomId`, `lines` | the same pick for the chat agent |
-
-Both answer `pieces` empty: the knowledge picker is shelved (`docs/gates.md`, 「Shelved」), and a piece of work
-reads the brain's index itself (「Reference」).
-
 ## Runs
 
 `POST /stages/{gateName}/runs` takes `prompt`, `system?`, `roomId?`, `messageId?`, `agentName?`, `thinking?`
@@ -189,7 +162,7 @@ its road gave none) and `ms`.
 - **One run of one gate,** for a unit that reads the answer itself. The run goes on the gate's road with the
   gate's options and is recorded as a road like any gate run.
 - **The instructions** are the gate's own where `system` is absent. A name that is not a gate is 404
-  `no-gate`; a gate switched off, or shelved, answers null without asking any road.
+  `no-gate`; a gate switched off answers null without asking any road.
 
 ## Formats
 
@@ -216,7 +189,6 @@ characters; a longer one is 413 `too-large`.
 
 | Route | Request | Answer |
 |---|---|---|
-| `POST /documents/sought` | `question`, `entries` (each `slug`, `line`, `group?`) | `picks`, the slugs chosen; 502 `no-answer` where the seeker gave none; 409 `shelved` while the seeker is shelved |
 | `POST /documents/translations` | `document`, `version`, `target`, `partCount`, `wanted` (each `part` and `text`) | 202 with `taken`, the parts queued |
 | `GET /documents/translations/state` | `document`, `target` | `pending`, `failure` (`reason`, `provider`, `model`) or null |
 | `GET /documents/translations/parts` | `document`, `version`, `target` | a page of `part`, `text`, `failed` and `failure` |
@@ -241,47 +213,6 @@ characters; a longer one is 413 `too-large`.
 `id` field its number; its data is `{"id", "kind", "at", "data"}`, the inner `data` being the member the
 event tells of. The kinds are `judgement.created`, `document-translation.changed` and `laya.changed`. A
 reader that falls behind loses what it missed and reads the collections again.
-
-## Console
-
-The gate keeps bmo-ui's console plugin contract (bmo-ui's `docs/console-bundles.md`): its screens are a console
-bundle the gate serves, and a console attaches them by the gate's manifest alone. The contract is every
-console's, so nothing here names one.
-
-| Route | Request | Answer |
-|---|---|---|
-| `GET /console-manifest` | | the manifest, in the shape bmo-ui's `console-manifest` module states |
-| `GET /console/words` | | the bundle's words: each locale's tree under the locale's code, every key under `gates` |
-| `GET /console/bundle/{file}` | | the bundle's module or its stylesheet, as the manifest names it |
-| `GET /console/gates` | | as `GET /gates` |
-| `GET /console/laya` | | as `GET /laya` |
-| `GET /console/trials` | as `GET /trials` | as `GET /trials` |
-| `POST /console/trials` | `gateName`, `prompt` | 201, the trial |
-
-- **The manifest** names the bundle `gates`, its menu name the words' `gates.title.gates`, its icon
-  `i-material-symbols-balance`, its screen path `/gates`, the service `gate` and the API prefix `/console`, and
-  asks for the `administrator` role. It asks for no owner key, no event stream, no socket and no notices. Under
-  `relays` it names `POST /translations` (「Translations」), the one route outside the prefix a console relays.
-- **The module and the stylesheet** stand under `/console/bundle/`, each named by the digest of its bytes, so
-  either path changes whenever its bytes do. Each is answered as an immutable file a year long; a name that is not
-  the current digest is 404 `not-found`.
-- **Where they are read from.** The manifest, the words and the two files are answered from the folder the
-  settings' `[console]` names (`docs/boundary-api.md`, 「Configuration」). Where the settings name none, those four
-  routes are 404 `not-found`, and a console leaves the gate out.
-- **The guard.** Every route here takes the gate's token. Every route under `/console/` but the words, the module
-  and the stylesheet among them, also reads `Owner-Role`, the role the console sets from its signed-in reader: a
-  call with none, or with a role that does not allow `administrator`, is 403 `forbidden`. The manifest and the
-  words are answered on the token alone.
-- **The screen's reads** under `/console/` answer as their routes outside it do. Since the API prefix is
-  `/console`, a console relays a browser nothing of the gate but them, the module and the stylesheet.
-- **A relayed route.** `POST /translations` is the gate's own route for every caller, and the route a console
-  names as its translator (bmo-ui's `docs/console-bundles.md`, 「Translation」); a console relays it because the
-  manifest names it under `relays`, and another bundle's screens reach it where their manifest names the service
-  `gate` under `calls`. A call to it that names a reader's role in `Owner-Role` is a console's call for that
-  reader and is answered only where the role allows `administrator`, else 403 `forbidden`; a call naming none is
-  a unit's own, on the token alone.
-- **A trial put through the console** is kept with no user name, under the reader's `Owner-Key`, the account
-  service's user id, where the call carries one; the trial answers its `userName` empty.
 
 ## The tools a tool host places
 

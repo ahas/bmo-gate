@@ -1,6 +1,5 @@
-//! The questions Laya is asked (docs/laya.md): the yes/no each probing gate puts over one candidate, and how a
-//! candidate is named in it. They stand in `prompts/laya/questions.toml`, in English, word for word as Laya's
-//! checkpoints are trained on them, since a question worded otherwise is one no checkpoint has learnt; and the
+//! The questions Laya is asked (docs/laya.md): the yes/no the output gate's probe puts over a message. They stand
+//! in `prompts/laya/questions.toml`, in English, word for word as Laya's checkpoints are trained on them, since a question worded otherwise is one no checkpoint has learnt; and the
 //! served checkpoints that learnt an earlier wording, which are asked that one instead (`docs/laya.md`, 「Each
 //! gate's probe」).
 
@@ -9,40 +8,11 @@ use std::sync::LazyLock;
 
 use serde::Deserialize;
 
-/// A reference gate's question over one candidate, and the word the candidate is named by in it.
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Asked {
-  pub question: String,
-  pub subject: String,
-}
-
-/// The situation-rule matcher's two questions over one rule, and how the rule is named in them (`{slug}` and
-/// `{rule}`, its condition and action as one phrase).
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct SituationQuestions {
-  pub applies: String,
-  pub spent: String,
-  pub about: String,
-}
-
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Questions {
   /// The one yes/no the fold asks over a message's state: yes is FOLD, no is OPEN.
   pub fold: String,
-  /// The sanitiser's one yes/no over the words: whether they carry security-intrusion material.
-  pub intrusion: String,
-  /// Each reference gate's and the person-book search's question, by the gate's key.
-  pub gates: BTreeMap<String, Asked>,
-  pub situation: SituationQuestions,
-}
-
-impl Questions {
-  pub fn of(&self, stage: &str) -> Option<&Asked> {
-    self.gates.get(stage)
-  }
 }
 
 pub static QUESTIONS: LazyLock<Questions> = LazyLock::new(|| {

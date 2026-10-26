@@ -20,7 +20,7 @@ fn route(way: Way) -> Route {
 #[test]
 fn a_programs_road_stands_its_pools_bound_and_the_gateway_takes_turns() {
   assert_eq!(bound("translator", Way::Session), 4);
-  assert_eq!(bound("room-rules", Way::Session), GATE_POOL.size);
+  assert_eq!(bound("output-format", Way::Session), GATE_POOL.size);
   assert_eq!(bound("translator", Way::Gateway), 1);
 }
 
@@ -29,28 +29,29 @@ async fn a_run_waits_for_its_place_no_longer_than_its_wait() {
   let pools = Pools::default();
   let gateway = route(Way::Gateway);
   let soon = || Instant::now() + Duration::from_millis(50);
-  let first = pools.take("room-rules", &gateway, soon()).await;
+  let first = pools.take("output-format", &gateway, soon()).await;
 
   assert!(first.is_some());
-  assert!(pools.take("room-rules", &gateway, soon()).await.is_none());
-  assert!(pools.take("sanitizer", &gateway, soon()).await.is_some());
+  assert!(pools.take("output-format", &gateway, soon()).await.is_none());
+  assert!(pools.take("session-summary", &gateway, soon()).await.is_some());
   drop(first);
-  assert!(pools.take("room-rules", &gateway, soon()).await.is_some());
+  assert!(pools.take("output-format", &gateway, soon()).await.is_some());
 
   let session = route(Way::Session);
-  let held: Vec<_> =
-    futures_util::future::join_all((0..GATE_POOL.size).map(|_| pools.take("room-rules", &session, soon())))
-      .await;
+  let held: Vec<_> = futures_util::future::join_all(
+    (0..GATE_POOL.size).map(|_| pools.take("output-format", &session, soon())),
+  )
+  .await;
 
   assert!(held.iter().all(Option::is_some));
-  assert!(pools.take("room-rules", &session, soon()).await.is_none());
+  assert!(pools.take("output-format", &session, soon()).await.is_none());
 }
 
 #[test]
 fn a_gate_run_stands_in_the_picture_while_it_is_held() {
   let run = GateRun {
     id: u64::MAX - 7,
-    stage: "sanitizer".to_owned(),
+    stage: "session-summary".to_owned(),
     chat_id: Some(-5),
     message_id: Some(9),
     started_at: 1,

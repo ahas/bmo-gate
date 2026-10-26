@@ -20,7 +20,7 @@ use gate_stages::{Reading, Stages};
 use reqwest::StatusCode;
 use serde_json::json;
 
-use crate::fakes::{AnsweringGateway, FakeBrain, FakeJob, FakeReceiver};
+use crate::fakes::{AnsweringGateway, FakeBrain, FakeReceiver};
 use crate::stub::Stub;
 use crate::{ROOM, TOKEN, ground};
 
@@ -49,13 +49,10 @@ fn app_on(ground: &crate::Ground, stub: &Stub, receiver: Arc<dyn Receiver>) -> A
       receiver,
       shipped: None,
     }),
-    job: Arc::new(FakeJob::default()),
     queue: Queue::default(),
     translations: Intake::of_policy(),
     token: TOKEN.to_owned(),
-    owner_room: 1,
     data_root: PathBuf::from(&ground.app.data_root),
-    console: None,
   })
 }
 

@@ -8,7 +8,6 @@ pub mod brain;
 pub mod brain_rows;
 pub mod gateway;
 pub mod http;
-pub mod job;
 pub mod receiver;
 
 pub use http::{Answer, Peer, PortError};

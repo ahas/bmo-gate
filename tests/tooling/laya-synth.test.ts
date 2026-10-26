@@ -61,24 +61,14 @@ function languageWanted(spec: GateSynthesis): LanguageBucket {
   return languageOf(stateText(spec, spec.example.state));
 }
 
-describe("the nine gates", () => {
-  test("there are nine, each named once", () => {
-    expect(gateSyntheses()).toHaveLength(9);
-    expect(new Set(gateSyntheses().map((one) => one.gate)).size).toBe(9);
+describe("the three gates", () => {
+  test("there are three, each named once", () => {
+    expect(gateSyntheses()).toHaveLength(3);
+    expect(new Set(gateSyntheses().map((one) => one.gate)).size).toBe(3);
   });
 
-  test("the nine gates each have a descriptor", () => {
-    expect(gateSyntheses().map((one) => one.title)).toEqual([
-      "System document classifier",
-      "Room rule classifier",
-      "Library knowledge classifier",
-      "Situation rule matcher",
-      "Note classifier",
-      "Output format",
-      "Sanitiser gate",
-      "Person-book search",
-      "Reply-or-not judge",
-    ]);
+  test("the three gates each have a descriptor", () => {
+    expect(gateSyntheses().map((one) => one.title)).toEqual(["Note classifier", "Output format", "Reply-or-not judge"]);
   });
 
   // Every line a model reads is English: only the conversation stays in the rooms' words. Hangul stands in
@@ -109,29 +99,11 @@ describe("the nine gates", () => {
     }
   });
 
-  // The writer's questions are the ones the gates ask (`prompts/laya/questions.toml`), word for word, so a
-  // checkpoint trained on the written rows has learnt what the gate asks. The sanitiser's rows are harvested
-  // apart and its gate's question is its own.
+  // The writer's question is the one the gate asks (`prompts/laya/questions.toml`), word for word, so a
+  // checkpoint trained on the written rows has learnt what the gate asks.
   test("each question the writer is shown is the gate's own, word for word", () => {
-    const asked = Bun.TOML.parse(readFileSync(join(repositoryRoot(), "prompts", "laya", "questions.toml"), "utf8")) as {
-      fold: string;
-      gates: Record<string, { question: string; subject: string }>;
-      situation: { applies: string; spent: string; about: string };
-    };
+    const asked = Bun.TOML.parse(readFileSync(join(repositoryRoot(), "prompts", "laya", "questions.toml"), "utf8")) as { fold: string };
 
-    for (const [name, one] of Object.entries(asked.gates)) {
-      const spec = synthesisFor(name);
-
-      if (spec !== null) {
-        expect(spec.questions.map((question) => question.instructions)).toEqual([one.question]);
-        expect(spec.candidateWord).toBe(one.subject);
-      }
-    }
-
-    const situation = gate("situation-rules");
-
-    expect(situation.questions.map((question) => question.instructions)).toEqual([asked.situation.applies, asked.situation.spent]);
-    expect(asked.situation.about.startsWith(`${situation.candidateWord} {slug}: `)).toBe(true);
     expect(gate("output-format").questions[0]!.instructions).toBe(asked.fold);
   });
 
@@ -162,7 +134,7 @@ describe("the nine gates", () => {
       .filter((spec) => spec.questions.some((question) => question.safe !== undefined))
       .map((spec) => spec.gate);
 
-    expect(asymmetric).toEqual(["sanitizer", "reply-wanted"]);
+    expect(asymmetric).toEqual(["reply-wanted"]);
   });
 
   test("the reply-wanted gate settles only that the message was not for the chat agent", () => {
@@ -187,7 +159,7 @@ describe("the nine gates", () => {
 
 describe("the balance target", () => {
   test("a yes/no question is drawn half and half", () => {
-    expect(targetBalance(gate("sanitizer").questions[0]!)).toEqual({ true: 0.5, false: 0.5 });
+    expect(targetBalance(gate("output-format").questions[0]!)).toEqual({ true: 0.5, false: 0.5 });
   });
 
   test("a four-option choice is drawn a quarter each", () => {
@@ -204,7 +176,7 @@ describe("the balance target", () => {
   });
 
   test("a yes/no question's answers are true and false", () => {
-    expect(answersOf(gate("sanitizer").questions[0]!)).toEqual(["true", "false"]);
+    expect(answersOf(gate("output-format").questions[0]!)).toEqual(["true", "false"]);
   });
 });
 
@@ -309,148 +281,100 @@ describe("the transcript shapes", () => {
   });
 });
 
-describe("naming a per-candidate question", () => {
-  test("one question a candidate is named by the slug alone", () => {
-    expect(candidateOf(gate("system-documents"), "structure")).toEqual({ slug: "structure", id: "needed" });
-  });
-
-  test("two questions a candidate are named slug and question", () => {
-    expect(candidateOf(gate("situation-rules"), "grocery-ping:spent")).toEqual({ slug: "grocery-ping", id: "spent" });
-  });
-
-  test("a slug that is not slug-shaped is not a candidate", () => {
-    expect(candidateOf(gate("system-documents"), "Structure Doc")).toBeNull();
-  });
-
+describe("naming a question", () => {
   test("a gate that asks of the whole state names no candidate", () => {
-    expect(candidateOf(gate("sanitizer"), "harmful")).toBeNull();
+    expect(candidateOf(gate("output-format"), "fold")).toBeNull();
   });
 });
 
 describe("the validator refuses", () => {
-  const classifier = gate("system-documents");
-  const sanitizer = gate("sanitizer");
+  const folds = gate("output-format");
   const notes = gate("knowledge-classifier");
+  // The output gate's state with its two text fields written as given.
+  const folded = (head: string, tail: string) => ({ ...(folds.example.state as Record<string, unknown>), head, tail });
 
   test("a state with no text in it — empty-state", () => {
-    const row = copyOf(sanitizer.example);
+    const row = copyOf(folds.example);
 
-    row.state = "   ";
+    row.state = folded("   ", "   ");
 
-    expect(validateSynthRow(sanitizer, row, "korean")).toMatchObject({ ok: false, refusal: "empty-state" });
+    expect(validateSynthRow(folds, row, "korean")).toMatchObject({ ok: false, refusal: "empty-state" });
   });
 
   test("a row that asks nothing — no-questions", () => {
-    const row = copyOf(sanitizer.example);
+    const row = copyOf(folds.example);
 
     row.questions = {};
     row.gold = {};
 
-    expect(validateSynthRow(sanitizer, row, "korean")).toMatchObject({ ok: false, refusal: "no-questions" });
+    expect(validateSynthRow(folds, row, "korean")).toMatchObject({ ok: false, refusal: "no-questions" });
   });
 
   test("a question with no gold beside it — unanswered-question", () => {
-    const row = copyOf(sanitizer.example);
+    const row = copyOf(folds.example);
 
     row.gold = {};
 
-    expect(validateSynthRow(sanitizer, row, "korean")).toMatchObject({ ok: false, refusal: "unanswered-question" });
+    expect(validateSynthRow(folds, row, "korean")).toMatchObject({ ok: false, refusal: "unanswered-question" });
   });
 
   test("a gold answering a question the row never asked — unasked-gold", () => {
-    const row = copyOf(sanitizer.example);
+    const row = copyOf(folds.example);
 
     row.gold.invented = { type: "noul", label: "true", noul: 1, probabilities: { true: 1, false: 0 } };
 
-    expect(validateSynthRow(sanitizer, row, "korean")).toMatchObject({ ok: false, refusal: "unasked-gold" });
+    expect(validateSynthRow(folds, row, "korean")).toMatchObject({ ok: false, refusal: "unasked-gold" });
   });
 
   // A model leaves a question or a gold half-written now and then, and a row like that is a bad
   // row. The gate refuses it and carries on; it does not fall over, which would cost the whole
   // gate its run over one row the model fumbled.
   test("a question that is not a question at all — wrong-question-type", () => {
-    const row = copyOf(sanitizer.example);
+    const row = copyOf(folds.example);
 
-    row.questions.harmful = "\uBB3B\uB294 \uB9D0" as unknown as LayaQuestion;
+    row.questions.fold = "\uBB3B\uB294 \uB9D0" as unknown as LayaQuestion;
 
-    expect(validateSynthRow(sanitizer, row, "korean")).toMatchObject({ ok: false, refusal: "wrong-question-type" });
+    expect(validateSynthRow(folds, row, "korean")).toMatchObject({ ok: false, refusal: "wrong-question-type" });
   });
 
   test("a question with nothing written in its instructions — wrong-instructions", () => {
-    const row = copyOf(sanitizer.example);
+    const row = copyOf(folds.example);
 
-    row.questions.harmful = { type: "noul" } as unknown as LayaQuestion;
+    row.questions.fold = { type: "noul" } as unknown as LayaQuestion;
 
-    expect(validateSynthRow(sanitizer, row, "korean")).toMatchObject({ ok: false, refusal: "wrong-instructions" });
+    expect(validateSynthRow(folds, row, "korean")).toMatchObject({ ok: false, refusal: "wrong-instructions" });
   });
 
   test("a gold with no probabilities in it — bad-probabilities", () => {
-    const row = copyOf(sanitizer.example);
+    const row = copyOf(folds.example);
 
-    row.gold.harmful = { type: "noul", label: "true", noul: 1 } as unknown as Gold;
+    row.gold.fold = { type: "noul", label: "true", noul: 1 } as unknown as Gold;
 
-    expect(validateSynthRow(sanitizer, row, "korean")).toMatchObject({ ok: false, refusal: "bad-probabilities" });
+    expect(validateSynthRow(folds, row, "korean")).toMatchObject({ ok: false, refusal: "bad-probabilities" });
   });
 
   test("a gold that is not an object at all — bad-probabilities", () => {
-    const row = copyOf(sanitizer.example);
+    const row = copyOf(folds.example);
 
-    row.gold.harmful = "\uCC38" as unknown as Gold;
+    row.gold.fold = "\uCC38" as unknown as Gold;
 
-    expect(validateSynthRow(sanitizer, row, "korean")).toMatchObject({ ok: false, refusal: "bad-probabilities" });
+    expect(validateSynthRow(folds, row, "korean")).toMatchObject({ ok: false, refusal: "bad-probabilities" });
   });
 
   test("a question of a type this gate does not ask — wrong-question-type", () => {
-    const row = copyOf(sanitizer.example);
+    const row = copyOf(folds.example);
 
-    row.questions.harmful = { type: "choice", instructions: row.questions.harmful!.instructions, criteria: { yes: "", no: "" } };
+    row.questions.fold = { type: "choice", instructions: row.questions.fold!.instructions, criteria: { yes: "", no: "" } };
 
-    expect(validateSynthRow(sanitizer, row, "korean")).toMatchObject({ ok: false, refusal: "wrong-question-type" });
+    expect(validateSynthRow(folds, row, "korean")).toMatchObject({ ok: false, refusal: "wrong-question-type" });
   });
 
   test("a question that does not ask what the gate asks — wrong-instructions", () => {
-    const row = copyOf(sanitizer.example);
+    const row = copyOf(folds.example);
 
-    row.questions.harmful = { type: "noul", instructions: "\uC774 \uAE00\uC740 \uC704\uD5D8\uD55C\uAC00?" };
+    row.questions.fold = { type: "noul", instructions: "\uC774 \uAE00\uC740 \uC704\uD5D8\uD55C\uAC00?" };
 
-    expect(validateSynthRow(sanitizer, row, "korean")).toMatchObject({ ok: false, refusal: "wrong-instructions" });
-  });
-
-  test("a per-candidate question named something that is not a slug — bad-question-id", () => {
-    const row = copyOf(classifier.example);
-    const asked = row.questions.structure!;
-    const gold = row.gold.structure!;
-
-    delete row.questions.structure;
-    delete row.gold.structure;
-    row.questions["Structure Doc"] = asked;
-    row.gold["Structure Doc"] = gold;
-
-    expect(validateSynthRow(classifier, row, "korean")).toMatchObject({ ok: false, refusal: "bad-question-id" });
-  });
-
-  test("a candidate missing one of its two questions — bad-question-id", () => {
-    const rules = gate("situation-rules");
-    const row = copyOf(rules.example);
-
-    delete row.questions["photo-thanks:spent"];
-    delete row.gold["photo-thanks:spent"];
-
-    expect(validateSynthRow(rules, row, "korean")).toMatchObject({ ok: false, refusal: "bad-question-id" });
-  });
-
-  test("fewer candidates than the gate offers — candidate-count", () => {
-    const rules = gate("situation-rules");
-    const row = copyOf(rules.example);
-    const first = candidateOf(rules, Object.keys(row.questions)[0]!)!.slug;
-
-    for (const id of Object.keys(row.questions).filter((one) => candidateOf(rules, one)!.slug !== first)) {
-      delete row.questions[id];
-      delete row.gold[id];
-    }
-
-    expect(1).toBeLessThan(rules.candidates!.min);
-    expect(validateSynthRow(rules, row, "korean")).toMatchObject({ ok: false, refusal: "candidate-count" });
+    expect(validateSynthRow(folds, row, "korean")).toMatchObject({ ok: false, refusal: "wrong-instructions" });
   });
 
   test("a gold naming answers the question does not have — bad-answers", () => {
@@ -462,27 +386,19 @@ describe("the validator refuses", () => {
   });
 
   test("probabilities that do not come to one — bad-probabilities", () => {
-    const row = copyOf(sanitizer.example);
+    const row = copyOf(folds.example);
 
-    row.gold.harmful = { type: "noul", label: "false", noul: 0.3, probabilities: { true: 0.3, false: 0.3 } };
+    row.gold.fold = { type: "noul", label: "false", noul: 0.3, probabilities: { true: 0.3, false: 0.3 } };
 
-    expect(validateSynthRow(sanitizer, row, "korean")).toMatchObject({ ok: false, refusal: "bad-probabilities" });
+    expect(validateSynthRow(folds, row, "korean")).toMatchObject({ ok: false, refusal: "bad-probabilities" });
   });
 
   test("a label that is not the likeliest answer — bad-probabilities", () => {
-    const row = copyOf(sanitizer.example);
+    const row = copyOf(folds.example);
 
-    row.gold.harmful = { type: "noul", label: "true", noul: 0.2, probabilities: { true: 0.2, false: 0.8 } };
+    row.gold.fold = { type: "noul", label: "true", noul: 0.2, probabilities: { true: 0.2, false: 0.8 } };
 
-    expect(validateSynthRow(sanitizer, row, "korean")).toMatchObject({ ok: false, refusal: "bad-probabilities" });
-  });
-
-  test("a transcript written in a shape the gate is not given — wrong-transcript", () => {
-    const row = copyOf(classifier.example);
-
-    row.state = "[2026-01-01T00:00:00.000Z] #1 Member (id 4471902): Robin \uC6CC\uCEE4\uAC00 \uC7A1\uC744 \uC5B4\uB514\uC11C \uBC1B\uC544\uC624\uB294\uC9C0 \uC54C\uC544?";
-
-    expect(validateSynthRow(classifier, row, "korean")).toMatchObject({ ok: false, refusal: "wrong-transcript" });
+    expect(validateSynthRow(folds, row, "korean")).toMatchObject({ ok: false, refusal: "bad-probabilities" });
   });
 
   test("a room-shaped gate handed plain lines — wrong-transcript", () => {
@@ -514,33 +430,33 @@ describe("the validator refuses", () => {
   });
 
   test("a row in a language the batch did not ask for — wrong-language", () => {
-    expect(validateSynthRow(sanitizer, sanitizer.example, "english")).toMatchObject({
+    expect(validateSynthRow(folds, folds.example, "english")).toMatchObject({
       ok: false,
       refusal: "wrong-language",
     });
   });
 
   test("a row past what one Laya call reads — too-large", () => {
-    const row = copyOf(sanitizer.example);
+    const row = copyOf(folds.example);
 
-    row.state = `${"\uC774 \uAE00\uC740 \uC544\uC8FC \uAE41\uB2C8\uB2E4. ".repeat(200)}`;
+    row.state = folded(`${"\uC774 \uAE00\uC740 \uC544\uC8FC \uAE41\uB2C8\uB2E4. ".repeat(200)}`, "");
 
-    expect(validateSynthRow(sanitizer, row, "korean")).toMatchObject({ ok: false, refusal: "too-large" });
+    expect(validateSynthRow(folds, row, "korean")).toMatchObject({ ok: false, refusal: "too-large" });
   });
 
   test("and lets a good row through", () => {
-    expect(validateSynthRow(sanitizer, sanitizer.example, "korean")).toEqual({ ok: true });
+    expect(validateSynthRow(folds, folds.example, "korean")).toEqual({ ok: true });
   });
 });
 
 describe("the row as the training file holds it", () => {
-  const spec = gate("sanitizer");
+  const spec = gate("output-format");
 
   test("the three parts go in as JSON strings under the gate's own name", () => {
     const row = datasetRowOf(spec, spec.example, shares);
 
-    expect(row.gate).toBe("sanitizer");
-    expect(row.id.startsWith("sanitizer:")).toBe(true);
+    expect(row.gate).toBe("output-format");
+    expect(row.id.startsWith("output-format:")).toBe(true);
     expect(JSON.parse(row.state)).toEqual(spec.example.state);
     expect(JSON.parse(row.questions)).toEqual(spec.example.questions);
     expect(JSON.parse(row.gold)).toEqual(spec.example.gold);
@@ -557,7 +473,7 @@ describe("the row as the training file holds it", () => {
   test("a different input gives a different id", () => {
     const other = copyOf(spec.example);
 
-    other.state = "\uB2E4\uB978 \uAE00\uC785\uB2C8\uB2E4. \uB77C\uC6B0\uD130 \uC124\uC815\uC744 \uBC31\uC5C5\uD574 \uB450\uB824\uACE0 \uD569\uB2C8\uB2E4.";
+    other.state = { ...(other.state as Record<string, unknown>), head: "\uB2E4\uB978 \uAE00\uC785\uB2C8\uB2E4. \uB77C\uC6B0\uD130 \uC124\uC815\uC744 \uBC31\uC5C5\uD574 \uB450\uB824\uACE0 \uD569\uB2C8\uB2E4." };
 
     expect(datasetRowOf(spec, other, shares).id).not.toBe(datasetRowOf(spec, spec.example, shares).id);
   });
@@ -570,14 +486,14 @@ describe("the row as the training file holds it", () => {
 });
 
 describe("the prompt", () => {
-  const spec = gate("system-documents");
+  const spec = gate("reply-wanted");
 
   test("the prefix carries the gate's rules, its line shape and its worked example", () => {
     const prefix = synthPrefix(spec);
 
     expect(prefix).toContain(spec.title);
-    expect(prefix).toContain(spec.questions[0]!.instructions);
-    expect(prefix).toContain(said("prompt.transcripts", "plain_line"));
+    expect(prefix).toContain(spec.questions[0]!.instructions.split("{{agent}}")[0]!);
+    expect(prefix).toContain(said("prompt.transcripts", "room_line"));
     expect(prefix).toContain(said("prompt.transcripts", "attachments"));
     expect(prefix).toContain(JSON.stringify(spec.example));
   });
@@ -616,8 +532,7 @@ describe("the prompt", () => {
     expect(prefix).toContain(said("prompt", "fields"));
     expect(prefix).toContain("The chat agent's answer does not go here.");
     expect(prefix).toContain(said("prompt", "one_call_range", { least: 1_200, most: 1_700 }));
-    expect(synthPrefix(gate("sanitizer"))).not.toContain(said("prompt", "fields"));
-    expect(synthPrefix(gate("sanitizer"))).toContain(said("prompt", "one_call", { most: 700 }));
+    expect(synthPrefix(gate("knowledge-classifier"))).not.toContain(said("prompt", "fields"));
   });
 
   test("an asymmetric gate's prefix says which answer Laya may settle", () => {
@@ -639,7 +554,7 @@ describe("the prompt", () => {
 
 describe("reading a batch back", () => {
   test("rows come back out of a fenced array", () => {
-    const written = JSON.stringify([gate("sanitizer").example]);
+    const written = JSON.stringify([gate("output-format").example]);
     const reading = readSynthBatch(`\uC5EC\uAE30 \uC788\uC2B5\uB2C8\uB2E4.\n\`\`\`json\n${written}\n\`\`\``);
 
     expect(reading.rows).toHaveLength(1);
@@ -687,37 +602,29 @@ describe("which gates a run writes", () => {
   const namesOf = (chosen: ReturnType<typeof gatesChosen>): string[] =>
     typeof chosen === "string" ? [chosen] : chosen.map((one) => one.gate);
 
-  test("nothing chosen and nothing left out is every gate this driver writes", () => {
-    expect(namesOf(gatesChosen([], []))).toEqual(gateSyntheses().filter((one) => one.builtApart !== true).map((one) => one.gate));
+  test("nothing chosen and nothing left out is every gate", () => {
+    expect(namesOf(gatesChosen([], []))).toEqual(gateSyntheses().map((one) => one.gate));
   });
 
-  test("a gate built apart is left out of the default roster", () => {
-    expect(namesOf(gatesChosen([], []))).not.toContain("sanitizer");
+  test("a gate left out is every other gate, in the roster order", () => {
+    const kept = namesOf(gatesChosen([], ["output-format"]));
+
+    expect(kept).not.toContain("output-format");
+    expect(kept).toEqual(gateSyntheses().filter((one) => one.gate !== "output-format").map((one) => one.gate));
   });
 
-  test("a gate left out is every other gate this driver writes, in the roster order", () => {
-    const kept = namesOf(gatesChosen([], ["room-rules"]));
-
-    expect(kept).not.toContain("room-rules");
-    expect(kept).toEqual(gateSyntheses().filter((one) => one.builtApart !== true && one.gate !== "room-rules").map((one) => one.gate));
-  });
-
-  test("a gate built apart, chosen outright, is turned back to where it is built", () => {
-    expect(namesOf(gatesChosen(["sanitizer"], []))[0]).toContain("built by its own harvest");
-  });
-
-  test("an ordinary gate chosen outright is the only one written", () => {
-    expect(namesOf(gatesChosen(["room-rules"], []))).toEqual(["room-rules"]);
+  test("a gate chosen outright is the only one written", () => {
+    expect(namesOf(gatesChosen(["output-format"], []))).toEqual(["output-format"]);
   });
 
   test("what is left out is left out of what was chosen too", () => {
-    expect(namesOf(gatesChosen(["sanitizer", "room-rules"], ["sanitizer"]))).toEqual(["room-rules"]);
+    expect(namesOf(gatesChosen(["reply-wanted", "output-format"], ["reply-wanted"]))).toEqual(["output-format"]);
   });
 
   test("a name that is no gate is said back, whichever side it was given on", () => {
-    for (const chosen of [gatesChosen(["sanitiser"], []), gatesChosen([], ["sanitiser"])]) {
-      expect(chosen).toContain("sanitiser");
-      expect(chosen).toContain("sanitizer");
+    for (const chosen of [gatesChosen(["output-gate"], []), gatesChosen([], ["output-gate"])]) {
+      expect(chosen).toContain("output-gate");
+      expect(chosen).toContain("output-format");
     }
   });
 

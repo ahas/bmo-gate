@@ -36,7 +36,7 @@ describe("claiming a gate", () => {
   });
 
   test("a folder that does not exist yet is made", () => {
-    const folder = join(scratch(), "gates", "sanitizer");
+    const folder = join(scratch(), "gates", "output-format");
 
     expect(claimGate(folder, { pid: 101, now: 1_000, alive })).toBeNull();
     expect(existsSync(folder)).toBe(true);
@@ -84,8 +84,8 @@ describe("two runs reaching for the same gate", () => {
   test("a second gate is not held by the first gate's claim", () => {
     const root = scratch();
 
-    expect(claimGate(join(root, "sanitizer"), { pid: 101, now: 1_000, alive })).toBeNull();
-    expect(claimGate(join(root, "room-rules"), { pid: 102, now: 2_000, alive })).toBeNull();
+    expect(claimGate(join(root, "output-format"), { pid: 101, now: 1_000, alive })).toBeNull();
+    expect(claimGate(join(root, "reply-wanted"), { pid: 102, now: 2_000, alive })).toBeNull();
   });
 });
 

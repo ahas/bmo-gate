@@ -11,7 +11,7 @@ use crate::scratch::Scratch;
 async fn every_row_is_one_json_object_in_the_order_written() {
   let scratch = Scratch::new().await;
 
-  for (stage, message) in [("room-rules", 7), ("system-documents", 3)] {
+  for (stage, message) in [("output-format", 7), ("session-summary", 3)] {
     scratch
       .run(
         r#"INSERT INTO judgements (chat_id, message_id, stage, verdict, created_at) VALUES (-5, $1, $2, 'NONE', 1)"#,
@@ -25,9 +25,9 @@ async fn every_row_is_one_json_object_in_the_order_written() {
   let rows: Vec<Value> = lines.iter().map(|line| serde_json::from_str(line).unwrap()).collect();
 
   assert_eq!(rows.len(), 2);
-  assert_eq!(rows[0]["stage"], "room-rules");
+  assert_eq!(rows[0]["stage"], "output-format");
   assert_eq!(rows[0]["message_id"], 7);
-  assert_eq!(rows[1]["stage"], "system-documents");
+  assert_eq!(rows[1]["stage"], "session-summary");
   assert_eq!(rows[1]["chat_id"], -5);
 }
 

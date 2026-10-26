@@ -6,6 +6,7 @@ mod m20261019_000001_tables;
 mod m20261023_000001_translation_failures;
 mod m20261024_000001_offer_rules;
 mod m20261026_000001_judgement_lines;
+mod m20261026_000002_sanitised_texts;
 
 use sea_orm_migration::prelude::*;
 
@@ -16,7 +17,7 @@ pub const MIGRATIONS_TABLE: &str = "gate_migrations";
 pub const TABLES: &str = m20261019_000001_tables::NAME;
 
 /// Every table the store's migrations make, beside the record of what ran.
-pub const OWN_TABLES: [&str; 11] = [
+pub const OWN_TABLES: [&str; 10] = [
   "document_translations",
   "format_cases",
   "gate_options",
@@ -26,7 +27,6 @@ pub const OWN_TABLES: [&str; 11] = [
   "laya_verdicts",
   "reference_offers",
   "reference_verdicts",
-  "sanitised_texts",
   "web_gate_chats",
 ];
 
@@ -40,6 +40,7 @@ impl MigratorTrait for Migrator {
       Box::new(m20261023_000001_translation_failures::Migration),
       Box::new(m20261024_000001_offer_rules::Migration),
       Box::new(m20261026_000001_judgement_lines::Migration),
+      Box::new(m20261026_000002_sanitised_texts::Migration),
     ]
   }
 

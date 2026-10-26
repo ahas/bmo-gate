@@ -23,7 +23,7 @@ async fn each_gate_is_a_block_and_one_gate_is_read_alone() {
 
   pair(&scratch, "output-format", 0.95, "FOLD", "FOLD").await;
   pair(&scratch, "output-format", 0.55, "OPEN", "FOLD").await;
-  pair(&scratch, "situation-rules", 0.9, "NONE", "NONE").await;
+  pair(&scratch, "output-decide", 0.9, "NONE", "NONE").await;
 
   let (lines, note) = read(scratch.db(), None, false).await.unwrap();
 
@@ -34,9 +34,9 @@ async fn each_gate_is_a_block_and_one_gate_is_read_alone() {
       .any(|line| line.starts_with("output-format: pairs 2 \u{b7} failures 0 \u{b7} agreement 50")),
     "{lines:?}"
   );
-  assert!(lines.iter().any(|line| line.starts_with("situation-rules: ")));
+  assert!(lines.iter().any(|line| line.starts_with("output-decide: ")));
 
-  let (alone, _) = read(scratch.db(), Some("situation-rules"), false).await.unwrap();
+  let (alone, _) = read(scratch.db(), Some("output-decide"), false).await.unwrap();
 
   assert!(alone.iter().all(|line| !line.starts_with("output-format")));
 }

@@ -42,8 +42,9 @@ function gate(name: string): GateSynthesis {
   return found;
 }
 
-const sanitizer = gate("sanitizer");
-const classifier = gate("system-documents");
+const folds = gate("output-format");
+const classifier = gate("knowledge-classifier");
+const replies = gate("reply-wanted");
 const shares = { calibration: 0.15, test: 0.15 };
 
 function korean(tag: string): string {
@@ -54,16 +55,17 @@ function english(tag: string): string {
   return `I want to back up the router settings before the weekend. marker ${tag}`;
 }
 
-function sanitizerRow(state: string, intrusion: boolean): SynthRow {
-  const noul = intrusion ? 0.9 : 0.1;
+// An output gate's row over a message whose opening and closing are the text given, folded or not.
+function foldRow(text: string, folded: boolean): SynthRow {
+  const noul = folded ? 0.9 : 0.1;
 
   return {
-    state,
-    questions: JSON.parse(JSON.stringify(sanitizer.example.questions)) as SynthRow["questions"],
+    state: { ...(folds.example.state as Record<string, unknown>), head: text, tail: text },
+    questions: JSON.parse(JSON.stringify(folds.example.questions)) as SynthRow["questions"],
     gold: {
-      harmful: {
+      fold: {
         type: "noul",
-        label: intrusion ? "true" : "false",
+        label: folded ? "true" : "false",
         noul,
         probabilities: { true: noul, false: 1 - noul },
       },
@@ -143,8 +145,8 @@ describe("reading a frozen folder", () => {
     const folder = scratch();
 
     freeze(folder, [
-      { spec: sanitizer, row: sanitizerRow(korean("a"), false), split: "train", language: "korean" },
-      { spec: sanitizer, row: sanitizerRow(english("b"), false), split: "test", language: "english" },
+      { spec: folds, row: foldRow(korean("a"), false), split: "train", language: "korean" },
+      { spec: folds, row: foldRow(english("b"), false), split: "test", language: "english" },
     ]);
 
     const { rows, broken } = readFrozen(folder);
@@ -157,7 +159,7 @@ describe("reading a frozen folder", () => {
   test("a line that is not a row at all is counted, not thrown away", () => {
     const folder = scratch();
 
-    freeze(folder, [{ spec: sanitizer, row: sanitizerRow(korean("a"), false), split: "train" }]);
+    freeze(folder, [{ spec: folds, row: foldRow(korean("a"), false), split: "train" }]);
     writeFileSync(join(folder, splitFiles.train), "\uC774\uAC74 JSON\uC774 \uC544\uB2D9\uB2C8\uB2E4\n{\"nope\":1}\n");
 
     expect(readFrozen(folder).broken).toBe(2);
@@ -166,7 +168,7 @@ describe("reading a frozen folder", () => {
   test("a folder with no sidecar still reads, with no language on its rows", () => {
     const folder = scratch();
 
-    freeze(folder, [{ spec: sanitizer, row: sanitizerRow(korean("a"), false), split: "train" }]);
+    freeze(folder, [{ spec: folds, row: foldRow(korean("a"), false), split: "train" }]);
     rmSync(join(folder, languageFile));
 
     expect(readFrozen(folder).rows[0]!.language).toBeNull();
@@ -178,11 +180,11 @@ describe("the conformance figure", () => {
     const folder = scratch();
 
     freeze(folder, Array.from({ length: 20 }, (_, index) => ({
-      spec: sanitizer,
-      row: sanitizerRow(korean(String(index)), index % 2 === 0),
+      spec: folds,
+      row: foldRow(korean(String(index)), index % 2 === 0),
     })));
 
-    const audit = auditOne(folder, "sanitizer");
+    const audit = auditOne(folder, "output-format");
 
     expect(audit.conformance).toBe(1);
     expect(audit.refused).toEqual({});
@@ -190,16 +192,16 @@ describe("the conformance figure", () => {
 
   test("a row whose gold does not name its question's answers is refused and named", () => {
     const folder = scratch();
-    const wrong = sanitizerRow(korean("bad"), false);
+    const wrong = foldRow(korean("bad"), false);
 
-    wrong.gold.harmful = { type: "choice", label: "nope", probabilities: { nope: 1 } };
+    wrong.gold.fold = { type: "choice", label: "nope", probabilities: { nope: 1 } };
 
     freeze(folder, [
-      { spec: sanitizer, row: sanitizerRow(korean("good"), false) },
-      { spec: sanitizer, row: wrong },
+      { spec: folds, row: foldRow(korean("good"), false) },
+      { spec: folds, row: wrong },
     ]);
 
-    const audit = auditOne(folder, "sanitizer");
+    const audit = auditOne(folder, "output-format");
 
     expect(audit.conformance).toBe(0.5);
     expect(audit.refused["bad-answers"]).toBe(1);
@@ -207,29 +209,29 @@ describe("the conformance figure", () => {
 
   test("a row whose questions do not ask what the gate asks is refused", () => {
     const folder = scratch();
-    const wrong = sanitizerRow(korean("bad"), false);
+    const wrong = foldRow(korean("bad"), false);
 
-    wrong.questions.harmful = { type: "noul", instructions: "\uC774 \uAE00\uC740 \uC704\uD5D8\uD55C\uAC00?" };
+    wrong.questions.fold = { type: "noul", instructions: "\uC774 \uAE00\uC740 \uC704\uD5D8\uD55C\uAC00?" };
 
-    freeze(folder, [{ spec: sanitizer, row: wrong }]);
+    freeze(folder, [{ spec: folds, row: wrong }]);
 
-    expect(auditOne(folder, "sanitizer").refused["wrong-instructions"]).toBe(1);
+    expect(auditOne(folder, "output-format").refused["wrong-instructions"]).toBe(1);
   });
 
   test("the share that is wrong is the share that is not right", () => {
     const folder = scratch();
-    const wrong = sanitizerRow(korean("bad"), false);
+    const wrong = foldRow(korean("bad"), false);
 
     wrong.gold = {};
 
     freeze(folder, [
-      { spec: sanitizer, row: sanitizerRow(korean("a"), false) },
-      { spec: sanitizer, row: sanitizerRow(korean("b"), true) },
-      { spec: sanitizer, row: sanitizerRow(korean("c"), false) },
-      { spec: sanitizer, row: wrong },
+      { spec: folds, row: foldRow(korean("a"), false) },
+      { spec: folds, row: foldRow(korean("b"), true) },
+      { spec: folds, row: foldRow(korean("c"), false) },
+      { spec: folds, row: wrong },
     ]);
 
-    const audit = auditOne(folder, "sanitizer");
+    const audit = auditOne(folder, "output-format");
 
     expect(audit.conformance).toBe(0.75);
     expect(audit.conforming).toBe(3);
@@ -240,13 +242,13 @@ describe("the broken-format figure", () => {
   test("a row whose three parts cannot be read is counted unreadable and judged on nothing", () => {
     const folder = scratch();
 
-    freeze(folder, [{ spec: sanitizer, row: sanitizerRow(korean("a"), false), split: "train" }]);
+    freeze(folder, [{ spec: folds, row: foldRow(korean("a"), false), split: "train" }]);
     writeFileSync(
       join(folder, splitFiles.train),
-      `${JSON.stringify({ id: "sanitizer:x", gate: "sanitizer", split: "train", state: "{{{", questions: "{}", gold: "{}" })}\n`,
+      `${JSON.stringify({ id: "output-format:x", gate: "output-format", split: "train", state: "{{{", questions: "{}", gold: "{}" })}\n`,
     );
 
-    const audit = auditOne(folder, "sanitizer");
+    const audit = auditOne(folder, "output-format");
 
     expect(audit.unreadable).toBe(1);
     expect(audit.conformance).toBe(0);
@@ -257,9 +259,9 @@ describe("the transcript figure", () => {
   test("a transcript in the gate's own shape is not counted broken", () => {
     const folder = scratch();
 
-    freeze(folder, [{ spec: classifier, row: classifier.example }]);
+    freeze(folder, [{ spec: replies, row: replies.example }]);
 
-    const audit = auditOne(folder, "system-documents");
+    const audit = auditOne(folder, "reply-wanted");
 
     expect(audit.transcriptBroken).toBe(0);
     expect(audit.conformance).toBe(1);
@@ -267,16 +269,16 @@ describe("the transcript figure", () => {
 
   test("a transcript in another gate's shape is counted on its own as well as refused", () => {
     const folder = scratch();
-    const wrong = JSON.parse(JSON.stringify(classifier.example)) as SynthRow;
+    const wrong = JSON.parse(JSON.stringify(replies.example)) as SynthRow;
 
-    wrong.state = "[2026-01-01T00:00:00.000Z] #1 \uBBFC\uC11C (id 4471902): \uC774 \uC904\uC740 \uBC29 \uBAA8\uC591\uC785\uB2C8\uB2E4";
+    (wrong.state as { message: string }).message = "\uBBFC\uC11C (id 4471902): \uC774 \uC904\uC740 \uD3C9\uBC94\uD55C \uBAA8\uC591\uC785\uB2C8\uB2E4";
 
     freeze(folder, [
-      { spec: classifier, row: classifier.example },
-      { spec: classifier, row: wrong },
+      { spec: replies, row: replies.example },
+      { spec: replies, row: wrong },
     ]);
 
-    const audit = auditOne(folder, "system-documents");
+    const audit = auditOne(folder, "reply-wanted");
 
     expect(audit.transcriptBroken).toBe(1);
     expect(audit.transcriptShare).toBe(0.5);
@@ -289,11 +291,11 @@ describe("the balance figure", () => {
     const folder = scratch();
 
     freeze(folder, Array.from({ length: 20 }, (_, index) => ({
-      spec: sanitizer,
-      row: sanitizerRow(korean(String(index)), index % 2 === 0),
+      spec: folds,
+      row: foldRow(korean(String(index)), index % 2 === 0),
     })));
 
-    const audit = auditOne(folder, "sanitizer");
+    const audit = auditOne(folder, "output-format");
 
     expect(audit.balance).toEqual({ true: 0.5, false: 0.5 });
     expect(audit.balanceTarget).toEqual({ true: 0.5, false: 0.5 });
@@ -304,27 +306,16 @@ describe("the balance figure", () => {
     const folder = scratch();
 
     freeze(folder, Array.from({ length: 10 }, (_, index) => ({
-      spec: sanitizer,
-      row: sanitizerRow(korean(String(index)), false),
+      spec: folds,
+      row: foldRow(korean(String(index)), false),
     })));
 
-    const audit = auditOne(folder, "sanitizer");
+    const audit = auditOne(folder, "output-format");
 
     expect(audit.balance).toEqual({ false: 1 });
     expect(audit.balanceDrift).toBe(0.5);
   });
 
-  test("a gate asking one question a candidate counts its balance over questions", () => {
-    const folder = scratch();
-
-    freeze(folder, [{ spec: classifier, row: classifier.example }]);
-
-    const audit = auditOne(folder, "system-documents");
-    const asked = Object.keys(classifier.example.questions).length;
-
-    expect(Object.values(audit.balance).reduce((sum, one) => sum + one, 0)).toBeCloseTo(1, 5);
-    expect(asked).toBeGreaterThan(1);
-  });
 });
 
 describe("the language figure", () => {
@@ -332,40 +323,40 @@ describe("the language figure", () => {
     const folder = scratch();
 
     freeze(folder, [
-      ...Array.from({ length: 4 }, (_, index) => ({ spec: sanitizer, row: sanitizerRow(korean(String(index)), false), language: "korean" as const })),
-      ...Array.from({ length: 4 }, (_, index) => ({ spec: sanitizer, row: sanitizerRow(english(String(index)), false), language: "english" as const })),
+      ...Array.from({ length: 4 }, (_, index) => ({ spec: folds, row: foldRow(korean(String(index)), false), language: "korean" as const })),
+      ...Array.from({ length: 4 }, (_, index) => ({ spec: folds, row: foldRow(english(String(index)), false), language: "english" as const })),
     ]);
 
-    const audit = auditOne(folder, "sanitizer");
+    const audit = auditOne(folder, "output-format");
 
     expect(audit.language.korean).toBe(0.5);
     expect(audit.language.english).toBe(0.5);
     expect(audit.language.mixed).toBe(0);
-    expect(audit.languageTarget).toEqual(sanitizer.language);
+    expect(audit.languageTarget).toEqual(folds.language);
   });
 
   test("the drift is the furthest any one language stands from its target", () => {
     const folder = scratch();
 
     freeze(folder, Array.from({ length: 10 }, (_, index) => ({
-      spec: sanitizer,
-      row: sanitizerRow(korean(String(index)), false),
+      spec: folds,
+      row: foldRow(korean(String(index)), false),
       language: "korean" as const,
     })));
 
-    // The sanitiser is drawn to 40% Korean, and this folder is all of it.
-    expect(auditOne(folder, "sanitizer").languageDrift).toBeCloseTo(0.6, 5);
+    // The output gate is drawn to 65% Korean, and this folder is all of it.
+    expect(auditOne(folder, "output-format").languageDrift).toBeCloseTo(0.35, 5);
   });
 
   test("a sidecar naming a language the row does not read as is counted", () => {
     const folder = scratch();
 
     freeze(folder, [
-      { spec: sanitizer, row: sanitizerRow(korean("a"), false), language: "english" },
-      { spec: sanitizer, row: sanitizerRow(korean("b"), false), language: "korean" },
+      { spec: folds, row: foldRow(korean("a"), false), language: "english" },
+      { spec: folds, row: foldRow(korean("b"), false), language: "korean" },
     ]);
 
-    expect(auditOne(folder, "sanitizer").sidecarMismatch).toBe(1);
+    expect(auditOne(folder, "output-format").sidecarMismatch).toBe(1);
   });
 });
 
@@ -374,12 +365,12 @@ describe("the floors", () => {
     const folder = scratch();
 
     freeze(folder, Array.from({ length: 6 }, (_, index) => ({
-      spec: sanitizer,
-      row: sanitizerRow(korean(String(index)), index % 2 === 0),
+      spec: folds,
+      row: foldRow(korean(String(index)), index % 2 === 0),
       split: (index < 4 ? "train" : "test") as DatasetSplit,
     })));
 
-    const audit = auditOne(folder, "sanitizer");
+    const audit = auditOne(folder, "output-format");
 
     expect(audit.floors.met).toBe(false);
     expect(audit.floors.train).toBe(4);
@@ -389,40 +380,24 @@ describe("the floors", () => {
 
   test("the minority count of a yes/no gate is the rarer answer's rows", () => {
     const rows: AuditRow[] = Array.from({ length: 10 }, (_, index) => ({
-      row: { id: `x${index}`, gate: "sanitizer", split: "train", state: "", questions: "", gold: "" },
+      row: { id: `x${index}`, gate: "output-format", split: "train", state: "", questions: "", gold: "" },
       language: "korean",
-      read: sanitizerRow(korean(String(index)), index < 3),
+      read: foldRow(korean(String(index)), index < 3),
     }));
 
-    expect(minorityRows(sanitizer, rows)).toBe(3);
-  });
-
-  test("the minority count of a per-candidate gate weighs rows that chose something against rows that chose nothing", () => {
-    const none = JSON.parse(JSON.stringify(classifier.example)) as SynthRow;
-
-    for (const key of Object.keys(none.gold)) {
-      none.gold[key] = { type: "noul", label: "false", noul: 0.05, probabilities: { true: 0.05, false: 0.95 } };
-    }
-
-    const rows: AuditRow[] = [
-      { row: { id: "a", gate: "system-documents", split: "train", state: "", questions: "", gold: "" }, language: "korean", read: classifier.example },
-      { row: { id: "b", gate: "system-documents", split: "train", state: "", questions: "", gold: "" }, language: "korean", read: none },
-      { row: { id: "c", gate: "system-documents", split: "train", state: "", questions: "", gold: "" }, language: "korean", read: none },
-    ];
-
-    expect(minorityRows(classifier, rows)).toBe(1);
+    expect(minorityRows(folds, rows)).toBe(3);
   });
 
   test("the floors are read off every row and not off the sample", () => {
     const folder = scratch();
 
     freeze(folder, Array.from({ length: 30 }, (_, index) => ({
-      spec: sanitizer,
-      row: sanitizerRow(korean(String(index)), index % 2 === 0),
+      spec: folds,
+      row: foldRow(korean(String(index)), index % 2 === 0),
       split: "train" as DatasetSplit,
     })));
 
-    const audit = auditOne(folder, "sanitizer", 5);
+    const audit = auditOne(folder, "output-format", 5);
 
     expect(audit.sampled).toBe(5);
     expect(audit.rows).toBe(30);
@@ -451,7 +426,7 @@ describe("what it prints", () => {
   test("the seed stands in the report so the sample can be drawn again", () => {
     const folder = scratch();
 
-    freeze(folder, [{ spec: sanitizer, row: sanitizerRow(korean("a"), false) }]);
+    freeze(folder, [{ spec: folds, row: foldRow(korean("a"), false) }]);
 
     expect(auditLines(auditFrozen({ folder, sample: 10, seed: "zz9" })).join("\n")).toContain("seed zz9");
   });
@@ -460,13 +435,13 @@ describe("what it prints", () => {
     const folder = scratch();
 
     freeze(folder, Array.from({ length: 8 }, (_, index) => ({
-      spec: sanitizer,
-      row: sanitizerRow(korean(String(index)), index % 2 === 0),
+      spec: folds,
+      row: foldRow(korean(String(index)), index % 2 === 0),
     })));
 
     const said = auditLines(auditFrozen({ folder, sample: 0, seed: "s" })).join("\n");
 
-    expect(said).toContain("sanitizer");
+    expect(said).toContain("output-format");
     expect(said).toContain("keep the specification");
     expect(said).toContain("off ");
     expect(said).toContain("rows of the wrong transcript shape");
@@ -490,16 +465,16 @@ describe("what the model wrote against what survived", () => {
   test("the repeats and the format breaks are shares of what was written", () => {
     const folder = scratch();
 
-    freeze(folder, [{ spec: sanitizer, row: sanitizerRow(korean("a"), false) }]);
+    freeze(folder, [{ spec: folds, row: foldRow(korean("a"), false) }]);
     writeFileSync(join(folder, metaFile), meta([{
-      gate: "sanitizer",
+      gate: "output-format",
       kept: 80,
       unreadable: 4,
       duplicates: 3,
       refused: { "wrong-transcript": 6, "wrong-language": 10 },
     }]));
 
-    const made = auditOne(folder, "sanitizer").generation!;
+    const made = auditOne(folder, "output-format").generation!;
 
     expect(made.written).toBe(100);
     expect(made.duplicates).toBe(3);
@@ -512,10 +487,10 @@ describe("what the model wrote against what survived", () => {
   test("the share that survived the generator is read off the run's own meta", () => {
     const folder = scratch();
 
-    freeze(folder, [{ spec: sanitizer, row: sanitizerRow(korean("a"), false) }]);
-    writeFileSync(join(folder, metaFile), meta([{ gate: "sanitizer", kept: 35, unreadable: 0, refused: { "bad-answers": 5 } }]));
+    freeze(folder, [{ spec: folds, row: foldRow(korean("a"), false) }]);
+    writeFileSync(join(folder, metaFile), meta([{ gate: "output-format", kept: 35, unreadable: 0, refused: { "bad-answers": 5 } }]));
 
-    const made = auditOne(folder, "sanitizer").generation!;
+    const made = auditOne(folder, "output-format").generation!;
 
     expect(made.written).toBe(40);
     expect(made.kept).toBe(35);
@@ -526,10 +501,10 @@ describe("what the model wrote against what survived", () => {
   test("rows the generator could not read at all count against what was written", () => {
     const folder = scratch();
 
-    freeze(folder, [{ spec: sanitizer, row: sanitizerRow(korean("a"), false) }]);
-    writeFileSync(join(folder, metaFile), meta([{ gate: "sanitizer", kept: 6, unreadable: 2, refused: { "too-large": 2 } }]));
+    freeze(folder, [{ spec: folds, row: foldRow(korean("a"), false) }]);
+    writeFileSync(join(folder, metaFile), meta([{ gate: "output-format", kept: 6, unreadable: 2, refused: { "too-large": 2 } }]));
 
-    const made = auditOne(folder, "sanitizer").generation!;
+    const made = auditOne(folder, "output-format").generation!;
 
     expect(made.written).toBe(10);
     expect(made.keptShare).toBe(0.6);
@@ -538,7 +513,7 @@ describe("what the model wrote against what survived", () => {
   test("a folder carried in from somewhere else has no such figure and says so", () => {
     const folder = scratch();
 
-    freeze(folder, [{ spec: sanitizer, row: sanitizerRow(korean("a"), false) }]);
+    freeze(folder, [{ spec: folds, row: foldRow(korean("a"), false) }]);
 
     const audit = auditFrozen({ folder, sample: 0, seed: "s" });
 
@@ -549,26 +524,26 @@ describe("what the model wrote against what survived", () => {
   test("a meta that names no such gate gives no figure rather than a zero", () => {
     const folder = scratch();
 
-    freeze(folder, [{ spec: sanitizer, row: sanitizerRow(korean("a"), false) }]);
+    freeze(folder, [{ spec: folds, row: foldRow(korean("a"), false) }]);
     writeFileSync(join(folder, metaFile), meta([{ gate: "someone-else", kept: 1, refused: {} }]));
 
-    expect(auditOne(folder, "sanitizer").generation).toBeNull();
+    expect(auditOne(folder, "output-format").generation).toBeNull();
   });
 
   test("a meta that cannot be read gives no figure rather than throwing", () => {
     const folder = scratch();
 
-    freeze(folder, [{ spec: sanitizer, row: sanitizerRow(korean("a"), false) }]);
+    freeze(folder, [{ spec: folds, row: foldRow(korean("a"), false) }]);
     writeFileSync(join(folder, metaFile), "\uC774\uAC74 JSON\uC774 \uC544\uB2D9\uB2C8\uB2E4");
 
-    expect(auditOne(folder, "sanitizer").generation).toBeNull();
+    expect(auditOne(folder, "output-format").generation).toBeNull();
   });
 
   test("the share is printed beside the sample's own", () => {
     const folder = scratch();
 
-    freeze(folder, [{ spec: sanitizer, row: sanitizerRow(korean("a"), false) }]);
-    writeFileSync(join(folder, metaFile), meta([{ gate: "sanitizer", kept: 9, unreadable: 0, refused: { "wrong-language": 1 } }]));
+    freeze(folder, [{ spec: folds, row: foldRow(korean("a"), false) }]);
+    writeFileSync(join(folder, metaFile), meta([{ gate: "output-format", kept: 9, unreadable: 0, refused: { "wrong-language": 1 } }]));
 
     const said = auditLines(auditFrozen({ folder, sample: 0, seed: "s" })).join("\n");
 
@@ -582,26 +557,26 @@ describe("auditing one gate at a time", () => {
     const folder = scratch();
 
     freeze(folder, [
-      { spec: sanitizer, row: sanitizerRow(korean("a"), false) },
+      { spec: folds, row: foldRow(korean("a"), false) },
       { spec: classifier, row: classifier.example },
     ]);
 
-    expect(auditFrozen({ folder, sample: 0, seed: "s" }).gates.map((one) => one.gate)).toEqual(["sanitizer", "system-documents"]);
-    expect(auditFrozen({ folder, sample: 0, seed: "s", gates: ["sanitizer"] }).gates.map((one) => one.gate)).toEqual(["sanitizer"]);
+    expect(auditFrozen({ folder, sample: 0, seed: "s" }).gates.map((one) => one.gate)).toEqual(["knowledge-classifier", "output-format"]);
+    expect(auditFrozen({ folder, sample: 0, seed: "s", gates: ["output-format"] }).gates.map((one) => one.gate)).toEqual(["output-format"]);
   });
 
   test("one gate's rows are never counted against another's", () => {
     const folder = scratch();
 
     freeze(folder, [
-      { spec: sanitizer, row: sanitizerRow(korean("a"), false) },
-      { spec: sanitizer, row: sanitizerRow(korean("b"), true) },
+      { spec: folds, row: foldRow(korean("a"), false) },
+      { spec: folds, row: foldRow(korean("b"), true) },
       { spec: classifier, row: classifier.example },
     ]);
 
     const { rows } = readFrozen(folder);
 
-    expect(auditGate("sanitizer", rows, 0, "s").rows).toBe(2);
-    expect(auditGate("system-documents", rows, 0, "s").rows).toBe(1);
+    expect(auditGate("output-format", rows, 0, "s").rows).toBe(2);
+    expect(auditGate("knowledge-classifier", rows, 0, "s").rows).toBe(1);
   });
 });

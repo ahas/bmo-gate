@@ -1,6 +1,5 @@
-//! The gate's contract in Rust (`docs/api.md`): every body and answer as a type, every route a unit calls as a call
-//! (the console's screen routes are a browser's, through a console's relay), and the OpenAPI document generated from
-//! those types. The server answers in these types, so the document, the server and the client never drift apart.
+//! The gate's contract in Rust (`docs/api.md`): every body and answer as a type, every route a unit calls as a call,
+//! and the OpenAPI document generated from those types. The server answers in these types, so the document, the server and the client never drift apart.
 
 pub mod client;
 pub mod openapi;

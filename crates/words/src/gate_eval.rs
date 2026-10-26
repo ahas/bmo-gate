@@ -42,9 +42,6 @@ pub const STARTED: &str =
 pub const STATUS_SET: &str = "set {set} · {folder}";
 pub const STATUS_HEAD: &str =
   "gate | state | made | target | left | batch | asked | refused | dropped | reason";
-pub const STATUS_SANITIZER: &str = "sanitizer | not made on Codex | its questions are the harmful sentences themselves, so they are left to the registered model";
-/// The voice gates' own line: their members wait for the voice unit's reading of a line's script.
-pub const STATUS_VOICE: &str = "voice-polish, voice-reading | no member | their items are read through the voice runner's script, which the voice unit does not serve yet";
 
 /// The last score of each gate on each road: a set with none, and the table's head.
 pub const REPORT_NONE: &str = "Set {set} has no scores yet.";

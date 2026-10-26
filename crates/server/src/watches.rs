@@ -1,7 +1,7 @@
 //! What the service keeps going beside its routes: the agency's `road-walked` events written into the road records,
 //! the receiver's `draft` rows written as the `draft` stage and told to the screens, Laya's health asked once a
-//! minute and told to the screens where its state or model moved, the attachments counted every hour, and the
-//! bounded tables swept as the service starts and once a day after. None of them registers a hook at the agency.
+//! minute and told to the screens where its state or model moved, and the bounded tables swept as the service starts
+//! and once a day after. None of them registers a hook at the agency.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -9,7 +9,6 @@ use std::time::Duration;
 use futures_util::StreamExt;
 use gate_ports::agency::RoadWalked;
 use gate_ports::receiver::Drafted;
-use gate_reference::attachments;
 use gate_runs::records::{self, Road, Spent, now};
 use gate_stages::{laya_health, retention};
 use sea_orm::DatabaseConnection;
@@ -22,9 +21,8 @@ use crate::routes::judgements::judgement_of;
 /// How long a dropped event stream waits before it is opened again.
 const REOPEN: Duration = Duration::from_secs(5);
 
-/// How often Laya's health is asked, and how often the attachments are counted.
+/// How often Laya's health is asked.
 const HEALTH_EVERY: Duration = Duration::from_secs(60);
-const ATTACHMENTS_EVERY: Duration = Duration::from_secs(3_600);
 
 /// How often the bounded tables are swept.
 const SWEEP_EVERY: Duration = Duration::from_secs(24 * 3_600);
@@ -134,20 +132,6 @@ async fn health(app: Arc<App>) {
   }
 }
 
-async fn attachments(app: Arc<App>) {
-  let file = app.data_root.join("gate").join("attachments.json");
-
-  loop {
-    tokio::time::sleep(ATTACHMENTS_EVERY).await;
-
-    match attachments::pass(&app.reference, app.job.as_ref(), app.owner_room, &file, now()).await {
-      Ok(raised) if !raised.is_empty() => println!("gate-server: the attachments watch raised {raised:?}"),
-      Ok(_) => {}
-      Err(why) => eprintln!("gate-server: the attachments watch stopped short: {why}"),
-    }
-  }
-}
-
 /// One sweep of the bounded tables, said where it took anything.
 pub async fn sweep_pass(db: &DatabaseConnection) {
   match retention::sweep(db, now()).await {
@@ -172,6 +156,5 @@ pub fn start(app: Arc<App>) {
   tokio::spawn(road_walked(app.clone()));
   tokio::spawn(drafted(app.clone()));
   tokio::spawn(health(app.clone()));
-  tokio::spawn(attachments(app.clone()));
   tokio::spawn(sweeps(app));
 }

@@ -6,19 +6,11 @@
   be put in numbers beside its quality on another: the Claude model the gate's tier maps to on Claude
   Code, and a registration of the deployment's own text model, which the off-turn gates run on.
 - **The questions are the gate's real input.** An item holds the material a gate is handed in its
-  own terms (an index and a question, a line to read aloud, a transcript), and the gate's own code builds
+  own terms (a transcript, a part of a document), and the gate's own code builds
   the request from it: the gate's system prompt and the prompt its caller writes. What the gate
   answers is read by the reader its caller uses.
-- **The gates it covers** are the off-turn gates and the session summariser: `document-seek`,
-  `session-summary` and `translator`.
-- **The two voice gates have no member here.** An item of `voice-polish` or `voice-reading` is read through
-  the line's script as the voice runner makes it — the markup unfolded into a script, the figures said by
-  rule, the spans the reading gate is asked about and the view the polishing gate is shown — and those rules
-  are the voice unit's. Their members come back once the voice unit serves that reading.
-- **The sanitizer has no set here.** Its questions would be security-intrusion material: orders to
-  attack, accounts of attacks carried out and recipes for slipping attack material past a safety
-  gate. The Codex account refuses to write that material, and the set is not made by working around
-  the refusal. It is left for a model that writes it to make.
+- **The gates it covers** are the off-turn gate and the session summariser: `session-summary` and
+  `translator`.
 
 ## The members
 
@@ -48,10 +40,6 @@
 
 ## What each gate is asked and how it is scored
 
-- **document-seek** — an index (one document's headings, a set of documents, or the branches of the
-  whole library) and a question. The key is the slugs that answer it, or `none`. Passes where the
-  gate's first pick is one of the key's slugs, or where it answers `none` for a `none` key; for a
-  branch index it must also name exactly three branches.
 - **session-summary** — the tail of a room session or a worker session, built into the transcript
   by the gate's own code. The key is the facts the note must carry, the strings it must not, or `none`
   for a tail with nothing to carry. Passes where the note keeps to its 1,200 characters and meets the

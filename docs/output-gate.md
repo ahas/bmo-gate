@@ -25,8 +25,8 @@ How the formatting gate runs, which every message meant for people passes before
   checkpoint was trained on verdicts made by that judgement.
 - **No model reads this document.** It is a procedure document for whoever works on the gate;
   what a model must know lives only in the rulebooks.
-- **The answer as written:** every answer comes here as the session wrote it, through the outgoing
-  sanitiser alone. This document covers only what happens after that.
+- **The answer as written:** every answer comes here as the session wrote it, in the receiver's words' form
+  alone. This document covers only what happens after that.
 
 ## Conversion
 

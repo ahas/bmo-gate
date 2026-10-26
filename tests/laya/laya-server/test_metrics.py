@@ -190,7 +190,7 @@ class MissedCallsTest(unittest.TestCase):
         self.assertEqual(counted["thresholds"][0]["missed"], 0)
 
     def test_a_gate_that_is_not_in_this_set_is_nothing_rather_than_a_zero(self):
-        self.assertIsNone(metrics.missed_calls([judged("sanitizer", "intrusion", "true", "true", 0.9)], self.rule))
+        self.assertIsNone(metrics.missed_calls([judged("output-format", "intrusion", "true", "true", 0.9)], self.rule))
 
     def test_an_answer_the_question_does_not_have_is_not_counted(self):
         rule = {"gate": "reply-wanted", "question": "forAgent", "settles": "maybe"}
@@ -222,12 +222,12 @@ class ReportTest(unittest.TestCase):
         tuned = [
             judged("reply-wanted", "forAgent", "true", "true", 0.9),
             judged("reply-wanted", "forAgent", "false", "false", 0.95),
-            judged("sanitizer", "intrusion", "true", "true", 0.8),
+            judged("output-format", "intrusion", "true", "true", 0.8),
         ]
         base = [
             judged("reply-wanted", "forAgent", "true", "false", 0.6),
             judged("reply-wanted", "forAgent", "false", "false", 0.6),
-            judged("sanitizer", "intrusion", "true", "false", 0.6),
+            judged("output-format", "intrusion", "true", "false", 0.6),
         ]
 
         return metrics.report(
@@ -250,11 +250,11 @@ class ReportTest(unittest.TestCase):
     def test_every_gate_carries_its_own_base_and_its_difference(self):
         gates = self.build()["gates"]
 
-        self.assertEqual(sorted(gates), ["reply-wanted", "sanitizer"])
+        self.assertEqual(sorted(gates), ["output-format", "reply-wanted"])
         self.assertEqual(gates["reply-wanted"]["agreement"], 1.0)
         self.assertEqual(gates["reply-wanted"]["base"]["agreement"], 0.5)
         self.assertEqual(gates["reply-wanted"]["difference"]["agreement"], 0.5)
-        self.assertEqual(gates["sanitizer"]["difference"]["agreement"], 1.0)
+        self.assertEqual(gates["output-format"]["difference"]["agreement"], 1.0)
 
     def test_the_asymmetric_gate_carries_its_missed_calls_and_the_others_do_not(self):
         gates = self.build()["gates"]
@@ -262,7 +262,7 @@ class ReportTest(unittest.TestCase):
         self.assertEqual(len(gates["reply-wanted"]["asymmetric"]), 1)
         self.assertEqual(gates["reply-wanted"]["asymmetric"][0]["question"], "forAgent")
         self.assertEqual(gates["reply-wanted"]["asymmetric"][0]["settles"], "false")
-        self.assertEqual(gates["sanitizer"]["asymmetric"], [])
+        self.assertEqual(gates["output-format"]["asymmetric"], [])
 
     def test_without_a_base_the_difference_is_left_out_rather_than_guessed(self):
         counted = self.build(base=None, base_model=None)

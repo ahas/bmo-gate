@@ -144,7 +144,7 @@ Each gate has one Laya mode. What it does to that gate's verdict:
 
 A probe whose questions are each a verdict of their own — one yes/no per candidate, where the gate's
 verdict is the set of candidates answered yes — may declare that Laya settles it one question at a
-time. The four reference gates do (「Each gate's probe」).
+time. No gate of the order does: the output gate's probe asks one question (「Each gate's probe」).
 
 - **What it declares:** how its input narrows to some of its questions — the same turn with only those
   candidates — and how a verdict made of two parts is joined, the part Laya settled first. Its gate
@@ -196,12 +196,8 @@ learned from are the same shape.
   every verdict the gate can give, and the gate names the verdict it takes when neither Laya nor its
   fallback LLM gives one.
   - **The formatting gate** (`output-format`), whose initial provider is Laya
-    (`docs/output-gate.md`). Where neither gives one, the gate's default fold stands.
-  - **The three reference gates and the person-book search**, whose initial provider is their LLM.
-    Where neither gives one, the gate wants nothing: no piece and no index attaches from it
-    (`docs/reference-selection.md`).
-  - **The situation-rule matcher**, whose initial provider is its LLM. Where neither gives one, no rule
-    fires and none is spent (the brain's `docs/memories.md`).
+    (`docs/output-gate.md`), is the one gate that does. Where neither gives one, the gate's default fold
+    stands.
 - **One call is the verdict.** The gate asks Laya once, and Laya's label stands whatever its
   confidence. No τ is compared and no LLM is asked beside it.
 - **Its model is its checkpoint.** A gate on Laya is answered by the checkpoint the service names for
@@ -245,7 +241,7 @@ mode other than `off`.
 - **A gate asks its checkpoint the wording that checkpoint was trained on.** A gate's own wording is English:
   each question's fixed wording and the word a candidate is named by stand in the gate's Laya question data,
   the same words the distilled data carries (`docs/laya-gates.md`); only the state is the room's words, as
-  written. The situation-rule matcher's two questions are the two its LLM is asked, in the same words.
+  written.
   - **A checkpoint that learnt an earlier wording is asked that wording,** word for word. Which ones did is
     a table beside the earlier wordings, the `learnt` table of `prompts/tooling/laya-wordings.toml`: a
     checkpoint's run — the folder `/health` names for the gate, without its step — and the wording each of
@@ -253,7 +249,7 @@ mode other than `off`.
   - **The checkpoint is the one the last health check names for the gate.** A gate whose checkpoint the
     table does not list, or for which no check has named one yet, asks its own wording.
   - **The formatting gate's probe is the one that reads the table,** the one gate here Laya serves
-    (`docs/laya-gates.md`, 「Which gates Laya serves」); every other probe asks its own wording. Its checkpoint
+    (`docs/laya-gates.md`, 「Which gates Laya serves」). Its checkpoint
     in service (`real-2-fold`) learnt the Korean wording of the fold question and is asked it. A checkpoint
     retrained on the English question is asked the English one once it serves, and moving a gate's mode
     meanwhile is the owner's (「Who decides」).
@@ -261,36 +257,10 @@ mode other than `off`.
 - **Formatting gate (`output-format`)** — one yes/no question: should this message be folded. Laya's
   yes is FOLD and its no is OPEN. The state is the markdown as written, reduced to its opening, its
   closing and its counts so a message of any length fits one call — never `too-large` — built to the
-  character as `docs/laya-gates.md` (「5. The output format」) specifies, since the checkpoint was
+  character as `docs/laya-gates.md` (「The output format」) specifies, since the checkpoint was
   trained on exactly that reduction. The probe belongs to the dialect that declares the fold
   decision, as the gate's name, model and instructions do (`docs/output-gate.md`); a dialect that does
   not fold has no gate and so no probe.
-- **The three reference gates (`system-documents`, `room-rules`, `library-knowledge`)** — one yes/no
-  question per candidate piece: does this turn need it. A gate is asked only about its own library's
-  candidates, each with what its index line says of it. Its verdict is the set of slugs at or above one
-  half, or none; it agrees with the LLM when the two sets are equal. The three read one probe shape,
-  told apart by the gate it is asked for. The state of `room-rules` and `library-knowledge` opens
-  with the message the turn follows on from, as the person-book search's does; that of
-  `system-documents` does not (`docs/reference-selection.md`, 「What a turn's lines are」). However
-  many candidates a turn offers, every one is asked about, in as many calls as it takes, against the
-  turn's newest messages that fit (「Fitting an input」). The shape is settled one question at a
-  time (「A gate settled one question at a time」).
-- **Person-book search (`people-search`)** — the same probe shape over the people a room offers: one
-  yes/no per person, does this turn need this person's record. Its state opens with the
-  message the turn follows on from, the oldest line and so the first to stay out where the turn is
-  long (`docs/reference-selection.md`, 「What a turn's lines are」). It is settled one question
-  at a time too; the pieces Laya settled as wanted come ahead of the ones the LLM names, and the
-  search's own cap is taken from the front of the two.
-- **Situation-rule matcher (`situation-rules`)** — two yes/no questions per rule the room offers: does
-  its condition fit the situation now, and is it spent. The state is the room's kind and its newest
-  messages in the room shape that fit. Every rule is asked about however many the room holds, since
-  each question is read against the state on its own. Laya's verdict is the rules it said fit and
-  the rules it said are spent, and it is settled whole: in `filter` its lowest confidence is compared
-  with τ (the brain's `docs/memories.md`, 「The matcher」).
-- **Sanitiser (`sanitizer`)** — one yes/no question: does this text carry security-intrusion material.
-  It is asked only where the LLM would be, after the trigger-word check and the memo. The safe verdict is
-  CLEAN, which Laya settles as the model's own CLEAN answer; a DEFUSE and its spans are always the
-  LLM's. Most carried context is past Laya's reach and is recorded as `too-large`.
 - **How confidence is read:** for a choice question, Laya's own confidence; for a yes/no question, the
   larger of the two probabilities; for a probe asking several questions, the lowest of its questions'
   confidences. A probe settled one question at a time has each question's own confidence compared
@@ -301,9 +271,7 @@ mode other than `off`.
 - **Where they live:** the gate's row of the gate options table (`gate_options`), in the columns
   `layaMode` and `layaTau`, beside its time limit (the agency's `docs/own-llm.md`, 「Per-gate time limit」). An empty
   mode means the gate's profile default.
-- **The profile defaults:** `shadow` for the formatting gate on an LLM road, the three reference
-  gates, the person-book search and the situation-rule matcher; `off` for the
-  sanitiser and every other gate. A gate's
+- **The profile defaults:** `shadow` for the formatting gate on an LLM road; `off` for every other gate. A gate's
   profile names a default mode only when the gate declares a probe, so a profile with none is a gate
   with no probe.
 - **τ** is a number from 0 to 1, empty until chosen. `filter` and `asymmetric` are refused for a gate
@@ -312,8 +280,9 @@ mode other than `off`.
   says.
 - **A mode is taken only where it can run.** Choosing a mode is refused, with the reason said, where
   the gate could not run in it:
-  - `asymmetric` for a gate whose probe names no safe verdict — only the sanitiser names one. Its profile says so beside its default mode, and a row that says
-    `asymmetric` for any other gate runs as `shadow`.
+  - `asymmetric` for a gate whose probe names no safe verdict, which no gate of the order names. A profile that
+    names one says so beside its default mode, and a row that says `asymmetric` for any other gate runs as
+    `shadow`.
   - `filter` and `asymmetric` for a gate the server holds no checkpoint for, by the last health check's
     model line — or where no check has yet named one. Laya would turn every call of such a gate away.
     A checkpoint gone after the mode was chosen is not undone here: every call is then recorded as

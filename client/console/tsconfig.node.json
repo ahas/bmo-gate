@@ -1,5 +1,0 @@
-{
-  // The console bundle's build configuration, read as the layer's own Nuxt configuration is.
-  "extends": "../.nuxt/tsconfig.node.json",
-  "include": ["./vite.config.ts"]
-}

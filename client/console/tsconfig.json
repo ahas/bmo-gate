@@ -1,5 +1,0 @@
-{
-  // The console bundle's entry, read with the app's config so the pages it routes are held to the same types.
-  "extends": "../.nuxt/tsconfig.app.json",
-  "include": ["../.nuxt/nuxt.d.ts", "./bundle.ts", "../app/**/*", "../shared/**/*"]
-}

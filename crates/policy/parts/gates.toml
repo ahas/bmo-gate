@@ -6,24 +6,8 @@
 # starts together and waits on together. A place names its gate, and the one condition its step runs under where
 # it runs in some turns only.
 
-# The off-turn part: the gates that run outside any chat turn, in the order the console lists them.
+# The off-turn part: the gates that run outside any chat turn, in the order they are listed.
 apart = ["translator"]
-
-# The shelved part: the gates no turn and no caller asks (docs/gates.md, 「Shelved」). Their profiles, options and
-# judgements stay readable. The three gates that picked a turn's reference, one library each, keep their marks
-# (docs/reference-selection.md, 「The shelved pickers」): the evaluation and replay commands read the three from them.
-shelved = [
-  { key = "system-documents", reference = true },
-  { key = "room-rules", reference = true },
-  { key = "library-knowledge", reference = true },
-  { key = "people-search" },
-  { key = "room-memories" },
-  { key = "situation-rules" },
-  { key = "sanitizer" },
-  { key = "document-seek" },
-  { key = "voice-polish" },
-  { key = "voice-reading" },
-]
 
 # The pre-gate part: the gates that run before the reply is written.
 

@@ -213,16 +213,16 @@ describe("what a batch says", () => {
   });
 });
 
-const sanitizer = synthesisFor("sanitizer")!;
+const folds = synthesisFor("output-format")!;
 
 const ask: SynthAsk = {
-  gate: "sanitizer",
+  gate: "output-format",
   count: 2,
   language: "korean",
   lean: true,
   room: "owner",
   edge: false,
-  seed: "sanitizer-1",
+  seed: "output-format-1",
 };
 
 function saying(stream: string): { run: CodexRun; commands: string[][]; saids: string[] } {
@@ -244,7 +244,7 @@ function saying(stream: string): { run: CodexRun; commands: string[][]; saids: s
 describe("the asker a run is driven with", () => {
   test("hands back the answer, the thread and the tally", async () => {
     const heard = saying(landed);
-    const answer = await codexAsker({ run: heard.run })(sanitizer, ask, null);
+    const answer = await codexAsker({ run: heard.run })(folds, ask, null);
 
     expect(answer.text).toBe("PROBE_STDIN");
     expect(answer.sessionId).toBe("01a0ccf2-4f26-7f12-b443-17095e040217");
@@ -256,8 +256,8 @@ describe("the asker a run is driven with", () => {
     const heard = saying(landed);
     const asker = codexAsker({ run: heard.run });
 
-    await asker(sanitizer, ask, null);
-    await asker(sanitizer, ask, "01a0ccf2-4f26-7f12-b443-17095e040217");
+    await asker(folds, ask, null);
+    await asker(folds, ask, "01a0ccf2-4f26-7f12-b443-17095e040217");
 
     expect(heard.saids[0]!.length).toBeGreaterThan(heard.saids[1]!.length);
     expect(heard.commands[0]).not.toContain("resume");
@@ -268,19 +268,19 @@ describe("the asker a run is driven with", () => {
   test("a failed turn stops the run rather than coming back as an empty answer", async () => {
     const heard = saying(failed);
 
-    await expect(codexAsker({ run: heard.run })(sanitizer, ask, null))
+    await expect(codexAsker({ run: heard.run })(folds, ask, null))
       .rejects.toThrow("The 'gpt-5-codex' model is not supported when using Codex with a ChatGPT account.");
   });
 
   test("the batch that failed is named, so a run says which one it lost", async () => {
     const heard = saying(failed);
 
-    await expect(codexAsker({ run: heard.run })(sanitizer, ask, null)).rejects.toThrow("sanitizer-1");
+    await expect(codexAsker({ run: heard.run })(folds, ask, null)).rejects.toThrow("output-format-1");
   });
 
   test("a turn carrying only a notice comes back as an answer", async () => {
     const heard = saying(noticed);
-    const answer = await codexAsker({ run: heard.run })(sanitizer, ask, null);
+    const answer = await codexAsker({ run: heard.run })(folds, ask, null);
 
     expect(answer.text).toBe("[{\"state\":\"\uC4F4 \uC904\"}]");
   });

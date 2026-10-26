@@ -286,40 +286,10 @@ pub fn document() -> Value {
     &mut paths,
     &mut generator,
     "post",
-    "/sanitised",
-    "sanitised",
-    "Sanitiser",
-    "Defuse the security-intrusion material in a text, leaving the rest as it was.",
-    vec![],
-    None,
-    Some(made::<SanitiseAsk>),
-    &[(200, "the words as the sanitiser left them", Some(made::<Sanitised>))],
-    &["unauthorized", "bad-request", "stopped", "failed", "upstream-failed"],
-  );
-  route(
-    &mut paths,
-    &mut generator,
-    "post",
-    "/sanitiser/documents",
-    "sanitiser_document",
-    "Sanitiser",
-    "Read a document an editor changed and answer the text to keep.",
-    vec![],
-    None,
-    Some(made::<DocumentSanitiseAsk>),
-    &[(200, "the text to keep", Some(made::<DocumentSanitised>))],
-    &["unauthorized", "bad-request", "stopped", "failed", "upstream-failed"],
-  );
-
-  route(
-    &mut paths,
-    &mut generator,
-    "post",
     "/translations",
     "translations",
     "Translations",
-    "Translate at most 16 originals into one language, in the order given, keeping each whole reading; a call \
-     naming a reader's role is a console's and is held to the manifest's role.",
+    "Translate at most 16 originals into one language, in the order given, keeping each whole reading.",
     vec![],
     None,
     Some(made::<TranslationAsk>),
@@ -363,35 +333,6 @@ pub fn document() -> Value {
     Some(made::<KeepTranslation>),
     &[(200, "the translation kept", Some(made::<KeptTranslation>))],
     &["unauthorized", "bad-request", "language-unknown", "failed"],
-  );
-
-  route(
-    &mut paths,
-    &mut generator,
-    "post",
-    "/knowledge/selected",
-    "knowledge_selected",
-    "Knowledge",
-    "Pick, from the agent's libraries, the pieces a piece of work's lines call for.",
-    vec![],
-    None,
-    Some(made::<KnowledgeAsk>),
-    &[(200, "the pieces picked", Some(made::<Pieces>))],
-    &["unauthorized", "bad-request", "failed", "upstream-failed"],
-  );
-  route(
-    &mut paths,
-    &mut generator,
-    "post",
-    "/knowledge/work",
-    "knowledge_work",
-    "Knowledge",
-    "The same pick for the chat agent, for a search's work.",
-    vec![],
-    None,
-    Some(made::<WorkKnowledgeAsk>),
-    &[(200, "the pieces picked", Some(made::<Pieces>))],
-    &["unauthorized", "bad-request", "failed", "upstream-failed"],
   );
 
   route(
@@ -465,20 +406,6 @@ pub fn document() -> Value {
     &mut paths,
     &mut generator,
     "post",
-    "/documents/sought",
-    "documents_sought",
-    "Documents",
-    "The documents a question calls for out of an index.",
-    vec![],
-    None,
-    Some(made::<SeekAsk>),
-    &[(200, "the slugs chosen", Some(made::<Picks>))],
-    &["unauthorized", "bad-request", "no-answer", "failed", "upstream-failed"],
-  );
-  route(
-    &mut paths,
-    &mut generator,
-    "post",
     "/documents/translations",
     "document_translation_add",
     "Documents",
@@ -533,114 +460,6 @@ pub fn document() -> Value {
     &["unauthorized", "failed"],
   );
 
-  route(
-    &mut paths,
-    &mut generator,
-    "get",
-    "/console-manifest",
-    "console_manifest",
-    "Console",
-    "The console bundle's manifest, in the shape bmo-ui's console-manifest module states.",
-    vec![],
-    None,
-    None,
-    &[(200, "the manifest", Some(made::<ConsoleManifest>))],
-    &["unauthorized", "not-found", "failed"],
-  );
-  route(
-    &mut paths,
-    &mut generator,
-    "get",
-    "/console/words",
-    "console_words",
-    "Console",
-    "The console bundle's words: each locale's tree under the locale's code.",
-    vec![],
-    None,
-    None,
-    &[(200, "the words", Some(made::<serde_json::Map<String, Value>>))],
-    &["unauthorized", "not-found"],
-  );
-  route(
-    &mut paths,
-    &mut generator,
-    "get",
-    "/console/bundle/{file}",
-    "console_bundle_file",
-    "Console",
-    "The console bundle's module or stylesheet, named by the digest of its bytes; the reader's role is read.",
-    vec![("file", "string")],
-    None,
-    None,
-    &[(200, "the module as JavaScript or the stylesheet as CSS", None)],
-    &["unauthorized", "forbidden", "not-found"],
-  );
-  route(
-    &mut paths,
-    &mut generator,
-    "get",
-    "/console/gates",
-    "console_gates",
-    "Console",
-    "The gate order, as GET /gates answers it; the reader's role is read.",
-    vec![],
-    None,
-    None,
-    &[(200, "the gate order", Some(made::<Page<Gate>>))],
-    &["unauthorized", "forbidden", "failed"],
-  );
-  route(
-    &mut paths,
-    &mut generator,
-    "get",
-    "/console/laya",
-    "console_laya",
-    "Console",
-    "Laya, as GET /laya answers it; the reader's role is read.",
-    vec![],
-    None,
-    None,
-    &[(200, "Laya's health and each probed gate", Some(made::<LayaView>))],
-    &["unauthorized", "forbidden", "failed"],
-  );
-  route(
-    &mut paths,
-    &mut generator,
-    "get",
-    "/console/trials",
-    "console_trials",
-    "Console",
-    "A page of trials, as GET /trials answers it; the reader's role is read.",
-    vec![],
-    Some(query_of::<TrialQuery>),
-    None,
-    &[(200, "a page of trials", Some(made::<Page<Trial>>))],
-    &["unauthorized", "forbidden", "bad-request", "no-gate", "failed"],
-  );
-  route(
-    &mut paths,
-    &mut generator,
-    "post",
-    "/console/trials",
-    "console_trial_add",
-    "Console",
-    "Put one prompt to one gate as a turn would, kept under the reader's owner key; the reader's role is read.",
-    vec![],
-    None,
-    Some(made::<ConsoleTrial>),
-    &[(201, "the trial as it was kept", Some(made::<Trial>))],
-    &[
-      "unauthorized",
-      "forbidden",
-      "bad-request",
-      "no-gate",
-      "too-large",
-      "stopped",
-      "failed",
-      "upstream-failed",
-    ],
-  );
-
   let error = made::<ErrorBody>(&mut generator).to_value();
   let definitions = generator.take_definitions(true);
   let mut document = Map::new();
@@ -650,10 +469,9 @@ pub fn document() -> Value {
     json!({
       "title": "bmo-gate",
       "version": env!("CARGO_PKG_VERSION"),
-      "description": "The gate stage of a turn: sanitising words on their way into a model's context, choosing \
-        the reference a turn is handed, checking an answer on its way out, translating, seeking documents \
-        and reading voice lines. Every answer is data in the common wire format; \
-        the console bundle carries its screens' words.",
+      "description": "The gate stage of a turn: summarising a fresh session's start, handing a turn what \
+        attaches without a pick and the brain's index, checking an answer on its way out, and translating. \
+        Every answer is data in the common wire format.",
     }),
   );
   document.insert("servers".into(), json!([{ "url": "/", "description": "the gate service" }]));
@@ -680,15 +498,12 @@ pub fn document() -> Value {
       "Laya",
       "Judgements",
       "Reference",
-      "Sanitiser",
       "Translations",
-      "Knowledge",
       "Runs",
       "Formats",
       "Trials",
       "Documents",
       "Events",
-      "Console",
     ]),
   );
 

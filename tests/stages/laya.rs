@@ -37,7 +37,7 @@ fn a_busy_card_is_read_from_the_engines_own_reason() {
 
   assert_eq!(failure_of(503, &taken), "busy");
   assert_eq!(busy_reason(&taken).as_deref(), Some("the card is taken for a-trainer"));
-  assert_eq!(failure_of(503, &said("the card has no room for the room-rules checkpoint")), "busy");
+  assert_eq!(failure_of(503, &said("the card has no room for the output-format checkpoint")), "busy");
   assert_eq!(failure_of(503, &said("laya has no place among this node's occupants")), "busy");
 
   // The front's word for an engine that does not answer, and the relay's for no node taking the call, are no
@@ -141,7 +141,7 @@ async fn in_shadow_the_llm_decides_and_the_pair_is_kept_once_both_settled() {
 
   let verdict = judge_with_laya(
     &ground.stages,
-    &LayaRun::of("room-rules", Some(7), None),
+    &LayaRun::of("output-format", Some(7), None),
     &YesNo,
     &"x".into(),
     |_| async { Ok::<_, GateError>(Some("UNSAFE".to_owned())) },
@@ -157,9 +157,9 @@ async fn in_shadow_the_llm_decides_and_the_pair_is_kept_once_both_settled() {
   assert_eq!(asked.bearer().as_deref(), Some("relay-token"));
   assert_eq!(
     asked.body,
-    r#"{"gate":"room-rules","state":"x","questions":{"ok":{"type":"noul","instructions":"is it fine?"}}}"#
+    r#"{"gate":"output-format","state":"x","questions":{"ok":{"type":"noul","instructions":"is it fine?"}}}"#
   );
-  assert_eq!(pairs(&ground.scratch).await, ["room-rules shadow llm SAFE UNSAFE -"]);
+  assert_eq!(pairs(&ground.scratch).await, ["output-format shadow llm SAFE UNSAFE -"]);
 }
 
 #[tokio::test]
@@ -170,7 +170,7 @@ async fn in_filter_a_verdict_sure_past_tau_stands_and_the_llm_is_not_asked() {
   ground
     .scratch
     .run(
-      "UPDATE gate_options SET laya_mode = 'filter', laya_tau = 0.8 WHERE key = 'room-rules'",
+      "UPDATE gate_options SET laya_mode = 'filter', laya_tau = 0.8 WHERE key = 'output-format'",
       vec![],
     )
     .await
@@ -179,7 +179,7 @@ async fn in_filter_a_verdict_sure_past_tau_stands_and_the_llm_is_not_asked() {
 
   let verdict = judge_with_laya(
     &ground.stages,
-    &LayaRun::of("room-rules", None, None),
+    &LayaRun::of("output-format", None, None),
     &YesNo,
     &"x".into(),
     |_| async {
@@ -190,7 +190,7 @@ async fn in_filter_a_verdict_sure_past_tau_stands_and_the_llm_is_not_asked() {
   .unwrap();
 
   assert_eq!(verdict.as_deref(), Some("SAFE"));
-  assert_eq!(pairs(&ground.scratch).await, ["room-rules filter laya SAFE - -"]);
+  assert_eq!(pairs(&ground.scratch).await, ["output-format filter laya SAFE - -"]);
 }
 
 #[tokio::test]
@@ -198,7 +198,7 @@ async fn off_or_with_no_relay_named_the_llm_alone_decides() {
   let ground = ground("no-relay", None, Default::default()).await;
   let verdict = judge_with_laya(
     &ground.stages,
-    &LayaRun::of("room-rules", None, None),
+    &LayaRun::of("output-format", None, None),
     &YesNo,
     &"x".into(),
     |_| async { Ok::<_, GateError>(Some("UNSAFE".to_owned())) },
@@ -214,7 +214,7 @@ async fn off_or_with_no_relay_named_the_llm_alone_decides() {
 async fn on_lays_road_its_label_is_the_verdict_and_its_failure_falls_to_the_fallback() {
   let stub = Stub::start().await;
   let ground = ground("road", Some(&stub), Default::default()).await;
-  let run = LayaRun::of("room-rules", None, None);
+  let run = LayaRun::of("output-format", None, None);
 
   relay_answers(&stub, 0.2);
 
@@ -240,7 +240,7 @@ async fn on_lays_road_its_label_is_the_verdict_and_its_failure_falls_to_the_fall
   );
   assert_eq!(
     pairs(&ground.scratch).await,
-    ["room-rules road laya UNSAFE - -", "room-rules road llm - SAFE unreachable"]
+    ["output-format road laya UNSAFE - -", "output-format road llm - SAFE unreachable"]
   );
 }
 
@@ -254,8 +254,8 @@ async fn a_call_that_waited_behind_one_turned_away_is_not_sent() {
   stub.answer(Method::POST, "/decide", 503, json!({}));
 
   let (first, second) = tokio::join!(
-    laya::ask(&ground.stages.laya, "room-rules", &request, wait),
-    laya::ask(&ground.stages.laya, "library-knowledge", &request, wait)
+    laya::ask(&ground.stages.laya, "output-format", &request, wait),
+    laya::ask(&ground.stages.laya, "output-format", &request, wait)
   );
 
   assert_eq!(
@@ -267,7 +267,7 @@ async fn a_call_that_waited_behind_one_turned_away_is_not_sent() {
   // A call that joins the line after the door turned one away is sent.
   relay_answers(&stub, 0.9);
 
-  assert!(laya::ask(&ground.stages.laya, "room-rules", &request, wait).await.is_ok());
+  assert!(laya::ask(&ground.stages.laya, "output-format", &request, wait).await.is_ok());
   assert_eq!(stub.seen().iter().filter(|seen| seen.path == "/decide").count(), 2);
 }
 
@@ -275,7 +275,7 @@ async fn a_call_that_waited_behind_one_turned_away_is_not_sent() {
 async fn a_busy_card_falls_to_the_fallback_at_once_with_the_engines_reason() {
   let stub = Stub::start().await;
   let ground = ground("busy-card", Some(&stub), Default::default()).await;
-  let run = LayaRun::of("room-rules", None, None);
+  let run = LayaRun::of("output-format", None, None);
 
   stub.answer(Method::POST, "/decide", 503, json!({ "error": "the card is taken for a-trainer" }));
 
@@ -290,7 +290,7 @@ async fn a_busy_card_falls_to_the_fallback_at_once_with_the_engines_reason() {
     ("SAFE", laya::DecidedBy::Llm, Some("busy"))
   );
   assert_eq!(fallen.failure_said(), "busy: the card is taken for a-trainer");
-  assert_eq!(pairs(&ground.scratch).await, ["room-rules road llm - SAFE busy"]);
+  assert_eq!(pairs(&ground.scratch).await, ["output-format road llm - SAFE busy"]);
 }
 
 #[tokio::test]
@@ -303,8 +303,8 @@ async fn a_call_that_waited_behind_a_busy_card_leaves_busy_unsent() {
   stub.answer(Method::POST, "/decide", 503, json!({ "error": "the card is taken for a-trainer" }));
 
   let (first, second) = tokio::join!(
-    laya::ask(&ground.stages.laya, "room-rules", &request, wait),
-    laya::ask(&ground.stages.laya, "library-knowledge", &request, wait)
+    laya::ask(&ground.stages.laya, "output-format", &request, wait),
+    laya::ask(&ground.stages.laya, "output-format", &request, wait)
   );
   let busy = laya::Missed {
     failure: "busy",
@@ -328,18 +328,18 @@ async fn the_health_row_reads_busy_while_the_last_call_found_the_card_taken() {
     Method::GET,
     "/health",
     200,
-    json!({ "state": "up", "model": "room-rules=/w/a", "device": "cuda:0" }),
+    json!({ "state": "up", "model": "output-format=/w/a", "device": "cuda:0" }),
   );
   stub.answer(Method::POST, "/decide", 503, json!({ "error": "the card is taken for a-trainer" }));
 
-  assert!(laya::ask(side, "room-rules", &request, wait).await.is_err());
+  assert!(laya::ask(side, "output-format", &request, wait).await.is_err());
   assert!(pass(db, side, 100).await.unwrap());
   assert_eq!(read(db).await.unwrap().state, "busy");
 
   // The first call answered after it lets the next check read the server up again.
   relay_answers(&stub, 0.9);
 
-  assert!(laya::ask(side, "room-rules", &request, wait).await.is_ok());
+  assert!(laya::ask(side, "output-format", &request, wait).await.is_ok());
   assert!(pass(db, side, 160).await.unwrap());
   assert_eq!(read(db).await.unwrap().state, "up");
 }

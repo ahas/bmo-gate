@@ -75,7 +75,7 @@ class HostCopiesSettingTest(unittest.TestCase):
 class DumpNameTest(unittest.TestCase):
     def test_named_by_the_source_and_changed_when_its_files_change(self) -> None:
         with tempfile.TemporaryDirectory() as root:
-            source = os.path.join(root, "checkpoints", "room-rules", "run", "step-000092")
+            source = os.path.join(root, "checkpoints", "output-format", "run", "step-000092")
             os.makedirs(source)
             weights = os.path.join(source, "model.safetensors")
             with open(weights, "wb") as out:
@@ -83,7 +83,7 @@ class DumpNameTest(unittest.TestCase):
             copies = MappedCopies(os.path.join(root, "dumps"))
             first = copies.path(source)
             self.assertTrue(first.startswith(os.path.join(root, "dumps", "")))
-            self.assertIn("room-rules--run--step-000092--", first)
+            self.assertIn("output-format--run--step-000092--", first)
             self.assertEqual(copies.path(source), first)
             with open(weights, "wb") as out:
                 out.write(b"other")
@@ -112,7 +112,7 @@ class KeptCopiesTest(unittest.TestCase):
             expected = [tensor.detach().clone() for tensor in agent.model.state_dict().values()]
             copies = MappedCopies(os.path.join(root, "dumps"))
 
-            checkpoint = Checkpoint("room-rules", "step-000001", agent, 1, copies, source)
+            checkpoint = Checkpoint("output-format", "step-000001", agent, 1, copies, source)
 
             dumps = os.listdir(os.path.join(root, "dumps"))
             self.assertEqual(len(dumps), 1)
@@ -127,7 +127,7 @@ class KeptCopiesTest(unittest.TestCase):
                 self.assertTrue(torch.equal(host.to(original.dtype), original))
 
             stamp = os.stat(os.path.join(root, "dumps", dumps[0])).st_mtime_ns
-            Checkpoint("room-rules", "step-000001", self.agent(), 1, copies, source)
+            Checkpoint("output-format", "step-000001", self.agent(), 1, copies, source)
             self.assertEqual(os.stat(os.path.join(root, "dumps", dumps[0])).st_mtime_ns, stamp)
 
     def test_a_mapped_checkpoint_on_the_card_holds_no_mapping_and_maps_its_dump_again_for_each_move(self) -> None:
@@ -138,7 +138,7 @@ class KeptCopiesTest(unittest.TestCase):
                 out.write(b"weights")
             agent = self.agent()
             expected = [tensor.detach().clone() for tensor in agent.model.state_dict().values()]
-            checkpoint = Checkpoint("room-rules", "step-000001", agent, 1, MappedCopies(os.path.join(root, "dumps")), source)
+            checkpoint = Checkpoint("output-format", "step-000001", agent, 1, MappedCopies(os.path.join(root, "dumps")), source)
             host_bytes = checkpoint.described()["hostBytes"]
             with mock.patch("torch.cuda.synchronize"), mock.patch("torch.cuda.empty_cache"):
                 for _ in range(2):
@@ -157,16 +157,16 @@ class KeptCopiesTest(unittest.TestCase):
             with open(weights, "wb") as out:
                 out.write(b"weights")
             copies = MappedCopies(os.path.join(root, "dumps"))
-            Checkpoint("room-rules", "step-000001", self.agent(), 1, copies, source)
+            Checkpoint("output-format", "step-000001", self.agent(), 1, copies, source)
             torch.save([torch.zeros(1)], copies.path(source))
 
-            Checkpoint("room-rules", "step-000001", self.agent(), 1, copies, source)
+            Checkpoint("output-format", "step-000001", self.agent(), 1, copies, source)
             self.assertIsNotNone(MappedCopies.read(copies.path(source), [host for host in torch.load(copies.path(source))]))
 
             with open(weights, "wb") as out:
                 out.write(b"retrained")
             os.utime(weights, ns=(os.stat(weights).st_mtime_ns + 10**9, os.stat(weights).st_mtime_ns + 10**9))
-            Checkpoint("room-rules", "step-000001", self.agent(), 1, copies, source)
+            Checkpoint("output-format", "step-000001", self.agent(), 1, copies, source)
             self.assertEqual(os.listdir(os.path.join(root, "dumps")), [os.path.basename(copies.path(source))])
 
 

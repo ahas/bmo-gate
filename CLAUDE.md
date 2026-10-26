@@ -34,7 +34,7 @@ These rules hold every change to this repository.
   instructions themselves being English; the questions Laya is asked and what the training tooling tells the
   model writing a gate's rows and its judges, English with Korean standing in them only as conversation; the
   briefs the evaluation set's items are written from, the stand-ins its rows carry and the earlier wordings of Laya's questions they may ask (`prompts/tooling/`), worded as the models
-  read them or the rows hold them, and the words the sanitiser's pre-filter matches, as the rooms write them. Nothing else holds Korean: the repository test holds every file outside
+  read them or the rows hold them. Nothing else holds Korean: the repository test holds every file outside
   `prompts/`, and the testbed's `korean` check every code file, to `korean-ledger.json`, which allows none.
   Korean a test feeds the code is written by its unicode escapes.
 - No personal data: no user names, home directories, machine names, domains, network addresses or names

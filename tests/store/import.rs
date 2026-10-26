@@ -7,8 +7,8 @@ use sea_orm::{ConnectionTrait, DbBackend, Statement};
 
 use crate::scratch::Scratch;
 
-/// The eleven tables, each with the row its fixture writes, or none.
-fn export() -> [(&'static str, &'static str, &'static [&'static str]); 11] {
+/// The ten tables, each with the row its fixture writes, or none.
+fn export() -> [(&'static str, &'static str, &'static [&'static str]); 10] {
   [
     (
       "gate_options",
@@ -33,11 +33,6 @@ fn export() -> [(&'static str, &'static str, &'static [&'static str]); 11] {
     ("laya_verdicts", "", &["\"id\""]),
     ("reference_offers", "", &["\"id\""]),
     ("reference_verdicts", "", &["\"id\""]),
-    (
-      "sanitised_texts",
-      r#"{"hash":"abc","text":"a text","changed":1,"at":"2026-10-21","judged_at":1791866256,"rowid":1}"#,
-      &["\"hash\""],
-    ),
     (
       "document_translations",
       r#"{"document":"one","version":"1","target":"ko","part":1,"parts":2,"text":"번역","failed":0,"translated_at":1791866256,"rowid":1}"#,
@@ -76,7 +71,7 @@ fn write(folder: &Path) -> Vec<(&'static str, u64)> {
 }
 
 #[tokio::test]
-async fn the_eleven_tables_are_moved_and_compared() {
+async fn the_ten_tables_are_moved_and_compared() {
   let folder = tempfile::tempdir().expect("a scratch folder");
   let counts = write(folder.path());
   let scratch = Scratch::new().await;
@@ -86,7 +81,7 @@ async fn the_eleven_tables_are_moved_and_compared() {
     .expect("the import runs");
 
   let expected: u64 = counts.iter().map(|(_, count)| count).sum();
-  assert_eq!(report.tables.len(), 11);
+  assert_eq!(report.tables.len(), 10);
   assert_eq!(report.tables.iter().map(|table| table.written).sum::<u64>(), expected);
   assert_eq!(report.sample.checked as u64, expected);
   assert_eq!(report.sample.failures, Vec::<String>::new());

@@ -89,7 +89,7 @@ pub struct MemoryRow {
   pub moved_at: Option<i64>,
 }
 
-/// A row with a condition, as the matcher is offered it.
+/// A row with a condition, as the brain's index lists it among the room's rules.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Condition {
   pub slug: String,
@@ -131,18 +131,6 @@ pub struct Fragment {
   pub body_hash: Option<String>,
 }
 
-/// A fragment row a turn attached, found by these four among the rows the turn's agent may read.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Hit {
-  /// The brain's own key for the row.
-  pub key: String,
-  pub kind: String,
-  pub chat_id: Option<i64>,
-  pub owner: Option<i64>,
-  pub slug: String,
-}
-
 /// A knowledge chunk read, by its slug, path, text and version.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Document {
@@ -161,14 +149,6 @@ pub struct Sheet {
   pub text: String,
 }
 
-/// One rule the owner grants in a room.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RoomRule {
-  pub id: String,
-  pub subject: i64,
-  pub text: String,
-}
-
 /// One document a session holds, by its path and version.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Load {
@@ -181,17 +161,8 @@ pub trait Brain: Send + Sync {
   /// The room's open rows that wait on nothing, and the errands whose event has come.
   fn standing<'a>(&'a self, agent: &'a str, chat: i64) -> BoxFuture<'a, Answer<Vec<MemoryRow>>>;
 
-  /// The rows with a condition the matcher is offered for the room.
+  /// The rows with a condition that reach the room.
   fn conditions<'a>(&'a self, agent: &'a str, chat: i64) -> BoxFuture<'a, Answer<Vec<Condition>>>;
-
-  /// What the matcher made of the room's rows: the ones it matched and the ones it spent.
-  fn matched<'a>(
-    &'a self,
-    agent: &'a str,
-    chat: i64,
-    matched: &'a [String],
-    spent: &'a [String],
-  ) -> BoxFuture<'a, Answer<()>>;
 
   /// The rows the turn's events wake.
   fn woken<'a>(
@@ -208,9 +179,6 @@ pub trait Brain: Send + Sync {
     chat: i64,
     kinds: &'a [String],
   ) -> BoxFuture<'a, Answer<Vec<Fragment>>>;
-
-  /// The rows a turn attached, their counts raised.
-  fn hits<'a>(&'a self, agent: &'a str, chat: i64, attached: &'a [Hit]) -> BoxFuture<'a, Answer<()>>;
 
   /// The knowledge chunks asked for, in the order asked, or the brain's refusal of a slug outside the room.
   fn knowledge<'a>(
@@ -233,12 +201,6 @@ pub trait Brain: Send + Sync {
     people: &'a [i64],
     lines: Option<usize>,
   ) -> BoxFuture<'a, Answer<Vec<Sheet>>>;
-
-  /// The rules the owner grants in the room.
-  fn room_rules(&self, chat: i64) -> BoxFuture<'_, Answer<Vec<RoomRule>>>;
-
-  /// What a session already holds.
-  fn loads<'a>(&'a self, session: &'a str) -> BoxFuture<'a, Answer<Vec<Load>>>;
 }
 
 // A subject as a brain finds it: the brain, the subject's type and its key.
@@ -263,30 +225,6 @@ impl HttpBrain {
   }
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct Hits<'a> {
-  memory_ids: Vec<i64>,
-  actor_name: &'a str,
-}
-
-#[allow(dead_code)]
-#[derive(Deserialize)]
-struct Recorded {
-  #[serde(default)]
-  recorded_count: i64,
-}
-
-#[derive(Serialize)]
-struct Session<'a> {
-  session: &'a str,
-}
-
-#[derive(Deserialize)]
-struct Loads {
-  loads: Vec<Load>,
-}
-
 impl HttpBrain {
   async fn get<T: DeserializeOwned>(
     &self,
@@ -297,17 +235,6 @@ impl HttpBrain {
     let segments: Vec<&str> = path.split('/').collect();
 
     self.caller.get(call, &segments, query).await
-  }
-
-  async fn post<B: Serialize, T: DeserializeOwned>(
-    &self,
-    call: &'static str,
-    path: &str,
-    body: &B,
-  ) -> Answer<T> {
-    let segments: Vec<&str> = path.split('/').collect();
-
-    self.caller.post(call, &segments, body).await
   }
 
   // The agent's brain, by the agent's key, remembered once found.
@@ -505,26 +432,6 @@ impl HttpBrain {
         .collect(),
     )
   }
-
-  async fn hit(&self, agent: &str, ids: Vec<i64>) -> Answer<()> {
-    if ids.is_empty() {
-      return Ok(());
-    }
-
-    let brain = self.brain(agent).await?;
-    let _: Recorded = self
-      .post(
-        "memories attached",
-        &format!("brains/{brain}/hits"),
-        &Hits {
-          memory_ids: ids,
-          actor_name: agent,
-        },
-      )
-      .await?;
-
-    Ok(())
-  }
 }
 
 impl Brain for HttpBrain {
@@ -547,31 +454,6 @@ impl Brain for HttpBrain {
       let rows = self.held(agent, chat).await?;
 
       Ok(conditions(&rows))
-    })
-  }
-
-  fn matched<'a>(
-    &'a self,
-    agent: &'a str,
-    chat: i64,
-    matched: &'a [String],
-    _spent: &'a [String],
-  ) -> BoxFuture<'a, Answer<()>> {
-    Box::pin(async move {
-      let rows = self.held(agent, chat).await?;
-      let mut ids: Vec<i64> = rows
-        .iter()
-        .filter(|memory| {
-          let slug = slug_of(memory);
-
-          matched.iter().any(|one| one == &slug)
-        })
-        .map(|memory| memory.id)
-        .collect();
-      ids.sort_unstable();
-      ids.dedup();
-
-      self.hit(agent, ids).await
     })
   }
 
@@ -616,16 +498,6 @@ impl Brain for HttpBrain {
       }
 
       Ok(all)
-    })
-  }
-
-  fn hits<'a>(&'a self, agent: &'a str, _chat: i64, attached: &'a [Hit]) -> BoxFuture<'a, Answer<()>> {
-    Box::pin(async move {
-      let mut ids: Vec<i64> = attached.iter().filter_map(|hit| hit.key.parse().ok()).collect();
-      ids.sort_unstable();
-      ids.dedup();
-
-      self.hit(agent, ids).await
     })
   }
 
@@ -716,31 +588,4 @@ impl Brain for HttpBrain {
       Ok(sheets)
     })
   }
-
-  fn room_rules(&self, chat: i64) -> BoxFuture<'_, Answer<Vec<RoomRule>>> {
-    Box::pin(async move {
-      let rules: Rules = self.post("room rules read", "room-rules/read", &Room { chat_id: chat }).await?;
-
-      Ok(rules.rules)
-    })
-  }
-
-  fn loads<'a>(&'a self, session: &'a str) -> BoxFuture<'a, Answer<Vec<Load>>> {
-    Box::pin(async move {
-      let loads: Loads = self.post("session loads", "sessions/loads", &Session { session }).await?;
-
-      Ok(loads.loads)
-    })
-  }
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct Room {
-  chat_id: i64,
-}
-
-#[derive(Deserialize)]
-struct Rules {
-  rules: Vec<RoomRule>,
 }

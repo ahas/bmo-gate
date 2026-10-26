@@ -158,8 +158,8 @@ export interface SynthProgress {
   effort: string;
   road: SynthRoad;
   // Every road that has driven this run, in the order they first drove it. A gate resumed onto a
-  // different road — sanitizer off codex and onto the local-model road, where codex refused its attack rows at the
-  // account level — carries both, because the batches already frozen were written on the first road
+  // different road — off codex and onto another, where codex refused its rows at the account level —
+  // carries both, because the batches already frozen were written on the first road
   // and the batches still to come on the second. `road` is only the one driving now; `roads` is the
   // honest account of what wrote the gate's rows. Absent on a run written before this was recorded,
   // which is read as the single `road` it names.

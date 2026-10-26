@@ -135,8 +135,8 @@ describe("judgedRows", () => {
 
 describe("judgeBatches", () => {
   const asking = (many: number, name: string): UnjudgedRow => ({
-    id: `people-search:${name}`,
-    gate: "people-search",
+    id: `output-format:${name}`,
+    gate: "output-format",
     split: "train",
     state: "\uB9D0",
     questions: Object.fromEntries(Array.from({ length: many }, (_, at) => [

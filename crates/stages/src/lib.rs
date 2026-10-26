@@ -1,8 +1,7 @@
-//! The gates themselves, each on the runs `gate-runs` carries: Laya and the probes it asks, the sanitiser, the
-//! output gate, the translator and a document's translation, the reading of a record into the owner's language,
-//! the document seeker, Laya's health and how often it agrees with each gate's LLM.
+//! The gates themselves, each on the runs `gate-runs` carries: Laya and the probes it asks, the output gate, the
+//! translator and a document's translation, the reading of a record into the owner's language, Laya's health and
+//! how often it agrees with each gate's LLM.
 
-pub mod document_seek;
 pub mod document_translation;
 pub mod fold;
 pub mod laya;
@@ -14,7 +13,6 @@ pub mod ordered;
 pub mod output;
 pub mod records;
 pub mod retention;
-pub mod sanitizer;
 pub mod sql;
 pub mod translator;
 

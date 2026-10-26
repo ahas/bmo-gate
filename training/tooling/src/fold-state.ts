@@ -1,4 +1,4 @@
-// What the output format gate is shown of one outgoing message (docs/laya-gates.md, 「5. The output format」).
+// What the output format gate is shown of one outgoing message (docs/laya-gates.md, 「The output format」).
 // A message worth folding is a long one, and a long one runs past what one Laya call reads, so
 // the gate never reads the message whole: it reads the opening and the closing of the markdown as
 // written and the counts that say how large and how built the message is. The shape is fixed to

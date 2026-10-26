@@ -121,11 +121,6 @@ impl GateClient {
     answer(self.get(&["health"])).await
   }
 
-  /// The console bundle's manifest (`docs/api.md`, 「Console」).
-  pub async fn console_manifest(&self) -> Result<ConsoleManifest, ClientFailure> {
-    answer(self.get(&["console-manifest"])).await
-  }
-
   /// The gate order.
   pub async fn gates(&self) -> Result<Page<Gate>, ClientFailure> {
     answer(self.get(&["gates"])).await
@@ -210,19 +205,6 @@ impl GateClient {
     answer(self.get(&["reference", "search"]).query(query)).await
   }
 
-  /// Defuse a text.
-  pub async fn sanitise(&self, ask: &SanitiseAsk) -> Result<Sanitised, ClientFailure> {
-    answer(self.post(&["sanitised"]).json(ask)).await
-  }
-
-  /// Sanitise a document.
-  pub async fn sanitise_document(
-    &self,
-    ask: &DocumentSanitiseAsk,
-  ) -> Result<DocumentSanitised, ClientFailure> {
-    answer(self.post(&["sanitiser", "documents"]).json(ask)).await
-  }
-
   /// Translate originals into one language.
   pub async fn translate(&self, ask: &TranslationAsk) -> Result<Readings, ClientFailure> {
     answer(self.post(&["translations"]).json(ask)).await
@@ -236,16 +218,6 @@ impl GateClient {
   /// Keep one translation.
   pub async fn keep_translation(&self, ask: &KeepTranslation) -> Result<KeptTranslation, ClientFailure> {
     answer(self.put(&["translations", "kept"]).json(ask)).await
-  }
-
-  /// The knowledge a piece of work's lines call for.
-  pub async fn knowledge(&self, ask: &KnowledgeAsk) -> Result<Pieces, ClientFailure> {
-    answer(self.post(&["knowledge", "selected"]).json(ask)).await
-  }
-
-  /// The knowledge a search's work calls for.
-  pub async fn work_knowledge(&self, ask: &WorkKnowledgeAsk) -> Result<Pieces, ClientFailure> {
-    answer(self.post(&["knowledge", "work"]).json(ask)).await
   }
 
   /// One run of one gate.
@@ -266,11 +238,6 @@ impl GateClient {
   /// Put one prompt to one gate and keep the trial.
   pub async fn add_trial(&self, ask: &NewTrial) -> Result<Trial, ClientFailure> {
     answer(self.post(&["trials"]).json(ask)).await
-  }
-
-  /// The documents a question calls for.
-  pub async fn seek_documents(&self, ask: &SeekAsk) -> Result<Picks, ClientFailure> {
-    answer(self.post(&["documents", "sought"]).json(ask)).await
   }
 
   /// Queue a document's translation.

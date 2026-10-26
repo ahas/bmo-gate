@@ -6,7 +6,7 @@ use std::sync::Arc;
 use gate_command::gate_eval::gates::members;
 use gate_command::gate_eval::member::{Ask, EvalGate};
 use gate_policy::prompts;
-use serde_json::{Value, json};
+use serde_json::json;
 
 use crate::ground;
 
@@ -26,7 +26,7 @@ fn member(stage: &str) -> &'static dyn EvalGate {
 fn every_gate_of_the_set_is_a_member_once_in_name_order_and_its_words_read() {
   let stages: Vec<&str> = members().iter().map(|member| member.stage()).collect();
 
-  assert_eq!(stages, ["document-seek", "session-summary", "translator"]);
+  assert_eq!(stages, ["session-summary", "translator"]);
   assert!(members().iter().all(|member| !member.topics().is_empty() && member.batch_size() > 0));
 }
 
@@ -38,14 +38,9 @@ async fn each_brief_shows_the_gate_s_real_request_for_its_example() {
 
     async move { member(stage).brief(&stages).await.unwrap() }
   };
-  let seek = brief("document-seek").await;
   let summary = brief("session-summary").await;
   let translator = brief("translator").await;
 
-  assert!(seek.starts_with("THE GATE: document-seek."));
-  assert!(seek.contains("SYSTEM PROMPT THE GATE IS GIVEN:\n"));
-  assert!(seek.contains("INDEX:\n"));
-  assert!(seek.ends_with("though entries look close."));
   assert!(summary.contains("SYSTEM PROMPT THE GATE IS GIVEN:\nthe recollection rulebook\n\n"));
   assert!(summary.contains("the-chat-agent (room -1001234567): "));
   assert!(summary.contains("WORKER INSTRUCTIONS:\nthe recollection rulebook"));
@@ -56,41 +51,9 @@ async fn each_brief_shows_the_gate_s_real_request_for_its_example() {
       .contains("PROMPT THE GATE IS GIVEN (for the example input):\nTranslate into English.\n\n## ")
   );
 
-  for one in [&seek, &summary, &translator] {
+  for one in [&summary, &translator] {
     assert!(!one.contains("BMO") && !one.contains("\u{be44}\u{baa8}"), "an agent's name in a brief");
   }
-}
-
-#[tokio::test]
-async fn document_seek_passes_on_a_right_first_pick_and_on_none_for_a_question_nothing_answers() {
-  let ground = ground("member-seek").await;
-  let seek = member("document-seek");
-  let input = json!({
-    "mode": "headings",
-    "entries": [
-      { "slug": "h1", "line": "deploy > rollback", "group": null },
-      { "slug": "h2", "line": "deploy > units", "group": null },
-      { "slug": "h3", "line": "setup", "group": null },
-    ],
-    "question": "deploy rollback",
-  });
-  let key = |slugs: &[&str]| json!({ "slugs": slugs });
-  let run = |key: Value, answer: Option<&'static str>| {
-    let stages = ground.stages.clone();
-    let input = input.clone();
-
-    async move { seek.run(&stages, &input, &key, &answering(answer)).await }
-  };
-
-  assert!(run(key(&["h1"]), Some("h1\nh2")).await.pass);
-  assert!(!run(key(&["h1"]), Some("h2")).await.pass);
-  assert!(run(key(&[]), Some("none")).await.pass);
-  assert!(!run(key(&[]), None).await.answered);
-  assert_eq!(seek.refusal(&input, &key(&["z"])).as_deref(), Some("a key slug not in the index"));
-
-  let branches = json!({ "mode": "branches", "entries": input["entries"], "question": "q" });
-
-  assert_eq!(seek.refusal(&branches, &key(&[])).as_deref(), Some("a branch index answered none"));
 }
 
 #[tokio::test]

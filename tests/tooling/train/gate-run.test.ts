@@ -66,7 +66,7 @@ function fakeNode(states: readonly string[], cards: readonly string[] = ["0"]): 
 
 function running(runner: NodeRunner, changes: Partial<GateRunOptions> = {}): GateRunOptions {
   return {
-    runner, console: "/console", pass: "ref-1-p0001", rehearsal: false, folder: "/data/room-rules", beside: null,
+    runner, console: "/console", pass: "ref-1-p0001", rehearsal: false, folder: "/data/output-format", beside: null,
     carryBeside: async () => null,
     collect: async (ask) => ({ folder: `/collected/${ask.gate}/${ask.step}` }),
     wait: async () => {}, polls: 4, everyMs: 1, now: () => new Date("2026-09-25T00:00:00Z"),
@@ -91,7 +91,7 @@ describe("the node's answers", () => {
 
   test("a gate's own declaration is what says which answer it may settle", () => {
     expect(asymmetricFlags("reply-wanted")).toEqual(["--asymmetric reply-wanted:forAgent:false"]);
-    expect(asymmetricFlags("room-rules")).toEqual([]);
+    expect(asymmetricFlags("output-format")).toEqual([]);
   });
 });
 
@@ -104,31 +104,31 @@ describe("runGate", () => {
       stateText({ finished: "yes", exists: "yes", calibrating: "yes", lines: "9" }),
       stateText({ finished: "yes", exists: "yes", calibrated: "yes", lines: "9" }),
     ]);
-    const row = await runGate("room-rules", "alpha", 1, running(runner));
+    const row = await runGate("output-format", "alpha", 1, running(runner));
 
     expect(row.state).toBe("done");
     expect(commands.filter((one) => one.startsWith("upload"))).toHaveLength(3);
-    expect(commands.some((one) => one.includes(" launch data/ref-1-p0001-room-rules "))).toBe(true);
+    expect(commands.some((one) => one.includes(" launch data/ref-1-p0001-output-format "))).toBe(true);
     expect(row).toMatchObject({ steps: 8, effectiveBatch: 64, calibration: { agreement: 0.93, balanced: 0.84, ece: 0.047 } });
-    expect(row.collected).toEqual(["/collected/room-rules/8"]);
+    expect(row.collected).toEqual(["/collected/output-format/8"]);
   });
 
   test("measures the new checkpoint beside the one serving the gate, carried to the node first", async () => {
     const { runner, commands } = fakeNode([stateText({ finished: "yes", exists: "yes" }), stateText({ finished: "yes", exists: "yes", calibrated: "yes" })]);
     const carried: string[] = [];
-    const row = await runGate("room-rules", "bravo", 1, running(runner, {
-      beside: "room-rules/real-1-hand/step-000044",
+    const row = await runGate("output-format", "bravo", 1, running(runner, {
+      beside: "output-format/real-1-hand/step-000044",
       carryBeside: async (node, checkpoint) => { carried.push(`${node} ${checkpoint}`); return null; },
     }));
 
-    expect(carried).toEqual(["bravo room-rules/real-1-hand/step-000044"]);
-    expect(commands.find((one) => one.includes(" calibrate "))).toContain("--base ~/bmo-laya/beside/checkpoints/room-rules/real-1-hand/step-000044");
-    expect(row.beside).toBe("room-rules/real-1-hand/step-000044");
+    expect(carried).toEqual(["bravo output-format/real-1-hand/step-000044"]);
+    expect(commands.find((one) => one.includes(" calibrate "))).toContain("--base ~/bmo-laya/beside/checkpoints/output-format/real-1-hand/step-000044");
+    expect(row.beside).toBe("output-format/real-1-hand/step-000044");
   });
 
   test("measures beside the checkpoint it came from where the serving one could not be carried, and says so", async () => {
     const { runner, commands } = fakeNode([stateText({ finished: "yes", exists: "yes" }), stateText({ finished: "yes", exists: "yes", calibrated: "yes" })]);
-    const row = await runGate("room-rules", "bravo", 1, running(runner, { beside: "room-rules/x/step-000001", carryBeside: async () => "hub refused" }));
+    const row = await runGate("output-format", "bravo", 1, running(runner, { beside: "output-format/x/step-000001", carryBeside: async () => "hub refused" }));
 
     expect(commands.find((one) => one.includes(" calibrate "))).not.toContain("--base");
     expect(row.beside).toBeNull();
@@ -141,18 +141,18 @@ describe("runGate", () => {
       stateText({ finished: "yes", exists: "yes", calibrated: "yes" }),
     ]);
     const collected: string[] = [];
-    const row = await runGate("room-rules", "alpha", 1, running(runner, {
+    const row = await runGate("output-format", "alpha", 1, running(runner, {
       collect: async (ask) => { collected.push(`${ask.kind} ${ask.step}`); return { folder: "f" }; },
     }));
 
     expect(row.resumes).toBe(1);
     expect(collected[0]).toBe("step 25");
-    expect(commands.some((one) => one.includes(" resume checkpoints/ref-1-p0001-room-rules "))).toBe(true);
+    expect(commands.some((one) => one.includes(" resume checkpoints/ref-1-p0001-output-format "))).toBe(true);
   });
 
   test("gives a run up once nothing about it has moved for the whole bound", async () => {
     const { runner } = fakeNode([stateText({ training: "yes", exists: "yes", lines: "3", last: "epoch 1" })]);
-    const row = await runGate("room-rules", "alpha", 1, running(runner));
+    const row = await runGate("output-format", "alpha", 1, running(runner));
 
     expect(row.state).toBe("failed");
     expect(row.fault).toContain("last line: epoch 1");
@@ -168,12 +168,12 @@ describe("runGate", () => {
       stateText({ finished: "yes", exists: "yes", calibrated: "yes", lines: "9" }),
     ], ["1", "1", "0"]);
     const said: string[] = [];
-    const row = await runGate("room-rules", "bravo", 1, running(runner, { say: (line) => said.push(line) }));
+    const row = await runGate("output-format", "bravo", 1, running(runner, { say: (line) => said.push(line) }));
     const launch = commands.findIndex((one) => one.includes(" launch "));
 
     expect(row.state).toBe("done");
     expect(commands.slice(0, launch).filter((one) => one.includes("node-probe.sh"))).toHaveLength(3);
-    expect(said.filter((line) => line.includes("waiting for it to free"))).toEqual(["bravo: the card room-rules would go on is taken; waiting for it to free: the card carries 1 process"]);
+    expect(said.filter((line) => line.includes("waiting for it to free"))).toEqual(["bravo: the card output-format would go on is taken; waiting for it to free: the card carries 1 process"]);
   });
 
   test("calibrates a finished run only on a card that stands free", async () => {
@@ -182,7 +182,7 @@ describe("runGate", () => {
       stateText({ finished: "yes", exists: "yes" }),
       stateText({ finished: "yes", exists: "yes", calibrated: "yes" }),
     ], ["1", "0"]);
-    const row = await runGate("room-rules", "bravo", 1, running(runner));
+    const row = await runGate("output-format", "bravo", 1, running(runner));
     const calibrate = commands.findIndex((one) => one.includes(" calibrate "));
 
     expect(row.state).toBe("done");
@@ -191,7 +191,7 @@ describe("runGate", () => {
 
   test("gives a gate up once its card has stayed taken for the whole bound, and says what holds it", async () => {
     const { runner, commands } = fakeNode([stateText()], ["2"]);
-    const row = await runGate("room-rules", "bravo", 1, running(runner));
+    const row = await runGate("output-format", "bravo", 1, running(runner));
 
     expect(row.state).toBe("failed");
     expect(row.fault).toBe("the card did not free in 0s: the card carries 2 processes");
@@ -200,7 +200,7 @@ describe("runGate", () => {
 
   test("a card that cannot be read is a node out of reach, and nothing is started on it", async () => {
     const { runner, commands } = fakeNode([stateText()], ["silent"]);
-    const row = await runGate("room-rules", "bravo", 1, running(runner));
+    const row = await runGate("output-format", "bravo", 1, running(runner));
 
     expect(row.state).toBe("unreachable");
     expect(row.fault).toContain("the node does not answer");
@@ -210,6 +210,6 @@ describe("runGate", () => {
   test("names a directory with nothing to carry on from rather than writing over it", async () => {
     const { runner } = fakeNode([stateText({ exists: "yes" })]);
 
-    expect((await runGate("room-rules", "alpha", 1, running(runner))).fault).toContain("never removed here unasked");
+    expect((await runGate("output-format", "alpha", 1, running(runner))).fault).toContain("never removed here unasked");
   });
 });

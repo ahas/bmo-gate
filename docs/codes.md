@@ -24,8 +24,6 @@ the camelCase keys.
 |---|---|---|
 | `stopped` | 409 | the run the request asked for was stopped by somebody |
 | `no-gate` | 404 | the gate named is none of the gate order |
-| `no-answer` | 502 | the document seeker gave no answer where the route needs one |
-| `shelved` | 409 | the gate the route serves is shelved and is never asked (`docs/gates.md`, 「Shelved」) |
 
 ## Gate options
 
@@ -57,9 +55,3 @@ the camelCase keys.
 | `language-unknown` | 422 | a language the translator does not take: for a translation neither the worker's nor the owner's, for a document's translation one the policy names no language for (`docs/api.md`, 「Translations」 and 「Documents」) |
 | `too-many-originals` | 400 | a translation names more originals than one call carries (`docs/api.md`, 「Translations」) |
 | `translator-busy` | 503 | a translation would take the originals standing at the translator past their bound; `Retry-After` names the seconds to wait (`docs/api.md`, 「Translations」) |
-
-## The console's routes
-
-| Code | Status | When |
-|---|---|---|
-| `forbidden` | 403 | a call under `/console/` whose `Owner-Role` is missing or does not allow the screen's role, or a call to a route the manifest relays whose `Owner-Role` does not allow it (`docs/api.md`, 「Console」) |

@@ -1,10 +1,8 @@
 //! What an agent holds in a room as its turn reads it (the brain's `docs/memories.md`;
 //! `docs/reference-selection.md`): every read is one agent's rows, answered by the brain. A row carrying no
-//! condition stands in its room: the errands whose event has come attach as due, a few of them, and the rest are
-//! the memory picker's candidates, the rows it picks joining the due ones in one entry. A row carrying a condition
-//! is the matcher's candidate, and a row waiting on an event attaches by the event alone. The brain withers the
-//! rows that waited too long, releases a state nobody moved, stamps an errand an event met and counts each match;
-//! the gate reads and writes back what it matched and what it attached.
+//! condition stands in its room, and the errands whose event has come attach as due, a few of them, in one entry;
+//! a row waiting on an event attaches by the event alone. The brain withers the rows that waited too long, releases
+//! a state nobody moved and stamps an errand an event met.
 
 use chrono::{FixedOffset, TimeZone};
 use gate_markup::js;
@@ -12,10 +10,8 @@ use gate_policy::fill_marks;
 use gate_policy::memories::MEMORIES;
 use gate_policy::reference::REFERENCE;
 use gate_ports::PortError;
-use gate_ports::brain::{self, Condition, Event, MemoryRow};
+use gate_ports::brain::{Condition, Event, MemoryRow};
 
-use crate::fragments::Fragment;
-use crate::pick::{self, Body, Library};
 use crate::{Entry, Reference, Source};
 
 // A moment as a row's line writes it, in Korean time to the minute, as the entry's line names it.
@@ -58,21 +54,18 @@ pub fn memory_path(chat_id: i64) -> String {
   format!("memories/{chat_id}")
 }
 
-/// The kind a standing row is offered to the memory picker as.
-pub const MEMORY: &str = "memory";
-
 /// Whether a standing row is due: an errand whose event has come.
 pub fn is_due(memory: &MemoryRow) -> bool {
   memory.event_met_at.is_some()
 }
 
-/// A room's standing rows parted: the due ones that attach with no pick, the latest come first and at most the
-/// policy's count of them, and the rest in the order the brain lists them, a due row past the count among them.
+/// A room's standing rows parted: the due ones that attach, the latest come first and at most the policy's count of
+/// them, and the rest in the order the brain lists them, a due row past the count among them.
 pub fn due_first(rows: &[MemoryRow]) -> (Vec<MemoryRow>, Vec<MemoryRow>) {
   let mut due: Vec<&MemoryRow> = rows.iter().filter(|memory| is_due(memory)).collect();
 
   due.sort_by(|left, right| right.event_met_at.cmp(&left.event_met_at).then(right.id.cmp(&left.id)));
-  due.truncate(REFERENCE.memories.due);
+  due.truncate(REFERENCE.due);
 
   let attached: Vec<i64> = due.iter().map(|memory| memory.id).collect();
   let rest = rows.iter().filter(|memory| !attached.contains(&memory.id)).cloned().collect();
@@ -90,103 +83,13 @@ pub fn index_title(memory: &MemoryRow) -> String {
     .find(|line| !line.is_empty())
     .unwrap_or(&memory.kind);
   let characters = js::chars(first);
-  let limit = REFERENCE.memories.index_chars;
+  let limit = REFERENCE.index_chars;
 
   if js::units(first) <= limit {
     return first.to_owned();
   }
 
   format!("{}\u{2026}", js::trim_end(&js::text(&characters[..js::within(&characters, limit - 1)])))
-}
-
-// The name a row falls back to.
-fn numbered(memory: &MemoryRow) -> String {
-  format!("{MEMORY}-{}", memory.id)
-}
-
-// Whether a name has the shape a row's number is named by.
-fn is_numbered(name: &str) -> bool {
-  name
-    .strip_prefix(MEMORY)
-    .and_then(|rest| rest.strip_prefix('-'))
-    .is_some_and(|number| !number.is_empty() && number.bytes().all(|byte| byte.is_ascii_digit()))
-}
-
-/// The names a room's rows are offered to the memory picker by, in their order (`docs/reference-selection.md`,
-/// 「The gates and what each reads」): each row's slug — its key where it has one — where an answer can name it,
-/// it is not of the numbered shape unless it is the row's own number, and no earlier row holds it; `memory-<id>`
-/// otherwise.
-pub fn names(rows: &[MemoryRow]) -> Vec<String> {
-  let mut taken: Vec<String> = vec![];
-
-  for memory in rows {
-    let own = numbered(memory);
-    let slug = memory.slug.as_str();
-    let name = if pick::answerable(slug)
-      && (!is_numbered(slug) || slug == own)
-      && !taken.iter().any(|one| one == slug)
-    {
-      slug.to_owned()
-    } else {
-      own
-    };
-
-    taken.push(name);
-  }
-
-  taken
-}
-
-/// One standing row as the memory picker's candidate under the name it is offered by: its kind as its index line's
-/// bracket, the first line of its words as its title, the person it is for and the item it was left open by for
-/// the narrowing, and its line in the entry as its body. Its key is the row's id, which a hit names it by.
-pub fn candidate(chat_id: i64, memory: &MemoryRow, name: &str) -> Fragment {
-  let row = brain::Fragment {
-    key: memory.id.to_string(),
-    kind: MEMORY.to_owned(),
-    chat_id: memory.chat_id,
-    owner: memory.for_user,
-    agent: memory.agent.clone(),
-    all_agents: false,
-    slug: name.to_owned(),
-    title: index_title(memory),
-    path: format!("{}/{}", memory_path(chat_id), memory.id),
-    scope: Some(format!("[{}]", memory.kind)),
-    section: None,
-    position: 0,
-    active: memory.active,
-    last_hit_at: memory.last_hit_at,
-    hits: memory.hits,
-    set_by: memory.set_by,
-    set_at: memory.set_at,
-    hand: None,
-    hand_at: None,
-    keywords: vec![],
-    items: memory.todo_id.into_iter().collect(),
-    written_on: None,
-    confirmed_on: None,
-    status: "open".to_owned(),
-    body_hash: None,
-  };
-
-  Fragment {
-    body: Some(memory_line(memory)),
-    ..Fragment::of(row)
-  }
-}
-
-/// The memory picker's library of a room's rows, in their order; none where there are none.
-pub fn library(chat_id: i64, rows: &[MemoryRow]) -> Option<Library> {
-  Library::of(
-    format!("{}/index.md", memory_path(chat_id)),
-    rows
-      .iter()
-      .zip(names(rows))
-      .map(|(memory, name)| candidate(chat_id, memory, &name))
-      .collect(),
-    Source::Memory,
-    Body::Memory,
-  )
 }
 
 /// The memories entry: the opening, with `open` the rows the room holds, what the session does with them, the
@@ -239,7 +142,7 @@ pub async fn standing(reference: &Reference, chat_id: i64, agent: &str) -> Vec<M
   }
 }
 
-/// The rows a room's matcher is offered: its own and the global ones that reach it, each carrying a condition.
+/// A room's standing rules: its own rows and the global ones that reach it, each carrying a condition.
 pub async fn candidates(
   reference: &Reference,
   chat_id: i64,
@@ -260,19 +163,4 @@ pub async fn woken(
   }
 
   reference.brain.woken(agent, chat_id, events).await
-}
-
-/// What the matcher made of the room's rows, handed to the brain: the rows it matched and the rows it spent.
-pub async fn matched(
-  reference: &Reference,
-  chat_id: i64,
-  agent: &str,
-  applies: &[String],
-  spent: &[String],
-) -> Result<(), PortError> {
-  if applies.is_empty() && spent.is_empty() {
-    return Ok(());
-  }
-
-  reference.brain.matched(agent, chat_id, applies, spent).await
 }

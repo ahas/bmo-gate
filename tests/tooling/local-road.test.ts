@@ -9,15 +9,15 @@ import { useToolingSettings } from "./settings";
 
 useToolingSettings({ local_mcp_url: "http://192.0.2.9/mcp", local_models_url: "http://192.0.2.9/v1/models", local_model: "qwen3.8-27b" });
 
-const spec = synthesisFor("sanitizer")!;
+const spec = synthesisFor("output-format")!;
 const ask: SynthAsk = {
-  gate: "sanitizer",
+  gate: "output-format",
   count: 2,
   language: "korean",
   lean: true,
   room: "owner",
   edge: false,
-  seed: "sanitizer-13",
+  seed: "output-format-13",
 };
 
 // Two invented rows, the shape the gate asks for, as one JSON array. Kept short and harmless — the
@@ -124,7 +124,7 @@ describe("the asker the run drives", () => {
     const asker = localAsker({ fetch, readKey: () => "k" });
 
     await asker(spec, ask, null);
-    await asker(spec, { ...ask, seed: "sanitizer-14" }, null);
+    await asker(spec, { ...ask, seed: "output-format-14" }, null);
 
     expect(lists).toBe(1);
   });

@@ -308,8 +308,8 @@ pub struct Judgement {
   pub created_at: i64,
   pub ms: Option<i64>,
   pub round: Option<String>,
-  /// What a picker's or the matcher's model was asked of its candidates, one line each, in the order it read
-  /// them; empty on every other judgement.
+  /// What a gate's model was asked of its candidates, one line each, in the order it read them, where the judgement
+  /// keeps them; empty on every other judgement.
   #[serde(default)]
   pub lines: Vec<JudgementLine>,
   pub roads: Vec<Road>,
@@ -317,8 +317,7 @@ pub struct Judgement {
 }
 
 /// One line a gate's model was asked of a candidate, exactly as the model read it, and what it answered of that
-/// line: `yes` or `no` for a picker, `applies: <yes|no>, spent: <yes|no>` for a rule the matcher read whole;
-/// none where its answer was not read.
+/// line as the judgement kept it; none where its answer was not read.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JudgementLine {
@@ -522,44 +521,6 @@ pub struct ReferenceSearch {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// The sanitiser
-
-/// Words to sanitise.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct SanitiseAsk {
-  pub text: String,
-  pub label: String,
-  #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub room_id: Option<i64>,
-  #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub message_id: Option<i64>,
-}
-
-/// Words as the sanitiser left them.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct Sanitised {
-  pub text: String,
-  pub changed: bool,
-}
-
-/// A document the brain is about to keep.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct DocumentSanitiseAsk {
-  pub path: String,
-  pub text: String,
-}
-
-/// The text to keep of a document.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct DocumentSanitised {
-  pub text: String,
-}
-
-// ---------------------------------------------------------------------------------------------------------------
 // Translations
 
 /// Originals to translate into one language.
@@ -609,39 +570,6 @@ pub struct KeepTranslation {
   pub language: String,
   pub original: String,
   pub text: String,
-}
-
-// ---------------------------------------------------------------------------------------------------------------
-// Knowledge
-
-/// The knowledge a job's work calls for.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct KnowledgeAsk {
-  pub agent_name: String,
-  pub room_id: i64,
-  pub lines: Vec<String>,
-}
-
-/// The knowledge a search's work calls for, for the chat agent.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct WorkKnowledgeAsk {
-  pub room_id: i64,
-  pub lines: Vec<String>,
-}
-
-/// One piece of knowledge.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct Piece {
-  pub path: String,
-  pub text: String,
-}
-
-/// The pieces picked.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct Pieces {
-  pub pieces: Vec<Piece>,
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -736,29 +664,6 @@ pub struct TrialQuery {
 // ---------------------------------------------------------------------------------------------------------------
 // Documents
 
-/// One line of a document index.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct SeekEntry {
-  pub slug: String,
-  pub line: String,
-  #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub group: Option<String>,
-}
-
-/// A question put to the document seeker over an index.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct SeekAsk {
-  pub question: String,
-  pub entries: Vec<SeekEntry>,
-}
-
-/// The documents a question calls for.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct Picks {
-  pub picks: Vec<String>,
-}
-
 /// One part of a document to translate.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -845,85 +750,4 @@ pub struct Health {
   pub version: String,
   /// `up`, `busy`, `down` or `off`.
   pub laya: String,
-}
-
-// ---------------------------------------------------------------------------------------------------------------
-// Console
-
-/// The role a console's reader holds, the one holding more first: an administrator holds every role a member
-/// holds (bmo-ui's `docs/console-bundles.md`, "Roles and the owner key").
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum ConsoleRole {
-  Administrator,
-  Member,
-}
-
-impl ConsoleRole {
-  /// The role a console's `Owner-Role` header names, or none.
-  pub fn named(spelled: &str) -> Option<Self> {
-    match spelled {
-      "administrator" => Some(Self::Administrator),
-      "member" => Some(Self::Member),
-      _ => None,
-    }
-  }
-
-  /// Whether a reader holding this role may open a screen needing `needed`.
-  pub fn allows(self, needed: ConsoleRole) -> bool {
-    self == ConsoleRole::Administrator || self == needed
-  }
-}
-
-/// The console bundle's manifest, in the shape bmo-ui's `console-manifest` module states.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct ConsoleManifest {
-  /// The bundle's name, in kebab-case: its words' namespace.
-  pub name: String,
-  /// The key, in the bundle's words, of the name a console's menu gives the screen.
-  pub title: String,
-  /// The icon drawn beside that name, as the component library names an icon.
-  pub icon: String,
-  /// The path the bundle's screens stand under.
-  pub screen_path: String,
-  /// The service's name, which a console relays it under.
-  pub service_name: String,
-  /// The path of the gate's API the bundle's module is answered at.
-  pub bundle: String,
-  /// The path of the gate's API the bundle's stylesheet is answered at.
-  #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub stylesheet: Option<String>,
-  /// The path of the gate's API the bundle's words are answered at.
-  pub words: String,
-  /// The path of the gate's API every call the screens make stands under.
-  pub api_prefix: String,
-  /// The least role a reader holds to open the screen.
-  pub role: ConsoleRole,
-  /// Whether every call the screens make needs the reader's owner key.
-  pub owner_key: bool,
-  /// Whether the screens read the gate's event stream through the console.
-  pub events: bool,
-  /// Whether the screens open a WebSocket to the gate through the console.
-  pub websocket: bool,
-  /// The gate's event kinds a console may raise as a notice to a reader not on the screen.
-  pub push_kinds: Vec<String>,
-  /// The gate's own routes outside the API prefix a console relays as well.
-  pub relays: Vec<ConsoleRelay>,
-}
-
-/// A route of the gate's own that a console relays outside the API prefix: its method and its whole path.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ConsoleRelay {
-  pub method: String,
-  pub path: String,
-}
-
-/// A trial put through the console: the gate and the prompt, the reader being the console's to name.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ConsoleTrial {
-  pub gate_name: String,
-  pub prompt: String,
 }

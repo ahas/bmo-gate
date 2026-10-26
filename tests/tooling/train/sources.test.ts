@@ -6,7 +6,7 @@ import { splitFiles } from "../../../training/tooling/src/laya-frozen";
 import { freezeBatch, noTokens, writeProgress } from "../../../training/tooling/src/laya-synth-run";
 import { gateFolder } from "../../../training/tooling/src/roots";
 import { scratchDir } from "../scratch";
-import { folderSource, referenceSource, sourceOf, toppedUp } from "../../../training/tooling/src/train/sources";
+import { folderSource, sourceOf, toppedUp } from "../../../training/tooling/src/train/sources";
 
 import type { DatasetRow, DatasetSplit } from "../../../training/tooling/src/laya-dataset";
 import { useToolingSettings } from "../settings";
@@ -34,27 +34,6 @@ function splits(where: string, rows: Record<DatasetSplit, string[]>): void {
     writeFileSync(join(where, file), rows[split].length === 0 ? "" : `${rows[split].join("\n")}\n`);
   }
 }
-
-describe("referenceSource", () => {
-  test("reads each gate's counts off its data file, holds it to its yes answers, and copies its rows", () => {
-    const run = folder();
-    const gate = join(run, "gates", "room-rules");
-
-    splits(gate, { train: [row("room-rules", "a", "train")], calibration: [row("room-rules", "b", "calibration")], test: [] });
-    writeFileSync(join(gate, "data.json"), JSON.stringify({ gate: "room-rules", rows: { train: 1, calibration: 1, test: 0 }, yes: 7 }));
-
-    const source = referenceSource(run);
-    const copy = source.copy("room-rules", join(folder(), "copy"));
-
-    expect(source.counts()).toEqual([{ gate: "room-rules", rows: { train: 1, calibration: 1, test: 0 }, rarer: 7, series: "" }]);
-    expect(source.bars("room-rules")).toEqual({ floor: 1_000, rarer: 200 });
-    expect(typeof copy === "string" ? copy : copy.ids).toEqual(["a", "b"]);
-  });
-
-  test("says so where no pass has put its gates in place", () => {
-    expect(referenceSource(folder()).counts()).toContain("Run a round of the reference data first");
-  });
-});
 
 describe("folderSource", () => {
   test("counts every gate a dataset folder holds and copies one gate's rows alone", () => {
@@ -138,11 +117,11 @@ describe("toppedUp", () => {
 });
 
 describe("sourceOf", () => {
-  test("knows the three kinds and refuses anything else", () => {
-    expect(typeof sourceOf("reference:ref-1")).toBe("object");
+  test("knows the two kinds and refuses anything else", () => {
     expect(typeof sourceOf("judging:real-1")).toBe("object");
     expect(typeof sourceOf("folder:/tmp/x")).toBe("object");
     expect(sourceOf("elsewhere:x")).toContain("is none of");
-    expect(sourceOf("reference:")).toContain("is none of");
+    expect(sourceOf("reference:ref-1")).toContain("is none of");
+    expect(sourceOf("judging:")).toContain("is none of");
   });
 });

@@ -50,7 +50,7 @@ The gates hold the client that asks it and the configuration of which gate asks 
   service and giving way to it (「Training on a service node」). The tunnel takes the same road as any
   node's, dialling the public name and coming back to the bridge; on the operations machine, the same
   machine.
-- **Measured on 3, 4 and 8 October 2026,** decisions of `room-rules` through the relay on the operations machine:
+- **Measured on 3, 4 and 8 October 2026,** decisions of a gate through the relay on the operations machine:
 
   | Where | First decision | Decisions one after another | Decisions five seconds apart |
   |---|---:|---:|---:|
@@ -339,7 +339,7 @@ beside it is the node unit's (「The tunnel」).
 - **The public name is the tunnel's door, never the service's.** What answers on it is the bridge, and
   what the bridge reaches is SSH, which still asks for the node's tunnel key under the restricted entry.
 - **Why the service is reached inside the house:** every caller — the gate, this repository's own
-  reference-data unit, and a Claude Code session — runs on the operations machine, where the tunnels land. A public name, a proxy host
+  training tooling, and a Claude Code session — runs on the operations machine, where the tunnels land. A public name, a proxy host
   and a certificate in front of the service would stand in front of no caller.
 - **Why the key is still checked:** both ends of the tunnel are shared. The node carries a second login
   account, and the operations machine's loopback is open to every process on the machine.
@@ -535,7 +535,7 @@ mcp=(-H 'content-type: application/json' -H 'accept: application/json, text/even
    `curl -s -H @<(key) "${mcp[@]}" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"check","version":"1"}}}' <relay>/mcp`
 5. **A tool call:** a bare `tools/call` of `laya_decide` for a served gate answers with the
    decision as text content.
-   `curl -s -H @<(key) "${mcp[@]}" -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"laya_decide","arguments":{"gate":"room-rules","state":"Please move tomorrow'"'"'s deployment to another time.","questions":{"q":{"type":"noul","instructions":"Is this message a request to change a schedule?"}}}}}' <relay>/mcp`
+   `curl -s -H @<(key) "${mcp[@]}" -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"laya_decide","arguments":{"gate":"output-format","state":"Please move tomorrow'"'"'s deployment to another time.","questions":{"q":{"type":"noul","instructions":"Is this message a request to change a schedule?"}}}}}' <relay>/mcp`
 6. **The same answers as the checkpoints give anywhere else:** `runtime/laya-server/bench.py --url
    <relay> --token-file <the key file> --gates <every served gate>` asks each gate in
    turn, and a decision's probabilities match what the same checkpoint answers on any other machine

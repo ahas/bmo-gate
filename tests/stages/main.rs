@@ -8,7 +8,6 @@ mod scratch;
 #[path = "../support/stub.rs"]
 mod stub;
 
-mod document_seek;
 mod document_translation;
 mod fold;
 mod laya;
@@ -19,7 +18,6 @@ mod markdown_shape;
 mod output;
 mod records;
 mod retention;
-mod sanitizer;
 mod translator;
 
 use std::os::unix::fs::PermissionsExt;

@@ -524,11 +524,11 @@ fn the_generation_s_unit_runs_the_same_words_in_the_foreground() {
 async fn a_scoring_run_asks_each_item_on_its_road_and_reports_the_last_score_of_each_road() {
   let ground = ground("score").await;
   // The scoring goes through the gate's own run, so the member stands for a gate the order holds.
-  let seeker = Echo {
-    stage: "document-seek",
+  let summary = Echo {
+    stage: "session-summary",
     ..ECHO
   };
-  let folder = set_folder(&ground.data_root, "v1").join(seeker.stage);
+  let folder = set_folder(&ground.data_root, "v1").join(summary.stage);
   let stored = [("s-0001", "a cat", "cat", "easy"), ("s-0002", "a dog", "dog", "borderline")];
 
   std::fs::create_dir_all(&folder).unwrap();
@@ -537,7 +537,7 @@ async fn a_scoring_run_asks_each_item_on_its_road_and_reports_the_last_score_of_
     stored
       .iter()
       .map(|(id, text, word, difficulty)| {
-        json!({ "id": id, "gate": "document-seek", "topic": "t", "difficulty": difficulty, "why": "w", "input": { "text": text }, "key": { "word": word } })
+        json!({ "id": id, "gate": "session-summary", "topic": "t", "difficulty": difficulty, "why": "w", "input": { "text": text }, "key": { "word": word } })
           .to_string()
       })
       .collect::<Vec<_>>()
@@ -554,7 +554,7 @@ async fn a_scoring_run_asks_each_item_on_its_road_and_reports_the_last_score_of_
     limit: None,
     log: &|_| {},
   };
-  let run = score_set(&[&seeker], &given).await.unwrap();
+  let run = score_set(&[&summary], &given).await.unwrap();
   let asked = ground.gateway.asked.lock().unwrap().clone();
 
   assert_eq!(run.road, "registered");
@@ -568,7 +568,7 @@ async fn a_scoring_run_asks_each_item_on_its_road_and_reports_the_last_score_of_
   let lines = report(&ground.data_root, "v1");
 
   assert!(
-    lines[1].starts_with("document-seek | registered | a-model | 2 | 2 | 1 | 50% | 1/1 | 0/1 | "),
+    lines[1].starts_with("session-summary | registered | a-model | 2 | 2 | 1 | 50% | 1/1 | 0/1 | "),
     "{lines:?}"
   );
   assert_eq!(report(&ground.data_root, "v2"), ["Set v2 has no scores yet."]);

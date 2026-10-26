@@ -9,7 +9,6 @@ mod arbiter;
 mod brain;
 mod gateway;
 mod http;
-mod job;
 mod receiver;
 
 use std::time::Duration;

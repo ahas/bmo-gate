@@ -59,33 +59,33 @@ const never = () => false;
 describe("rotating the collection", () => {
   test("keeps what is served, the gate's previous deployment and the newest candidate, and removes the rest", async () => {
     const at = folder();
-    lay(at, "people-search/ref-1-p0001/step-000100", "2026-09-01T00:00:00Z");
-    lay(at, "people-search/ref854-p0001/step-000644", "2026-09-02T00:00:00Z");
-    lay(at, "people-search/ref895-plain-p0001/step-000640", "2026-09-03T00:00:00Z");
-    lay(at, "people-search/ref-1-p0041/step-000624", "2026-09-04T00:00:00Z");
-    lay(at, "people-search/ref-1-p0042/step-000604", "2026-09-05T00:00:00Z");
+    lay(at, "session-summary/ref-1-p0001/step-000100", "2026-09-01T00:00:00Z");
+    lay(at, "session-summary/ref854-p0001/step-000644", "2026-09-02T00:00:00Z");
+    lay(at, "session-summary/ref895-plain-p0001/step-000640", "2026-09-03T00:00:00Z");
+    lay(at, "session-summary/ref-1-p0041/step-000624", "2026-09-04T00:00:00Z");
+    lay(at, "session-summary/ref-1-p0042/step-000604", "2026-09-05T00:00:00Z");
     writeFileSync(join(at, SERVED_FILE), [
-      { gate: "people-search", checkpoint: "people-search/ref-1-p0001/step-000100", at: "2026-09-01T01:00:00Z" },
-      { gate: "people-search", checkpoint: "people-search/ref854-p0001/step-000644", at: "2026-09-02T01:00:00Z" },
+      { gate: "session-summary", checkpoint: "session-summary/ref-1-p0001/step-000100", at: "2026-09-01T01:00:00Z" },
+      { gate: "session-summary", checkpoint: "session-summary/ref854-p0001/step-000644", at: "2026-09-02T01:00:00Z" },
     ].map((line) => `${JSON.stringify(line)}\n`).join(""));
 
     const rotation = await rotateCollection({
       root: at, training: never, now: () => new Date("2026-10-06T00:00:00Z"),
-      served: serving({ gate: "people-search", checkpoint: "people-search/ref895-plain-p0001/step-000640" }),
+      served: serving({ gate: "session-summary", checkpoint: "session-summary/ref895-plain-p0001/step-000640" }),
     });
 
     if (typeof rotation === "string") throw new Error(rotation);
     expect(rotation.plan.keep.map((one) => [one.checkpoint, one.why])).toEqual([
-      ["people-search/ref-1-p0042/step-000604", "candidate"],
-      ["people-search/ref854-p0001/step-000644", "deployed"],
-      ["people-search/ref895-plain-p0001/step-000640", "served"],
+      ["session-summary/ref-1-p0042/step-000604", "candidate"],
+      ["session-summary/ref854-p0001/step-000644", "deployed"],
+      ["session-summary/ref895-plain-p0001/step-000640", "served"],
     ]);
-    expect(existsSync(join(at, "people-search/ref-1-p0001"))).toBe(false);
-    expect(existsSync(join(at, "people-search/ref-1-p0041"))).toBe(false);
-    expect(existsSync(join(at, "people-search/ref854-p0001/step-000644/model.safetensors"))).toBe(true);
+    expect(existsSync(join(at, "session-summary/ref-1-p0001"))).toBe(false);
+    expect(existsSync(join(at, "session-summary/ref-1-p0041"))).toBe(false);
+    expect(existsSync(join(at, "session-summary/ref854-p0001/step-000644/model.safetensors"))).toBe(true);
     expect(rotation.freed).toBe(2_000_000);
     // What is served now became the gate's latest line.
-    expect(readServed(at).at(-1)).toEqual({ gate: "people-search", checkpoint: "people-search/ref895-plain-p0001/step-000640", at: "2026-10-06T00:00:00.000Z" });
+    expect(readServed(at).at(-1)).toEqual({ gate: "session-summary", checkpoint: "session-summary/ref895-plain-p0001/step-000640", at: "2026-10-06T00:00:00.000Z" });
   });
 
   test("never removes a served checkpoint, however old, rehearsed or rolling, and with the fewest settings", async () => {
@@ -106,10 +106,10 @@ describe("rotating the collection", () => {
 
   test("leaves every checkpoint of a pass still training, rolling saves included", async () => {
     const at = folder();
-    lay(at, "room-rules/ref-1-p0042/step-000025", "2026-09-01T00:00:00Z", { kind: "step" });
-    lay(at, "room-rules/ref-1-p0042/step-000050", "2026-09-02T00:00:00Z", { kind: "step" });
-    lay(at, "room-rules/ref-1-p0041/step-000092", "2026-09-03T00:00:00Z");
-    lay(at, "room-rules/ref-1-p0040/step-000092", "2026-09-04T00:00:00Z");
+    lay(at, "knowledge-classifier/ref-1-p0042/step-000025", "2026-09-01T00:00:00Z", { kind: "step" });
+    lay(at, "knowledge-classifier/ref-1-p0042/step-000050", "2026-09-02T00:00:00Z", { kind: "step" });
+    lay(at, "knowledge-classifier/ref-1-p0041/step-000092", "2026-09-03T00:00:00Z");
+    lay(at, "knowledge-classifier/ref-1-p0040/step-000092", "2026-09-04T00:00:00Z");
 
     const rotation = await rotateCollection({
       root: at, training: (run) => run === "ref-1-p0042", served: serving(),
@@ -118,9 +118,9 @@ describe("rotating the collection", () => {
 
     if (typeof rotation === "string") throw new Error(rotation);
     expect(rotation.plan.keep.map((one) => [one.checkpoint, one.why])).toEqual([
-      ["room-rules/ref-1-p0040/step-000092", "candidate"],
-      ["room-rules/ref-1-p0042/step-000025", "training"],
-      ["room-rules/ref-1-p0042/step-000050", "training"],
+      ["knowledge-classifier/ref-1-p0040/step-000092", "candidate"],
+      ["knowledge-classifier/ref-1-p0042/step-000025", "training"],
+      ["knowledge-classifier/ref-1-p0042/step-000050", "training"],
     ]);
   });
 
@@ -141,8 +141,8 @@ describe("rotating the collection", () => {
 
   test("a service that cannot say what it serves stops the rotation before anything goes", async () => {
     const at = folder();
-    lay(at, "situation-rules/real-1-p0002/step-000068", "2026-09-01T00:00:00Z");
-    lay(at, "situation-rules/real-1-p0004/step-000092", "2026-09-02T00:00:00Z");
+    lay(at, "translator/real-1-p0002/step-000068", "2026-09-01T00:00:00Z");
+    lay(at, "translator/real-1-p0004/step-000092", "2026-09-02T00:00:00Z");
 
     const rotation = await rotateCollection({
       root: at, training: never,
@@ -150,23 +150,23 @@ describe("rotating the collection", () => {
     });
 
     expect(rotation).toContain("node-a");
-    expect(existsSync(join(at, "situation-rules/real-1-p0002/step-000068"))).toBe(true);
+    expect(existsSync(join(at, "translator/real-1-p0002/step-000068"))).toBe(true);
     expect(existsSync(join(at, SERVED_FILE))).toBe(false);
   });
 
   test("a dry run removes nothing and records nothing", async () => {
     const at = folder();
-    lay(at, "library-knowledge/ref-1-p0011/step-000060", "2026-09-01T00:00:00Z");
-    lay(at, "library-knowledge/ref-1-p0012/step-000064", "2026-09-02T00:00:00Z");
+    lay(at, "output-decide/ref-1-p0011/step-000060", "2026-09-01T00:00:00Z");
+    lay(at, "output-decide/ref-1-p0012/step-000064", "2026-09-02T00:00:00Z");
 
     const rotation = await rotateCollection({
       root: at, training: never, dryRun: true,
-      served: serving({ gate: "library-knowledge", checkpoint: "library-knowledge/ref-1-p0012/step-000064" }),
+      served: serving({ gate: "output-decide", checkpoint: "output-decide/ref-1-p0012/step-000064" }),
     });
 
     if (typeof rotation === "string") throw new Error(rotation);
-    expect(rotation.plan.drop.map((one) => one.checkpoint)).toEqual(["library-knowledge/ref-1-p0011/step-000060"]);
-    expect(existsSync(join(at, "library-knowledge/ref-1-p0011/step-000060"))).toBe(true);
+    expect(rotation.plan.drop.map((one) => one.checkpoint)).toEqual(["output-decide/ref-1-p0011/step-000060"]);
+    expect(existsSync(join(at, "output-decide/ref-1-p0011/step-000060"))).toBe(true);
     expect(existsSync(join(at, SERVED_FILE))).toBe(false);
   });
 

@@ -1,5 +1,5 @@
-//! The memories a turn is handed (docs/reference-selection.md): the lines their entry is written in. Which rows
-//! it carries is the memory picker's (`crate::reference`); the rows themselves, their conditions and their
+//! The memories a turn is handed (docs/reference-selection.md): the lines their entry is written in. How many due
+//! rows it carries is `crate::reference`'s; the rows themselves, their conditions and their
 //! withering are the brain's.
 
 use serde::Deserialize;

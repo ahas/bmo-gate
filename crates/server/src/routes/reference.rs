@@ -1,7 +1,6 @@
 //! A turn's reference (`docs/api.md`, 「Reference」): what a turn is given with no model, and the brain's index, its
 //! pieces and a search of it as the agent reads them itself.
 
-use std::collections::HashSet;
 use std::sync::Arc;
 
 use axum::Json;
@@ -12,25 +11,18 @@ use bmo_gate_client::{
 };
 use gate_codes::Code;
 use gate_ports::brain::Event;
+use gate_reference::SituationTurn;
 use gate_reference::index::{self as gate_index, IndexEntry, Unanswered};
 use gate_reference::road::{Turn, handed};
-use gate_reference::{RoomKind, SituationTurn};
 
 use crate::App;
 use crate::answer::{Answered, Body, Query, Refused};
-
-fn room_kind(word: &str) -> RoomKind {
-  if word == "group" { RoomKind::Group } else { RoomKind::Owner }
-}
 
 /// The turn the envelope stands for.
 pub fn turn_of(envelope: ReferenceAsk) -> Turn {
   let situation = envelope.situation.map(|situation| SituationTurn {
     chat_id: envelope.room_id,
     agent: situation.agent_name,
-    message_id: envelope.message_id,
-    room: room_kind(&situation.room_kind),
-    message_lines: envelope.lines.clone(),
     events: situation
       .events
       .into_iter()
@@ -39,23 +31,13 @@ pub fn turn_of(envelope: ReferenceAsk) -> Turn {
         item: event.item_id,
       })
       .collect(),
-    round: envelope.round.clone(),
-    now: situation.now_at,
   });
 
   Turn {
     chat_id: envelope.room_id,
-    message_lines: envelope.lines,
     message_id: envelope.message_id,
     speaker_ids: envelope.speaker_ids,
     situation,
-    holds: envelope.holds.map(|holds| holds.into_iter().collect::<HashSet<_>>()),
-    round: envelope.round,
-    people_spoke: envelope.people_spoke,
-    answered: envelope.answered,
-    off: envelope.off_gates,
-    lore: envelope.lore.unwrap_or(true),
-    records: envelope.records,
   }
 }
 

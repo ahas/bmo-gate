@@ -14,21 +14,21 @@ import { useToolingSettings } from "./settings";
 
 useToolingSettings({ text_base_url: "http://192.0.2.5:8020/v1" });
 
-const spec = synthesisFor("sanitizer")!;
+const spec = synthesisFor("output-format")!;
 const ask: SynthAsk = {
-  gate: "sanitizer",
+  gate: "output-format",
   count: 2,
   language: "korean",
   lean: false,
   room: "owner",
   edge: false,
-  seed: "sanitizer-5",
+  seed: "output-format-5",
 };
 
 // A harmless answer, the shape the gate asks for, as one JSON array. Kept short and harmless — the
 // road only has to carry whatever the model answers, and the test checks only that it carries it.
 const rowsText = JSON.stringify([
-  { state: "\uD55C \uC904", questions: { intrusion: { type: "noul", instructions: "…" } }, gold: { intrusion: { type: "noul", label: "false", noul: 0.1, probabilities: { true: 0.1, false: 0.9 } } }, sanitized: "\uD55C \uC904" },
+  { state: "\uD55C \uC904", questions: { fold: { type: "noul", instructions: "…" } }, gold: { fold: { type: "noul", label: "false", noul: 0.1, probabilities: { true: 0.1, false: 0.9 } } }, sanitized: "\uD55C \uC904" },
 ]);
 
 function completion(content: string, usage?: { prompt_tokens: number; completion_tokens: number }): string {
@@ -162,7 +162,7 @@ describe("the asker", () => {
     const { fetch } = stubFetch(() => jsonResponse("", 503));
     const asker = textAsker(settings(fetch, { busyRetries: 2 }));
 
-    await expect(asker(spec, ask, null)).rejects.toThrow("sanitizer sanitizer-5");
+    await expect(asker(spec, ask, null)).rejects.toThrow("output-format output-format-5");
   });
 
   test("an engine set aside stops the gate at once with the front's reason", async () => {

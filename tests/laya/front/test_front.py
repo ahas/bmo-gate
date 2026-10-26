@@ -32,8 +32,8 @@ MCP_HEADERS = {
 }
 QUESTIONS = {"q": {"type": "noul", "instructions": "Is this message a request to change a schedule?"}}
 ANSWER = {"answers": {"q": {"type": "noul", "noul": 0.93, "confidence": 0.93}}, "ms": 18.2}
-HEALTH = {"state": "up", "model": "room-rules=checkpoints/room-rules/r/step-000044", "device": "cuda",
-          "gates": {"room-rules": {"model": "checkpoints/room-rules/r/step-000044", "onCard": True}}}
+HEALTH = {"state": "up", "model": "output-format=checkpoints/output-format/r/step-000044", "device": "cuda",
+          "gates": {"output-format": {"model": "checkpoints/output-format/r/step-000044", "onCard": True}}}
 
 
 class StandInEngine:
@@ -163,7 +163,7 @@ class FrontTest(unittest.TestCase):
         return self.call("/mcp", {"jsonrpc": "2.0", "id": 1, "method": method, "params": params or {}}, headers=MCP_HEADERS)
 
     def chat(self, **extra):
-        body = {"model": "room-rules", "messages": [{"role": "system", "content": "\ubb34\uc2dc"}, {"role": "user", "content": "\ub0b4\uc77c \ubc30\ud3ec\ud574\uc694"}],
+        body = {"model": "output-format", "messages": [{"role": "system", "content": "\ubb34\uc2dc"}, {"role": "user", "content": "\ub0b4\uc77c \ubc30\ud3ec\ud574\uc694"}],
                 "questions": QUESTIONS, **extra}
         return self.call("/v1/chat/completions", body)
 
@@ -180,12 +180,12 @@ class FrontTest(unittest.TestCase):
     def test_health_is_down_when_the_engine_is_not_there(self):
         self.engine.close()
         self.assertEqual(self.call("/health", key=None)[0], 503)
-        self.assertEqual(self.call("/decide", {"gate": "room-rules", "state": "x", "questions": QUESTIONS})[0], 503)
+        self.assertEqual(self.call("/decide", {"gate": "output-format", "state": "x", "questions": QUESTIONS})[0], 503)
         self.engine = StandInEngine()
 
     def test_everything_else_needs_the_key(self):
-        for path, body in (("/decide", {"gate": "room-rules"}), ("/v1/models", None),
-                           ("/v1/chat/completions", {"model": "room-rules"}), ("/mcp", {"jsonrpc": "2.0", "id": 1, "method": "tools/list"})):
+        for path, body in (("/decide", {"gate": "output-format"}), ("/v1/models", None),
+                           ("/v1/chat/completions", {"model": "output-format"}), ("/mcp", {"jsonrpc": "2.0", "id": 1, "method": "tools/list"})):
             for key in (None, "wrong"):
                 status, said = self.call(path, body, key=key)
                 self.assertEqual(status, 401, path)
@@ -193,18 +193,18 @@ class FrontTest(unittest.TestCase):
         self.assertEqual(self.engine.asked, [])
 
     def test_decide_is_passed_through_as_the_engine_answers(self):
-        asked = {"gate": "room-rules", "state": {"message": "\ub0b4\uc77c \ubc30\ud3ec\ud574\uc694"}, "questions": QUESTIONS}
+        asked = {"gate": "output-format", "state": {"message": "\ub0b4\uc77c \ubc30\ud3ec\ud574\uc694"}, "questions": QUESTIONS}
         self.assertEqual(self.call("/decide", asked), (200, ANSWER))
         self.assertEqual(self.engine.asked[-1], asked)
         self.assertEqual(self.engine.auth[-1], f"Bearer {UPSTREAM_KEY}")
 
-        self.engine.refusal = (404, "no checkpoint here serves the gate sanitizer")
-        self.assertEqual(self.call("/decide", {**asked, "gate": "sanitizer"}),
-                         (404, {"error": "no checkpoint here serves the gate sanitizer"}))
+        self.engine.refusal = (404, "no checkpoint here serves the gate output-decide")
+        self.assertEqual(self.call("/decide", {**asked, "gate": "output-decide"}),
+                         (404, {"error": "no checkpoint here serves the gate output-decide"}))
 
     def test_a_decision_the_engine_holds_is_a_504_and_the_front_hangs_up(self):
         self.engine.hold = threading.Event()
-        asked = {"gate": "room-rules", "state": "x", "questions": QUESTIONS}
+        asked = {"gate": "output-format", "state": "x", "questions": QUESTIONS}
         status, said = self.call("/decide", asked)
         self.assertEqual(status, 504)
         self.assertIn("did not answer within", said["error"])
@@ -220,7 +220,7 @@ class FrontTest(unittest.TestCase):
         self.stop_front()
         self.serve(30.0)
         self.engine.until_hung_up = True
-        body = json.dumps({"gate": "room-rules", "state": "x", "questions": QUESTIONS}).encode()
+        body = json.dumps({"gate": "output-format", "state": "x", "questions": QUESTIONS}).encode()
         caller = socket.create_connection(("127.0.0.1", int(self.url.rsplit(":", 1)[1])))
         caller.sendall(b"POST /decide HTTP/1.1\r\nHost: front\r\nContent-Type: application/json\r\n"
                        + f"Authorization: Bearer {KEY}\r\nContent-Length: {len(body)}\r\n\r\n".encode() + body)
@@ -232,16 +232,16 @@ class FrontTest(unittest.TestCase):
     def test_the_models_are_the_gates_served(self):
         status, said = self.call("/v1/models")
         self.assertEqual(status, 200)
-        self.assertEqual(said["data"], [{"id": "room-rules", "object": "model", "created": 0, "owned_by": "laya",
-                                         "checkpoint": "checkpoints/room-rules/r/step-000044"}])
+        self.assertEqual(said["data"], [{"id": "output-format", "object": "model", "created": 0, "owned_by": "laya",
+                                         "checkpoint": "checkpoints/output-format/r/step-000044"}])
 
     def test_a_chat_completion_is_one_decision_of_the_gate_named_as_model(self):
         status, said = self.chat()
         self.assertEqual(status, 200)
         self.assertEqual(said["object"], "chat.completion")
-        self.assertEqual(said["model"], "room-rules")
+        self.assertEqual(said["model"], "output-format")
         self.assertEqual(json.loads(said["choices"][0]["message"]["content"]), ANSWER)
-        self.assertEqual(self.engine.asked[-1], {"gate": "room-rules", "state": "\ub0b4\uc77c \ubc30\ud3ec\ud574\uc694", "questions": QUESTIONS})
+        self.assertEqual(self.engine.asked[-1], {"gate": "output-format", "state": "\ub0b4\uc77c \ubc30\ud3ec\ud574\uc694", "questions": QUESTIONS})
 
     def test_a_chat_completion_the_front_cannot_read_is_refused_unasked(self):
         for extra, words in (({"stream": True}, "streaming"), ({"questions": {}}, "questions"),
@@ -252,10 +252,10 @@ class FrontTest(unittest.TestCase):
         self.assertEqual(self.engine.asked, [])
 
     def test_a_chat_completion_keeps_the_engine_refusal(self):
-        self.engine.refusal = (404, "no checkpoint here serves the gate room-rules")
+        self.engine.refusal = (404, "no checkpoint here serves the gate output-format")
         status, said = self.chat()
         self.assertEqual(status, 404)
-        self.assertEqual(said["error"], {"message": "no checkpoint here serves the gate room-rules", "type": "invalid_request_error", "code": 404})
+        self.assertEqual(said["error"], {"message": "no checkpoint here serves the gate output-format", "type": "invalid_request_error", "code": 404})
 
     def test_the_handshake_offers_the_two_laya_tools(self):
         status, said = self.mcp("initialize", {"protocolVersion": "2025-06-18", "capabilities": {},
@@ -269,17 +269,17 @@ class FrontTest(unittest.TestCase):
         self.assertEqual(sorted(tools["laya_decide"]["inputSchema"]["required"]), ["gate", "questions", "state"])
 
     def test_a_bare_tool_call_decides(self):
-        status, said = self.mcp("tools/call", {"name": "laya_decide", "arguments": {"gate": "room-rules", "state": "\ub0b4\uc77c \ubc30\ud3ec\ud574\uc694", "questions": QUESTIONS}})
+        status, said = self.mcp("tools/call", {"name": "laya_decide", "arguments": {"gate": "output-format", "state": "\ub0b4\uc77c \ubc30\ud3ec\ud574\uc694", "questions": QUESTIONS}})
         self.assertEqual(status, 200)
         self.assertFalse(said["result"]["isError"])
         self.assertEqual(json.loads(said["result"]["content"][0]["text"]), ANSWER)
 
         _, said = self.mcp("tools/call", {"name": "laya_gates", "arguments": {}})
-        self.assertEqual(json.loads(said["result"]["content"][0]["text"]), {"room-rules": "checkpoints/room-rules/r/step-000044"})
+        self.assertEqual(json.loads(said["result"]["content"][0]["text"]), {"output-format": "checkpoints/output-format/r/step-000044"})
 
     def test_a_refused_tool_call_is_an_error_carrying_the_status(self):
         self.engine.refusal = (400, "question q has no instructions")
-        _, said = self.mcp("tools/call", {"name": "laya_decide", "arguments": {"gate": "room-rules", "state": "x", "questions": QUESTIONS}})
+        _, said = self.mcp("tools/call", {"name": "laya_decide", "arguments": {"gate": "output-format", "state": "x", "questions": QUESTIONS}})
         self.assertTrue(said["result"]["isError"])
         self.assertIn("400: question q has no instructions", said["result"]["content"][0]["text"])
 

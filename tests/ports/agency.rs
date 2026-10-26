@@ -40,15 +40,15 @@ async fn the_reads_answer_the_agents_the_rulebooks_the_providers_and_the_work_ke
   );
   stub.answer(
     Method::GET,
-    "/work-keys/room-rules",
+    "/work-keys/output-format",
     200,
-    json!({ "key": "room-rules", "provider": "claude-code", "model": "a-model", "effort": "low", "answerTokens": 2048, "capMs": 0, "runMode": "run" }),
+    json!({ "key": "output-format", "provider": "claude-code", "model": "a-model", "effort": "low", "answerTokens": 2048, "capMs": 0, "runMode": "run" }),
   );
 
   let agents = agency.agents().await.unwrap();
   let rulebooks = agency.rulebooks(&["plain-writing", "recollection"]).await.unwrap();
   let providers = agency.providers().await.unwrap();
-  let route = agency.work_key("room-rules").await.unwrap().unwrap();
+  let route = agency.work_key("output-format").await.unwrap().unwrap();
   let stand_in = agency.stand_in("chat-agent").await.unwrap();
 
   assert_eq!(agents[0].brain_folder.as_deref(), Some(""));
@@ -70,29 +70,29 @@ async fn a_mapping_is_resolved_at_a_tier_and_a_key_no_provider_serves_resolves_t
 
   stub.answer(
     Method::GET,
-    "/work-keys/room-rules",
+    "/work-keys/output-format",
     200,
-    json!({ "key": "room-rules", "provider": "claude-code", "model": "a-model", "effort": "low", "answerTokens": 2048 }),
+    json!({ "key": "output-format", "provider": "claude-code", "model": "a-model", "effort": "low", "answerTokens": 2048 }),
   );
 
-  let mapping = agency.resolve("room-rules", None, "Light").await.unwrap().unwrap();
+  let mapping = agency.resolve("output-format", None, "Light").await.unwrap().unwrap();
 
   assert_eq!(mapping.provider.as_deref(), Some("claude-code"));
   assert_eq!(mapping.model.as_deref(), Some("a-model"));
   assert_eq!(mapping.answer_tokens, Some(2048));
-  assert_eq!(stub.one("/work-keys/room-rules").query.as_deref(), Some("tier=Light"));
+  assert_eq!(stub.one("/work-keys/output-format").query.as_deref(), Some("tier=Light"));
 
   let named = Stub::start().await;
   named.answer(
     Method::GET,
-    "/work-keys/room-rules",
+    "/work-keys/output-format",
     200,
-    json!({ "key": "room-rules", "provider": "codex", "model": "a-codex-model", "effort": "low", "answerTokens": null }),
+    json!({ "key": "output-format", "provider": "codex", "model": "a-codex-model", "effort": "low", "answerTokens": null }),
   );
 
   assert_eq!(
     HttpAgency::new(peer(&named, "t"))
-      .resolve("room-rules", Some("codex"), "Light")
+      .resolve("output-format", Some("codex"), "Light")
       .await
       .unwrap()
       .unwrap()
@@ -100,19 +100,22 @@ async fn a_mapping_is_resolved_at_a_tier_and_a_key_no_provider_serves_resolves_t
       .as_deref(),
     Some("codex")
   );
-  assert_eq!(named.one("/work-keys/room-rules").query.as_deref(), Some("tier=Light&provider=codex"));
+  assert_eq!(
+    named.one("/work-keys/output-format").query.as_deref(),
+    Some("tier=Light&provider=codex")
+  );
 
   let none = Stub::start().await;
   none.answer(
     Method::GET,
-    "/work-keys/room-rules",
+    "/work-keys/output-format",
     404,
-    json!({ "error": "no route serves room-rules", "code": "not-found" }),
+    json!({ "error": "no route serves output-format", "code": "not-found" }),
   );
 
   assert_eq!(
     HttpAgency::new(peer(&none, "t"))
-      .resolve("room-rules", Some("codex"), "Light")
+      .resolve("output-format", Some("codex"), "Light")
       .await
       .unwrap(),
     None
@@ -128,7 +131,7 @@ async fn a_gate_run_is_a_conversation_and_one_turn_carrying_the_whole_system_pro
     Method::POST,
     "/sessions",
     201,
-    json!({ "id": "s-1", "agentName": "room-rules", "scope": "conversation" }),
+    json!({ "id": "s-1", "agentName": "output-format", "scope": "conversation" }),
   );
   stub.answer(
     Method::POST,
@@ -142,7 +145,7 @@ async fn a_gate_run_is_a_conversation_and_one_turn_carrying_the_whole_system_pro
     model: "a-model".into(),
     cwd: "/tmp/empty".into(),
   };
-  let session = agency.start_apart("room-rules", &apart).await.unwrap();
+  let session = agency.start_apart("output-format", &apart).await.unwrap();
   let turn = GateTurn {
     session: session.id.clone(),
     prompt: "the material".into(),
@@ -154,8 +157,8 @@ async fn a_gate_run_is_a_conversation_and_one_turn_carrying_the_whole_system_pro
       tier: Some("Light".into()),
       answer_tokens: None,
     },
-    name: "gate:room-rules:1".into(),
-    work_key: "room-rules".into(),
+    name: "gate:output-format:1".into(),
+    work_key: "output-format".into(),
     chat: Some(7),
     system: "the gate's instructions".into(),
     thinking: false,
@@ -166,7 +169,7 @@ async fn a_gate_run_is_a_conversation_and_one_turn_carrying_the_whole_system_pro
   assert_eq!(ended.answer.as_deref(), Some("[]"));
   assert_eq!(
     stub.one("/sessions").json(),
-    json!({ "agentName": "room-rules", "scope": "conversation", "options": { "provider": "claude-code", "model": "a-model", "cwd": "/tmp/empty" } })
+    json!({ "agentName": "output-format", "scope": "conversation", "options": { "provider": "claude-code", "model": "a-model", "cwd": "/tmp/empty" } })
   );
   assert_eq!(
     stub.one("/sessions/s-1/turns").json(),

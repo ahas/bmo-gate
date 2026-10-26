@@ -54,8 +54,6 @@ ever holds a lock a service waits on.
   unavailable, which every run says as it starts.
 - **The snapshot is the only conversation this tooling reads.** It is written once as it is taken and
   never written again.
-- **The gate's own command that builds the reference gates' inputs reads the units as they stand**
-  (`docs/reference-data.md`, 「The input」); it reads and writes nothing.
 - **A source whose owner serves no route yet is unavailable,** said as such by the run: the run builds
   no row that rests on it and counts what it could not read, rather than reading the source's files or
   database.
@@ -71,9 +69,6 @@ ever holds a lock a service waits on.
 The rows come out of the snapshot, which is never written. What is built is one row per turn: the state
 that gate would have been given, and the questions it would have been asked, with no answer on either.
 
-- **The four reference gates are not built here.** Their rows are made by the reference data, out of
-  the input the gate's own code hands each gate today and the answer the chat agent actually sent
-  (`docs/reference-data.md`). What follows is the other gates'.
 - **Each gate is built in the shape it really receives.** The room shape for the gates that judge a
   room's situation, and the message-and-markup pair for the formatting gate. The shapes are built
   from the room's own record rather than described, because a row whose lines are nearly the shape
@@ -83,19 +78,6 @@ that gate would have been given, and the questions it would have been asked, wit
   leaving it out is what stops a judgement being bought for it.
 - **The window is what fits one Laya call**, newest first to go in and oldest first to stay out,
   which is how the gates themselves cut it.
-- **The situation-rule matcher's candidates are what that room was really offered**, read back out
-  of the probe inputs the verdict record kept. Reading the brain's rows would build a row out of what the
-  room holds now rather than what the matcher was offered then. A record kept while the matcher asked an
-  earlier wording of its questions builds rows asking the gate's own (「A question reworded」).
-- **A row is offered as many candidates as its gate says it offers**, never as many as the record
-  holds. What the record keeps for a room is every rule that room was ever offered, which can run
-  past what the matcher is handed at once; a row carrying the lot is a row no turn of that gate ever
-  saw, the gate's own specification refuses it, and the judgement bought for it was bought for
-  nothing. The recorded set is cut into sets of the gate's own maximum,
-  and a remainder short of the gate's minimum reaches back over the set before it rather than being
-  dropped — so every candidate the room was offered stands in some row, and the overlap costs only a
-  candidate being asked about twice. A room offered fewer than the gate's minimum builds no row of
-  that gate at all.
 - **The formatting gate's material is what went out.** One judgement decides the fold, so the
   markdown of every message people received is that judgement's own material, and it outlives every
   log. A message of any length is a row, reduced to what the gate is shown; a message with no line
@@ -287,14 +269,11 @@ So the answer arrives as ordinary text and the reading is what has to be robust.
 
 ## The local-model road
 
-One gate cannot be written on codex at all. The sanitiser gate decides whether a message carries a
-security intrusion, so its rows are wall-to-wall attack sentences, and the codex account reads a
-batch of them as security work and refuses it — not for the model chosen, but at the account's own
-policy, which no model inside codex gets past. The rows are the gate's whole point and are not
-softened to slip by; the road is changed instead.
+A gate whose rows the codex account refuses at its own policy — not for the model chosen, which no model
+inside codex gets past — is written on another road rather than softened to slip by.
 
 The second road is the local-model road, a qwen model the deployment runs itself. It is not claude, which
-a road for writing rows avoids, and it writes the same attack rows without flinching. It is reached as one
+a road for writing rows avoids. It is reached as one
 HTTPS request per batch against a small MCP service, at the address the tooling's settings name (`local_mcp_url`,
 with its model list at `local_models_url`, the model it serves as `local_model`, and its key in the file
 `local_key_file` names under the runtime data root's `env/`).
@@ -320,17 +299,12 @@ with its model list at `local_models_url`, the model it serves as `local_model`,
 
 The other home model codex cannot make write is the text model, the general text model the deployment
 runs itself, reached as one OpenAI-compatible front at the base address the tooling's settings name
-(`text_base_url`; the engine and its front are the text model engine's own repository's). It is
-uncensored, so it writes the sanitiser gate's attack material without flinching, and it is the road
-that gate's own generator drives (「The sanitiser gate's own build」).
+(`text_base_url`; the engine and its front are the text model engine's own repository's). It writes rows the
+codex account refuses, as the local-model road does.
 
 - **One chat completion, one batch, no thread.** The road holds no session and reads no cache: every
   batch carries the gate's whole fixed prefix afresh as a system message and the answer comes back as
   the completion's text, so nothing here resumes a thread.
-- **The sanitiser harvest streams.** Where the sanitiser generator drives this road, the completion is
-  asked to hand its text back token by token so the sentences it writes can be watched as they land in
-  the run's live file; the usage rides the final chunk so a streamed harvest still tallies its tokens.
-  The streaming reader is the harvest's own and is not carried with the road (「Not carried」).
 - **The road writes on the model the settings name.** At the start of every run it reads `text_model`,
   the name the front lists its model under. A front moved to another model is followed by the next run
   with that setting changed and nothing else. That name labels the run's batches and is the `model` of
@@ -363,11 +337,11 @@ and everything below holds for a writing batch as for a judging one.
   an API key), so the login the job itself runs under never leaks into a batch. Before the first
   batch it reads the account that directory is logged into and refuses to start where it is not
   the one the road is pinned to.
-- **A run may be pinned to another login on the owner's word.** A reference pass told
-  `--claude-login <directory>` rides the account whose credentials stand in that directory instead,
-  for the whole pass and that account alone, read off the directory the same way. It is for the
-  stretch the pinned account's limit is spent, where the owner has said how much of the other account the
-  pass may take, and the frozen batches say which judge answered them (`docs/reference-data.md`).
+- **A run may be pinned to another login on the owner's word.** A pass told `--claude-login <directory>`
+  rides the account whose credentials stand in that directory instead, for the whole pass and that account
+  alone, read off the directory the same way. It is for the stretch the pinned account's limit is spent, where
+  the owner has said how much of the other account the pass may take, and the frozen batches say which judge
+  answered them.
 - **It never walks to another account.** A batch refused for a spent limit fails like any other
   failed batch: it stops the gate, the frozen batches stand, and the gate is taken up on the same
   road once the limit has reset. Nothing here knows of the other logins, so nothing can fall over
@@ -412,186 +386,14 @@ A gate stopped on one road is taken up on another without rebuilding what the fi
 - **The rows are one gate's either way.** Every row conforms to the same gate specification whatever
   road wrote it, so the audit and the merge read a two-road gate as one gate's data.
 
-## The sanitiser gate's own build
-
-**Its code is not carried in this repository, and nor is a unit that runs it** (「Not carried」); what follows is
-the build it is carried to.
-
-One gate is not written by the roster driver at all. Its rows are wall-to-wall attack material, and
-a model asked to write whole rows for it is either turned back at the account level or graded against
-a sentence rule nobody set. It is built the other way round, by a generator of its own, and left out
-of the roster driver's default so its data is never made two ways at once.
-
-- **The gate the sanitiser trains is binary.** Laya answers CLEAN or DEFUSE, and only the downstream
-  model names the spans a DEFUSE would defuse — Laya never does. So a row carries one gold, the
-  intrusion yes/no, and nothing about a span.
-- **The model writes only the dangerous sentences.** the text model, being uncensored,
-  writes them without flinching, one to a line, by category. The categories are the policy research's
-  full risk taxonomy, its fourteen Usage Policy categories, each falling mostly under one
-  of three kinds: an order to carry a dangerous act out against a real target, an account of one
-  carried out, and a recipe for slipping such material past a safeguard. Every sentence a model writes
-  is harmful by construction, so the label is fixed by how the row is made rather than by anything the
-  model says, and there is no whole row for the account to refuse.
-- **Two categories are never written by a model.** Child safety and sexually explicit content the gate
-  must still judge, but no model is ever asked for their content. Their harmful rows are built from
-  harmless meta-descriptions held in the code — a plain description of the forbidden request, at the
-  level of a description and never the content — so the gate learns to defuse the category without the
-  content being made. These rows are fixed to harmful the same as a harvested sentence and are told
-  apart only by their category.
-- **One front writes them all.** The run hands the category-and-language harvests to the text model's one
-  front once its health answers; its one engine spans every card it borrows (the text model engine's own documents), so
-  the harvests are written one after another. A front that does not answer stops the run before any
-  harvest, saying so.
-- **The code makes the rows.** A harvested sentence is embedded among the rooms' ordinary lines —
-  some standing bare as a short order, most hidden among a few lines of ordinary talk, which is where
-  the gate really meets such material — and fixed to intrusion true. Where the sentence was embedded
-  is not a trained field; it only makes the state look like the ones the gate is handed.
-- **The clean side asks no model.** It is the rooms' own ordinary talk, with the attack words filtered
-  out so a harmful order hiding in a message is never mislabelled clean, together with the
-  over-refusal cases — security-adjacent requests that carry the vocabulary of an attack and still
-  read CLEAN — fixed to intrusion false. As many clean rows carry attack words as harmful ones do, so
-  the gate cannot settle on the words alone.
-- **The sentences stream to a live file the owner watches.** Each sentence the model writes lands as it
-  arrives in the run folder's `live.txt`, one line with its category, its language, and whether it was
-  kept or dropped and why. That file is the owner's to read; no job and no agent reads either it or the
-  frozen sentences, and only the counts, the label and language balance, the drop reasons and the
-  file's own path are reported.
-- **What it freezes is one gate's data like any other, and also split by category.** The batches, the
-  three splits, the language sidecar, the meta and the progress take the same shape the roster driver's
-  gates take, so the merge and the training read this gate's folder as one gate's data beside the nine.
-  Beside them the run writes each category's rows to a file of its own, so a later pass can measure
-  where the gate misses or over-refuses one category at a time; the training reads the combined splits,
-  in which the categories are mixed evenly, the test split included.
-
-## The downgrade harvest
-
-**Its code is not carried in this repository either, and nor are its unit and timer** (「Not carried」); what
-follows is the harvest it is carried to.
-
-The sanitiser's own build makes its harmful rows by construction. Its second source is the opposite:
-real material the gate already missed, gathered from the account safeguard's own reactions. When the
-safeguard reads a session's context and balks, it puts the run on a lesser model — a downgrade — and
-that reaction is a standing answer key for what the gate should have caught. The harvest turns each
-downgrade into sanitiser rows whose label is not fixed by construction but judged on a road, because
-a downgrade is a signal that something in the context was dangerous, not proof of which text it was
-or that it was dangerous at all.
-
-- **A downgrade is read from two durable traces.** The receiver keeps, for every downgrade, a notice it
-  owes the room the downgrade happened in, stamped with that room and the moment. Beside it, the agency's
-  run records name the model that actually answered, and a model that only ever answers and is never the
-  one a run was launched on is a safeguard's fallback; a turn answered by such a model is a downgraded
-  turn. The fallback models are read from the spend itself rather than named here, so a change of
-  which model the safeguard falls to needs no change in the harvest. One downgrade turns a session to
-  the fallback until it is woken fresh, so one notice stands for many fallback-answered turns; the
-  harvest counts both the events and the turns.
-- **Every past downgrade is gathered and new ones accrue.** The harvest reads a snapshot of the
-  conversation source from its first line to its last, so it reaches every downgrade the traces still
-  hold; run again over a newer snapshot, it reaches the ones since. It is run again on its own: the
-  standing harvest run `downgrade` is resumed every six hours over a fresh snapshot by a unit and a timer
-  of its own, which `deploy/` holds once the harvest is carried, so each pass judges only the passages the
-  downgrades since have added and the ones a past
-  pass left unread, and freezes them into the same folder. A pass with nothing new judges nothing and
-  holds no card. It stops at the data: taking the folder into a training pass stays a separate step.
-- **The input is the text the model was actually handed.** What the safeguard read is the session's
-  context after the sanitiser gate had already passed it — the messages, the documents a session
-  reads, and the job prompt a worker is given, each recorded as it stood once the gate was through
-  with it. The harvest gathers the passed-through texts standing in the window before a downgrade,
-  which is the material the safeguard balked at.
-- **The window is matched to the room where it can be.** A passed-through text carries a plain note of
-  where it came from, and where that note names the room, only the downgraded room's texts are kept;
-  a text whose note names no room is kept by time alone, because concurrent sessions share the clock
-  and the judge is what tells their material apart.
-- **Which text caused it is found by judging, never by a person reading it.** A downgrade fires on the
-  whole context, so the window holds more than the cause. Every passed-through text in the window,
-  cut into passages of one Laya call, is offered to the gate's own question on a road, exactly as a
-  real row is judged, and the road's verdict is what localises the cause. No vocabulary decides which
-  passages are offered: the gate answers for fourteen risk categories and for injected orders that
-  name no attack at all, and a word list reads only a sliver of that, so a passage it skipped would
-  be a missed cause never looked at. No worker and no person reads the harmful body: it streams past
-  the judge and freezes into the run folder, and only counts, labels and paths are reported. What
-  reaches the judge is scrubbed of secrets and identifiers first, as every real row is.
-- **The three outcomes are told apart by the verdict and the vocabulary.** The vocabulary is the
-  gate's own list of attack words, the one its build counts clean rows against. For each downgrade:
-  - **Harmful** — at least one passage in its window is judged to carry what the gate's question asks
-    about. Those passages become DEFUSE rows: material the gate was handed and let through.
-  - **Over-refusal** — no passage is judged harmful, yet the window carries the vocabulary of an
-    attack. This is a legitimate request that reads like one — remote administration of the owner's
-    own machine, a tunnel that runs commands, work on the gate's own attack data, and their kind — and
-    the safeguard over-reacted. The passages that carry the vocabulary become CLEAN rows, so the gate
-    learns not to defuse the words alone.
-  - **Cause unknown** — no passage is judged harmful and none carries the vocabulary, or the window
-    holds no passed-through text at all. The causing text was not recovered, so the downgrade is set
-    aside, counted and left out of the data rather than guessed at.
-- **What is kept is the verdict and the vocabulary, passage by passage.** A passage judged harmful is
-  kept as DEFUSE and one judged clean that carries the vocabulary as CLEAN, whatever window it stood
-  in. A passage judged clean without the vocabulary is recorded as judged and not kept: it is ordinary
-  text the gate's own build already covers, and in a window whose cause was not found it may be the
-  cause the judge missed.
-- **The road is a home model, not the account.** The judging rides the same uncensored home text
-  model the sanitiser's own build uses, because the account that would be asked to judge attack
-  material is the one whose safeguard produced these downgrades in the first place. On that road the
-  batches are spread over every text-model node whose front answers its health, one batch in hand a
-  node, and a node that does not answer is named and left out. The claude road stands in for a judging
-  pass while that account is shut.
-- **What it freezes is one gate's data like any other.** The harvest writes a sanitiser gate folder
-  of its own — its three splits, the language sidecar, the meta — so the merge and the training read
-  it as sanitiser rows beside the built-apart generator's, and a training pass takes it in as a
-  top-up of the gate's real, missed material without touching the test split of the main data.
-
-### Resuming the harvest
-
-The home model judges slowly and shares its card, so a harvest is stopped part way — when the card is
-wanted for something else — and taken up later from where it stood, without re-judging or re-asking
-the account for anything it already settled.
-
-- **The saved data says what is already judged.** The frozen splits are the authoritative record of
-  the passages a past pass kept, and beside them the folder keeps a record of every verdict the judge
-  gave, kept or not, written as each batch lands; a resume reads both, skips those passages, and judges only
-  the ones still unjudged — the ones the judge never read and the downgrades gathered since. A stop
-  leaves both standing, so what was judged is never lost to a stop.
-- **A stop may leave the raw batches in a mix**, where a run wrote over part of an earlier run's
-  batches before it was stopped, and a stop before a pass's end leaves kept rows frozen in batches the
-  splits never took in. So a resume rebuilds one consolidation batch from the saved splits and the
-  batches' rows the splits lack, each passage once, and clears the rest, leaving the frozen batches in
-  step with the saved dataset before it judges anything more.
-- **Stopping saves without judging.** The harvest can be told to freeze only — to settle the saved
-  splits into a clean, consistent, resumable folder and report the tally so far — touching no road
-  and holding no card, which is how a stop hands the card back at once.
-- **A busy card stops a batch, not the run.** The judging road waits out a busy card and asks again a
-  bounded number of times; a batch that still fails is left for a later round or counted unread, and
-  the batches already frozen stand. A passage the judge never read is counted, never taken for clean.
-
-## Not carried
-
-Six of the tooling's files stand outside this repository until the owner decides how they move: carried by
-hand, or left out for good.
-
-- **The sanitiser gate's own build** (「The sanitiser gate's own build」): its generator, the generator's
-  test, and its script `scripts/laya-sanitize.ts`. They hold the harm categories and what the model is told
-  to write for each, the meta-descriptions of the two categories no model writes, and the over-refusal and
-  attack-word lists. No unit in `deploy/` builds the gate either, as the downgrade harvest has none: the
-  roster driver turns the gate back, so a unit asking the driver for it could only fail.
-- **The downgrade harvest** (「The downgrade harvest」): its module, the module's test, and its script
-  `scripts/laya-downgrade.ts`. They sort the passages a downgrade window holds by the same attack vocabulary.
-  Its unit `bmo-gate-downgrade` and the timer that resumes it are not in `deploy/` either, so no deployment
-  enables a run that cannot start.
-- **Why.** That material is not reproduced by an automated build, so a person carries it or it stays out.
-- **What stands without them.** The sanitiser gate's specification — its question, its answer balance and
-  its worked row — is the gate technician's, carried with the rest of the gates, and the roster driver turns
-  the gate back as built by a harvest this repository does not carry. Nothing carried imports the six. The
-  text model road's streaming reader and the conversation reads only the downgrade harvest made (its
-  notices, the models launched and answered, the texts the sanitiser passed) went with them.
-
 ## A run
 
 A run is a name, a set of gates, a number of rows per gate and a batch size.
 
-- **The gates the roster driver writes run at once**, one per thread, one per folder — the nine, the
-  tenth, the sanitiser gate, being built apart by its own generator into the same folder's gate slot. Nothing
-  a gate writes is read or written by another.
-- **A gate another run is writing is left out.** One run folder can be driven by two runs at once —
-  sanitiser on its own road beside the other nine on codex — and the run that is not writing a gate
-  is told to leave it out, so neither ever asks for the other's batch. A run names the gates it
+- **The gates the roster driver writes run at once**, one per thread, one per folder. Nothing a gate writes is
+  read or written by another.
+- **A gate another run is writing is left out.** One run folder can be driven by two runs at once — a gate on
+  its own road beside the rest on codex — and the run that is not writing a gate is told to leave it out, so neither ever asks for the other's batch. A run names the gates it
   leaves out rather than the ones it keeps, because what it is for is "the rest of them" and a list
   of the rest is a second roster to keep in step with the first.
 - **Rows per gate defaults to what the specification asks for.** The driver does not invent a
@@ -612,7 +414,7 @@ A run is a name, a set of gates, a number of rows per gate and a batch size.
   fixes; the number of rows is only a means to them, and it is chosen so that the smallest split
   still clears its floor once the gate's refusals are allowed for. A gate that comes up short is
   built again asking for more.
-- **A gate that falls over costs only itself.** The other nine keep writing, what the fallen one
+- **A gate that falls over costs only itself.** The others keep writing, what the fallen one
   had frozen stands, and the run says which gates did not finish.
 - **How many gates run at once is a count held, not a roster cut into groups.** A gate that finishes
   is replaced by the next one waiting. Cut into fixed groups, the run stands on the slowest gate of

@@ -307,7 +307,7 @@ class DigestTest(unittest.TestCase):
             first = resume.file_digest(path)
             self.assertEqual(first, resume.file_digest(path))
             with open(path, "a", encoding="utf-8") as handle:
-                handle.write('{"gate": "sanitizer"}\n')
+                handle.write('{"gate": "output-format"}\n')
             self.assertNotEqual(first, resume.file_digest(path))
 
 

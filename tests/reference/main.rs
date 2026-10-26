@@ -1,6 +1,6 @@
-//! The reference road's tests: a turn's reference composed against a stand-in brain, receiver and bmo-job on a
-//! scratch database of the test's own, each gate's model a gateway answering by what it is asked; the narrowing's and
-//! the pickers' readings; the situation matcher; and the watch on what attaches.
+//! The reference road's tests: a turn's reference composed against a stand-in brain and receiver on a scratch
+//! database of the test's own, a gateway standing for any model, which the road never asks; the memories entry; the
+//! woken rows; and the brain's index.
 
 #[path = "../runs/fakes.rs"]
 mod agency;
@@ -8,11 +8,8 @@ mod fakes;
 #[path = "../support/scratch.rs"]
 mod scratch;
 
-mod attachments;
 mod index;
 mod memories;
-mod narrow;
-mod pick;
 mod road;
 mod situation;
 
@@ -106,14 +103,4 @@ pub async fn paused_ground(
     shipped,
     reference,
   }
-}
-
-/// The slugs a picker's index offers, in order.
-pub fn offered_slugs(input: &str) -> Vec<String> {
-  input
-    .lines()
-    .filter_map(|line| line.strip_prefix("- "))
-    .filter_map(|line| line.split_whitespace().next())
-    .map(str::to_owned)
-    .collect()
 }

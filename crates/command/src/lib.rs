@@ -1,6 +1,6 @@
 //! The gate's unit command, `bmo-gate` (`docs/boundary-api.md`, 「The unit command」): the nouns it declares when
-//! asked `nouns` — the gate's own and the reference road's benches — each read into its verb from the words it is given and its answer printed in English. A noun
-//! reads the settings the service reads, and with them the gate's own database and data root.
+//! asked `nouns` — the gate's own — each read into its verb from the words it is given and its answer printed in
+//! English. A noun reads the settings the service reads, and with them the gate's own database and data root.
 
 pub mod ceiling;
 pub mod format_cases;
@@ -9,7 +9,6 @@ pub mod gate_eval;
 pub mod health;
 pub mod laya_agreement;
 pub mod records;
-pub mod reference;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -25,18 +24,7 @@ pub const SETTINGS_VARIABLE: &str = "BMO_GATE_SETTINGS";
 pub const SETTINGS_FILE: &str = "settings.toml";
 
 /// Every noun this command carries, as `nouns` prints them.
-pub const NOUNS: [&str; 10] = [
-  "gate eval",
-  "gate bench",
-  "gate laya-agreement",
-  "gate format-cases",
-  "reference compare",
-  "reference inputs",
-  "reference narrowing",
-  "reference replay",
-  "reference roads",
-  "reference waste",
-];
+pub const NOUNS: [&str; 4] = ["gate eval", "gate bench", "gate laya-agreement", "gate format-cases"];
 
 // How many database connections a noun holds.
 const CONNECTIONS: u32 = 2;
@@ -67,7 +55,7 @@ pub type Answered = Result<Vec<String>, Fault>;
 #[command(
   name = "bmo-gate",
   version,
-  about = "The gate's evaluation set, replay bench, Laya agreement and format cases, and the reference road's benches"
+  about = "The gate's evaluation set, replay bench, Laya agreement and format cases"
 )]
 pub struct Cli {
   #[command(subcommand)]
@@ -85,9 +73,6 @@ pub enum Noun {
   /// The gate's nouns.
   #[command(subcommand)]
   Gate(GateNoun),
-  /// The reference road's benches.
-  #[command(subcommand)]
-  Reference(reference::ReferenceNoun),
   /// Whether the service the settings name answers ready: the deployment's check, and no noun.
   Health,
   /// Every row of one of the gate's own tables, one JSON object a line: the training tooling's read, and no noun.
@@ -164,7 +149,6 @@ pub async fn dispatch(noun: Noun) -> Answered {
     Noun::Gate(GateNoun::Bench(args)) => gate_bench::gate_bench(args).await,
     Noun::Gate(GateNoun::LayaAgreement(args)) => laya_agreement::laya_agreement(args).await,
     Noun::Gate(GateNoun::FormatCases(args)) => format_cases::format_cases(args).await,
-    Noun::Reference(noun) => reference::run(noun).await,
     Noun::Health => health::health(&settings_path()).await,
     Noun::Records(args) => records::records(args).await,
     Noun::Import(args) => moved(args).await,

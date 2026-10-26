@@ -5,11 +5,11 @@ unit, the unit command it carries, and what it owns. A unit reaches the gate onl
 reaches another unit only by the calls below. A route or a call that is not in `docs/api.md` or here is not
 part of the boundary.
 
-The gate is the gate stage of a turn. The receiver builds a turn's envelope; the gate sanitises the words on
-their way into a model's context, picks the reference the turn is handed, and checks the answer on its way
-out; the agency carries the turn; the brain serves the raw material the gate picks from. Beside a turn the
-gate translates, seeks documents and reads voice lines for the units that ask, and
-it records every judgement it makes and the road each run walked. Laya, the decision filter some gates ask
+The gate is the gate stage of a turn. The receiver builds a turn's envelope; the gate summarises a replaced
+session, hands the turn what attaches with no pick and serves the brain's index the agent reads the rest
+through, and checks the answer on its way out; the agency carries the turn; the brain serves the rows. Beside
+a turn the gate translates for the units that ask, and it records every judgement it makes and the road each
+run walked. Laya, the decision filter some gates ask
 first, is the gate's own service, reached through the gate's own relay.
 
 ## Configuration
@@ -27,13 +27,11 @@ each release links to the data root's `env/gate.toml`. It names:
 | `chat_agent` | the registration name whose gate options stand for the deployment, and which a companion's are copied from |
 | `run_agent` | the registration name a gate run's own session stands under, so its program keeps a place apart from the agent whose turn it judges; absent, the caller's agent stands, or the stage's name where the caller names none |
 | `session_folder` | the folder a gate run's thrown-away session is started in |
-| `owner_room` | the room a row the gate raises reports to |
-| `[agency]`, `[brain]`, `[receiver]`, `[job]` | each unit's `address`, and the `token_file` under `env/` holding the token it is called with |
+| `[agency]`, `[brain]`, `[receiver]` | each unit's `address`, and the `token_file` under `env/` holding the token it is called with |
 | `[arbiter]` | the card master's `address` |
 | `[gateway]` | the agency's model gateway: its `address`, and the `key_file` under `env/` |
 | `[laya]` | the gate's own Laya relay, where one stands: its `address`, and the `token_file` under `env/` |
 | `[shipped]` | `folder`, under which the shipped pieces' bodies are read — the system's reference documents, as the deployment places them — a row's path read relative to it |
-| `[console]` | `folder`, the folder the console bundle is built into (`docs/layout.md`, 「The console plugin bundle」): its module `bundle.js`, its stylesheet `bundle.css` and its words `words.json`, a relative folder read from the folder the settings file stands in. Absent, the gate serves no console bundle (`docs/api.md`, 「Console」) |
 | `[reading]` | what the translator's checks read a text by: `set_aside`, the words the English test reads past — the names of people and agents and the marks a note's strands open with — and `wording`, the file the owner's banned words are read from, where the deployment keeps one |
 
 No address, port, host, path or name of a deployment is written in the code; every one is read from here.
@@ -42,8 +40,8 @@ No address, port, host, path or name of a deployment is written in the code; eve
 
 `docs/api.md` states every route the gate serves, one section per resource, in the common wire format: camelCase
 keys, epoch milliseconds, signed 64-bit ids, `{code, error}` on a non-2xx answer, and a page of `items` and
-`more`. No section of that document is written for one caller, and no route names one: its 「Console」 is bmo-ui's
-console plugin contract, which every console keeps alike.
+`more`. No section of that document is written for one caller, and no route names one. The gate serves no
+console screen: a console reads its routes as any caller does.
 
 - **Records.** `bmo-gate records <table>` prints every row of one of the gate's own tables, from the database the
   settings name or the one `--db` names, one JSON object a line with every column under its own name, in the
@@ -74,58 +72,37 @@ no room at all.
 | standing rows | `GET /brains/{brainId}/memories` | `type` (each of `promise`, `check`, `followup`, `situation`, `state`), `status=active`, `limit` at the route's ceiling, `after` for each page after the first | `items`: the rows that wait on nothing, by their old `conditions` label or, for a `situation` the agent wrote, its own text, and the errands whose event has come, by their `event_met_at` label; a row's words are its old condition's action, else its text |
 | conditional rows | the standing rows | | their old `conditions` label, or a `situation`'s text as its condition |
 | rows the events wake | the standing rows | | the gate filters them by the events their `event` or `conditions` labels name |
-| matched rows written | `POST /brains/{brainId}/hits` | `memoryIds`, `actorName` | `recordedCount` |
 | fragments offered | `GET /brains/{brainId}/memories` | `type` (the brain's type for the reference kind: `knowledge`, `rule`, `lore`), `status=active`, paged | `items`: the rows read in the room, each mapped to a fragment row whose key and version are the memory's id |
-| people offered | `GET /brains/{brainId}/tallies` | `type=fact`, `status=active`, `by=subject` | the subjects the brain's live facts are about, each `group` a subject's id; the person-book search is offered one candidate for each of them that is a person (below) |
+| people offered | `GET /brains/{brainId}/tallies` | `type=fact`, `status=active`, `by=subject` | the subjects the brain's live facts are about, each `group` a subject's id; the index's `people` group lists one entry for each of them that is a person (below) |
 | people named | `GET /brains/{brainId}/subjects` | `ids`, those subjects' ids, comma-separated; `limit` at the route's ceiling | `items`: each `id`, `type`, `key` (a person's user id) and `name` |
 | lore sections | `GET /brains/{brainId}/layers` | `limit` at the route's ceiling, `after` the largest id read for each page after the first | `items`: the brain's layers, each `id`, `name` and `position`; a lore row's section is its layer |
-| fragments attached | `POST /brains/{brainId}/hits` | `memoryIds` (the attached rows' ids), `actorName` | `recordedCount` |
 | knowledge read | `GET /brains/{brainId}/memories` | `type=knowledge`, `status=active`, paged | `items`, filtered by the slug asked |
 | lore read | `GET /brains/{brainId}/memories` | `type=lore`, `status=active`, paged | `items`, filtered by the slug asked; a piece's body is the row's text |
 | a subject found | `GET /brains/{brainId}/subjects` | `type` (`person` or `room`), `key` (the user's or the room's id), `limit=1` | `items`: the subject, or none where the brain holds none |
-| a person's sheet | `GET /brains/{brainId}/subjects/{subjectId}/sheet` | `roomId`, the room's subject, where the brain holds one; `limit`, the head's line count, for a speaker's head (`docs/reference-selection.md`, 「What attaches without a gate」), and none for a whole sheet | `text/plain`: one line a fact, `- [#<id> since <date>] <text>`, the most important first; empty where the brain knows no fact of the person there |
-| owner room rules | `POST /room-rules/read` | `chatId` | `rules`: `id`, `subject`, `text` |
-| a session's loads | `POST /sessions/loads` | `session` | `loads`: `path`, `version` |
+| a person's sheet | `GET /brains/{brainId}/subjects/{subjectId}/sheet` | `roomId`, the room's subject, where the brain holds one; `limit`, the head's line count, for a speaker's head (`docs/reference-selection.md`, 「What a turn is given」), and none for a whole sheet | `text/plain`: one line a fact, `- [#<id> since <date>] <text>`, the most important first; empty where the brain knows no fact of the person there |
 
-The system's reference documents are held nowhere in the brain, so the gate is offered no rows of them, and
-the shipped folder holds their bodies alone. The lore is the agent's brain's: memories of type `lore`, each
+The system's reference documents are held nowhere in the brain, so the brain answers no rows of them, and the
+shipped folder holds their bodies alone. The lore is the agent's brain's: memories of type `lore`, each
 in a layer named `lore` or `lore/<section heading>` (the brain's `docs/design.md`, 「Persona and lore」),
-offered in a room that reads the lore and in no other. Each row is one candidate: its slug is the part of
-its key after `lore/`, its index line its `title` label with its `scope` label as the line's bracket where
-it carries one, its section its layer's name, and its body its text. The rows stand in their layers'
-positions and, within a layer, in their own, and a row the turn attached is handed back as a hit like any
-other.
+listed in a room that reads the lore and in no other. Each row is one entry: its slug is the part of its key
+after `lore/`, what it holds its `title` label with its `scope` label where it carries one, its section its
+layer's name, and its body its text. The rows stand in their layers' positions and, within a layer, in their
+own.
 A person is read through their sheet, never through a row: the brain holds no memory of type `sheet`, and
-the gate reads none. A speaker's standing and a person the person-book search picks are both that person's
-sheet as the brain renders it with the turn's room as its room — their facts about no room and their facts
-about that room (the brain's `docs/design.md`, 「A person is a subject」) — held to the reference's ceiling
-for a sheet (`docs/reference-selection.md`, 「What attaches without a gate」). A candidate of the person-book
-search is one person subject the brain's live facts are about: its slug `person-<user id>`, its index line
-the subject's name, else the user id, and its owner the user id. A sheet is no row, so attaching one hands
-the brain no hit.
-The brain picks nothing: the gate narrows and picks among what these answer, and writes back only what it
-attached.
+the gate reads none. A speaker's head and a person's piece read from the index are both that person's sheet as
+the brain renders it with the turn's room as its room — their facts about no room and their facts about that
+room (the brain's `docs/design.md`, 「A person is a subject」) — held to the reference's ceiling for a sheet
+(`docs/reference-selection.md`, 「What a turn is given」). An entry of the `people` group is one person subject
+the brain's live facts are about: its slug `person-<user id>`, what it holds the subject's name, else the user
+id. The brain picks nothing, and the gate writes nothing back to it.
 
 ### bmo-receiver
 
-The receiver's fixed API in the common format (the receiver's `docs/api.md`), which the gate reads its room facts
-through, and its event stream, which the gate reads the rows of each round's draft process off.
+The receiver's event stream, which the gate reads the rows of each round's draft process off.
 
 | Call | Route | Body or query | Answer |
 |---|---|---|---|
-| room titles | `GET /rooms` | none | a page of `Room`: `id`, `title`, `senders` |
-| roads | `GET /rooms/{roomId}/roads` | none | `kind` (`owner` or `group`), `oneToOne` |
-| spoke between | `GET /rooms/{roomId}/spoke-between` | `person`, `from`, `to` | `spoke` |
-| owner spoke | `GET /rooms/{roomId}/owner-spoke` | `person`, `before`, `windowMs` | `owner`, `spoke` |
-| display names | `GET /people` | `ids`, comma-separated | a page of `Person`: `id`, `name` |
-| waits on a happening | `POST /promise-readings` | `text` | `waits` |
-| own number | `GET /rooms/{roomId}/own-number` | `agentName` | `number`: the sender the agent's words stand under in the room, or null |
-| owner notice | `POST /owner/notices` | `code` and its fields | 201, `id` |
-| a message | `GET /rooms/{roomId}/messages/{messageId}` | none | a `Message`: `senderId?`, `senderName`, `sentAt`, `text`; 404 where the receiver keeps no such message |
 | draft rows | `GET /events`, held open | none | the receiver's event stream; the gate takes the frames whose data's `type` is `draft` and lets every other go |
-
-The reference nouns of the unit command (「The unit command」) read a stored turn's message through the message
-read above.
 
 A `draft` frame of a row is one row of a round's draft process as the receiver's round log keeps it (the
 receiver's `docs/drafting.md`, 「The round log」): `chatId`, `round`, `agentName`, `number` (from 1, the round's own
@@ -137,10 +114,6 @@ judgements as the `draft` stage (`docs/gates.md`, 「What a turn records」). Th
 of recent events each time it is opened, and the gate opens it again five seconds after it drops; a row the gate
 has written already is not written twice, and a row that left the ring while the stream was down is not written
 at all.
-
-The owner notice tells the chat agent in the owner's room a fact the gate raised, as a code and its fields:
-`attachment-alarm` (`row`, `stage`, `piece`, `share`) where the attachments watch filed a row
-(「bmo-job」 below).
 
 ### bmo-agency
 
@@ -206,18 +179,6 @@ node」), its connection type with an ssh node's address, port, account, key pat
 hub and token file, and its role. No credential is in it. A hub node is then driven through the node console the
 settings name, an ssh node by a batch login.
 
-### bmo-job
-
-| Call | Route | Body | Answer |
-|---|---|---|---|
-| a row raised | `POST /todos/raised` | `title`, `judgement`, `chat`, `key` | `id`, `raised` |
-
-The attachments watch raises a row where one reference piece attached on more than its share of a gate's turns
-over the last day and its latest half, so a job finds why; the owner's room hears of it through the receiver's
-owner notice, code `attachment-alarm` with `row`, `title`, `stage`, `slug` and both shares. `key` names the piece:
-while the row last raised under it is neither done nor deleted, bmo-job answers that row's `id` with `raised` false
-and raises nothing.
-
 ## How a gate run reaches a model
 
 Gate runs are the gate's own: the agency starts none and holds no gate's line. A gate runs on its one road, one
@@ -243,32 +204,27 @@ ask and nothing behind it (the agency's `docs/own-llm.md`, 「A gate has one roa
 ### Its tables
 
 `gate_options`, `gate_roads`, `judgements`, `laya_health`, `laya_verdicts`, `reference_offers`,
-`reference_verdicts`, `sanitised_texts`, `document_translations`, `format_cases` and `web_gate_chats`, in its own
-database and its own migrations. Every row of `gate_options` names its agent. A format case and a sanitiser's
-verdict are kept ninety days: the service sweeps both tables as it starts and once a day after.
+`reference_verdicts`, `document_translations`, `format_cases` and `web_gate_chats`, in its own database and its
+own migrations. Every row of `gate_options` names its agent. `reference_offers` and `reference_verdicts` hold
+records the history reads (`docs/api.md`, 「Judgements」) and nothing writes. A format case is kept ninety days:
+the service sweeps the table as it starts and once a day after.
 
 ### Its gates and their instructions
 
 - **The gate order** — which gates stand, the part and step each takes against a turn, and each gate's profile
   (whether it may be switched off, its Laya probe and default mode, its answer floor) — is the gate's, and
   `GET /gates` serves it.
-- **The instructions,** twenty-two files in thirteen folders, one folder a gate: `sanitizer`, `situation-rules`
-  (two), `document-seek`, `system-documents` (two), `room-rules` (two), `library-knowledge` (two),
-  `people-search` (two), `room-memories` (two), `translator` (three), `output-gate/telegram-html`,
-  `session-summary` (two), `voice-reading` and `voice-polish`. The second file of a reference gate, the
-  person-book search, the memory picker and the situation-rule matcher is the answer file its request closes on (`docs/reference-selection.md`, 「What the
-  three reference gates are asked, and what they answer」). A prompt told its own ceiling (the person-book
-  search's and the document seeker's) is rendered with the ceiling the gate's run holds to.
+- **The instructions,** six files in three folders, one folder a gate: `translator` (three),
+  `output-gate/telegram-html` and `session-summary` (two).
 
 ### The policy it reads
 
 | Values | Owner | How the gate reads them |
 |---|---|---|
-| the document seeker's caps | the gate | its own policy file |
 | the gate pool: how many runs of one gate stand at once | the gate | its own policy file |
 | the output gate's folding dialects and checks | the gate | its own policy file |
-| the reference gates' libraries, caps and rules | the gate | its own policy file |
-| the memory rows a turn is handed: their caps and order | the gate | its own policy file |
+| what a turn is handed: the sheet's head and ceiling, the due memories' count, the woken rows' and the turn's totals | the gate | its own policy file |
+| the memories entry's lines | the gate | its own policy file |
 | the session summariser's transcript and summary: their lengths and the line the transcript rides under | the gate | its own policy file |
 | the gate order and the gates' profiles | the gate | its own policy file, served by `GET /gates` |
 | the prompt ceilings | the gate | its own policy file |
@@ -282,7 +238,7 @@ verdict are kept ninety days: the service sweeps both tables as it starts and on
 ## The unit command
 
 `bmo-gate` is the gate's unit command (bmo-cli's `docs/boundary.md`, 「Unit commands」). Asked `nouns`, it
-declares the nouns it carries, one a line. These are its ten nouns:
+declares the nouns it carries, one a line. These are its four nouns:
 
 | Noun | What it does |
 |---|---|
@@ -290,12 +246,6 @@ declares the nouns it carries, one a line. These are its ten nouns:
 | `gate bench` | benches a gate's road against recorded turns |
 | `gate laya-agreement` | counts each Laya gate's agreement with its LLM |
 | `gate format-cases` | reads the output gate's format failure cases |
-| `reference compare` | compares two reference picks over recorded turns |
-| `reference inputs` | prints the input the reference gates are handed for a turn |
-| `reference narrowing` | measures the narrowing before the reference gates |
-| `reference replay` | replays recorded turns through the reference gates |
-| `reference roads` | compares the reference gates' roads |
-| `reference waste` | counts the reference attached and never used |
 
 - **Every noun prints English** and ends with 0, with 1 where its work failed, and with 2 where the words it was
   given are wrong; `--help` prints a noun's whole usage.
@@ -331,9 +281,8 @@ Statements here that a sibling's document does not yet match, each for that sibl
   hands it (「bmo-agency」 above); the road runs whatever command the tooling's settings name until the agency
   states one.
 - **The upstreams' published clients do not carry the calls the gate makes.** bmo-brain's client serves memory
-  rows, notes, watches, reminders, fragments and libraries, and not the generated reference, subject, sheet,
-  tally, room-rule and session routes the gate reads; bmo-agency's client serves sessions and turns, and not the
-  work-key route the gate resolves; bmo-job's client serves items, and not a row another unit raises. The
+  rows, notes, watches, reminders, fragments and libraries, and not the subject, sheet and tally routes the gate
+  reads; bmo-agency's client serves sessions and turns, and not the work-key route the gate resolves. The
   gate's hand-written ports in `crates/ports` stand for these calls until their owners serve them, and the
   gate takes the client of each one as soon as it does.
 - **No unit but the gate serves its part of the training tooling's conversation snapshot:** the receiver's messages
@@ -341,39 +290,16 @@ Statements here that a sibling's document does not yet match, each for that sibl
   unavailable in every snapshot (`docs/gate-data.md`, 「The conversation source」) until each owner serves a route
   for its part.
 - **The agency keeps copies of gate-owned files:** the gate order (its `policy/gates.toml` and the policy crate's
-  module of it), the prompt ceilings (its `policy/gate-prompts.toml` and its module), and thirteen of the gate's
-  instruction files under its `prompts/agents/`: `sanitizer`, `situation-rules`, `document-seek`,
-  `system-documents`, `room-rules`, `library-knowledge`, `people-search`, `translator`
-  (three), `output-gate/telegram-html`, `voice-reading` and `voice-polish`. Its gate switch route validates a
-  gate's name against its own copy of the order; the copies are for the agency to retire, reading the order
-  through `GET /gates`. Its copies do not hold the memory picker, `room-memories`, so its gate switch refuses
-  that name until it reads the order.
-- **The agency holds no work-key profile for `room-memories`:** no label, and no seeded road. The gate resolves
-  it by its tier on the agency's walk (「How a gate run reaches a model」) until the agency seeds it beside the
-  other pickers.
+  module of it), the prompt ceilings (its `policy/gate-prompts.toml` and its module), and gate instruction files
+  under its `prompts/agents/`. Its gate switch route validates a gate's name against its own copy of the order;
+  the copies are for the agency to retire, reading the order through `GET /gates`.
 - **No chat unit asks the output gate yet:** the telegram unit's send path folds a reply's parts by its own
   code; it is to ask `POST /formats/decided` for each part where the send asks for the gate.
-- **The brain's knowledge read** answers the knowledge chunks a room may be offered; the gate reads a picked
-  room-rule chunk's body through it as well, for the brain to take the room's room-rule chunks there.
-- **The receiver sends no `lore`** with a turn's reference; a room's tone is in its persona file, which the
-  receiver reads, and it is to send false for a room whose tone reads no lore.
-- **bmo-job serves no route for a row another unit raises;** the gate makes `POST /todos/raised` as written
-  above, and bmo-job refuses it until it adds the route.
+- **The brain's knowledge read** answers the knowledge chunks a room may read; the gate reads a room rule's piece
+  through it as well, for the brain to take the room's room-rule chunks there.
+- **The receiver sends no `lore`** with a turn's reference, so every room's index lists the lore.
 - **The document viewer counts a part kept as failed and says no more:** the parts page answers each such part's
   `failure` (`docs/api.md`, 「Documents」), for the web unit to show beside the count.
-- **The web unit's console** shows the gates' screen, Laya and the gate order as unavailable; its server routes
-  are to hand the gates' screen to `client/` and call the console's routes above.
-- **The voice unit serves no reading of a line's script:** the evaluation set's voice members read an item as the
-  voice runner makes a line's script, its spans and its polishing view, which are the voice unit's rules, so
-  `voice-polish` and `voice-reading` have no member until the voice unit serves that reading
-  (`docs/gate-eval.md`, 「The members」).
 - **The receiver serves no route for a room's latest messages:** the output gate's replay bench makes its set out
   of the chat agent's latest answers, and says the source is unavailable until the receiver serves them
   (`docs/output-gate.md`, 「The replay bench」).
-- **The receiver names bmo-job alone as the reader of a stored message:** the reference nouns read one through
-  the same route (「bmo-receiver」 above), for the receiver to name the gate beside bmo-job.
-- **No unit serves what the reference nouns read beyond that** (`docs/reference-selection.md`, 「What it picks and
-  what it costs, measured」): the agency lists no agent's runs out of its run log, so `reference compare` reads
-  the stored runs it is handed; the brain serves its rows and not its index files, so `reference roads` sets
-  the index file beside the rows for the system's reference documents alone; and no unit keeps the usage
-  record, so `reference waste` gives no size for a turn's own prompt.

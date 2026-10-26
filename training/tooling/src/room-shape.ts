@@ -1,5 +1,5 @@
 // The two transcript shapes a gate is handed, built from the conversation snapshot's own rows
-// (`docs/laya-gates.md`, 「The three transcript shapes」). A row built out of real conversation is
+// (`docs/laya-gates.md`, 「The transcript shapes」). A row built out of real conversation is
 // written in the shape that gate really receives, so these are built here rather than described:
 // a row whose lines are nearly the shape teaches the model a shape no gate ever sends it.
 //

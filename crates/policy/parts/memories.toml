@@ -1,5 +1,5 @@
 # What an agent holds in a room as a turn reads it (docs/reference-selection.md): the lines the memories entry is
-# written in. How many rows it carries is the memory picker's (reference.toml).
+# written in. How many due rows it carries stands in reference.toml.
 
 # The memories entry: its opening (`{count}` rows, `{items}` the word for them), what a session does with it
 # (`{chat}` the room), the line a state adds, each row's line and its parts, and the line on the rows not carried.

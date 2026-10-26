@@ -1,7 +1,6 @@
 //! The gates of the set: each file here brings its own member, which registers itself with the set, so a gate is
 //! added by adding its file and its words and declaring it here (docs/gate-eval.md, 「The members」).
 
-pub mod document_seek;
 pub mod session_summary;
 pub mod translator;
 

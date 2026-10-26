@@ -9,29 +9,13 @@ macro_rules! prompt {
 }
 
 /// Every instruction file, by its path under `prompts/`.
-pub const FILES: [(&str, &str); 22] = [
-  prompt!("document-seek/instructions.md"),
-  prompt!("library-knowledge/answer.md"),
-  prompt!("library-knowledge/instructions.md"),
+pub const FILES: [(&str, &str); 6] = [
   prompt!("output-gate/telegram-html/format.md"),
-  prompt!("people-search/answer.md"),
-  prompt!("people-search/instructions.md"),
-  prompt!("room-memories/answer.md"),
-  prompt!("room-memories/instructions.md"),
-  prompt!("room-rules/answer.md"),
-  prompt!("room-rules/instructions.md"),
-  prompt!("sanitizer/instructions.md"),
   prompt!("session-summary/chat.md"),
   prompt!("session-summary/worker.md"),
-  prompt!("situation-rules/answer.md"),
-  prompt!("situation-rules/instructions.md"),
-  prompt!("system-documents/answer.md"),
-  prompt!("system-documents/instructions.md"),
   prompt!("translator/instructions.md"),
   prompt!("translator/record.md"),
   prompt!("translator/worker.md"),
-  prompt!("voice-polish/instructions.md"),
-  prompt!("voice-reading/instructions.md"),
 ];
 
 /// The file at a path under `prompts/`, trimmed; none where no such file is compiled in.

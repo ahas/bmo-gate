@@ -53,12 +53,6 @@ export interface GateSynthesis {
   // The gate's name, which is what the row's `gate` column holds.
   gate: string;
   title: string;
-  // Whether this gate's data is built by a generator of its own rather than by the roster driver
-  // that has a model write whole rows. The sanitiser gate is: its rows are wall-to-wall attack
-  // material and its label is fixed by how each row is made, so it is harvested and assembled apart
-  // (docs/gate-data.md, 「The sanitiser gate's own build」). The spec still stands here for its
-  // question's wording and its balance; only the roster driver leaves it out.
-  builtApart?: boolean;
   // What this gate decides, in one line, as the prompt tells a model.
   judges: string;
   // Where the natural text of a state lives. Empty means the state is itself a string of text; a
@@ -650,40 +644,7 @@ interface GateShape extends Omit<GateSynthesis, "title" | "judges" | "candidateW
   exampleState?: (written: Record<string, unknown>) => LayaState;
 }
 
-const plainPerCandidate = { textFields: [], transcript: { shape: "plain", fields: [] }, perCandidate: true } as const;
-
 const gateShapes: readonly GateShape[] = [
-  {
-    gate: "system-documents",
-    ...plainPerCandidate,
-    candidates: { min: 1, max: layaQuestionsPerCall },
-    questions: [{ id: "needed", type: "noul" }],
-    language: { korean: 0.7, english: 0.1, mixed: 0.2 },
-  },
-  {
-    gate: "room-rules",
-    ...plainPerCandidate,
-    candidates: { min: 1, max: layaQuestionsPerCall },
-    questions: [{ id: "needed", type: "noul" }],
-    language: { korean: 0.8, english: 0.05, mixed: 0.15 },
-  },
-  {
-    gate: "library-knowledge",
-    ...plainPerCandidate,
-    candidates: { min: 1, max: layaQuestionsPerCall },
-    questions: [{ id: "needed", type: "noul" }],
-    language: { korean: 0.75, english: 0.08, mixed: 0.17 },
-  },
-  {
-    gate: "situation-rules",
-    textFields: ["situation"],
-    transcript: { shape: "room", fields: ["situation"] },
-    choices: { room: ["owner", "group"] },
-    perCandidate: true,
-    candidates: { min: 2, max: 8 },
-    questions: [{ id: "applies", type: "noul" }, { id: "spent", type: "noul" }],
-    language: { korean: 0.8, english: 0.05, mixed: 0.15 },
-  },
   {
     gate: "knowledge-classifier",
     textFields: ["note"],
@@ -705,25 +666,6 @@ const gateShapes: readonly GateShape[] = [
     questions: [{ id: "fold", type: "noul" }],
     language: { korean: 0.65, english: 0.05, mixed: 0.3 },
     exampleState: (written) => foldState(String(written.message)),
-  },
-  {
-    gate: "sanitizer",
-    builtApart: true,
-    textFields: [],
-    transcript: null,
-    perCandidate: false,
-    candidates: null,
-    questions: [{ id: "harmful", type: "noul", safe: false }],
-    language: { korean: 0.4, english: 0.35, mixed: 0.25 },
-  },
-  {
-    gate: "people-search",
-    textFields: [],
-    transcript: { shape: "plain", fields: [] },
-    perCandidate: true,
-    candidates: { min: 1, max: layaQuestionsPerCall },
-    questions: [{ id: "needed", type: "noul" }],
-    language: { korean: 0.8, english: 0.05, mixed: 0.15 },
   },
   {
     gate: "reply-wanted",
@@ -850,16 +792,9 @@ export function gatesChosen(wanted: readonly string[], leftOut: readonly string[
     return `${unknown.join(", ")}: no such gate. Choose among: ${gateSyntheses().map((one) => one.gate).join(", ")}`;
   }
 
-  // The default roster is the gates this driver writes, which leaves out the ones built by a
-  // generator of their own; a gate built apart is written only when it is named outright, and then
-  // it is turned back with where it is really built rather than written the wrong way.
-  const chosen = wanted.length === 0 ? gateSyntheses().filter((one) => one.builtApart !== true) : wanted.map((name) => synthesisFor(name)!);
+  // The default roster is every gate; a gate named outright is written alone.
+  const chosen = wanted.length === 0 ? gateSyntheses() : wanted.map((name) => synthesisFor(name)!);
   const kept = chosen.filter((one) => !leftOut.includes(one.gate));
-  const apart = kept.filter((one) => one.builtApart === true);
-
-  if (apart.length > 0) {
-    return `${apart.map((one) => one.gate).join(", ")}: not written by this driver; it is built by its own harvest, which this repository does not carry (docs/gate-data.md, 「The sanitiser gate's own build」).`;
-  }
 
   if (kept.length === 0) {
     return "No gate is left. Look at --gate and --except again.";

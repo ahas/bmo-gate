@@ -39,8 +39,6 @@ Writes the distilled data one held thread a gate, and freezes it under the run f
   and no cache.
   text is the text model road, the OpenAI-compatible front the settings name. No session and no cache;
   a busy card's 503 is waited out a while and asked again.
-  The sanitiser gate is not written by this driver: it is built by its own harvest, which this
-  repository does not carry (docs/gate-data.md, 「The sanitiser gate's own build」).
 --top-up writes every batch with this one answer and puts no row in the test. It adds the rare answer a
   real judging run is short of to training and calibration (docs/gate-data.md, 「Invented data」).
 --at-once is how many gates are written at once (default: every gate chosen).

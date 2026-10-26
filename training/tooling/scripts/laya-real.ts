@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { asksUsage, allOf, asked, lastOf, readFlags } from "../src/flags";
-import { agentIdFrom, judgedCounts, messagesIn, ownerIdFrom, recordedQuestions, roomsIn, sentMessages } from "../src/conversation";
+import { agentIdFrom, judgedCounts, messagesIn, ownerIdFrom, roomsIn, sentMessages } from "../src/conversation";
 import { openSnapshot, readSnapshot, releaseSnapshot, snapshotFile, takeSnapshot, unavailableLines } from "../src/snapshot";
 import { gateSyntheses, synthesisFor } from "../src/laya-synth";
 import { pseudonyms } from "../src/pii";
@@ -112,7 +112,6 @@ const reads: ConversationReads = {
 
     return room;
   },
-  recorded: (stage) => recordedQuestions(db, stage),
   sent: () => (sentRows ??= sentMessages(db, agentId).map((one) => ({ original: one.original, visible: one.visible, folded: one.folded }))),
 };
 

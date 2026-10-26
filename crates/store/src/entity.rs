@@ -9,5 +9,4 @@ pub mod laya_health;
 pub mod laya_verdicts;
 pub mod reference_offers;
 pub mod reference_verdicts;
-pub mod sanitised_texts;
 pub mod web_gate_chats;

@@ -84,37 +84,6 @@ export function judgedTurns(db: Database, stage: string): JudgedTurn[] {
     .all(stage) as JudgedTurn[];
 }
 
-// What a gate really offered a room as candidates, read back out of the probe inputs the verdict
-// record kept. The candidate slugs and the one line each carries are a room's own library as it
-// stood, and they are what a row built from a fresh turn of that room offers: the brain moves, and
-// a generation that read it directly would be writing rows against a library no recorded turn ever
-// saw. Rows with no input, and gates that never recorded one, come back with nothing.
-export interface RecordedQuestions {
-  chatId: number;
-  questions: Record<string, unknown>;
-}
-
-export function recordedQuestions(db: Database, stage: string): RecordedQuestions[] {
-  const rows = db.query(`SELECT chat_id AS chatId, input FROM laya_verdicts
-    WHERE stage = ? AND input IS NOT NULL AND input <> '' AND input <> '{}' ORDER BY id`)
-    .all(stage) as { chatId: number | null; input: string }[];
-  const read: RecordedQuestions[] = [];
-
-  for (const row of rows) {
-    try {
-      const request = JSON.parse(row.input) as { questions?: unknown };
-
-      if (row.chatId !== null && typeof request.questions === "object" && request.questions !== null) {
-        read.push({ chatId: row.chatId, questions: request.questions as Record<string, unknown> });
-      }
-    } catch {
-      // An input that does not read back is left out rather than guessed at.
-    }
-  }
-
-  return read;
-}
-
 // What the chat agent actually sent and what the reader saw of it: the markdown it wrote, the text the room
 // received, and whether the room received it folded. One judgement decides the fold, so the sent
 // message is that judgement's own record, and it outlives every log.

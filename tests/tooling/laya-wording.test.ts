@@ -84,29 +84,8 @@ describe("the earlier wordings", () => {
 });
 
 describe("a row read in its gate's own wording", () => {
-  test("a candidate's question in the earlier wording asks the gate's own, its slug and line as written", () => {
-    const rules = gate("room-rules");
-    const earlier = rowOf(rules, inEarlierWording(rules));
-
-    expect(Object.values(questionsOf(earlier)).some((one) => one.instructions.startsWith(rules.questions[0]!.instructions))).toBe(false);
-
-    const now = askedNow(earlier);
-
-    expect(questionsOf(now)).toEqual(rules.example.questions);
-    expect({ ...now, questions: "" }).toEqual({ ...earlier, questions: "" });
-  });
-
-  test("a gate asking two questions of each candidate reads both", () => {
-    const situation = gate("situation-rules");
-    const now = askedNow(rowOf(situation, inEarlierWording(situation)));
-
-    expect(questionsOf(now)).toEqual(situation.example.questions);
-    expect(validateSynthRow(situation, { state: situation.example.state, questions: questionsOf(now), gold: situation.example.gold }, "korean"))
-      .toEqual({ ok: true });
-  });
-
   test("a question asked of the whole input reads the gate's own", () => {
-    for (const name of ["output-format", "reply-wanted", "sanitizer"]) {
+    for (const name of ["output-format", "reply-wanted"]) {
       const spec = gate(name);
 
       expect(questionsOf(askedNow(rowOf(spec, inEarlierWording(spec))))).toEqual(spec.example.questions);
@@ -132,20 +111,10 @@ describe("a row read in its gate's own wording", () => {
     }
   });
 
-  test("a wording the list does not hold is left as written, and the validator refuses it", () => {
-    const rules = gate("room-rules");
-    const written = { "photo-consent": { type: "noul" as const, instructions: "Does this rule bear on the room? Rule photo-consent: a photo" } };
-    const row = rowOf(rules, written);
-
-    expect(askedNow(row)).toBe(row);
-    expect(validateSynthRow(rules, { state: rules.example.state, questions: written, gold: { "photo-consent": rules.example.gold["photo-consent"]! } }, "korean"))
-      .toMatchObject({ ok: false, refusal: "wrong-instructions" });
-  });
-
   test("a gate the tooling writes no rows for, or questions that cannot be read, stay as they are", () => {
-    const rules = gate("room-rules");
-    const other = { ...rowOf(rules, inEarlierWording(rules)), gate: "room-memories" };
-    const broken = { ...rowOf(rules, rules.example.questions), questions: "{not json" };
+    const folds = gate("output-format");
+    const other = { ...rowOf(folds, inEarlierWording(folds)), gate: "session-summary" };
+    const broken = { ...rowOf(folds, folds.example.questions), questions: "{not json" };
 
     expect(askedNow(other)).toBe(other);
     expect(askedNow(broken)).toBe(broken);

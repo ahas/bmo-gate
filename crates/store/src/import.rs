@@ -140,11 +140,6 @@ pub const TABLES: &[TableMap] = &[
     columns: &["id", "stage", "chat_id", "message_id", "slug", "llm", "laya", "attached", "created_at"],
   },
   TableMap {
-    source: "sanitised_texts",
-    target: "sanitised_texts",
-    columns: &["hash", "text", "changed", "at", "judged_at"],
-  },
-  TableMap {
     source: "document_translations",
     target: "document_translations",
     columns: &["document", "version", "target", "part", "parts", "text", "failed", "translated_at"],

@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::brain::{Condition, Event, Fragment, MemoryRow, RoomRule};
+use crate::brain::{Condition, Event, Fragment, MemoryRow};
 
 /// A brain, as the brain lists it.
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -140,7 +140,7 @@ pub const LORE_TYPE: &str = "lore";
 // What a lore row's key opens with before its slug.
 const LORE_KEY: &str = "lore/";
 
-/// The memory types the standing rows and the matcher's conditions are read from: what an agent holds of
+/// The memory types the standing rows and the room's conditions are read from: what an agent holds of
 /// its own doing in a room.
 pub const STANDING_TYPES: [&str; 5] = ["promise", "check", "followup", "situation", "state"];
 
@@ -267,7 +267,7 @@ pub fn memory_row(agent: &str, memory: &Memory) -> MemoryRow {
   }
 }
 
-/// The conditions the matcher is offered out of these memories: each old condition a moved row kept, and a
+/// The conditions these memories carry: each old condition a moved row kept, and a
 /// situation's own text where it kept none.
 pub fn conditions(memories: &[Memory]) -> Vec<Condition> {
   let mut found = Vec::new();
@@ -432,13 +432,4 @@ pub fn person_row(agent: &str, chat: i64, person: i64, name: Option<&str>) -> Fr
 /// The path a person's sheet in a room is handed under.
 pub fn sheet_path(chat: i64, person: i64) -> String {
   format!("rooms/{chat}/people/{person}/sheet.md")
-}
-
-/// A rule memory as the owner's room rule: its id the memory's key, its grantee the person it is about.
-pub fn room_rule(memory: &Memory) -> RoomRule {
-  RoomRule {
-    id: memory.key.clone().unwrap_or_else(|| memory.id.to_string()),
-    subject: label_i64(&memory.labels, "subject").or_else(|| person_of(memory)).unwrap_or(0),
-    text: memory.text.clone(),
-  }
 }

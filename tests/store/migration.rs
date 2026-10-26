@@ -60,7 +60,6 @@ async fn every_index_the_readers_lean_on_stands() {
     "reference_verdicts_chat",
     "reference_verdicts_one",
     "reference_verdicts_stage",
-    "sanitised_texts_at",
     "web_gate_chats_stage",
   ] {
     assert!(indexes.iter().any(|stands| stands == index), "{index} does not stand: {indexes:?}");
@@ -72,13 +71,13 @@ async fn a_gate_option_names_its_agent_and_none_is_filled_in() {
   let scratch = Scratch::new().await;
 
   let nameless = scratch
-    .run(r#"INSERT INTO "gate_options" ("key", "set_at") VALUES ('sanitizer', 1)"#, vec![])
+    .run(r#"INSERT INTO "gate_options" ("key", "set_at") VALUES ('output-format', 1)"#, vec![])
     .await;
   assert!(nameless.is_err(), "a gate option with no agent was kept");
 
   scratch
     .run(
-      r#"INSERT INTO "gate_options" ("key", "agent", "set_at") VALUES ('sanitizer', 'chat-agent', 1)"#,
+      r#"INSERT INTO "gate_options" ("key", "agent", "set_at") VALUES ('output-format', 'chat-agent', 1)"#,
       vec![],
     )
     .await
@@ -108,7 +107,7 @@ async fn the_health_row_is_the_one_row_its_table_holds() {
 async fn a_reference_verdict_stands_once_for_its_gate_turn_and_piece() {
   let scratch = Scratch::new().await;
   let insert = r#"INSERT INTO "reference_verdicts" ("stage", "chat_id", "message_id", "slug", "created_at")
-    VALUES ('room-rules', 7, $1, 'quiet-hours', 1)"#;
+    VALUES ('output-format', 7, $1, 'quiet-hours', 1)"#;
 
   scratch.run(insert, vec![Option::<i64>::None.into()]).await.unwrap();
   assert!(
@@ -126,7 +125,7 @@ async fn a_rows_rowid_follows_its_id() {
 
   scratch
     .run(
-      r#"INSERT INTO "judgements" ("id", "chat_id", "stage", "verdict", "created_at") VALUES (90, 7, 'sanitizer', 'PASS', 1)"#,
+      r#"INSERT INTO "judgements" ("id", "chat_id", "stage", "verdict", "created_at") VALUES (90, 7, 'output-format', 'PASS', 1)"#,
       vec![],
     )
     .await

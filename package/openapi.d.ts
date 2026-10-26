@@ -4,126 +4,6 @@
  */
 
 export interface paths {
-    "/console-manifest": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** The console bundle's manifest, in the shape bmo-ui's console-manifest module states. */
-        get: operations["console_manifest"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/console/bundle/{file}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** The console bundle's module or stylesheet, named by the digest of its bytes; the reader's role is read. */
-        get: operations["console_bundle_file"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/console/gates": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** The gate order, as GET /gates answers it; the reader's role is read. */
-        get: operations["console_gates"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/console/laya": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Laya, as GET /laya answers it; the reader's role is read. */
-        get: operations["console_laya"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/console/trials": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** A page of trials, as GET /trials answers it; the reader's role is read. */
-        get: operations["console_trials"];
-        put?: never;
-        /** Put one prompt to one gate as a turn would, kept under the reader's owner key; the reader's role is read. */
-        post: operations["console_trial_add"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/console/words": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** The console bundle's words: each locale's tree under the locale's code. */
-        get: operations["console_words"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/documents/sought": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** The documents a question calls for out of an index. */
-        post: operations["documents_sought"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/documents/translations": {
         parameters: {
             query?: never;
@@ -278,40 +158,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/knowledge/selected": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Pick, from the agent's libraries, the pieces a piece of work's lines call for. */
-        post: operations["knowledge_selected"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/knowledge/work": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** The same pick for the chat agent, for a search's work. */
-        post: operations["knowledge_work"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/laya": {
         parameters: {
             query?: never;
@@ -449,40 +295,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/sanitised": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Defuse the security-intrusion material in a text, leaving the rest as it was. */
-        post: operations["sanitised"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sanitiser/documents": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Read a document an editor changed and answer the text to keep. */
-        post: operations["sanitiser_document"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/stages/{gateName}/runs": {
         parameters: {
             query?: never;
@@ -509,7 +321,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Translate at most 16 originals into one language, in the order given, keeping each whole reading; a call naming a reader's role is a console's and is held to the manifest's role. */
+        /** Translate at most 16 originals into one language, in the order given, keeping each whole reading. */
         post: operations["translations"];
         delete?: never;
         options?: never;
@@ -597,55 +409,6 @@ export interface components {
              */
             since: number;
         };
-        /** @description The console bundle's manifest, in the shape bmo-ui's `console-manifest` module states. */
-        ConsoleManifest: {
-            /** @description The path of the gate's API every call the screens make stands under. */
-            apiPrefix: string;
-            /** @description The path of the gate's API the bundle's module is answered at. */
-            bundle: string;
-            /** @description Whether the screens read the gate's event stream through the console. */
-            events: boolean;
-            /** @description The icon drawn beside that name, as the component library names an icon. */
-            icon: string;
-            /** @description The bundle's name, in kebab-case: its words' namespace. */
-            name: string;
-            /** @description Whether every call the screens make needs the reader's owner key. */
-            ownerKey: boolean;
-            /** @description The gate's event kinds a console may raise as a notice to a reader not on the screen. */
-            pushKinds: string[];
-            /** @description The gate's own routes outside the API prefix a console relays as well. */
-            relays: components["schemas"]["ConsoleRelay"][];
-            /** @description The least role a reader holds to open the screen. */
-            role: components["schemas"]["ConsoleRole"];
-            /** @description The path the bundle's screens stand under. */
-            screenPath: string;
-            /** @description The service's name, which a console relays it under. */
-            serviceName: string;
-            /** @description The path of the gate's API the bundle's stylesheet is answered at. */
-            stylesheet?: string | null;
-            /** @description The key, in the bundle's words, of the name a console's menu gives the screen. */
-            title: string;
-            /** @description Whether the screens open a WebSocket to the gate through the console. */
-            websocket: boolean;
-            /** @description The path of the gate's API the bundle's words are answered at. */
-            words: string;
-        };
-        /** @description A route of the gate's own that a console relays outside the API prefix: its method and its whole path. */
-        ConsoleRelay: {
-            method: string;
-            path: string;
-        };
-        /**
-         * @description The role a console's reader holds, the one holding more first: an administrator holds every role a member
-         *     holds (bmo-ui's `docs/console-bundles.md`, "Roles and the owner key").
-         * @enum {string}
-         */
-        ConsoleRole: "administrator" | "member";
-        /** @description A trial put through the console: the gate and the prompt, the reader being the console's to name. */
-        ConsoleTrial: {
-            gateName: string;
-            prompt: string;
-        };
         /** @description The values a blank setting stands for. */
         DefaultOptions: {
             /** Format: int64 */
@@ -671,15 +434,6 @@ export interface components {
         DocumentPartPage: {
             items: components["schemas"]["DocumentPart"][];
             more: boolean;
-        };
-        /** @description A document the brain is about to keep. */
-        DocumentSanitiseAsk: {
-            path: string;
-            text: string;
-        };
-        /** @description The text to keep of a document. */
-        DocumentSanitised: {
-            text: string;
         };
         /** @description A document's translation queued part by part. */
         DocumentTranslationOrder: {
@@ -835,8 +589,8 @@ export interface components {
             /** Format: int64 */
             id: number;
             /**
-             * @description What a picker's or the matcher's model was asked of its candidates, one line each, in the order it read
-             *     them; empty on every other judgement.
+             * @description What a gate's model was asked of its candidates, one line each, in the order it read them, where the judgement
+             *     keeps them; empty on every other judgement.
              * @default []
              */
             lines: components["schemas"]["JudgementLine"][];
@@ -853,8 +607,7 @@ export interface components {
         };
         /**
          * @description One line a gate's model was asked of a candidate, exactly as the model read it, and what it answered of that
-         *     line: `yes` or `no` for a picker, `applies: <yes|no>, spent: <yes|no>` for a rule the matcher read whole;
-         *     none where its answer was not read.
+         *     line as the judgement kept it; none where its answer was not read.
          */
         JudgementLine: {
             answer: string | null;
@@ -893,13 +646,6 @@ export interface components {
         KeptTranslationPage: {
             items: components["schemas"]["KeptTranslation"][];
             more: boolean;
-        };
-        /** @description The knowledge a job's work calls for. */
-        KnowledgeAsk: {
-            agentName: string;
-            lines: string[];
-            /** Format: int64 */
-            roomId: number;
         };
         /** @description One probed gate as Laya's screen reads it. */
         LayaGate: {
@@ -985,19 +731,6 @@ export interface components {
             agentName: string;
             fromAgentName: string;
         };
-        /** @description The documents a question calls for. */
-        Picks: {
-            picks: string[];
-        };
-        /** @description One piece of knowledge. */
-        Piece: {
-            path: string;
-            text: string;
-        };
-        /** @description The pieces picked. */
-        Pieces: {
-            pieces: components["schemas"]["Piece"][];
-        };
         /** @description One original's reading. */
         Reading: {
             text: string;
@@ -1058,36 +791,11 @@ export interface components {
             provider: string;
             tokens: components["schemas"]["Tokens"] | null;
         };
-        /** @description Words to sanitise. */
-        SanitiseAsk: {
-            label: string;
-            /** Format: int64 */
-            messageId?: number | null;
-            /** Format: int64 */
-            roomId?: number | null;
-            text: string;
-        };
-        /** @description Words as the sanitiser left them. */
-        Sanitised: {
-            changed: boolean;
-            text: string;
-        };
         /** @description One entry a search found, with its group. */
         SearchEntry: {
             group: string;
             holds: string;
             readWhen: string | null;
-            slug: string;
-        };
-        /** @description A question put to the document seeker over an index. */
-        SeekAsk: {
-            entries: components["schemas"]["SeekEntry"][];
-            question: string;
-        };
-        /** @description One line of a document index. */
-        SeekEntry: {
-            group?: string | null;
-            line: string;
             slug: string;
         };
         /** @description A turn's situation: the agent, the kind of room, the events and the moment. */
@@ -1180,12 +888,6 @@ export interface components {
             part: number;
             text: string;
         };
-        /** @description The knowledge a search's work calls for, for the chat agent. */
-        WorkKnowledgeAsk: {
-            lines: string[];
-            /** Format: int64 */
-            roomId: number;
-        };
     };
     responses: {
         /** @description a refusal or failure, in the common error shape */
@@ -1205,189 +907,6 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    console_manifest: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description the manifest */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ConsoleManifest"];
-                };
-            };
-            default: components["responses"]["Error"];
-        };
-    };
-    console_bundle_file: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                file: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description the module as JavaScript or the stylesheet as CSS */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            default: components["responses"]["Error"];
-        };
-    };
-    console_gates: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description the gate order */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GatePage"];
-                };
-            };
-            default: components["responses"]["Error"];
-        };
-    };
-    console_laya: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Laya's health and each probed gate */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LayaView"];
-                };
-            };
-            default: components["responses"]["Error"];
-        };
-    };
-    console_trials: {
-        parameters: {
-            query?: {
-                after?: number;
-                before?: number;
-                gateName?: string;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description a page of trials */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TrialPage"];
-                };
-            };
-            default: components["responses"]["Error"];
-        };
-    };
-    console_trial_add: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ConsoleTrial"];
-            };
-        };
-        responses: {
-            /** @description the trial as it was kept */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Trial"];
-                };
-            };
-            default: components["responses"]["Error"];
-        };
-    };
-    console_words: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description the words */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            default: components["responses"]["Error"];
-        };
-    };
-    documents_sought: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SeekAsk"];
-            };
-        };
-        responses: {
-            /** @description the slugs chosen */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Picks"];
-                };
-            };
-            default: components["responses"]["Error"];
-        };
-    };
     document_translation_add: {
         parameters: {
             query?: never;
@@ -1627,56 +1146,6 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
-    knowledge_selected: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["KnowledgeAsk"];
-            };
-        };
-        responses: {
-            /** @description the pieces picked */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Pieces"];
-                };
-            };
-            default: components["responses"]["Error"];
-        };
-    };
-    knowledge_work: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["WorkKnowledgeAsk"];
-            };
-        };
-        responses: {
-            /** @description the pieces picked */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Pieces"];
-                };
-            };
-            default: components["responses"]["Error"];
-        };
-    };
     laya: {
         parameters: {
             query?: never;
@@ -1898,56 +1367,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReferenceAnswer"];
-                };
-            };
-            default: components["responses"]["Error"];
-        };
-    };
-    sanitised: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SanitiseAsk"];
-            };
-        };
-        responses: {
-            /** @description the words as the sanitiser left them */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Sanitised"];
-                };
-            };
-            default: components["responses"]["Error"];
-        };
-    };
-    sanitiser_document: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DocumentSanitiseAsk"];
-            };
-        };
-        responses: {
-            /** @description the text to keep */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DocumentSanitised"];
                 };
             };
             default: components["responses"]["Error"];

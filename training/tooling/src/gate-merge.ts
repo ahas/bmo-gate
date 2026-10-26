@@ -197,9 +197,8 @@ function readPart(root: string, gate: string, growing: boolean): GatePart | stri
 // parts must agree on every one of these before they are put together.
 //
 // The road, the model and the effort are not among them: a gate carries its own, and one run may
-// build different gates on different roads on purpose. Sanitizer is written on the local-model road while the
-// other nine ride codex, because codex refuses sanitizer's attack rows at the account level; the
-// gates still merge into one dataset, since what makes them one run is the row count, the batch
+// build different gates on different roads on purpose, a gate whose rows codex refuses on another road
+// while the rest ride codex; the gates still merge into one dataset, since what makes them one run is the row count, the batch
 // size and the split shares they were all cut to, not the model that wrote each one. What road
 // wrote what is kept — every part's roads are gathered onto the merged meta — rather than enforced.
 const runWide = ["rowsAsked", "batchSize"] as const;

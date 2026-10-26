@@ -23,69 +23,11 @@ sampling = { temperature = 0.3, top_p = 0.8, top_k = 20, min_p = 0 }
 holds_no_session = true
 
 [[profile]]
-key = "system-documents"
-tier = "Simple"
-sampling = { temperature = 0.1, top_p = 0.8, top_k = 20, min_p = 0 }
-laya_mode = "shadow"
-laya_road = true
-laya_each = true
-
-[[profile]]
-key = "room-rules"
-tier = "Simple"
-sampling = { temperature = 0.1, top_p = 0.8, top_k = 20, min_p = 0 }
-laya_mode = "shadow"
-laya_road = true
-laya_each = true
-
-[[profile]]
-key = "library-knowledge"
-tier = "Simple"
-sampling = { temperature = 0.1, top_p = 0.8, top_k = 20, min_p = 0 }
-laya_mode = "shadow"
-laya_road = true
-laya_each = true
-
-[[profile]]
-key = "people-search"
-tier = "Simple"
-sampling = { temperature = 0.1, top_p = 0.8, top_k = 20, min_p = 0 }
-laya_mode = "shadow"
-laya_road = true
-laya_each = true
-
-# The memory picker reads its candidates as the pickers do; no checkpoint has learnt its question, so Laya is off.
-[[profile]]
-key = "room-memories"
-tier = "Simple"
-sampling = { temperature = 0.1, top_p = 0.8, top_k = 20, min_p = 0 }
-laya_mode = "off"
-
-[[profile]]
-key = "situation-rules"
-tier = "Simple"
-sampling = { temperature = 0.1, top_p = 0.8, top_k = 20, min_p = 0 }
-laya_mode = "shadow"
-laya_road = true
-
-[[profile]]
-key = "sanitizer"
-tier = "Simple"
-sampling = { temperature = 0.1, top_p = 0.8, top_k = 20, min_p = 0 }
-laya_mode = "off"
-laya_safe = true
-
-[[profile]]
 key = "output-format"
 tier = "Simple"
 sampling = { temperature = 0.1, top_p = 0.8, top_k = 20, min_p = 0 }
 laya_mode = "shadow"
 laya_road = true
-
-[[profile]]
-key = "document-seek"
-tier = "Simple"
-sampling = { temperature = 0.1, top_p = 0.8, top_k = 20, min_p = 0 }
 
 [[profile]]
 key = "translator"
@@ -95,15 +37,3 @@ forwards_to = "translate"
 sampling = { temperature = 0.3, top_p = 0.8, top_k = 20, min_p = 0 }
 answer_tokens = 2048
 pool = 4
-
-[[profile]]
-key = "voice-polish"
-tier = "Reliable"
-sampling = { temperature = 0.5, top_p = 0.8, top_k = 20, min_p = 0 }
-answer_tokens = 8192
-switchable = true
-
-[[profile]]
-key = "voice-reading"
-tier = "Reliable"
-sampling = { temperature = 0.3, top_p = 0.8, top_k = 20, min_p = 0 }

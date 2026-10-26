@@ -31,7 +31,7 @@ export interface DriveOptions {
   effort: string;
   // The road these gates are driven on. The asker must be the one that speaks it: the driver hands
   // in both, and this is what a gate's own progress and meta record. Codex unless a run says
-  // otherwise, which is what sanitizer's own run does when it moves off codex onto the local-model road.
+  // otherwise, which is what a gate's own run does when it moves off codex onto another road.
   road?: SynthRoad;
   shares: SplitShares;
   // The one answer every batch leans on, for a top-up run (docs/gate-data.md 「Invented data」).
@@ -179,7 +179,7 @@ export interface GateStanding {
   threadHeld: boolean;
   // What is writing this gate, read off its own progress: the road driving now, every road that
   // has driven it, and that road's model and effort. They are the gate's and not the run's — one
-  // run builds sanitiser on the local-model road while the other nine ride codex — so they are read here, where
+  // run may build a gate on another road while the rest ride codex — so they are read here, where
   // a gate's own folder is read, rather than taken from whichever gate was looked at last.
   road: SynthRoad | null;
   roads: SynthRoad[];

@@ -47,8 +47,8 @@ fn settings(root: &Path, address: &str, token: &str) -> PathBuf {
     format!(
       "listen = \"127.0.0.1:0\"\naddress = \"{address}\"\ntoken_file = \"gate.token\"\n\
        database = \"postgres://nobody@127.0.0.1/none\"\ndata_root = \"{}\"\nchat_agent = \"agent\"\n\
-       session_folder = \"/tmp\"\nowner_room = 1\n\
-       [agency]\n{unit}\n[brain]\n{unit}\n[receiver]\n{unit}\n[job]\n{unit}\n\
+       session_folder = \"/tmp\"\n\
+       [agency]\n{unit}\n[brain]\n{unit}\n[receiver]\n{unit}\n\
        [gateway]\n{unit}\nkey_file = \"gateway.key\"\n",
       root.display()
     ),

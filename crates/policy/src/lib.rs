@@ -5,7 +5,6 @@
 
 use serde::de::DeserializeOwned;
 
-pub mod document_seek;
 pub mod gate_pool;
 pub mod gates;
 pub mod handover;
@@ -16,7 +15,6 @@ pub mod profiles;
 pub mod prompts;
 pub mod reference;
 pub mod translation;
-pub mod triggers;
 
 /// A line of the policy with each `{name}` it holds filled in, every one at once so a value that itself
 /// holds a mark is left as it is; a mark nothing names stays.

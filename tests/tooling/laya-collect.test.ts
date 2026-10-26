@@ -115,8 +115,8 @@ describe("where a collected checkpoint stands", () => {
   });
 
   test("two runs of one gate do not stand on each other", () => {
-    expect(collectedPath("/root", "sanitizer", "rehearsal-713", 40))
-      .not.toBe(collectedPath("/root", "sanitizer", "gates-2026-09", 40));
+    expect(collectedPath("/root", "output-format", "rehearsal-713", 40))
+      .not.toBe(collectedPath("/root", "output-format", "gates-2026-09", 40));
   });
 
   test("the collection is under the workbench, which outlives a job", () => {
@@ -364,9 +364,9 @@ describe("what stands in the collection", () => {
       const { runner } = fakeNode();
 
       await collectCheckpoint(asking(runner, root));
-      mkdirSync(join(root, "sanitizer", "rehearsal-713", "step-000040.partial"), { recursive: true });
-      writeFileSync(join(root, "sanitizer", "rehearsal-713", "step-000040.partial", manifestFile),
-        JSON.stringify({ kind: "laya-checkpoint", gate: "sanitizer" }));
+      mkdirSync(join(root, "output-format", "rehearsal-713", "step-000040.partial"), { recursive: true });
+      writeFileSync(join(root, "output-format", "rehearsal-713", "step-000040.partial", manifestFile),
+        JSON.stringify({ kind: "laya-checkpoint", gate: "output-format" }));
 
       const standing = collectedCheckpoints(root);
 

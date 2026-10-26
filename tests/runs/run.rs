@@ -30,14 +30,14 @@ async fn a_registered_model_is_one_gateway_request_with_the_gates_room_thinking_
   let runs = runs_of(&scratch, &agency, &gateway);
 
   agency.providers.lock().unwrap().push(provider("registry", true));
-  agency.route("room-rules", "registry");
+  agency.route("output-format", "registry");
   agency
     .mappings
     .lock()
     .unwrap()
     .insert("registry".into(), mapping("registry", "a-registration", Some("thinking"), Some(3000)));
   gateway.answers(vec![completion(" PICK a \n")]);
-  wait(&runs, "room-rules", 30_000).await;
+  wait(&runs, "output-format", 30_000).await;
 
   let mut request = GateRequest::new("the instructions", "the material");
 
@@ -45,7 +45,7 @@ async fn a_registered_model_is_one_gateway_request_with_the_gates_room_thinking_
   request.message_id = Some(9);
   request.round = Some("round-1".into());
 
-  let answer = runs.run("room-rules", &request).await.unwrap();
+  let answer = runs.run("output-format", &request).await.unwrap();
   let asked = gateway.asked.lock().unwrap()[0].clone();
 
   assert_eq!(answer.as_deref(), Some("PICK a"));
@@ -61,11 +61,11 @@ async fn a_registered_model_is_one_gateway_request_with_the_gates_room_thinking_
   );
   assert_eq!(
     agency.resolved.lock().unwrap()[0],
-    ("room-rules".into(), Some("registry".into()), "Simple".into())
+    ("output-format".into(), Some("registry".into()), "Simple".into())
   );
   assert_eq!(
     roads(&scratch).await,
-    ["room-rules registry a-registration answered 20 7 100 round-1 7 9"]
+    ["output-format registry a-registration answered 20 7 100 round-1 7 9"]
   );
 }
 
@@ -180,15 +180,15 @@ async fn a_turn_past_its_wait_is_stopped_and_the_gate_has_no_answer() {
     .insert("claude-code".into(), mapping("claude-code", "a-model", None, None));
   *agency.end.lock().unwrap() = Some(turn_end("answered", Some("late"), None));
   *agency.turn_takes.lock().unwrap() = Duration::from_secs(5);
-  wait(&runs, "sanitizer", 1_000).await;
+  wait(&runs, "session-summary", 1_000).await;
 
-  let answer = runs.run("sanitizer", &GateRequest::new("clean", "text")).await.unwrap();
+  let answer = runs.run("session-summary", &GateRequest::new("clean", "text")).await.unwrap();
   let stopped = agency.stopped.lock().unwrap().clone();
 
   assert_eq!(answer, None);
   assert_eq!(stopped.len(), 1);
   assert!(stopped[0].starts_with("session-"));
-  assert_eq!(roads(&scratch).await, ["sanitizer claude-code a-model timeout - - - - - -"]);
+  assert_eq!(roads(&scratch).await, ["session-summary claude-code a-model timeout - - - - - -"]);
 }
 
 #[tokio::test]
@@ -203,7 +203,7 @@ async fn a_gate_whose_row_holds_no_wait_is_not_run() {
     .unwrap()
     .insert("claude-code".into(), mapping("claude-code", "a-model", None, None));
 
-  assert_eq!(runs.run("room-rules", &GateRequest::new("s", "p")).await.unwrap(), None);
+  assert_eq!(runs.run("output-format", &GateRequest::new("s", "p")).await.unwrap(), None);
   assert!(agency.turns.lock().unwrap().is_empty());
   assert!(roads(&scratch).await.is_empty());
 }
@@ -214,27 +214,24 @@ async fn a_gate_on_laya_runs_no_model_and_asks_its_fallback_where_its_caller_say
   let runs = runs_of(&scratch, &agency, &gateway);
 
   agency.providers.lock().unwrap().push(provider("registry", true));
-  agency.route("system-documents", "laya");
+  agency.route("output-format", "laya");
   agency
     .mappings
     .lock()
     .unwrap()
     .insert("registry".into(), mapping("registry", "a-registration", None, None));
   gateway.answers(vec![completion("YES")]);
-  wait(&runs, "system-documents", 30_000).await;
+  wait(&runs, "output-format", 30_000).await;
 
-  assert_eq!(runs.run("system-documents", &GateRequest::new("s", "p")).await.unwrap(), None);
+  assert_eq!(runs.run("output-format", &GateRequest::new("s", "p")).await.unwrap(), None);
   assert!(gateway.asked.lock().unwrap().is_empty());
 
   let mut fallback = GateRequest::new("s", "p");
 
   fallback.laya_fallback = true;
 
-  assert_eq!(runs.run("system-documents", &fallback).await.unwrap().as_deref(), Some("YES"));
-  assert_eq!(
-    roads(&scratch).await,
-    ["system-documents registry a-registration answered 20 7 100 - - -"]
-  );
+  assert_eq!(runs.run("output-format", &fallback).await.unwrap().as_deref(), Some("YES"));
+  assert_eq!(roads(&scratch).await, ["output-format registry a-registration answered 20 7 100 - - -"]);
 }
 
 #[tokio::test]
@@ -271,12 +268,12 @@ async fn a_provider_that_maps_the_gate_to_nothing_leaves_it_unavailable() {
   let runs = runs_of(&scratch, &agency, &gateway);
 
   agency.providers.lock().unwrap().push(provider("codex", false));
-  agency.route("document-seek", "codex");
-  wait(&runs, "document-seek", 30_000).await;
+  agency.route("translator", "codex");
+  wait(&runs, "translator", 30_000).await;
 
-  assert_eq!(runs.run("document-seek", &GateRequest::new("s", "p")).await.unwrap(), None);
+  assert_eq!(runs.run("translator", &GateRequest::new("s", "p")).await.unwrap(), None);
   assert!(agency.started.lock().unwrap().is_empty());
-  assert_eq!(roads(&scratch).await, ["document-seek codex  unavailable - - - - - -"]);
+  assert_eq!(roads(&scratch).await, ["translator codex  unavailable - - - - - -"]);
 }
 
 // A caller's cut: the first part answered by the caller itself, the other two asked, the answers joined.

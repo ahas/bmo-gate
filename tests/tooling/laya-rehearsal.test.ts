@@ -74,7 +74,7 @@ describe("the rows a rehearsal is made of", () => {
   });
 
   test("a row's own text is what varies, and every row is its own input", () => {
-    const gate = synthesisFor("system-documents")!;
+    const gate = synthesisFor("reply-wanted")!;
     const rows = rehearsalRows(gate, 12, 713);
     const ids = new Set(rows.map((row) => datasetRowOf(gate, row, shares).id));
 
@@ -124,7 +124,7 @@ describe("the rows a rehearsal is made of", () => {
 
 describe("the three splits", () => {
   test("a gate's rows grow until every split holds what it owes", () => {
-    const gate = synthesisFor("sanitizer")!;
+    const gate = synthesisFor("output-format")!;
     const filled = rowsUntilSplitsFill(gate, 8, 2, 713, shares);
 
     expect(typeof filled).not.toBe("string");
@@ -194,7 +194,7 @@ describe("the mark a rehearsal row carries", () => {
   });
 
   test("a row of real data carries none", () => {
-    expect(isRehearsalRow({ id: "x", gate: "sanitizer", split: "train" })).toBe(false);
+    expect(isRehearsalRow({ id: "x", gate: "output-format", split: "train" })).toBe(false);
     expect(isRehearsalRow({ rehearsal: "yes" })).toBe(false);
     expect(isRehearsalRow(null)).toBe(false);
   });
@@ -221,7 +221,7 @@ describe("the mark a rehearsal row carries", () => {
     const where = folder();
 
     try {
-      writeFileSync(join(where, splitFiles.train), `${JSON.stringify({ id: "x", gate: "sanitizer", split: "train" })}\n`);
+      writeFileSync(join(where, splitFiles.train), `${JSON.stringify({ id: "x", gate: "output-format", split: "train" })}\n`);
 
       expect(rehearsalFolder(where)).toBe(false);
       expect(rehearsalMeta(where)).toBeNull();

@@ -26,7 +26,7 @@ const alive = (pid: number): boolean => living.has(pid);
 // The gate's own parts answered with one judgement, every other part unavailable.
 const read: PartReader = (part) => part.owner !== "bmo-gate"
   ? { unavailable: `${part.owner} serves no route for its ${part.table}` }
-  : { rows: part.table === "judgements" ? [{ id: 1, chat_id: -7, message_id: 3, stage: "room-rules", verdict: "NONE", llm: true }] : [] };
+  : { rows: part.table === "judgements" ? [{ id: 1, chat_id: -7, message_id: 3, stage: "output-format", verdict: "NONE", llm: true }] : [] };
 
 function hands(where: string, pid: number, at: string) {
   return { root: join(where, "snapshots"), pid, now: () => new Date(at), alive, read };
@@ -39,7 +39,7 @@ describe("takeSnapshot", () => {
     const db = openSnapshot(snapshot.path);
 
     expect(db.query("SELECT chat_id AS chatId, message_id AS messageId, stage FROM judgements").all())
-      .toEqual([{ chatId: -7, messageId: 3, stage: "room-rules" }]);
+      .toEqual([{ chatId: -7, messageId: 3, stage: "output-format" }]);
     expect(db.query("SELECT COUNT(*) AS n FROM messages").get()).toEqual({ n: 0 });
     db.close();
     expect(snapshot.takenAt).toBe("2026-09-25T03:00:00.000Z");

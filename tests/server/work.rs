@@ -1,10 +1,9 @@
-//! Translations and knowledge: kept translations read and kept, originals translated, words through the
-//! sanitiser, and the knowledge a piece of work is handed.
+//! Translations: kept translations read and kept, and originals translated.
 
 use reqwest::StatusCode;
 use serde_json::json;
 
-use crate::{ROOM, ground, picking, refused};
+use crate::{ground, refused};
 
 // A Korean greeting, as a worker's record holds it.
 const GREETING: &str = "\u{c548}\u{b155}\u{d558}\u{c138}\u{c694}";
@@ -77,57 +76,4 @@ async fn a_language_no_reader_takes_is_refused() {
 
   assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
   refused(&body, "language-unknown");
-}
-
-#[tokio::test]
-async fn a_workers_words_go_through_the_sanitiser_with_no_room() {
-  let ground = ground("job-sanitised", |_| None).await;
-  let (status, body) = ground
-    .post(
-      "/sanitised",
-      json!({ "text": "The notes of the running turn.", "label": "a worker's notes", "roomId": null }),
-    )
-    .await;
-
-  assert_eq!(status, StatusCode::OK);
-  assert_eq!(body, json!({ "text": "The notes of the running turn.", "changed": false }));
-}
-
-#[tokio::test]
-async fn a_jobs_work_is_handed_no_piece_while_the_knowledge_picker_is_shelved() {
-  let ground = ground("selected", picking(&["deploy-notes"])).await;
-
-  ground.furnish();
-
-  let (status, body) = ground
-    .post(
-      "/knowledge/selected",
-      json!({ "agentName": "the-chat-agent", "roomId": ROOM, "lines": ["Deploy the release."] }),
-    )
-    .await;
-
-  assert_eq!(status, StatusCode::OK, "{body}");
-  assert_eq!(body, json!({ "pieces": [] }));
-  assert!(ground.gateway.asked.lock().unwrap().is_empty(), "no model was asked");
-  assert_eq!(ground.scratch.count("SELECT count(*) FROM reference_offers", vec![]).await, 0);
-}
-
-#[tokio::test]
-async fn a_searchs_work_is_handed_no_piece_while_the_knowledge_picker_is_shelved() {
-  let ground = ground("work", picking(&["deploy-notes"])).await;
-
-  ground.furnish();
-
-  let (status, body) = ground
-    .post("/knowledge/work", json!({ "roomId": ROOM, "lines": ["How do deploys go?"] }))
-    .await;
-
-  assert_eq!(status, StatusCode::OK, "{body}");
-  assert_eq!(body, json!({ "pieces": [] }));
-  assert!(ground.gateway.asked.lock().unwrap().is_empty(), "no model was asked");
-
-  let (status, body) = ground.post("/knowledge/work", json!({ "roomId": ROOM, "lines": [] })).await;
-
-  assert_eq!(status, StatusCode::OK);
-  assert_eq!(body, json!({ "pieces": [] }));
 }

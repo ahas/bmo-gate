@@ -142,9 +142,6 @@ pub fn status(data_root: &Path, args: &GateEvalArgs, members: &[&dyn EvalGate]) 
     );
   }
 
-  lines.push(words::STATUS_SANITIZER.to_owned());
-  lines.push(words::STATUS_VOICE.to_owned());
-
   Ok(lines)
 }
 

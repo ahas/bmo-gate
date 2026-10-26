@@ -1,4 +1,4 @@
-//! One trial of a gate from the console: the prompt, who asked, the answer and how long it took.
+//! One trial of a gate: the prompt, who asked, the answer and how long it took.
 
 use sea_orm::entity::prelude::*;
 

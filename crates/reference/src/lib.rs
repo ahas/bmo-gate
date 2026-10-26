@@ -1,15 +1,11 @@
 //! A turn's reference (`docs/reference-selection.md`; `docs/boundary-api.md`, `POST /reference/selected`): what a
 //! chat turn is given to read beside the conversation — the room's due memories, the rows the turn's events wake
-//! and the standing sheets of everyone who spoke, which no model chooses, then what the three reference gates, the
-//! person-book search, the memory picker and the situation-rule matcher pick, each after the code's narrowing,
-//! held to their allowances and the turn's total. The brain answers the rows and reads the pieces; the gate picks.
+//! and the standing sheets of everyone who spoke, which no model chooses, held to the turn's total — and the brain's
+//! index an agent reads the rest through itself. The brain answers the rows and reads the pieces.
 
-pub mod attachments;
 pub mod fragments;
 pub mod index;
 pub mod memories;
-pub mod narrow;
-pub mod pick;
 pub mod road;
 pub mod situation;
 
@@ -21,7 +17,7 @@ use gate_ports::receiver::Receiver;
 use gate_stages::Stages;
 use serde::{Deserialize, Serialize};
 
-pub use road::{Turn, select};
+pub use road::{Turn, handed};
 
 /// Which sort of thing entered a turn, which is what the turn's log calls it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -72,19 +68,12 @@ pub enum RoomKind {
   Group,
 }
 
-/// One turn as the situation road reads it: the room, the agent whose turn it is, the message it is about, the
-/// room's kind, the room's recent messages in the room shape with every line the turn brought, the events it
-/// carries, the round it belongs to, and the moment it is read at.
+/// One turn as the situation road reads it: the room, the agent whose turn it is, and the events it carries.
 #[derive(Clone, Debug)]
 pub struct SituationTurn {
   pub chat_id: i64,
   pub agent: String,
-  pub message_id: Option<i64>,
-  pub room: RoomKind,
-  pub message_lines: Vec<String>,
   pub events: Vec<Event>,
-  pub round: Option<String>,
-  pub now: i64,
 }
 
 /// What a turn's reference is composed on: the gates and their runs, the brain the rows and pieces come from, the

@@ -97,7 +97,7 @@ async fn a_pass_writes_the_one_row_and_says_whether_the_state_or_the_model_moved
     Method::GET,
     "/health",
     200,
-    json!({ "state": "up", "model": "room-rules=/w/a", "device": "cuda:0", "versions": { "torch": "2.6" } }),
+    json!({ "state": "up", "model": "output-format=/w/a", "device": "cuda:0", "versions": { "torch": "2.6" } }),
   );
 
   assert_eq!(read(scratch.db()).await.unwrap().state, "unknown");
@@ -106,7 +106,7 @@ async fn a_pass_writes_the_one_row_and_says_whether_the_state_or_the_model_moved
 
   let health = read(scratch.db()).await.unwrap();
 
-  assert_eq!((health.state.as_str(), health.model.as_deref()), ("up", Some("room-rules=/w/a")));
+  assert_eq!((health.state.as_str(), health.model.as_deref()), ("up", Some("output-format=/w/a")));
   assert_eq!(health.address.as_deref(), Some(stub.address.as_str()));
   assert_eq!(stub.seen()[0].bearer().as_deref(), Some("relay-token"));
   assert_eq!(scratch.count("SELECT count(*) FROM laya_health", vec![]).await, 1);

@@ -4,7 +4,6 @@
 //! counted every hour.
 
 pub mod answer;
-pub mod console;
 pub mod drafts;
 pub mod routes;
 pub mod settings;
@@ -23,7 +22,6 @@ use gate_ports::Peer;
 use gate_ports::agency::HttpAgency;
 use gate_ports::brain::HttpBrain;
 use gate_ports::gateway::HttpGateway;
-use gate_ports::job::{HttpJob, Job};
 use gate_ports::receiver::HttpReceiver;
 use gate_reference::Reference;
 use gate_runs::Runs;
@@ -35,22 +33,17 @@ use sea_orm::DatabaseConnection;
 use sea_orm_migration::MigratorTrait;
 
 use crate::answer::Refused;
-use crate::console::ConsoleBundle;
 use crate::settings::{Settings, Unread};
 
-/// Everything a route stands on: the gates and the reference road, bmo-job for the rows the gate raises, the
-/// document translations' queue, the translations' intake, the token every caller presents, the owner's room, the
-/// data root, and the console bundle where the settings name one.
+/// Everything a route stands on: the gates and the reference road, the document translations' queue, the
+/// translations' intake, the token every caller presents and the data root.
 pub struct App {
   pub stages: Arc<Stages>,
   pub reference: Arc<Reference>,
-  pub job: Arc<dyn Job>,
   pub queue: Queue,
   pub translations: Intake,
   pub token: String,
-  pub owner_room: i64,
   pub data_root: PathBuf,
-  pub console: Option<ConsoleBundle>,
 }
 
 async fn bearer(State(app): State<Arc<App>>, request: Request, next: Next) -> Response {
@@ -71,12 +64,11 @@ async fn absent() -> Refused {
   Refused::new(Code::NoRoute, "no route answers this method and path")
 }
 
-/// Every route, behind the bearer check, a route the manifest relays behind the reader's role as well.
+/// Every route, behind the bearer check.
 pub fn router(app: Arc<App>) -> Router {
   routes::all()
     .fallback(absent)
     .method_not_allowed_fallback(absent)
-    .layer(middleware::from_fn(routes::console::relayed_role))
     .layer(middleware::from_fn_with_state(app.clone(), bearer))
     .with_state(app)
 }
@@ -155,23 +147,14 @@ pub async fn stand(settings: &Settings) -> Result<Arc<App>, Unread> {
   let token = settings
     .token(&settings.token_file)?
     .ok_or_else(|| Unread("the gate's token file is empty".into()))?;
-  let console = settings
-    .console
-    .as_ref()
-    .map(|console| ConsoleBundle::read(&console.folder))
-    .transpose()
-    .map_err(Unread)?;
 
   Ok(Arc::new(App {
     stages,
     reference,
-    job: Arc::new(HttpJob::new(peer(&settings.job.address, settings.unit_token(&settings.job)?)?)),
     queue: Queue::default(),
     translations: Intake::of_policy(),
     token,
-    owner_room: settings.owner_room,
     data_root: settings.data_root.clone(),
-    console,
   }))
 }
 

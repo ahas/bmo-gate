@@ -1,5 +1,5 @@
-//! Documents (`docs/api.md`, 「Documents」): the documents a question calls for out of an index, and a document's
-//! translation queued part by part, its state and its parts read back.
+//! Documents (`docs/api.md`, 「Documents」): a document's translation queued part by part, its state and its parts
+//! read back.
 
 use std::sync::Arc;
 
@@ -8,37 +8,15 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use bmo_gate_client::{
   DocumentPart, DocumentPartsQuery, DocumentStateQuery, DocumentTranslationOrder, DocumentTranslationState,
-  Page, Picks, SeekAsk, SeekEntry, Taken, TranslationFailure, WantedPart,
+  Page, Taken, TranslationFailure, WantedPart,
 };
 use gate_codes::Code;
-use gate_stages::document_seek::{self, SeekEntry as GateSeekEntry};
 use gate_stages::document_translation::{self, Order, State as Standing};
 use gate_store::entity::document_translations;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 
 use crate::App;
 use crate::answer::{Answered, Body, Query, Refused};
-
-pub async fn sought(State(app): State<Arc<App>>, Body(asked): Body<SeekAsk>) -> Answered<Json<Picks>> {
-  if gate_policy::gates::GATE_ORDER.is_shelved(document_seek::STAGE) {
-    return Err(Refused::new(Code::Shelved, "the document seeker is shelved and is never asked"));
-  }
-
-  let entries: Vec<GateSeekEntry> = asked
-    .entries
-    .into_iter()
-    .map(|entry: SeekEntry| GateSeekEntry {
-      slug: entry.slug,
-      line: entry.line,
-      group: entry.group,
-    })
-    .collect();
-  let picks = document_seek::sought(&app.stages, &entries, &asked.question)
-    .await
-    .ok_or_else(|| Refused::new(Code::NoAnswer, "the document seeker gave no answer"))?;
-
-  Ok(Json(Picks { picks }))
-}
 
 fn document(name: &str) -> Answered<()> {
   match name.split_once('/') {

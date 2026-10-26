@@ -3,7 +3,7 @@
 //! hit posted by memory id.
 
 use axum::http::Method;
-use gate_ports::brain::{Brain, Event, Hit, HttpBrain, Reply};
+use gate_ports::brain::{Brain, Event, HttpBrain, Reply};
 use serde_json::{Value, json};
 
 use crate::peer;
@@ -143,11 +143,9 @@ async fn the_memory_reads_find_the_agents_brain_and_map_its_standing_types() {
   stub.answer(Method::GET, "/brains", 200, brains());
   // Every standing type is asked for; the stub answers the same page for each.
   served(&stub, "promise", vec![moved_state(), written_situation(), elsewhere()]);
-  stub.answer(Method::POST, "/brains/9/hits", 201, json!({ "recordedCount": 1 }));
 
   let standing = brain.standing("chat-agent", 7).await.unwrap();
   let conditions = brain.conditions("chat-agent", 7).await.unwrap();
-  brain.matched("chat-agent", 7, &["c".to_owned()], &[]).await.unwrap();
   let events = [Event {
     kind: "job-ended".into(),
     item: Some(12),
@@ -183,10 +181,6 @@ async fn the_memory_reads_find_the_agents_brain_and_map_its_standing_types() {
       .iter()
       .all(|seen| seen.query.as_deref().is_some_and(|q| q.contains("status=active")))
   );
-  assert_eq!(
-    stub.one("/brains/9/hits").json(),
-    json!({ "memoryIds": [4], "actorName": "chat-agent" })
-  );
 }
 
 #[tokio::test]
@@ -213,23 +207,14 @@ async fn a_row_the_agent_wrote_stands_by_its_text_and_an_errand_stands_once_its_
 }
 
 #[tokio::test]
-async fn the_fragment_reads_ask_the_brain_by_type_and_hand_back_what_attached_by_id() {
+async fn the_fragment_reads_ask_the_brain_by_type() {
   let stub = Stub::start().await;
   let brain = HttpBrain::new(peer(&stub, "t"));
 
   stub.answer(Method::GET, "/brains", 200, brains());
   served(&stub, "rule", vec![rule()]);
-  stub.answer(Method::POST, "/brains/9/hits", 201, json!({ "recordedCount": 1 }));
 
   let offered = brain.offered("chat-agent", 7, &["room-rule".to_owned()]).await.unwrap();
-  let attached = [Hit {
-    key: "3".into(),
-    kind: "room-rule".into(),
-    chat_id: Some(7),
-    owner: None,
-    slug: "quiet".into(),
-  }];
-  brain.hits("chat-agent", 7, &attached).await.unwrap();
 
   assert_eq!(offered[0].slug, "quiet");
   assert_eq!(offered[0].items, vec![12]);
@@ -242,10 +227,6 @@ async fn the_fragment_reads_ask_the_brain_by_type_and_hand_back_what_attached_by
   let asked = stub.one("/brains/9/memories");
   let query = asked.query.as_deref().unwrap_or_default();
   assert!(query.contains("type=rule"), "{query}");
-  assert_eq!(
-    stub.one("/brains/9/hits").json(),
-    json!({ "memoryIds": [3], "actorName": "chat-agent" })
-  );
 }
 
 #[tokio::test]
@@ -445,48 +426,4 @@ async fn the_person_book_offers_one_candidate_for_each_person_the_facts_are_abou
 
   assert!(tallies.contains("type=fact") && tallies.contains("by=subject"), "{tallies}");
   assert!(stub.seen().iter().all(|seen| seen.path != "/brains/9/memories"));
-
-  // A sheet is no memory, so attaching one hands the brain no hit.
-  brain
-    .hits(
-      "chat-agent",
-      7,
-      &[offered[0].clone()].map(|row| gate_ports::brain::Hit {
-        key: row.key,
-        kind: row.kind,
-        chat_id: row.chat_id,
-        owner: row.owner,
-        slug: row.slug,
-      }),
-    )
-    .await
-    .unwrap();
-  assert!(stub.seen().iter().all(|seen| seen.path != "/brains/9/hits"));
-}
-
-#[tokio::test]
-async fn the_room_rules_and_the_loads_go_by_their_own_keys() {
-  let stub = Stub::start().await;
-  let brain = HttpBrain::new(peer(&stub, "t"));
-
-  stub.answer(
-    Method::POST,
-    "/room-rules/read",
-    200,
-    json!({ "rules": [{ "id": "quiet", "subject": 31, "text": "quiet" }] }),
-  );
-  stub.answer(
-    Method::POST,
-    "/sessions/loads",
-    200,
-    json!({ "loads": [{ "path": "rooms/7/rules/quiet.md", "version": "h" }] }),
-  );
-
-  let rules = brain.room_rules(7).await.unwrap();
-  let loads = brain.loads("s").await.unwrap();
-
-  assert_eq!((rules[0].id.as_str(), rules[0].subject), ("quiet", 31));
-  assert_eq!(loads[0].version, "h");
-  assert_eq!(stub.one("/room-rules/read").json(), json!({ "chatId": 7 }));
-  assert_eq!(stub.one("/sessions/loads").json(), json!({ "session": "s" }));
 }

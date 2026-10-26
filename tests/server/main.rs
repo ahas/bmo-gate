@@ -1,7 +1,6 @@
 //! The service's contract tests: the router served on the loopback over a scratch database of the test's own, the
-//! agency, the brain, the receiver and bmo-job stood in, and every route driven with the bodies its callers send —
-//! bmo-receiver's, bmo-job's, bmo-brain's, bmo-artifact's, the voice unit's and the console's — the console bundle
-//! the gate serves behind its guard, and the watches beside them as the agency sees them.
+//! agency, the brain and the receiver stood in, every route driven with the bodies its callers send, and the
+//! watches beside them as the agency sees them.
 
 #[path = "../runs/fakes.rs"]
 mod agency;
@@ -12,9 +11,6 @@ mod scratch;
 #[path = "../support/stub.rs"]
 mod stub;
 
-mod brain;
-mod bundle;
-mod console;
 mod receiver;
 mod watches;
 mod wire;
@@ -28,7 +24,6 @@ use gate_ports::gateway::Ask;
 use gate_reference::Reference;
 use gate_runs::Runs;
 use gate_server::App;
-use gate_server::console::ConsoleBundle;
 use gate_stages::document_translation::Queue;
 use gate_stages::laya::Side;
 use gate_stages::translator::Intake;
@@ -37,7 +32,7 @@ use reqwest::{Method, StatusCode};
 use serde_json::{Value, json};
 
 use crate::agency::{FakeAgency, mapping, provider};
-use crate::fakes::{AnsweringGateway, FakeBrain, FakeJob, FakeReceiver, fragment};
+use crate::fakes::{AnsweringGateway, FakeBrain, FakeReceiver, fragment};
 use crate::scratch::Scratch;
 
 /// The token every caller presents.
@@ -53,7 +48,6 @@ pub struct Ground {
   pub agency: Arc<FakeAgency>,
   pub brain: Arc<FakeBrain>,
   pub gateway: Arc<AnsweringGateway>,
-  pub job: Arc<FakeJob>,
   pub app: Arc<App>,
   pub address: String,
   pub client: reqwest::Client,
@@ -61,15 +55,6 @@ pub struct Ground {
 
 /// The ground with every gate's model answering as `answer` makes it.
 pub async fn ground(test: &str, answer: impl Fn(&Ask) -> Option<String> + Send + Sync + 'static) -> Ground {
-  ground_serving(test, None, answer).await
-}
-
-/// The ground serving `console` as its console bundle, every gate's model answering as `answer` makes it.
-pub async fn ground_serving(
-  test: &str,
-  console: Option<ConsoleBundle>,
-  answer: impl Fn(&Ask) -> Option<String> + Send + Sync + 'static,
-) -> Ground {
   let scratch = Scratch::new().await;
   let agency = Arc::new(FakeAgency::default());
   let gateway = Arc::new(AnsweringGateway {
@@ -104,7 +89,6 @@ pub async fn ground_serving(
   let side = Side::new(scratch.db().clone(), None, None, "the-chat-agent");
   let stages = Arc::new(Stages::new(runs, side, Reading::default()));
   let brain = Arc::new(FakeBrain::default());
-  let job = Arc::new(FakeJob::default());
   let reference = Arc::new(Reference {
     stages: stages.clone(),
     brain: brain.clone(),
@@ -114,13 +98,10 @@ pub async fn ground_serving(
   let app = Arc::new(App {
     stages,
     reference,
-    job: job.clone(),
     queue: Queue::default(),
     translations: Intake::of_policy(),
     token: TOKEN.to_owned(),
-    owner_room: 1,
     data_root: PathBuf::from(&data_root),
-    console,
   });
   let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
   let address = format!("http://{}", listener.local_addr().unwrap());
@@ -132,7 +113,6 @@ pub async fn ground_serving(
     agency,
     brain,
     gateway,
-    job,
     app,
     address,
     client: reqwest::Client::new(),
@@ -180,31 +160,6 @@ impl Ground {
       .lock()
       .unwrap()
       .insert("deploy-notes".to_owned(), "Deploys go through the testbed.".to_owned());
-  }
-}
-
-/// The slugs a picker's index offers, in order.
-pub fn offered_slugs(input: &str) -> Vec<String> {
-  input
-    .lines()
-    .filter_map(|line| line.strip_prefix("- "))
-    .filter_map(|line| line.split_whitespace().next())
-    .map(str::to_owned)
-    .collect()
-}
-
-/// A gateway answering a picker yes for the slugs wanted and no for the rest, and nothing to any other gate.
-pub fn picking(wanted: &'static [&'static str]) -> impl Fn(&Ask) -> Option<String> + Send + Sync {
-  move |ask| {
-    let slugs = offered_slugs(&ask.input);
-
-    (!slugs.is_empty()).then(|| {
-      slugs
-        .iter()
-        .map(|slug| format!("{slug}: {}", if wanted.contains(&slug.as_str()) { "yes" } else { "no" }))
-        .collect::<Vec<_>>()
-        .join("\n")
-    })
   }
 }
 

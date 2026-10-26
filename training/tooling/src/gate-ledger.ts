@@ -37,8 +37,8 @@ export interface GateLedgerRow {
   seconds: number;
   threadHeld: boolean;
   // The road or roads this gate was written on, and the model and effort driving it. More than one
-  // road for a gate carried across roads. They are the gate's own: one run builds sanitiser on
-  // the local-model road while the other nine ride codex, so no one of them is the run's.
+  // road for a gate carried across roads. They are the gate's own: one run may build a gate on
+  // another road while the rest ride codex, so no one of them is the run's.
   roads: SynthRoad[];
   model: string;
   effort: string;

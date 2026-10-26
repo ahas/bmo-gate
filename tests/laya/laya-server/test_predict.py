@@ -26,7 +26,7 @@ class StandIn:
 
 
 def row(rid, questions, turn="t1"):
-    return json.dumps({"id": rid, "gate": "people-search", "split": "test", "turn": turn,
+    return json.dumps({"id": rid, "gate": "reply-wanted", "split": "test", "turn": turn,
                        "state": json.dumps("Owner: \uc751"), "questions": json.dumps(questions), "gold": "{}"})
 
 
@@ -39,8 +39,8 @@ class AnswerRows(unittest.TestCase):
         answered = list(answer_rows(agent, lines))
 
         self.assertEqual(answered, [
-            {"id": "r1", "gate": "people-search", "turn": "t1", "answers": {"a": 0.4, "b": 0.2}},
-            {"id": "r2", "gate": "people-search", "turn": "t2", "answers": {"c": 0.6}},
+            {"id": "r1", "gate": "reply-wanted", "turn": "t1", "answers": {"a": 0.4, "b": 0.2}},
+            {"id": "r2", "gate": "reply-wanted", "turn": "t2", "answers": {"c": 0.6}},
         ])
         self.assertEqual(agent.asked[0][0], "Owner: \uc751")
 

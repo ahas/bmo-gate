@@ -89,7 +89,7 @@ class ServerTest(unittest.TestCase):
         self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
 
     def setUp(self):
-        self.serve(["output-decide", "library-knowledge"])
+        self.serve(["output-decide", "knowledge-classifier"])
 
     def tearDown(self):
         self.server.shutdown()
@@ -111,8 +111,8 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(body["state"], "up")
         self.assertEqual(body["model"], "output-decide=checkpoints/output-decide/run/step-000001, "
-                                        "library-knowledge=checkpoints/library-knowledge/run/step-000001")
-        self.assertEqual(body["gates"]["library-knowledge"]["model"], "checkpoints/library-knowledge/run/step-000001")
+                                        "knowledge-classifier=checkpoints/knowledge-classifier/run/step-000001")
+        self.assertEqual(body["gates"]["knowledge-classifier"]["model"], "checkpoints/knowledge-classifier/run/step-000001")
         self.assertEqual(body["gates"]["output-decide"]["where"], "pinned")
         self.assertEqual(body["device"], "cuda")
         self.assertEqual(body["vramBytes"], 700_000_000)
@@ -126,31 +126,31 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(self.gates["output-decide"].asked, [])
 
     def test_decide_asks_the_gate_own_checkpoint(self):
-        status, body = self.call("/decide", noul("library-knowledge", "\uc11c\uace0"))
+        status, body = self.call("/decide", noul("knowledge-classifier", "\uc11c\uace0"))
         self.assertEqual(status, 200)
         self.assertEqual(body["answers"]["fold"], {"type": "noul", "noul": 0.9, "confidence": 0.9})
         self.assertIn("ms", body)
-        self.assertEqual(self.gates["library-knowledge"].asked[0][0], "\uc11c\uace0")
+        self.assertEqual(self.gates["knowledge-classifier"].asked[0][0], "\uc11c\uace0")
         self.assertEqual(self.gates["output-decide"].asked, [])
 
     def test_a_gate_nobody_serves_is_refused_without_asking(self):
-        status, body = self.call("/decide", noul("people-search"))
+        status, body = self.call("/decide", noul("content-judge"))
         self.assertEqual(status, 404)
-        self.assertIn("people-search", body["error"])
+        self.assertIn("content-judge", body["error"])
         self.assertEqual(self.moves, [])
 
     def test_the_least_recently_asked_checkpoint_leaves_the_card(self):
-        self.serve(["output-decide", "library-knowledge", "room-rules"], card_models=2)
-        for gate in ["output-decide", "library-knowledge", "output-decide", "room-rules", "output-decide"]:
+        self.serve(["output-decide", "knowledge-classifier", "reply-wanted"], card_models=2)
+        for gate in ["output-decide", "knowledge-classifier", "output-decide", "reply-wanted", "output-decide"]:
             self.assertEqual(self.call("/decide", noul(gate))[0], 200)
-        self.assertEqual(self.moves, [("on", "output-decide"), ("on", "library-knowledge"),
-                                      ("off", "library-knowledge"), ("on", "room-rules")])
+        self.assertEqual(self.moves, [("on", "output-decide"), ("on", "knowledge-classifier"),
+                                      ("off", "knowledge-classifier"), ("on", "reply-wanted")])
 
     def test_a_full_card_is_cleared_once_before_giving_up(self):
-        self.serve(["output-decide", "library-knowledge"], card_models=2, full={"library-knowledge": 1})
+        self.serve(["output-decide", "knowledge-classifier"], card_models=2, full={"knowledge-classifier": 1})
         self.assertEqual(self.call("/decide", noul("output-decide"))[0], 200)
-        self.assertEqual(self.call("/decide", noul("library-knowledge"))[0], 200)
-        self.assertEqual(self.moves, [("on", "output-decide"), ("off", "output-decide"), ("on", "library-knowledge")])
+        self.assertEqual(self.call("/decide", noul("knowledge-classifier"))[0], 200)
+        self.assertEqual(self.moves, [("on", "output-decide"), ("off", "output-decide"), ("on", "knowledge-classifier")])
 
         self.serve(["output-decide"], full={"output-decide": 2})
         status, body = self.call("/decide", noul("output-decide"))
@@ -160,13 +160,13 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(self.call("/decide", noul("output-decide"))[0], 200)
 
     def test_a_decision_that_runs_out_of_card_is_lent_the_room_and_the_card_keeps_its_number(self):
-        self.serve(["output-decide", "library-knowledge", "room-rules"], card_models=3)
-        for gate in ["output-decide", "library-knowledge", "room-rules"]:
+        self.serve(["output-decide", "knowledge-classifier", "reply-wanted"], card_models=3)
+        for gate in ["output-decide", "knowledge-classifier", "reply-wanted"]:
             self.assertEqual(self.call("/decide", noul(gate))[0], 200)
-        self.gates["room-rules"].tight = 2
-        self.assertEqual(self.call("/decide", noul("room-rules"))[0], 200)
-        self.assertEqual(self.moves[3:], [("off", "output-decide"), ("off", "library-knowledge")])
-        self.assertEqual(len(self.gates["room-rules"].asked), 2)
+        self.gates["reply-wanted"].tight = 2
+        self.assertEqual(self.call("/decide", noul("reply-wanted"))[0], 200)
+        self.assertEqual(self.moves[3:], [("off", "output-decide"), ("off", "knowledge-classifier")])
+        self.assertEqual(len(self.gates["reply-wanted"].asked), 2)
         health = self.call("/health")[1]
         self.assertEqual((health["cardModels"], health["roomMade"]), (3, 1))
 
@@ -272,13 +272,13 @@ class ServerTest(unittest.TestCase):
 
     def test_the_card_is_let_go_when_the_last_call_in_hand_ends(self):
         path = self.lock_file()
-        self.serve(["output-decide", "library-knowledge"], card_models=2, card_lock=CardLock(path))
+        self.serve(["output-decide", "knowledge-classifier"], card_models=2, card_lock=CardLock(path))
         first = self.gates["output-decide"]
         first.hold = threading.Event()
         ahead = threading.Thread(target=self.call, args=("/decide", noul("output-decide")))
         ahead.start()
         self.assertTrue(first.holding.wait(5))
-        behind = threading.Thread(target=self.call, args=("/decide", noul("library-knowledge")))
+        behind = threading.Thread(target=self.call, args=("/decide", noul("knowledge-classifier")))
         behind.start()
         Waits().until(lambda: self.decider.in_hand >= 2, "the second call to be counted")
 
@@ -286,8 +286,8 @@ class ServerTest(unittest.TestCase):
         first.hold.set()
         ahead.join(5)
         behind.join(5)
-        self.assertEqual(self.moves, [("on", "output-decide"), ("on", "library-knowledge"),
-                                      ("off", "output-decide"), ("off", "library-knowledge")])
+        self.assertEqual(self.moves, [("on", "output-decide"), ("on", "knowledge-classifier"),
+                                      ("off", "output-decide"), ("off", "knowledge-classifier")])
         health = self.call("/health")[1]
         self.assertFalse(health["cardLock"]["held"])
         self.assertEqual({gate["where"] for gate in health["gates"].values()}, {"pinned"})
@@ -299,7 +299,7 @@ class ServerTest(unittest.TestCase):
         ahead = threading.Thread(target=self.call, args=("/decide", noul("output-decide")))
         ahead.start()
         self.assertTrue(first.holding.wait(5))
-        body = json.dumps(noul("library-knowledge")).encode()
+        body = json.dumps(noul("knowledge-classifier")).encode()
         with socket.create_connection(self.server.server_address) as gone:
             gone.sendall(b"POST /decide HTTP/1.1\r\nHost: laya\r\nAuthorization: Bearer " + TOKEN.encode()
                          + b"\r\nContent-Type: application/json\r\nContent-Length: " + str(len(body)).encode()
@@ -308,7 +308,7 @@ class ServerTest(unittest.TestCase):
         ahead.join(5)
         Waits().until(lambda: self.call("/health")[1]["droppedCalls"] >= 1, "the call whose caller left to be dropped")
         self.assertEqual(len(first.asked), 1)
-        self.assertEqual(self.gates["library-knowledge"].asked, [])
+        self.assertEqual(self.gates["knowledge-classifier"].asked, [])
 
     def test_malformed_requests_are_refused_without_asking(self):
         question = {"a": {"type": "noul", "instructions": "x"}}
@@ -412,9 +412,9 @@ class GuardedForwardTest(unittest.TestCase):
 
 class CheckpointsSettingTest(unittest.TestCase):
     def test_pairs_are_read_in_order_and_relative_to_the_server(self):
-        named = read_checkpoints("output-decide=checkpoints/output-format/r/step-000152\n  library-knowledge=/abs/lk", "/srv")
+        named = read_checkpoints("output-decide=checkpoints/output-format/r/step-000152\n  knowledge-classifier=/abs/lk", "/srv")
         self.assertEqual(list(named.items()), [("output-decide", "/srv/checkpoints/output-format/r/step-000152"),
-                                               ("library-knowledge", "/abs/lk")])
+                                               ("knowledge-classifier", "/abs/lk")])
         self.assertEqual(read_checkpoints("", "/srv"), {})
 
     def test_a_pair_that_cannot_be_read_stops_the_server(self):

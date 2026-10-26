@@ -3,8 +3,6 @@ import { describe, expect, test } from "bun:test";
 import { gateFor, judgeItemOf, judgePrompt as gateJudgePrompt, judgeSystem as gateJudgeSystem, judgedRows, readJudgements } from "../../training/tooling/src/gate-judge";
 import { promptFile } from "../../training/tooling/src/prompts";
 import { unjudgedRowOf } from "../../training/tooling/src/real-rows";
-import { judgePrompt as referenceJudgePrompt, judgeSystem as referenceJudgeSystem } from "../../training/tooling/src/reference/judge";
-import { attachedWordNames, isWordFor, offeredWordNames, readLabels } from "../../training/tooling/src/reference/labels";
 import { useToolingSettings } from "./settings";
 
 import { mkdtempSync, writeFileSync } from "node:fs";
@@ -26,7 +24,7 @@ const row = unjudgedRowOf(
   shares,
 );
 
-// What the training tooling tells its judges is English (docs/layout.md, 「The rules the layout keeps」); Korean
+// What the training tooling tells its judges is English (docs/layout.md, "The rules the layout keeps"); Korean
 // stands in `prompts/tooling/` only as what the rows carry.
 const hangul = /[\uAC00-\uD7A3\u3131-\u318E]/;
 
@@ -56,16 +54,9 @@ describe("what the judges are told", () => {
     expect(hangulPaths("gate-judge")).toEqual([]);
   });
 
-  test("every text the reference judge's file holds is English", () => {
-    expect(hangulPaths("reference-judge")).toEqual([]);
-  });
-
-  test("the prompts the judges are handed carry no Hangul of their own", () => {
-
+  test("the prompts the judge is handed carry no Hangul of its own", () => {
     expect(gateJudgeSystem()).not.toMatch(hangul);
     expect(gateJudgePrompt(spec, [judgeItemOf(row)])).not.toMatch(hangul);
-    expect(referenceJudgeSystem()).not.toMatch(hangul);
-    expect(referenceJudgePrompt([])).not.toMatch(hangul);
   });
 });
 
@@ -90,18 +81,5 @@ describe("rows judged before the judges' words were English", () => {
     }
 
     expect(frozen.id).toBe(row.id);
-  });
-
-  test("a label stands on its word, so every label judged before still reads as one the judge gives", () => {
-    const folder = mkdtempSync(join(tmpdir(), "labels-"));
-    const path = join(folder, "labels.jsonl");
-    const words = [...attachedWordNames.map((word) => ({ word, attached: true })), ...offeredWordNames.map((word) => ({ word, attached: false }))];
-
-    writeFileSync(path, words.map(({ word, attached }, index) => `${JSON.stringify({ turn: `1:${index}`, gate: "room-rules", slug: "quiet", word, attached, batch: 1, at: "2026-10-01T00:00:00.000Z" })}\n`).join(""));
-
-    const read = [...readLabels(path).values()];
-
-    expect(read.length).toBe(words.length);
-    expect(read.every((one) => isWordFor(one.attached, one.word))).toBe(true);
   });
 });

@@ -37,8 +37,7 @@ record. This document adds no mechanism to either.
   their account numbers, by which a real row tells the chat agent's own lines and the owner's room
   (`docs/gate-data.md`, 「The real rows」).
 - **`gate_command`** is the gate's own unit command as a list of words, which the tooling runs for the gate's records
-  and the reference gates' inputs (`docs/gate-data.md`, 「The conversation source」; `docs/reference-data.md`,
-  「The input」).
+  (`docs/gate-data.md`, 「The conversation source」).
 - **The roads' keys** (`docs/gate-data.md`, 「The roads」): `claude_batch_command`, `claude_login` and
   `claude_account` for the claude road; `local_mcp_url`, `local_models_url`, `local_model` and `local_key_file` for
   the local-model road; `text_base_url`, `text_model` and `text_key_file` for the text model road. A key file is
@@ -53,9 +52,6 @@ same four things for each: how many rows each of the three splits holds now, how
 the gate's rarer answer, the bars the gate is held to, and a copy of its rows for a pass to train on.
 The driver asks those four and never which kind of source it is talking to.
 
-- **The reference data** (`docs/reference-data.md`) — the folder a reference-data pass puts in place,
-  one gate a folder, with its counts beside the rows. Its gates are held to a thousand rows and two
-  hundred questions whose gold is yes.
 - **A judging run** (`docs/gate-data.md`, 「A run folder」) — a run of the other gates, read at its
   whole batches while its judging goes on: the batches are read from the first and the reading stops
   at the first one missing, since a batch is renamed into place whole and one still being written
@@ -70,9 +66,8 @@ The driver asks those four and never which kind of source it is talking to.
   together, the bars are the source's own, and the source is named after both, `<source>.<top-up>`,
   so its curve is a series of its own and never mixed with the points the source earned alone. The
   top-up is read at its whole batches, the way a judging run is.
-- **A row's split is fixed where the row is made** — by its input's hash for a judging run and by its
-  turn for the reference data — so a row held out for the test in one pass is held out in every pass
-  after it, and two points of one gate are measured on one test set that only grows.
+- **A row's split is fixed where the row is made** — by its input's hash — so a row held out for the test in
+  one pass is held out in every pass after it, and two points of one gate are measured on one test set that only grows.
 - **Rows are copied, not pointed at.** A pass copies each gate's three files into its own folder
   before anything goes to a node, and trains on that copy for its whole life, however the source
   moves under it.
@@ -93,8 +88,8 @@ The driver asks those four and never which kind of source it is talking to.
   with too little of it to learn from or to be measured on.
 - **A gate is trained again once a quarter of its rows are new** to its last trained point: rows whose
   id its last pass did not carry, counted against the rows that pass carried. A row is new because the
-  data grew, or because its input changed — a reference gate whose index lines were rewritten has new
-  rows without having grown — and either is new data. A learning curve moves with the logarithm of the
+  data grew, or because its input changed — a gate whose input was rebuilt has new rows without having
+  grown — and either is new data. A learning curve moves with the logarithm of the
   data, so points a constant ratio apart are evenly spaced along it, and the cost of every pass a gate
   ever gets is bounded by a few times the cost of its last one rather than by how often a pass
   is run.
@@ -105,15 +100,13 @@ The driver asks those four and never which kind of source it is talking to.
 
 ## A pass
 
-- **A pass runs only when the owner asks for one.** No timer starts a pass over any source: a reference
-  round is started by its own command (`docs/reference-data.md`, 「A round on request」), and a pass
-  over the judging run by starting `bmo-gate-train.service` by hand.
-- **`bun scripts/laya-train.ts <source>` is one pass**, where the source is `reference:<run>`,
-  `judging:<run>` or `folder:<path>`. `--gate` narrows it to named gates, `--dry-run` says which gates
+- **A pass runs only when the owner asks for one.** No timer starts a pass over any source: a pass over the
+  judging run is started by starting `bmo-gate-train.service` by hand.
+- **`bun scripts/laya-train.ts <source>` is one pass**, where the source is `judging:<run>` or
+  `folder:<path>`. `--gate` narrows it to named gates, `--dry-run` says which gates
   it would train and why the rest wait, and `--show` prints the curve.
 - **`--give-way` holds every gate until the operations machine is quiet** before it is handed to a node: no job
-  or other training running but the units `--spare <unit>` names, and memory to spare — the quiet a
-  reference round waits for (`docs/reference-data.md`, 「A round on request」). The wait has no bound
+  or other training running but the units `--spare <unit>` names, and memory to spare. The wait has no bound
   and is apart from the card's, so a node is never dropped from the pass for it.
 - **One pass at a time per source.** A pass claims its source's curve before it starts and a second
   one stands down while the first lives. Standing down is not a failure — the pass already going is
@@ -174,8 +167,7 @@ The driver asks those four and never which kind of source it is talking to.
   pass says which node dropped out and why, and goes on with the rest.
 - **Where no training node is left, nothing trains and it is said so.** A pass with no node left says
   there is no node to train on and which nodes dropped out, and ends without fault, as a pass of an
-  empty list does; every node command refuses with the same words; and a reference round refuses
-  before it starts (`docs/reference-data.md`, 「A round on request」).
+  empty list does; and every node command refuses with the same words.
 - **A node of the service may be among them only where its training gives way.** Its card answers
   the gates and the voice unit, so its occupants stand `laya-train` below both, and a run there gives the
   card back whenever either asks (「One gate on one node」; `docs/llm-server.md`, 「Training on a service
@@ -376,8 +368,8 @@ picked up rather than begun again.
 
 ## Rotating the collection
 
-Every pass collects a checkpoint of some hundreds of megabytes a gate, and a reference round runs
-pass after pass, so the collection is rotated around what the service answers with: a gate's
+Every pass collects a checkpoint of some hundreds of megabytes a gate, and passes follow one another, so the
+collection is rotated around what the service answers with: a gate's
 collection keeps what it is served by and what it could be rolled back to or put in service next,
 and nothing else.
 
@@ -484,8 +476,8 @@ prints the sheet and writes it beside the ledger; `--json` gives the same figure
     with it is right by that measure and by no other.
   - **Balanced accuracy is what says a training worked.** A model that always gives a gate's common
     answer scores high on plain agreement and decides nothing.
-  - **The yes answers given back are counted apart** because they are the rarer answer of every
-    reference gate: a checkpoint that learns to say no scores well on everything else.
+  - **The yes answers given back are counted apart** because they are the rarer answer of a lopsided gate:
+    a checkpoint that learns to say no scores well on everything else.
   - **A gate whose run left no report keeps its line** and says what stopped it, because a table that
     quietly holds fewer gates than were trained is a table that has been read wrong.
 - **The missed calls stand in a table of their own**, threshold by threshold, for every gate that

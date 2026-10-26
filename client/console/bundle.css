@@ -1,9 +1,0 @@
-/* The utility classes the gates' pages use, on the layer's tokens. Tailwind's theme and the component library's are
-   read for reference alone, their variables being the console's copy, so nothing but the pages' utilities is
-   written: the library's own sources, which the console's stylesheet already covers, are not read for classes. */
-@reference "tailwindcss";
-@reference "../.nuxt/ui.css";
-@import "tailwindcss/utilities.css" source(none);
-@source "../app";
-@source not "../node_modules";
-@source not "../.nuxt";

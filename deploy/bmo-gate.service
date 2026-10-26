@@ -13,13 +13,10 @@ Type=oneshot
 WorkingDirectory=%h/.local/share/bmo-gate/deploy/training/tooling
 Environment=BMO_DATA_DIR=%h/.local/share/bmo/data
 Environment=PATH=%h/.bun/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
-# The sanitiser gate is left out: it is built apart, by a harvest this repository does not carry, and the
-# roster driver turns it back.
-#
 # Always resumed, never overwritten: the unit is restarted by a crash, a failure or a reboot, and
 # every one of those must take up at the batch after the last one frozen. An overwrite here would
 # throw away a day's work on the first restart.
-ExecStart=%h/.bun/bin/bun scripts/laya-synth.ts --run full-1 --except sanitizer --rows 9000 --batch 20 --resume
+ExecStart=%h/.bun/bin/bun scripts/laya-synth.ts --run full-1 --rows 9000 --batch 20 --resume
 Restart=on-failure
 RestartSec=60
 

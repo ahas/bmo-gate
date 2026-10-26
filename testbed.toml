@@ -8,8 +8,8 @@ name = "bmo-gate"
 # `tests/`, so one `cargo test` gathers them with the rest.
 [test]
 languages = ["cargo", "bun"]
-# The two Bun projects' packages, which their checks and the bundle's types stand on.
-setup = ["cd training/tooling && bun install --frozen-lockfile", "cd package && bun install --frozen-lockfile", "cd client && bun install --frozen-lockfile"]
+# The two Bun projects' packages, which their checks stand on.
+setup = ["cd training/tooling && bun install --frozen-lockfile", "cd package && bun install --frozen-lockfile"]
 
 # The store's tests make their own scratch databases on the suite's server, so no template is named.
 [test.database]
@@ -79,13 +79,6 @@ ln -sfn "$HOME/.local/share/bmo-gate/deploy/bin/bmo-gate" "$bmo_dir/bmo-gate"
 id = "tooling-packages"
 phase = "before-flip"
 command = "cd training/tooling && bun install --frozen-lockfile"
-
-# The console bundle, built into the release's client/dist, the folder the deployed settings' [console] names
-# (docs/layout.md, 「The console plugin bundle」).
-[[deploy.step]]
-id = "console-bundle"
-phase = "before-flip"
-command = "cd client && bun install --frozen-lockfile && bun run bundle"
 
 # The translator's tool placed as one folder, its release executable beside its manifest, schemas and manual, and
 # registered with the tool host as this repository's own, allowing the capability its entry asks for (docs/layout.md,

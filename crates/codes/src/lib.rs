@@ -15,8 +15,6 @@ pub enum Code {
   NotReady,
   Stopped,
   NoGate,
-  NoAnswer,
-  Shelved,
   NothingToChange,
   OwnLlm,
   TimeoutOutOfRange,
@@ -33,12 +31,11 @@ pub enum Code {
   LanguageUnknown,
   TooManyOriginals,
   TranslatorBusy,
-  Forbidden,
 }
 
 impl Code {
   /// Every code, in the order `docs/codes.md` lists them.
-  pub const ALL: [Code; 30] = [
+  pub const ALL: [Code; 27] = [
     Code::BadRequest,
     Code::Unauthorized,
     Code::NoRoute,
@@ -50,8 +47,6 @@ impl Code {
     Code::NotReady,
     Code::Stopped,
     Code::NoGate,
-    Code::NoAnswer,
-    Code::Shelved,
     Code::NothingToChange,
     Code::OwnLlm,
     Code::TimeoutOutOfRange,
@@ -68,7 +63,6 @@ impl Code {
     Code::LanguageUnknown,
     Code::TooManyOriginals,
     Code::TranslatorBusy,
-    Code::Forbidden,
   ];
 
   /// The code as the wire spells it: kebab-case.
@@ -85,8 +79,6 @@ impl Code {
       Code::NotReady => "not-ready",
       Code::Stopped => "stopped",
       Code::NoGate => "no-gate",
-      Code::NoAnswer => "no-answer",
-      Code::Shelved => "shelved",
       Code::NothingToChange => "nothing-to-change",
       Code::OwnLlm => "own-llm",
       Code::TimeoutOutOfRange => "timeout-out-of-range",
@@ -103,7 +95,6 @@ impl Code {
       Code::LanguageUnknown => "language-unknown",
       Code::TooManyOriginals => "too-many-originals",
       Code::TranslatorBusy => "translator-busy",
-      Code::Forbidden => "forbidden",
     }
   }
 
@@ -112,9 +103,8 @@ impl Code {
     match self {
       Code::BadRequest | Code::NothingToChange | Code::TooManyOriginals => 400,
       Code::Unauthorized => 401,
-      Code::Forbidden => 403,
       Code::NoRoute | Code::NotFound | Code::NoGate => 404,
-      Code::Conflict | Code::Stopped | Code::Shelved => 409,
+      Code::Conflict | Code::Stopped => 409,
       Code::TooLarge => 413,
       Code::OwnLlm
       | Code::TimeoutOutOfRange
@@ -130,7 +120,7 @@ impl Code {
       | Code::DocumentUnknown
       | Code::LanguageUnknown => 422,
       Code::Failed => 500,
-      Code::UpstreamFailed | Code::NoAnswer => 502,
+      Code::UpstreamFailed => 502,
       Code::NotReady | Code::TranslatorBusy => 503,
     }
   }

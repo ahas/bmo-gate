@@ -8,10 +8,9 @@ import { splitOf } from "./laya-dataset";
 import { indexOf, plainShapeLine, roomShapeLine } from "./room-shape";
 import { scrubText } from "./pii";
 import { roomKindOf } from "./conversation";
-import { candidateOf, synthesisFor } from "./laya-synth";
-import { questionsNow } from "./laya-wording";
+import { synthesisFor } from "./laya-synth";
 
-import type { ArchivedMessage, RecordedQuestions } from "./conversation";
+import type { ArchivedMessage } from "./conversation";
 import type { GateSynthesis } from "./laya-synth";
 import type { LayaQuestion, LayaRequest, LayaState } from "./laya";
 import type { DatasetSplit, SplitShares } from "./laya-dataset";
@@ -206,135 +205,6 @@ export function outputFormatRows(sent: readonly SentRow[], settings: RealSetting
   return rows;
 }
 
-// One recorded set's candidates, in the order the record names them, each with the question ids it
-// was asked under. A slug the record asked something other than this gate's own questions of is not
-// a candidate of this gate and is left out.
-function candidatesIn(gate: GateSynthesis, set: Record<string, LayaQuestion>): { slug: string; ids: string[] }[] {
-  const order: string[] = [];
-  const asked = new Map<string, string[]>();
-
-  for (const id of Object.keys(set)) {
-    const named = candidateOf(gate, id);
-
-    if (named === null) {
-      continue;
-    }
-
-    const held = asked.get(named.slug);
-
-    if (held === undefined) {
-      order.push(named.slug);
-      asked.set(named.slug, [id]);
-    } else {
-      held.push(id);
-    }
-  }
-
-  return order
-    .map((slug) => ({ slug, ids: asked.get(slug)! }))
-    .filter((one) => one.ids.length === gate.questions.length);
-}
-
-// The sets one recorded set really stands for, each holding as many candidates as the gate says it
-// offers (docs/laya-gates.md, 「Candidates per row」). A room's record holds every candidate that
-// room was ever offered, which for the person book runs to dozens, and the gate itself is never
-// handed more than its own maximum — so a row carrying the lot is a row no turn of that gate ever
-// saw, and the gate's own specification refuses it outright.
-//
-// The candidates are cut into groups of the gate's maximum. A remainder short of the minimum
-// reaches back over the group before it rather than being dropped, so every candidate the room was
-// offered stands in some set and the overlap costs only a candidate being asked about twice.
-export function offeredSets(gate: GateSynthesis, set: Record<string, LayaQuestion>): Record<string, LayaQuestion>[] {
-  const range = gate.candidates;
-
-  if (range === null) {
-    return Object.keys(set).length === 0 ? [] : [set];
-  }
-
-  const candidates = candidatesIn(gate, set);
-
-  if (candidates.length < range.min) {
-    return [];
-  }
-
-  const sets: Record<string, LayaQuestion>[] = [];
-
-  for (let at = 0; at < candidates.length; at += range.max) {
-    const taken = candidates.length - at < range.min
-      ? candidates.slice(candidates.length - range.min)
-      : candidates.slice(at, at + range.max);
-
-    sets.push(Object.fromEntries(taken.flatMap((one) => one.ids.map((id) => [id, set[id]!]))));
-  }
-
-  return sets;
-}
-
-// The candidate sets one gate really offered, kept per room and cut to what the gate offers. A room
-// with none offered the gate nothing that was ever recorded, and no row of that gate is built from
-// its turns.
-export function candidateSetsByRoom(gate: GateSynthesis, recorded: readonly RecordedQuestions[]): Map<number, Record<string, LayaQuestion>[]> {
-  const byRoom = new Map<number, Record<string, LayaQuestion>[]>();
-
-  for (const one of recorded) {
-    // A record of a gate deployed on an earlier wording of its question asks in that wording, and the rows
-    // built of it ask the gate's own (docs/gate-data.md, 「A question reworded」).
-    const asked = one.questions as Record<string, LayaQuestion>;
-    const sets = offeredSets(gate, questionsNow(gate, asked) ?? asked);
-
-    if (sets.length === 0) {
-      continue;
-    }
-
-    const held = byRoom.get(one.chatId) ?? [];
-
-    held.push(...sets);
-    byRoom.set(one.chatId, held);
-  }
-
-  return byRoom;
-}
-
-// The situation-rule matcher: the room's recent messages in the room shape as the situation, and the room's
-// standing rules as candidates, both halves of each rule named by its own slug.
-export function situationRows(
-  room: readonly ArchivedMessage[],
-  sets: readonly Record<string, LayaQuestion>[],
-  settings: RealSettings,
-): UnjudgedRow[] {
-  const gate = "situation-rules";
-  const rows: UnjudgedRow[] = [];
-  const kind = roomKindOf(room[0]?.chatId ?? 0, settings.who.ownerId);
-  const index = indexOf(room);
-  const lines = room.map((one) => roomShapeLine(one, index, settings.who));
-
-  if (sets.length === 0) {
-    return rows;
-  }
-
-  for (const [at, one] of room.entries()) {
-    if (rows.length >= settings.limit) {
-      break;
-    }
-
-    if (one.senderId === settings.who.agentId || !hasText(one)) {
-      continue;
-    }
-
-    const before = lines.slice(Math.max(0, at - 12), at + 1);
-    const questions = sets[at % sets.length]!;
-    const situation = newestFitting(before, (kept) => ({ state: { room: kind, situation: [...kept] }, questions }));
-
-    if (situation.length === 0) {
-      continue;
-    }
-
-    rows.push(unjudgedRowOf(gate, { room: kind, situation }, questions, settings.shares));
-  }
-
-  return rows;
-}
-
 // Where a gate's unjudged rows stand in its own folder, beside the batches a judging pass freezes.
 export const unjudgedFile = "unjudged.jsonl";
 
@@ -365,14 +235,12 @@ export interface RealMeta {
 export interface ConversationReads {
   rooms(): number[];
   messages(chatId: number): ArchivedMessage[];
-  recorded(stage: string): RecordedQuestions[];
   sent(): SentRow[];
 }
 
 // The gates this source builds rows for. A gate not named here has no material in the rooms and is
-// written on a road instead, or — the four reference gates — is made from the chat agent's own inputs and the
-// answers it sent (docs/reference-data.md).
-export const realSourceGates = ["reply-wanted", "output-format", "situation-rules"] as const;
+// written on a road instead.
+export const realSourceGates = ["reply-wanted", "output-format"] as const;
 
 // Every gate's rows, built room by room. A gate the rooms hold nothing for comes back with none
 // rather than being left out, so a count says the same thing about every gate.
@@ -387,10 +255,6 @@ export function realRows(reads: ConversationReads, settings: RealSettings, gates
       continue;
     }
 
-    const sets = gate === "situation-rules"
-      ? candidateSetsByRoom(specOf(gate), reads.recorded(gate))
-      : new Map<number, Record<string, LayaQuestion>[]>();
-
     for (const chatId of reads.rooms()) {
       if (rows.length >= settings.limit) {
         break;
@@ -401,8 +265,6 @@ export function realRows(reads: ConversationReads, settings: RealSettings, gates
 
       if (gate === "reply-wanted") {
         rows.push(...replyWantedRows(room, left));
-      } else if (gate === "situation-rules") {
-        rows.push(...situationRows(room, sets.get(chatId) ?? [], left));
       }
     }
   }

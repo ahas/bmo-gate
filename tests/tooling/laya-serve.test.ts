@@ -11,7 +11,7 @@ import { scratchDir } from "./scratch";
 import type { NodeRunner, RunResult } from "../../training/tooling/src/node-calls";
 
 const CONSOLE = "/opt/console/main.ts";
-const CHECKPOINT = "room-rules/real-1-hand/step-000044";
+const CHECKPOINT = "output-format/real-1-hand/step-000044";
 const TAR = "the checkpoint, packed";
 
 const answer = (stdout: string, code = 0): RunResult => ({ code, stdout, stderr: "" });
@@ -77,7 +77,7 @@ function asking(node: Node, root: string, changes: Partial<ServeAsk> = {}): Serv
       writeFileSync(tarball, TAR);
       return { code: 0, stderr: "" };
     },
-    health: async () => ({ gates: { "room-rules": { model: `checkpoints/${CHECKPOINT}` } } }),
+    health: async () => ({ gates: { "output-format": { model: `checkpoints/${CHECKPOINT}` } } }),
     wait: async () => {},
     healthPolls: 2,
     ...changes,
@@ -86,14 +86,14 @@ function asking(node: Node, root: string, changes: Partial<ServeAsk> = {}): Serv
 
 describe("the settings file a gate is named in", () => {
   test("the gate's pair is replaced and every other pair and line is left as it stood", () => {
-    const text = 'LAYA_CARD_MODELS=8\nLAYA_CHECKPOINTS="output-decide=checkpoints/a/r/step-000001 room-rules=checkpoints/b/r/step-000002"\n';
-    expect(namedSettings(text, "room-rules", CHECKPOINT))
-      .toBe(`LAYA_CARD_MODELS=8\nLAYA_CHECKPOINTS="output-decide=checkpoints/a/r/step-000001 room-rules=checkpoints/${CHECKPOINT}"\n`);
+    const text = 'LAYA_CARD_MODELS=8\nLAYA_CHECKPOINTS="output-decide=checkpoints/a/r/step-000001 output-format=checkpoints/b/r/step-000002"\n';
+    expect(namedSettings(text, "output-format", CHECKPOINT))
+      .toBe(`LAYA_CARD_MODELS=8\nLAYA_CHECKPOINTS="output-decide=checkpoints/a/r/step-000001 output-format=checkpoints/${CHECKPOINT}"\n`);
   });
 
   test("a gate not named yet is added, and a file naming none gains the setting", () => {
-    expect(namedSettings('LAYA_CHECKPOINTS=""\n', "room-rules", CHECKPOINT)).toBe(`LAYA_CHECKPOINTS="room-rules=checkpoints/${CHECKPOINT}"\n`);
-    expect(namedSettings("", "room-rules", CHECKPOINT)).toBe(`LAYA_CHECKPOINTS="room-rules=checkpoints/${CHECKPOINT}"\n`);
+    expect(namedSettings('LAYA_CHECKPOINTS=""\n', "output-format", CHECKPOINT)).toBe(`LAYA_CHECKPOINTS="output-format=checkpoints/${CHECKPOINT}"\n`);
+    expect(namedSettings("", "output-format", CHECKPOINT)).toBe(`LAYA_CHECKPOINTS="output-format=checkpoints/${CHECKPOINT}"\n`);
   });
 
   test("the checkpoint serving a gate is read off the engine's health", () => {
@@ -110,7 +110,7 @@ describe("putting a checkpoint in service", () => {
 
     expect(await serveCheckpoint(asking(node, root, { partBytes: 8 }))).toEqual({ carried: true, gate: null });
 
-    const tarball = "incoming/room-rules-real-1-hand-step-000044.tar";
+    const tarball = "incoming/output-format-real-1-hand-step-000044.tar";
     const parts = [...node.carried.keys()];
     expect(parts).toEqual(["000", "001", "002"].map((n) => `/srv/trainer/bmo-laya/${tarball}.part-${n}`));
     expect(parts.map((part) => node.carried.get(part)).join("")).toBe(TAR);
@@ -139,32 +139,32 @@ describe("putting a checkpoint in service", () => {
   test("naming it for a gate writes that pair alone, restarts the engine and waits until health says so", async () => {
     const node = fakeNode({ standing: true, settings: 'LAYA_CHECKPOINTS="output-decide=checkpoints/a/r/step-000001"\n' });
 
-    expect(await serveCheckpoint(asking(node, collection(), { gate: "room-rules" }))).toEqual({ carried: false, gate: "room-rules" });
+    expect(await serveCheckpoint(asking(node, collection(), { gate: "output-format" }))).toEqual({ carried: false, gate: "output-format" });
     expect(node.carried.get("/srv/trainer/.config/bmo-laya/env"))
-      .toBe(`LAYA_CHECKPOINTS="output-decide=checkpoints/a/r/step-000001 room-rules=checkpoints/${CHECKPOINT}"\n`);
+      .toBe(`LAYA_CHECKPOINTS="output-decide=checkpoints/a/r/step-000001 output-format=checkpoints/${CHECKPOINT}"\n`);
     expect(node.commands.at(-1)).toContain("systemctl --user restart bmo-llm-laya.service");
   });
 
   test("an engine that never answers with the new checkpoint is said so", async () => {
     const node = fakeNode({ standing: true });
 
-    expect(await serveCheckpoint(asking(node, collection(), { gate: "room-rules", health: async () => null }))).toContain("journalctl");
+    expect(await serveCheckpoint(asking(node, collection(), { gate: "output-format", health: async () => null }))).toContain("journalctl");
   });
 
   test("a name that is not a collected checkpoint reaches no node", async () => {
     const node = fakeNode();
     const root = collection();
 
-    expect(await serveCheckpoint(asking(node, root, { checkpoint: "room-rules/real-1-hand" }))).toContain("is not of the shape");
-    expect(await serveCheckpoint(asking(node, root, { checkpoint: "room-rules/other/step-000001" }))).toContain("laya-collect");
+    expect(await serveCheckpoint(asking(node, root, { checkpoint: "output-format/real-1-hand" }))).toContain("is not of the shape");
+    expect(await serveCheckpoint(asking(node, root, { checkpoint: "output-format/other/step-000001" }))).toContain("laya-collect");
     expect(await serveCheckpoint(asking(node, root, { gate: "Room Rules" }))).toContain("is not a gate's name");
     expect(node.commands).toEqual([]);
-    expect(existsSync(join(root, "room-rules", "other"))).toBe(false);
+    expect(existsSync(join(root, "output-format", "other"))).toBe(false);
   });
 });
 
 describe("releasing a gate the gate service no longer asks", () => {
-  const settings = `LAYA_CARD_MODELS=8\nLAYA_CHECKPOINTS="content-judge=checkpoints/c/r/step-000060 room-rules=checkpoints/${CHECKPOINT}"\n`;
+  const settings = `LAYA_CARD_MODELS=8\nLAYA_CHECKPOINTS="content-judge=checkpoints/c/r/step-000060 output-format=checkpoints/${CHECKPOINT}"\n`;
 
   function releasing(node: Node, changes: Partial<ReleaseAsk> = {}): ReleaseAsk {
     return {
@@ -173,7 +173,7 @@ describe("releasing a gate the gate service no longer asks", () => {
       node: "echo",
       gate: "content-judge",
       tmpRoot: scratchDir("bmo-laya-release-"),
-      health: async () => ({ gates: { "room-rules": { model: `checkpoints/${CHECKPOINT}` } } }),
+      health: async () => ({ gates: { "output-format": { model: `checkpoints/${CHECKPOINT}` } } }),
       wait: async () => {},
       healthPolls: 2,
       ...changes,
@@ -184,13 +184,13 @@ describe("releasing a gate the gate service no longer asks", () => {
     const node = fakeNode({ settings });
 
     expect(await releaseGate(releasing(node))).toEqual({ released: true });
-    expect(node.carried.get("/srv/trainer/.config/bmo-laya/env")).toBe(`LAYA_CARD_MODELS=8\nLAYA_CHECKPOINTS="room-rules=checkpoints/${CHECKPOINT}"\n`);
+    expect(node.carried.get("/srv/trainer/.config/bmo-laya/env")).toBe(`LAYA_CARD_MODELS=8\nLAYA_CHECKPOINTS="output-format=checkpoints/${CHECKPOINT}"\n`);
     expect(node.commands.at(-1)).toContain("systemctl --user restart bmo-llm-laya.service");
     expect(node.commands.some((command) => command.includes("rm "))).toBe(false);
   });
 
   test("a node without the pair is left as it is and not restarted", async () => {
-    const node = fakeNode({ settings: `LAYA_CHECKPOINTS="room-rules=checkpoints/${CHECKPOINT}"\n` });
+    const node = fakeNode({ settings: `LAYA_CHECKPOINTS="output-format=checkpoints/${CHECKPOINT}"\n` });
 
     expect(await releaseGate(releasing(node))).toEqual({ released: false });
     expect(releasedSettings("", "content-judge")).toBeNull();

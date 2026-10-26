@@ -1,100 +1,23 @@
-//! The gates that pick a turn's reference out of an index (docs/reference-selection.md): each reference gate in
-//! the order its picks stand in a prompt, the person-book search and the memory picker beside them, the
-//! situation-rule matcher, and how the road writes down what a turn's gate decided. The question Laya asks of each
-//! gate's candidates is Laya's (`crate::laya`).
+//! What a turn is handed with no pick (docs/reference-selection.md): how much it may carry together, how much of a
+//! speaker's sheet attaches, and how many due memories it carries.
 
 use serde::Deserialize;
-
-/// When the bot's own lines alone ask a gate.
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
-pub enum BotLinesAlone {
-  #[serde(rename = "never")]
-  Never,
-  #[serde(rename = "own turn")]
-  OwnTurn,
-  #[serde(rename = "own turn, named items")]
-  OwnTurnNamedItems,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ReferenceGate {
-  pub stage: String,
-  pub budget: usize,
-  pub hold: u8,
-  pub bot_lines_alone: BotLinesAlone,
-  pub reads_answered: bool,
-  pub speakers_keep: bool,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct PeopleSearch {
-  pub stage: String,
-  pub cap: usize,
-  pub budget: usize,
-  pub bot_lines_alone: BotLinesAlone,
-  pub reads_answered: bool,
-  pub speakers_keep: bool,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct MemoryPicker {
-  pub stage: String,
-  pub budget: usize,
-  pub due: usize,
-  pub index_chars: usize,
-  pub bot_lines_alone: BotLinesAlone,
-  pub reads_answered: bool,
-  pub speakers_keep: bool,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Decided {
-  pub by_fallback: String,
-  pub nothing_attached: String,
-  pub no_candidates: String,
-  pub no_candidates_detail: String,
-}
-
-/// The keywords a picker's and the matcher's verdict lines open with.
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Verdicts {
-  pub picked: String,
-  pub matched: String,
-  pub nothing: String,
-  pub unreadable: String,
-  pub no_answer: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Situation {
-  pub budget: usize,
-  pub nothing_matched: String,
-}
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Reference {
+  /// What a turn may carry together, in characters.
   pub turn_budget_chars: usize,
+  /// What a person's sheet may hold where it attaches, in characters.
   pub sheet_chars: usize,
+  /// How many lines of a speaker's sheet attach as its head.
   pub sheet_lines: usize,
-  pub gates: Vec<ReferenceGate>,
-  pub people: PeopleSearch,
-  pub memories: MemoryPicker,
-  pub situation: Situation,
-  pub decided: Decided,
-  pub verdicts: Verdicts,
-}
-
-impl Reference {
-  pub fn gate(&self, stage: &str) -> Option<&ReferenceGate> {
-    self.gates.iter().find(|gate| gate.stage == stage)
-  }
+  /// How many of a room's due memories attach.
+  pub due: usize,
+  /// How long a standing row's line in the brain's index runs, in characters.
+  pub index_chars: usize,
+  /// What the rows a turn's events wake may come to, in characters.
+  pub woken_budget: usize,
 }
 
 crate::part!(pub REFERENCE: Reference = "reference.toml");

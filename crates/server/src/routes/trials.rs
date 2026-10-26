@@ -1,13 +1,13 @@
 //! Trials (`docs/api.md`, 「Trials」): one prompt put to one gate as a turn would put it, kept with who asked and
-//! what came back, and a gate's trials read back oldest first; a console's reader puts them too (「Console」).
+//! what came back, and a gate's trials read back oldest first.
 
 use std::sync::Arc;
 use std::time::Instant;
 
 use axum::Json;
 use axum::extract::State;
-use axum::http::{HeaderMap, StatusCode};
-use bmo_gate_client::{ConsoleTrial, NewTrial, Page, Trial, TrialQuery};
+use axum::http::StatusCode;
+use bmo_gate_client::{NewTrial, Page, Trial, TrialQuery};
 use gate_codes::Code;
 use gate_runs::GateRequest;
 use gate_runs::records::now;
@@ -18,7 +18,6 @@ use sea_orm::{
 
 use crate::App;
 use crate::answer::{Answered, Body, Query, Refused};
-use crate::console::OWNER_KEY;
 use crate::routes::gates::{gate, instructions_of};
 use crate::routes::judgements::page;
 
@@ -42,21 +41,6 @@ pub async fn add(
   Body(asked): Body<NewTrial>,
 ) -> Answered<(StatusCode, Json<Trial>)> {
   put(&app, asked.gate_name, asked.prompt, asked.user_name, None).await
-}
-
-/// A trial put through a console (`docs/api.md`, 「Console」): kept with no user name, under the reader's owner key
-/// where the call carries one.
-pub async fn add_from_console(
-  State(app): State<Arc<App>>,
-  headers: HeaderMap,
-  Body(asked): Body<ConsoleTrial>,
-) -> Answered<(StatusCode, Json<Trial>)> {
-  let owner = headers
-    .get(OWNER_KEY)
-    .and_then(|value| value.to_str().ok())
-    .and_then(|value| value.parse::<i64>().ok());
-
-  put(&app, asked.gate_name, asked.prompt, String::new(), owner).await
 }
 
 async fn put(

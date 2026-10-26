@@ -5,45 +5,17 @@ import { basename, join } from "node:path";
 import { growingCounts, mergeGates, rarerOf, readsAsRehearsal } from "../gate-merge";
 import { datasetSplits } from "../laya-dataset";
 import { splitFiles } from "../laya-frozen";
-import { gateDataFile, gatesFolder } from "../reference/tick";
 import { dataPath, runFolder } from "../roots";
 import { copyGateRows } from "./source";
 
 import type { DatasetRow, DatasetSplit } from "../laya-dataset";
 import type { GateBars, GateCopy, GateCount, GateSource } from "./source";
 
-// The three kinds of source a pass reads (docs/training.md, 「Where the data comes from」). Each
+// The two kinds of source a pass reads (docs/training.md, 「Where the data comes from」). Each
 // declares the bars its own gates are held to.
 
 // A thousand rows is about a hundred and fifty test rows at the shares every source holds out.
 export const rowFloor = 1_000;
-
-// The reference gates' yes answers are a few in a hundred, so they wait for this many as well.
-export const referenceYesFloor = 200;
-
-// The reference data (docs/reference-data.md): one folder a gate, put in place whole by each of its
-// passes, with the gate's counts beside its rows.
-export function referenceSource(run: string, root: string = run.startsWith("/") ? run : dataPath("reference-data", run)): GateSource {
-  const gates = join(root, gatesFolder);
-
-  return {
-    name: basename(root),
-    rehearsal: false,
-    counts: () => {
-      if (!existsSync(gates)) {
-        return `${gates} does not exist. Run a round of the reference data first.`;
-      }
-
-      return readdirSync(gates).sort().filter((gate) => existsSync(join(gates, gate, gateDataFile))).map((gate): GateCount => {
-        const data = JSON.parse(readFileSync(join(gates, gate, gateDataFile), "utf8")) as { rows: Record<DatasetSplit, number>; yes: number };
-
-        return { gate, rows: data.rows, rarer: data.yes, series: "" };
-      });
-    },
-    bars: () => ({ floor: rowFloor, rarer: referenceYesFloor }),
-    copy: (gate, to) => copyGateRows(join(gates, gate), gate, to),
-  };
-}
 
 // A judging run, read at its whole batches while its judging goes on (docs/gate-data.md, 「A run
 // folder」). A gate started over is a series of its own, told apart by when its judging began.
@@ -207,25 +179,23 @@ export function toppedUp(base: GateSource, run: string, root: string = runFolder
   };
 }
 
-// A source as a pass is told it: `reference:<run>`, `judging:<run>` or `folder:<path>`. This is the
-// one place that knows there are three kinds.
+// A source as a pass is told it: `judging:<run>` or `folder:<path>`. This is the one place that
+// knows there are two kinds.
 export function sourceOf(said: string, options: { rarer?: number } = {}): GateSource | string {
   const cut = said.indexOf(":");
   const kind = cut < 0 ? "" : said.slice(0, cut);
   const where = cut < 0 ? "" : said.slice(cut + 1);
 
   if (where === "") {
-    return `${said} is none of reference:<run>, judging:<run>, folder:<path>.`;
+    return `${said} is none of judging:<run>, folder:<path>.`;
   }
 
   switch (kind) {
-    case "reference":
-      return referenceSource(where);
     case "judging":
       return judgingSource(where, options.rarer ?? 0);
     case "folder":
       return folderSource(where);
     default:
-      return `${said} is none of reference:<run>, judging:<run>, folder:<path>.`;
+      return `${said} is none of judging:<run>, folder:<path>.`;
   }
 }
