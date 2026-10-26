@@ -80,6 +80,7 @@ fn entry_of(entry: IndexEntry) -> bmo_gate_client::IndexEntry {
     slug: entry.slug,
     holds: entry.holds,
     read_when: entry.read_when,
+    path: entry.path,
   }
 }
 

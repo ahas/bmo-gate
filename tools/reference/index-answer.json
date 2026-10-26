@@ -6,25 +6,61 @@
       "items": {
         "type": "object",
         "properties": {
-          "group": { "type": "string" },
-          "unread": { "type": "integer", "description": "How many of its entries this session has not read." },
-          "hint": { "type": ["string", "null"], "description": "What changed in the last three days, or null." },
+          "group": {
+            "type": "string"
+          },
+          "unread": {
+            "type": "integer",
+            "description": "How many of its entries this session has not read."
+          },
+          "hint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What changed in the last three days, or null."
+          },
           "entries": {
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "slug": { "type": "string" },
-                "holds": { "type": "string" },
-                "readWhen": { "type": ["string", "null"] }
+                "slug": {
+                  "type": "string"
+                },
+                "holds": {
+                  "type": "string"
+                },
+                "readWhen": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "path": {
+                  "type": "string",
+                  "description": "The path a piece read of the entry is recorded under among the session's loads."
+                }
               },
-              "required": ["slug", "holds", "readWhen"]
+              "required": [
+                "slug",
+                "holds",
+                "readWhen",
+                "path"
+              ]
             }
           }
         },
-        "required": ["group", "unread", "hint", "entries"]
+        "required": [
+          "group",
+          "unread",
+          "hint",
+          "entries"
+        ]
       }
     }
   },
-  "required": ["groups"]
+  "required": [
+    "groups"
+  ]
 }

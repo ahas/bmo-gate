@@ -26,7 +26,7 @@ fn nothing(_: &str) -> Option<String> {
 async fn the_index_a_piece_and_a_search_go_to_the_gate_for_the_turns_room_and_session() {
   let gate = Stub::start().await;
   let index = json!({ "groups": [{ "group": "knowledge", "unread": 1, "hint": null, "entries": [
-    { "slug": "release", "holds": "How a release goes out", "readWhen": "needed when releasing" }
+    { "slug": "release", "holds": "How a release goes out", "readWhen": "needed when releasing", "path": "knowledge/release.md" }
   ] }] });
   let piece = json!({ "slug": "release", "group": "knowledge", "path": "knowledge/release.md", "text": "The whole piece." });
   let found = json!({ "entries": [{ "slug": "release", "group": "knowledge", "holds": "How a release goes out", "readWhen": null }] });

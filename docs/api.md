@@ -111,7 +111,7 @@ It answers `entries`, each `path`, `text` and `source` (`document`, `person`, `r
 
 | Route | Query | Answer |
 |---|---|---|
-| `GET /reference/index` | `session?`, `room`, `agent?` | `groups`, each `group`, `unread`, `hint` (or null) and `entries`, each `slug`, `holds`, `readWhen` (or null) |
+| `GET /reference/index` | `session?`, `room`, `agent?` | `groups`, each `group`, `unread`, `hint` (or null) and `entries`, each `slug`, `holds`, `readWhen` (or null) and `path`, the path a piece read of it is recorded under among the session's loads |
 | `GET /reference/pieces/{slug}` | `room`, `group`, `session?`, `agent?` | `slug`, `group`, `path`, `text` |
 | `GET /reference/search` | `q`, `room`, `limit?` (8 where absent, at most 24), `agent?` | `entries`, each `slug`, `group`, `holds`, `readWhen` (or null) |
 

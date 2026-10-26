@@ -444,6 +444,8 @@ pub struct IndexEntry {
   pub slug: String,
   pub holds: String,
   pub read_when: Option<String>,
+  /// The path a piece read of the entry is recorded under among the session's loads.
+  pub path: String,
 }
 
 /// One group of the index: `system-documents`, `room-rules`, `knowledge`, `people` or `room-memories`, how many of

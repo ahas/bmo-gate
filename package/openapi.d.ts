@@ -562,6 +562,8 @@ export interface components {
         /** @description One entry of the index: its slug, what it holds and when it is read, null where its title says not. */
         IndexEntry: {
             holds: string;
+            /** @description The path a piece read of the entry is recorded under among the session's loads. */
+            path: string;
             readWhen: string | null;
             slug: string;
         };

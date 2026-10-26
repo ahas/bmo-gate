@@ -44,7 +44,7 @@ pieces themselves live in the brain, and the system documents among them are the
 
 | Route | Query | Answer |
 |---|---|---|
-| `GET /reference/index` | `session?`, `room`, `agent?` | `groups`, each `group`, `unread`, `hint` and `entries` (each `slug`, `holds`, `readWhen`) |
+| `GET /reference/index` | `session?`, `room`, `agent?` | `groups`, each `group`, `unread`, `hint` and `entries` (each `slug`, `holds`, `readWhen`, `path`) |
 | `GET /reference/pieces/{slug}` | `room`, `group`, `session?`, `agent?` | `slug`, `group`, `path`, `text` |
 | `GET /reference/search` | `q`, `room`, `limit?`, `agent?` | `entries`, each `slug`, `group`, `holds`, `readWhen` |
 
@@ -52,7 +52,8 @@ pieces themselves live in the brain, and the system documents among them are the
   it, the lore of the agent's brain), `room-rules` (the room's rules and its situation rules), `knowledge`, `people`
   (everyone the brain knows facts of in the room) and `room-memories` (the room's standing memories). The agent is
   the one named, else the chat agent.
-- **An entry** is the row's `slug`, what it `holds` and when to read it, `readWhen`. A knowledge piece's or a
+- **An entry** is the row's `slug`, what it `holds`, when to read it, `readWhen`, and its `path`, the path a piece
+  read of it is recorded under among the session's loads, which is how a caller names what a session read. A knowledge piece's or a
   rule's title is split where it says when it is needed — at "; needed", "; consulted" and their kin up to the
   "when" that follows — what stands before being `holds` and the rest `readWhen`; a title that says no such thing
   is all `holds`, with `readWhen` null. A situation rule holds its action and is read when its condition holds; a

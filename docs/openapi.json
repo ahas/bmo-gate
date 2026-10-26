@@ -646,6 +646,10 @@
           "holds": {
             "type": "string"
           },
+          "path": {
+            "description": "The path a piece read of the entry is recorded under among the session's loads.",
+            "type": "string"
+          },
           "readWhen": {
             "type": [
               "string",
@@ -659,7 +663,8 @@
         "required": [
           "slug",
           "holds",
-          "readWhen"
+          "readWhen",
+          "path"
         ],
         "type": "object"
       },
