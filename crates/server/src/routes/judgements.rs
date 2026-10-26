@@ -9,7 +9,8 @@ use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
 use bmo_gate_client::{
-  AttachJudgements, Judgement, JudgementQuery, KeptCounts, NewJudgement, Offer, Page, Road, Tokens,
+  AttachJudgements, Judgement, JudgementLine, JudgementQuery, KeptCounts, NewJudgement, Offer, Page, Road,
+  Tokens,
 };
 use gate_runs::records;
 use gate_store::entity::{gate_roads, judgements, reference_offers};
@@ -76,6 +77,13 @@ pub(crate) fn judgement_of(row: &judgements::Model) -> Judgement {
     created_at: row.created_at,
     ms: row.ms,
     round: row.round.clone(),
+    lines: records::lines_of(row)
+      .into_iter()
+      .map(|asked| JudgementLine {
+        line: asked.line,
+        answer: asked.answer,
+      })
+      .collect(),
     roads: vec![],
     offers: vec![],
   }
@@ -209,6 +217,7 @@ pub async fn add(
       detail: judged.detail.as_deref(),
       ms: judged.ms,
       round: judged.round.as_deref(),
+      lines: &[],
     },
   )
   .await

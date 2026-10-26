@@ -281,6 +281,7 @@ pub async fn gate_message<P: Probe<Input = String, Verdict = String>>(
             detail: decision.detail.as_deref(),
             ms: Some(decision.ms),
             round: None,
+            lines: &[],
           },
         )
         .await;

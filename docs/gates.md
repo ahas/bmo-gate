@@ -181,6 +181,19 @@
   A decision on Laya is written the same way whoever settled it — Laya, the fallback LLM or the default — and
   its detail says which, and where Laya gave no verdict why: its failure kind, a busy card with the reason the
   engine gave, as `busy: the card is taken for <claim>` (`docs/laya.md`, 「A gate whose provider is Laya」).
+- **Their judgements carry the lines the model was asked of their candidates, each with what it answered of
+  it,** so the room's log shows exactly what the model read beside what it said. A line is written as the model
+  read it, character for character, in the order it read them, and its answer is null where the answer was not
+  read (`UNREADABLE`, `NO-ANSWER`):
+
+  | Judgement | Its lines | Each line's answer |
+  |---|---|---|
+  | a run of a picker's model | each candidate's index line, as the request's index carries it | `yes` or `no`; for `people-search`, `yes` for a candidate it named and `no` for one it passed over |
+  | a run of the matcher's model | each rule's line, as the request's rules carry it | `applies: <yes\|no>, spent: <yes\|no>` |
+  | a decision on Laya | each question Laya was asked: a picker's one per candidate, the matcher's two per rule (`docs/laya.md`, 「Each gate's probe」) | `yes` or `no` where Laya settled it; null where its fallback LLM or the default did, whose own run judgement carries the lines that model read |
+
+  A candidate is named in its line by the name the gate offers it under, which is the name its answer and its
+  verdict record keep. Every other judgement carries no lines.
 - **A reference gate, `people-search`, `room-memories` or `situation-rules` that is on for the turn but has no
   candidate left once the code has narrowed them** — a room with no rulebook, an agent with no knowledge of its own, a turn
   no situation rule of the room is open for — is not asked, and leaves the judgement `SKIP: no candidates` in

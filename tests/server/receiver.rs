@@ -121,6 +121,7 @@ async fn a_judgement_is_written_as_it_comes_and_told_to_the_stream() {
     2
   );
   assert_eq!(body.as_object().unwrap().get("roads"), Some(&Value::Array(vec![])));
+  assert_eq!(body["lines"], json!([]));
 }
 
 #[tokio::test]

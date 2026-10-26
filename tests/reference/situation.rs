@@ -4,7 +4,9 @@
 
 use gate_ports::brain::{Condition, Event};
 use gate_reference::pick::run_verdict;
-use gate_reference::situation::{Verdicts, event_entries, parse_answer, sides_of, situation_entries};
+use gate_reference::situation::{
+  Asked, Candidate, Verdicts, event_entries, parse_answer, question_lines, sides_of, situation_entries,
+};
 use gate_reference::{RoomKind, SituationTurn, Source};
 
 use crate::fakes::memory;
@@ -34,6 +36,53 @@ fn a_label_reads_back_into_its_two_sides() {
 
   assert_eq!(verdicts.label(), "applies=a,b spent=none");
   assert_eq!(sides_of("applies=a,b spent=none"), Some((vec!["a".into(), "b".into()], vec![])));
+}
+
+// The lines the gate's judgements keep, each with its answer.
+async fn lines_of(ground: &crate::Ground, stage: &str) -> Vec<(String, Option<String>)> {
+  ground
+    .scratch
+    .texts(
+      "SELECT lines FROM judgements WHERE stage = $1 AND lines IS NOT NULL ORDER BY id",
+      vec![stage.into()],
+    )
+    .await
+    .iter()
+    .flat_map(|lines| serde_json::from_str::<Vec<serde_json::Value>>(lines).unwrap())
+    .map(|one| (one["line"].as_str().unwrap().to_owned(), one["answer"].as_str().map(str::to_owned)))
+    .collect()
+}
+
+#[test]
+fn a_decision_on_laya_keeps_both_questions_of_every_rule_as_laya_read_them() {
+  let input = Asked {
+    room: RoomKind::Owner,
+    message_lines: vec!["Owner (id 5): still up?".into()],
+    candidates: vec![Candidate {
+      slug: "late".into(),
+      condition: "someone writes after midnight".into(),
+      action: "say good night".into(),
+    }],
+  };
+  let settled = Verdicts {
+    applies: vec!["late".into()],
+    spent: vec![],
+    answers: None,
+  };
+  let lines = question_lines(&input, Some(&settled));
+  let questions = &gate_policy::laya::QUESTIONS.situation;
+
+  assert_eq!(lines.len(), 2);
+  assert!(
+    lines[0].line.starts_with(&questions.applies) && lines[0].line.contains("late"),
+    "{lines:?}"
+  );
+  assert!(lines[1].line.starts_with(&questions.spent), "{lines:?}");
+  assert_eq!(
+    lines.iter().map(|line| line.answer.as_deref()).collect::<Vec<_>>(),
+    [Some("yes"), Some("no")]
+  );
+  assert!(question_lines(&input, None).iter().all(|line| line.answer.is_none()));
 }
 
 fn turn() -> SituationTurn {
@@ -101,6 +150,20 @@ async fn a_rule_that_fits_attaches_its_action_and_what_matched_and_spent_go_to_t
       .await,
     ["MATCH: applies=late spent=old"]
   );
+  // The judgement keeps each rule's line as the model read it, beside both its answers.
+  assert_eq!(
+    lines_of(&ground, "situation-rules").await,
+    [
+      (
+        "- late \u{2014} someone writes after midnight, say good night".to_owned(),
+        Some("applies: yes, spent: no".to_owned())
+      ),
+      (
+        "- old \u{2014} the release ships, tell the room".to_owned(),
+        Some("applies: no, spent: yes".to_owned())
+      ),
+    ]
+  );
   assert!(
     ground.gateway.asked.lock().unwrap()[0]
       .input
@@ -145,6 +208,10 @@ async fn a_matcher_answering_a_sentence_writes_unreadable_with_the_answer_as_its
       )
       .await,
     ["UNREADABLE / Still up? Get some sleep soon."]
+  );
+  assert_eq!(
+    lines_of(&ground, "situation-rules").await,
+    [("- late \u{2014} someone writes after midnight, say good night".to_owned(), None)]
   );
 }
 

@@ -173,10 +173,14 @@ flowchart TB
   in place of the head, so no sheet attaches twice. A person whose sheet in the room renders as nothing
   attaches nothing.
 - **`room-memories`** — the memory picker: the room's standing memories that are not attached as due, one
-  candidate a row, in the order the brain lists them. A candidate's slug is `memory-<row id>` and its index
-  line the row's kind as its bracket and the first line of its words, cut to the policy's 120 characters with
-  `…`. A row is narrowed as a fragment row is (below): by the item it was left open by, its words, and the
-  person it is for where the turn names them.
+  candidate a row, in the order the brain lists them. A candidate is named by the row's slug, which is its key
+  where it has one (`docs/boundary-api.md`, 「bmo-brain」), and by `memory-<row id>` where the row has none,
+  where its slug is not one an answer can name — lower-case letters, digits and hyphens alone — where it has
+  the `memory-<number>` shape of another row's, or where an earlier row of the room already holds it. That
+  name is the one the model reads, the one it answers by, and the one the judgement and the verdict record
+  keep. Its index line is the row's kind as its bracket and the first line of its words, cut to the policy's
+  120 characters with `…`. A row is narrowed as a fragment row is (below): by the item it was left open by,
+  its words, and the person it is for where the turn names them.
   - **It is a picker of the three's shape and not one of them:** it is asked one yes or no per candidate, in
     their answer shape, reads the message the turn follows on from, and on a turn of the chat agent's own
     lines alone asks as `room-rules` does; its picks join the memories entry rather than each standing as a
@@ -188,7 +192,7 @@ flowchart TB
     the agent lists the rest.
   - **A picked row is handed back to the brain as a hit,** as an attached fragment is, so a row the turns keep
     needing stays strong and one no turn asks for fades (the brain's `docs/design.md`, 「Strength and
-    decay」).
+    decay」). The hit names the row by its row id, whatever name the model read it under.
   - **Its Laya mode is off:** no checkpoint has learnt its question, so it runs on its own model alone.
 - **`situation-rules`** — the room's standing memories that carry a condition, and the global ones
   that reach it, offered as their conditions alone. It is not one of the three: its candidates are
@@ -503,8 +507,9 @@ flowchart TB
   the order the gate read them, and what the narrowing kept and dropped to get there (above). A
   candidate the person-book search passed over is therefore still readable as offered, which is
   what a gate's training reads a no from.
-- The one-line-per-run judgement record and the Laya verdict record stand beside it as they are
-  (`docs/laya.md`).
+- **The judgement of each run carries the lines its model was asked,** one per candidate, under the name the
+  candidate was offered by, each beside what the model answered of it (`docs/gates.md`, 「What a turn records」).
+- The Laya verdict record stands beside it as it is (`docs/laya.md`).
 
 ## Replaying a stored turn's inputs
 

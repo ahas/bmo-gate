@@ -2,7 +2,8 @@
 //! the verdict line a run of it writes, a keyword first and never the answer itself.
 
 use gate_reference::pick::{
-  Selection, named_of, parse_selection, parse_verdicts, run_verdict, selection_of, selection_verdict,
+  Asked, Candidate, ReferenceProbe, Selection, named_of, parse_selection, parse_verdicts, question_lines,
+  run_verdict, selection_of, selection_verdict,
 };
 
 fn offered(slugs: &[&str]) -> Vec<String> {
@@ -62,4 +63,51 @@ fn a_named_answer_reads_as_its_keyword_and_a_sentence_as_unreadable() {
   assert_eq!(verdict("c2-b\np1-a"), "PICK: c2-b, p1-a");
   assert_eq!(verdict("none"), "NONE");
   assert_eq!(verdict("Nobody here needs a piece, I think."), "UNREADABLE");
+}
+
+#[test]
+fn a_decision_on_laya_keeps_each_question_as_laya_read_it_beside_what_laya_settled() {
+  let probe = ReferenceProbe {
+    question: "Does this turn need".into(),
+    subject: "the memory".into(),
+  };
+  let input = Asked {
+    message_lines: vec!["Owner (id 5): the lamp?".into()],
+    candidates: vec![
+      Candidate {
+        slug: "birthday-record".into(),
+        about: "Keep the birthday.".into(),
+      },
+      Candidate {
+        slug: "memory-52".into(),
+        about: "Follow up on the door.".into(),
+      },
+    ],
+  };
+  let settled = Selection {
+    none: false,
+    slugs: vec!["birthday-record".into()],
+    answers: None,
+  };
+  let read = |settled: Option<&Selection>| {
+    question_lines(&probe, &input, settled)
+      .into_iter()
+      .map(|line| (line.line, line.answer))
+      .collect::<Vec<_>>()
+  };
+
+  assert_eq!(
+    read(Some(&settled)),
+    [
+      (
+        "Does this turn need the memory birthday-record: Keep the birthday.".to_owned(),
+        Some("yes".to_owned())
+      ),
+      (
+        "Does this turn need the memory memory-52: Follow up on the door.".to_owned(),
+        Some("no".to_owned())
+      ),
+    ]
+  );
+  assert!(read(None).iter().all(|(_, answer)| answer.is_none()));
 }

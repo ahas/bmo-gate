@@ -11,7 +11,7 @@ use gate_markup::js;
 use gate_policy::fill_marks;
 use gate_policy::reference::REFERENCE;
 use gate_ports::brain::Reply as Read;
-use gate_runs::records::{self, Judgement};
+use gate_runs::records::{self, AskedLine, Judgement};
 use gate_runs::{GateError, GateRequest, route};
 use gate_stages::laya::{self, LayaRun, NONE_LABEL, PairKept, Probe, Question, Reading, Reply, Request};
 use gate_stages::ordered::Ordered;
@@ -156,6 +156,11 @@ static ANSWER_LINE: LazyLock<Regex> = LazyLock::new(|| {
     .expect("an answer line")
 });
 static SLUG: LazyLock<Regex> = LazyLock::new(|| Regex::new("^[a-z0-9-]+$").expect("a slug"));
+
+/// Whether a name is one a picker's answer can name a candidate by: lower-case letters, digits and hyphens alone.
+pub fn answerable(name: &str) -> bool {
+  SLUG.is_match(name)
+}
 
 fn answer_lines(answer: &str) -> Vec<&str> {
   answer.split('\n').map(js::trim).filter(|line| !line.is_empty()).collect()
@@ -502,6 +507,38 @@ async fn keep(db: &DatabaseConnection, picker: &Picker, laya_side: bool, answers
   fragments::record_verdicts(db, &rows).await;
 }
 
+// A selection's word for one candidate: yes where it picked it, no where it did not.
+fn said_of(selection: &Selection, slug: &str) -> String {
+  if selection.slugs.iter().any(|picked| picked == slug) { "yes" } else { "no" }.to_owned()
+}
+
+/// The lines a picker's model read of its candidates — every row's index line in the libraries its request
+/// carried, as the index writes them — each with what the read answer said of its candidate; none said where the
+/// answer was not read.
+pub fn index_lines(asked: &[Library], parsed: Option<&Selection>) -> Vec<AskedLine> {
+  asked
+    .iter()
+    .flat_map(|library| library.rows.iter())
+    .map(|row| AskedLine {
+      line: index_line(row),
+      answer: parsed.map(|selection| said_of(selection, &row.slug)),
+    })
+    .collect()
+}
+
+/// The questions Laya was asked of a picker's candidates, each as the line Laya read, with what the selection
+/// it settled said of each; none said where Laya settled nothing.
+pub fn question_lines(
+  probe: &ReferenceProbe,
+  input: &Asked,
+  settled: Option<&Selection>,
+) -> Vec<AskedLine> {
+  probe.question(input).map_or_else(
+    |_| vec![],
+    |request| request.asked_lines(|slug| settled.map(|selection| said_of(selection, slug))),
+  )
+}
+
 fn fallback(chat_id: i64, libraries: &[Library], reason: &str) -> Vec<Entry> {
   eprintln!("reference: chat {chat_id} falling back to the indexes ({reason})");
 
@@ -635,7 +672,7 @@ pub async fn pick(reference: &Reference, picker: Picker) -> Result<Picked, GateE
     async move {
       let slugs: Vec<String> = question.candidates.iter().map(|candidate| candidate.slug.clone()).collect();
       let whole = slugs.len() == candidates(&picker.libraries).len();
-      let index = picker
+      let asked: Vec<Library> = picker
         .libraries
         .iter()
         .filter_map(|library| {
@@ -645,9 +682,8 @@ pub async fn pick(reference: &Reference, picker: Picker) -> Result<Picked, GateE
             library.with(|row| slugs.contains(&row.slug))
           }
         })
-        .map(|library| library.index_text())
-        .collect::<Vec<_>>()
-        .join("\n\n");
+        .collect();
+      let index = asked.iter().map(Library::index_text).collect::<Vec<_>>().join("\n\n");
       let started = std::time::Instant::now();
       let mut request = picker_request(&picker.system, &picker.answer, &index, &picker.message_lines);
 
@@ -663,6 +699,7 @@ pub async fn pick(reference: &Reference, picker: Picker) -> Result<Picked, GateE
 
       if picker.records {
         let verdict = run_verdict(answer.as_deref(), parsed.as_ref(), selection_verdict);
+        let lines = index_lines(&asked, parsed.as_ref());
 
         records::judgement(
           db,
@@ -674,6 +711,7 @@ pub async fn pick(reference: &Reference, picker: Picker) -> Result<Picked, GateE
             detail: answer.as_deref(),
             ms: Some(ms),
             round: picker.round.as_deref(),
+            lines: &lines,
           },
         )
         .await;
@@ -751,6 +789,9 @@ pub async fn pick(reference: &Reference, picker: Picker) -> Result<Picked, GateE
     let verdict = selection_verdict(&decided.verdict);
 
     if picker.records {
+      let settled = (decided.decided_by == laya::DecidedBy::Laya).then_some(&decided.verdict);
+      let lines = question_lines(&picker.probe, &input, settled);
+
       records::judgement(
         db,
         &Judgement {
@@ -761,6 +802,7 @@ pub async fn pick(reference: &Reference, picker: Picker) -> Result<Picked, GateE
           detail: Some(&detail),
           ms: Some(started.elapsed().as_millis() as i64),
           round: picker.round.as_deref(),
+          lines: &lines,
         },
       )
       .await;

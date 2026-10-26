@@ -14,7 +14,7 @@ use gate_policy::laya::QUESTIONS;
 use gate_policy::prompts;
 use gate_policy::reference::REFERENCE;
 use gate_ports::brain::Condition;
-use gate_runs::records::{self, Judgement};
+use gate_runs::records::{self, AskedLine, Judgement};
 use gate_runs::{GateError, GateRequest, route};
 use gate_stages::laya::{self, LayaRun, NONE_LABEL, PairKept, Probe, Question, Reading, Reply, Request};
 use gate_stages::ordered::Ordered;
@@ -280,6 +280,47 @@ impl Probe for SituationProbe {
   }
 }
 
+/// One rule as the matcher's model reads it among the rules.
+pub fn rule_line(candidate: &Candidate) -> String {
+  format!("- {} \u{2014} {}", candidate.slug, candidate.text())
+}
+
+fn word(yes: bool) -> &'static str {
+  if yes { "yes" } else { "no" }
+}
+
+/// The lines the matcher's model read of its rules, each with both its answers where the answer was read.
+pub fn rule_lines(candidates: &[Candidate], parsed: Option<&Verdicts>) -> Vec<AskedLine> {
+  candidates
+    .iter()
+    .map(|candidate| AskedLine {
+      line: rule_line(candidate),
+      answer: parsed.map(|verdicts| {
+        let has = |side: &[String]| side.contains(&candidate.slug);
+
+        format!("applies: {}, spent: {}", word(has(&verdicts.applies)), word(has(&verdicts.spent)))
+      }),
+    })
+    .collect()
+}
+
+/// The questions Laya was asked of the rules, two a rule, each as the line Laya read, with what the verdicts it
+/// settled said of each; none said where Laya settled nothing.
+pub fn question_lines(input: &Asked, settled: Option<&Verdicts>) -> Vec<AskedLine> {
+  SituationProbe.question(input).map_or_else(
+    |_| vec![],
+    |request| {
+      request.asked_lines(|id| {
+        let verdicts = settled?;
+        let (slug, question) = id.rsplit_once(':').unwrap_or((id, ""));
+        let side = if question == "applies" { &verdicts.applies } else { &verdicts.spent };
+
+        Some(word(side.iter().any(|one| one == slug)).to_owned())
+      })
+    },
+  )
+}
+
 /// One call's prompt: the rules it may answer about, then the situation to judge them against, and the answer
 /// file closing them where there is one.
 pub fn request(
@@ -290,11 +331,7 @@ pub fn request(
 ) -> GateRequest {
   let mut lines = vec!["RULES:".to_owned()];
 
-  lines.extend(
-    candidates
-      .iter()
-      .map(|candidate| format!("- {} \u{2014} {}", candidate.slug, candidate.text())),
-  );
+  lines.extend(candidates.iter().map(rule_line));
   lines.push(String::new());
   lines.push("SITUATION:".to_owned());
   lines.extend(message_lines.iter().cloned());
@@ -377,6 +414,7 @@ pub async fn judge(
       let answer = stages.runs.run(STAGE, &asked).await?;
       let parsed = answer.as_deref().and_then(|answer| parse_answer(answer, &slugs));
       let verdict = run_verdict(answer.as_deref(), parsed.as_ref(), Verdicts::verdict);
+      let lines = rule_lines(candidates, parsed.as_ref());
 
       records::judgement(
         db,
@@ -388,6 +426,7 @@ pub async fn judge(
           detail: answer.as_deref(),
           ms: Some(started.elapsed().as_millis() as i64),
           round,
+          lines: &lines,
         },
       )
       .await;
@@ -450,6 +489,9 @@ pub async fn judge(
     laya::DecidedBy::Default => fill_marks(&REFERENCE.situation.nothing_matched, &[("failure", &failure)]),
   };
 
+  let settled = (decided.decided_by == laya::DecidedBy::Laya).then_some(&decided.verdict);
+  let lines = question_lines(&input, settled);
+
   records::judgement(
     db,
     &Judgement {
@@ -460,6 +502,7 @@ pub async fn judge(
       detail: Some(&detail),
       ms: Some(started.elapsed().as_millis() as i64),
       round,
+      lines: &lines,
     },
   )
   .await;

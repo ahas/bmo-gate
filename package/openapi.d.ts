@@ -364,6 +364,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/options/{gateName}/agents/{agentName}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change a gate's options for one agent, as the chat agent's are changed, leaving every other agent's as they stand. */
+        post: operations["gate_options_change_for_agent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reference/selected": {
         parameters: {
             query?: never;
@@ -731,7 +748,7 @@ export interface components {
         };
         /** @description Readiness, version and Laya's last state. */
         Health: {
-            /** @description `up`, `down` or `off`. */
+            /** @description `up`, `busy`, `down` or `off`. */
             laya: string;
             ready: boolean;
             reason: string | null;
@@ -748,6 +765,12 @@ export interface components {
             gateName: string;
             /** Format: int64 */
             id: number;
+            /**
+             * @description What a picker's or the matcher's model was asked of its candidates, one line each, in the order it read
+             *     them; empty on every other judgement.
+             * @default []
+             */
+            lines: components["schemas"]["JudgementLine"][];
             /** Format: int64 */
             messageId: number | null;
             /** Format: int64 */
@@ -758,6 +781,15 @@ export interface components {
             roomId: number;
             round: string | null;
             verdict: string;
+        };
+        /**
+         * @description One line a gate's model was asked of a candidate, exactly as the model read it, and what it answered of that
+         *     line: `yes` or `no` for a picker, `applies: <yes|no>, spent: <yes|no>` for a rule the matcher read whole;
+         *     none where its answer was not read.
+         */
+        JudgementLine: {
+            answer: string | null;
+            line: string;
         };
         /** @description One page of a list, and whether anything stands past its last member. */
         JudgementPage: {
@@ -778,6 +810,10 @@ export interface components {
             keyword: number;
             /** Format: int64 */
             person: number;
+            /** Format: int64 */
+            recent: number;
+            /** Format: int64 */
+            word: number;
         };
         /** @description One translation kept under its original and its language. */
         KeptTranslation: {
@@ -1633,6 +1669,34 @@ export interface operations {
         };
         responses: {
             /** @description the options as the change left them */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GateOptionsChanged"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    gate_options_change_for_agent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                gateName: string;
+                agentName: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GateOptionChange"];
+            };
+        };
+        responses: {
+            /** @description the options as the change left them for the agent */
             200: {
                 headers: {
                     [name: string]: unknown;

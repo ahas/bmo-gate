@@ -69,6 +69,9 @@ An agreement carries `gateName`, `unit` (`pair` or `question`), `pairs`, `failur
 
 - **A judgement** is a decision written into a room's log: a round's skip, a re-ask, an answer sent. It is
   written as it comes, with the moment it was written.
+- **A judgement's `lines`** are what a picker's or the matcher's model was asked of its candidates, each `line`
+  exactly as the model read it and its `answer`, null where the answer was not read (`docs/gates.md`,
+  「What a turn records」). They are empty on every other judgement and on one written by `POST`.
 - **A judgement's roads** are its gate's road records of the same round, or of the same message where either
   names no round, that fall within the time the judgement took, give or take five seconds; each road goes to
   one judgement. Its `offers` are the offers record of its round. Both are empty on a judgement as `POST`

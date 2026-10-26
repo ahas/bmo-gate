@@ -15,7 +15,7 @@ use gate_ports::PortError;
 use gate_ports::brain::{self, Condition, Event, MemoryRow};
 
 use crate::fragments::Fragment;
-use crate::pick::{Body, Library};
+use crate::pick::{self, Body, Library};
 use crate::{Entry, Reference, Source};
 
 // A moment as a row's line writes it, in Korean time to the minute, as the entry's line names it.
@@ -99,10 +99,48 @@ pub fn index_title(memory: &MemoryRow) -> String {
   format!("{}\u{2026}", js::trim_end(&js::text(&characters[..js::within(&characters, limit - 1)])))
 }
 
-/// One standing row as the memory picker's candidate: its slug `memory-<id>`, its kind as its index line's
+// The name a row falls back to.
+fn numbered(memory: &MemoryRow) -> String {
+  format!("{MEMORY}-{}", memory.id)
+}
+
+// Whether a name has the shape a row's number is named by.
+fn is_numbered(name: &str) -> bool {
+  name
+    .strip_prefix(MEMORY)
+    .and_then(|rest| rest.strip_prefix('-'))
+    .is_some_and(|number| !number.is_empty() && number.bytes().all(|byte| byte.is_ascii_digit()))
+}
+
+/// The names a room's rows are offered to the memory picker by, in their order (`docs/reference-selection.md`,
+/// 「The gates and what each reads」): each row's slug — its key where it has one — where an answer can name it,
+/// it is not of the numbered shape unless it is the row's own number, and no earlier row holds it; `memory-<id>`
+/// otherwise.
+pub fn names(rows: &[MemoryRow]) -> Vec<String> {
+  let mut taken: Vec<String> = vec![];
+
+  for memory in rows {
+    let own = numbered(memory);
+    let slug = memory.slug.as_str();
+    let name = if pick::answerable(slug)
+      && (!is_numbered(slug) || slug == own)
+      && !taken.iter().any(|one| one == slug)
+    {
+      slug.to_owned()
+    } else {
+      own
+    };
+
+    taken.push(name);
+  }
+
+  taken
+}
+
+/// One standing row as the memory picker's candidate under the name it is offered by: its kind as its index line's
 /// bracket, the first line of its words as its title, the person it is for and the item it was left open by for
 /// the narrowing, and its line in the entry as its body. Its key is the row's id, which a hit names it by.
-pub fn candidate(chat_id: i64, memory: &MemoryRow) -> Fragment {
+pub fn candidate(chat_id: i64, memory: &MemoryRow, name: &str) -> Fragment {
   let row = brain::Fragment {
     key: memory.id.to_string(),
     kind: MEMORY.to_owned(),
@@ -110,7 +148,7 @@ pub fn candidate(chat_id: i64, memory: &MemoryRow) -> Fragment {
     owner: memory.for_user,
     agent: memory.agent.clone(),
     all_agents: false,
-    slug: format!("memory-{}", memory.id),
+    slug: name.to_owned(),
     title: index_title(memory),
     path: format!("{}/{}", memory_path(chat_id), memory.id),
     scope: Some(format!("[{}]", memory.kind)),
@@ -141,7 +179,11 @@ pub fn candidate(chat_id: i64, memory: &MemoryRow) -> Fragment {
 pub fn library(chat_id: i64, rows: &[MemoryRow]) -> Option<Library> {
   Library::of(
     format!("{}/index.md", memory_path(chat_id)),
-    rows.iter().map(|memory| candidate(chat_id, memory)).collect(),
+    rows
+      .iter()
+      .zip(names(rows))
+      .map(|(memory, name)| candidate(chat_id, memory, &name))
+      .collect(),
     Source::Memory,
     Body::Memory,
   )

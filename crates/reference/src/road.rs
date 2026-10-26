@@ -694,6 +694,7 @@ pub async fn no_candidates(
       detail: Some(&decided.no_candidates_detail),
       ms: None,
       round,
+      lines: &[],
     },
   )
   .await;

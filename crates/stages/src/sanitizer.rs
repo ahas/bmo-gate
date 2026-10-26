@@ -361,6 +361,7 @@ async fn judged(stages: &Stages, chat_id: Option<i64>, answer: Option<&str>, ver
       detail: answer,
       ms: Some(ms),
       round: None,
+      lines: &[],
     },
   )
   .await;

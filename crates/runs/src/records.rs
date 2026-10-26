@@ -156,8 +156,17 @@ pub fn verdict_line(answer: &str, most: usize) -> String {
   }
 }
 
+/// One line a gate's model was asked of a candidate, exactly as the model read it, and what it answered of that
+/// line; none where its answer was not read (`docs/gates.md`, 「What a turn records」).
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct AskedLine {
+  pub line: String,
+  pub answer: Option<String>,
+}
+
 /// What a gate decided about a room's message, as the room's log shows it: the verdict line, the whole of what
-/// was answered or why nothing was, how long it took, and the round it belongs to.
+/// was answered or why nothing was, how long it took, the round it belongs to, and the lines its model was asked
+/// of its candidates.
 pub struct Judgement<'a> {
   pub chat_id: i64,
   pub message_id: Option<i64>,
@@ -166,6 +175,16 @@ pub struct Judgement<'a> {
   pub detail: Option<&'a str>,
   pub ms: Option<i64>,
   pub round: Option<&'a str>,
+  pub lines: &'a [AskedLine],
+}
+
+/// The lines a judgement row keeps, as written; none where it keeps none or they cannot be read.
+pub fn lines_of(row: &judgements::Model) -> Vec<AskedLine> {
+  row
+    .lines
+    .as_deref()
+    .and_then(|lines| serde_json::from_str(lines).ok())
+    .unwrap_or_default()
 }
 
 /// A decision written into the room's log, answering the row as written; one the database would not take is
@@ -182,6 +201,9 @@ pub async fn judgement(db: &DatabaseConnection, judgement: &Judgement<'_>) -> Op
     ms: Set(judgement.ms),
     round: Set(judgement.round.map(str::to_owned)),
     rowid: NotSet,
+    lines: Set(
+      (!judgement.lines.is_empty()).then(|| serde_json::to_string(judgement.lines).unwrap_or_default()),
+    ),
   };
 
   match row.insert(db).await {

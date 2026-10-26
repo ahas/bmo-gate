@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use gate_policy::profiles::PROFILES;
 use gate_runs::GateError;
 use gate_runs::options;
-use gate_runs::records::now;
+use gate_runs::records::{AskedLine, now};
 use sea_orm::DatabaseConnection;
 use sha2::{Digest, Sha256};
 
@@ -90,7 +90,8 @@ impl Question {
     }
   }
 
-  fn instructions(&self) -> &str {
+  /// The words the question asks, as Laya reads them.
+  pub fn instructions(&self) -> &str {
     match self {
       Self::Noul { instructions }
       | Self::Choice { instructions, .. }
@@ -136,6 +137,19 @@ pub struct Request {
 }
 
 impl Request {
+  /// Each question as the line Laya reads, in the order asked, with what `answer` says of the question its id
+  /// names (`docs/gates.md`, 「What a turn records」).
+  pub fn asked_lines(&self, answer: impl Fn(&str) -> Option<String>) -> Vec<AskedLine> {
+    self
+      .questions
+      .iter()
+      .map(|(id, question)| AskedLine {
+        line: question.instructions().to_owned(),
+        answer: answer(id),
+      })
+      .collect()
+  }
+
   /// The request as Laya and the record read it.
   pub fn ordered(&self) -> Ordered {
     Ordered::map([

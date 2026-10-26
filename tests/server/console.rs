@@ -155,10 +155,11 @@ async fn a_rooms_judgements_come_a_page_at_a_time_with_their_roads_and_offers() 
   ground
     .scratch
     .run(
-      r#"INSERT INTO judgements (chat_id, message_id, stage, verdict, created_at, ms, round) VALUES
-           (7, 9, 'sanitizer', 'CLEAN', $1, 2000, 'round-1'),
-           (7, 10, 'sanitizer', 'CLEAN', $1, 1000, 'round-2'),
-           (8, 11, 'sanitizer', 'CLEAN', $1, 1000, 'round-3')"#,
+      r#"INSERT INTO judgements (chat_id, message_id, stage, verdict, created_at, ms, round, lines) VALUES
+           (7, 9, 'sanitizer', 'CLEAN', $1, 2000, 'round-1',
+            '[{"line":"- a \u2014 the first","answer":"yes"},{"line":"- b \u2014 the second","answer":null}]'),
+           (7, 10, 'sanitizer', 'CLEAN', $1, 1000, 'round-2', NULL),
+           (8, 11, 'sanitizer', 'CLEAN', $1, 1000, 'round-3', NULL)"#,
       vec![at.into()],
     )
     .await
@@ -195,6 +196,7 @@ async fn a_rooms_judgements_come_a_page_at_a_time_with_their_roads_and_offers() 
   assert_eq!(newest["roads"].as_array().unwrap().len(), 1, "{newest}");
   assert_eq!(newest["roads"][0]["tokens"], json!(null));
   assert_eq!(newest["offers"], json!([]));
+  assert_eq!(newest["lines"], json!([]));
 
   let before = newest["id"].as_i64().unwrap();
   let (status, body) = ground.get(&format!("/judgements?roomId={ROOM}&before={before}")).await;
@@ -205,6 +207,11 @@ async fn a_rooms_judgements_come_a_page_at_a_time_with_their_roads_and_offers() 
   let older = &body["items"][0];
 
   assert_eq!(older["roads"][0]["tokens"]["inputTokens"], 120);
+  // A picker's judgement carries each line its model was asked beside what it answered.
+  assert_eq!(
+    older["lines"],
+    json!([{ "line": "- a \u{2014} the first", "answer": "yes" }, { "line": "- b \u{2014} the second", "answer": null }])
+  );
   assert_eq!(
     older["offers"],
     json!([{ "gateName": "library-knowledge", "held": 4, "asked": 2, "kept": { "item": 0, "keyword": 2, "word": 0, "person": 0, "recent": 0 }, "capped": 0, "rules": ["keyword"] }])

@@ -308,8 +308,22 @@ pub struct Judgement {
   pub created_at: i64,
   pub ms: Option<i64>,
   pub round: Option<String>,
+  /// What a picker's or the matcher's model was asked of its candidates, one line each, in the order it read
+  /// them; empty on every other judgement.
+  #[serde(default)]
+  pub lines: Vec<JudgementLine>,
   pub roads: Vec<Road>,
   pub offers: Vec<Offer>,
+}
+
+/// One line a gate's model was asked of a candidate, exactly as the model read it, and what it answered of that
+/// line: `yes` or `no` for a picker, `applies: <yes|no>, spent: <yes|no>` for a rule the matcher read whole;
+/// none where its answer was not read.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct JudgementLine {
+  pub line: String,
+  pub answer: Option<String>,
 }
 
 /// Which judgements to read: a room, a gate, a span, and the cursor of the page.

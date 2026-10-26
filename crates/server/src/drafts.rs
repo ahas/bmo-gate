@@ -78,6 +78,7 @@ pub async fn write(db: &DatabaseConnection, drafted: &Drafted) -> Result<Option<
         detail: Some(&detail),
         ms: Some(drafted.ms),
         round: Some(&drafted.round),
+        lines: &[],
       },
     )
     .await,

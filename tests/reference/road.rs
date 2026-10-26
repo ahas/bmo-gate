@@ -111,6 +111,29 @@ fn furnish(ground: &Ground) {
   std::fs::write(ground.shipped.join("system-document/structure.md"), "  The structure.\n").unwrap();
 }
 
+// The lines a gate's judgements keep, each with its answer, in the order they were written.
+async fn judged_lines(ground: &Ground, stage: &str) -> Vec<(String, Option<String>)> {
+  ground
+    .scratch
+    .texts(
+      "SELECT lines FROM judgements WHERE stage = $1 AND lines IS NOT NULL ORDER BY id",
+      vec![stage.into()],
+    )
+    .await
+    .iter()
+    .flat_map(|lines| serde_json::from_str::<Vec<serde_json::Value>>(lines).unwrap())
+    .map(|one| (one["line"].as_str().unwrap().to_owned(), one["answer"].as_str().map(str::to_owned)))
+    .collect()
+}
+
+// The name an index line offers its candidate under.
+fn slug_of_line(line: &str) -> &str {
+  line
+    .strip_prefix("- ")
+    .and_then(|line| line.split_whitespace().next())
+    .unwrap_or_default()
+}
+
 fn paths(entries: &[Entry]) -> Vec<(&str, Source)> {
   entries.iter().map(|entry| (entry.path.as_str(), entry.source)).collect()
 }
@@ -118,7 +141,7 @@ fn paths(entries: &[Entry]) -> Vec<(&str, Source)> {
 #[tokio::test]
 async fn a_turns_reference_stands_its_memories_and_sheets_first_then_what_each_gate_picked() {
   let ground =
-    ground("turn", picking(&["structure", "greeting", "deploy-notes", "person-6", "memory-41"])).await;
+    ground("turn", picking(&["structure", "greeting", "deploy-notes", "person-6", "call-back"])).await;
 
   furnish(&ground);
 
@@ -145,7 +168,7 @@ async fn a_turns_reference_stands_its_memories_and_sheets_first_then_what_each_g
 
   assert_eq!(
     hits,
-    ["structure", "greeting", "deploy-notes", "person-6", "memory-41"]
+    ["structure", "greeting", "deploy-notes", "person-6", "call-back"]
       .map(str::to_owned)
       .into()
   );
@@ -168,7 +191,7 @@ async fn a_turns_reference_stands_its_memories_and_sheets_first_then_what_each_g
     scratch
       .texts("SELECT slug FROM reference_verdicts WHERE attached = 1 ORDER BY slug", vec![])
       .await,
-    ["deploy-notes", "greeting", "memory-41", "person-6", "structure"]
+    ["call-back", "deploy-notes", "greeting", "person-6", "structure"]
   );
   assert_eq!(
     scratch
@@ -198,10 +221,45 @@ async fn a_turns_reference_stands_its_memories_and_sheets_first_then_what_each_g
     [
       "library-knowledge PICK: deploy-notes",
       "people-search PICK: person-6",
-      "room-memories PICK: memory-41",
+      "room-memories PICK: call-back",
       "room-rules PICK: greeting",
       "system-documents PICK: structure"
     ]
+  );
+
+  // Each picker's judgement keeps every line its model read, as its request carried it, beside what it answered.
+  let inputs: Vec<String> =
+    ground.gateway.asked.lock().unwrap().iter().map(|ask| ask.input.clone()).collect();
+
+  for (stage, picked) in [
+    ("system-documents", "structure"),
+    ("room-rules", "greeting"),
+    ("library-knowledge", "deploy-notes"),
+    ("people-search", "person-6"),
+    ("room-memories", "call-back"),
+  ] {
+    let lines = judged_lines(&ground, stage).await;
+
+    assert!(!lines.is_empty(), "{stage}");
+    assert!(
+      inputs
+        .iter()
+        .any(|input| lines.iter().all(|(line, _)| input.lines().any(|read| read == line))),
+      "{stage}: {lines:?}"
+    );
+
+    for (line, answer) in &lines {
+      let yes = slug_of_line(line) == picked;
+
+      assert_eq!(answer.as_deref(), Some(if yes { "yes" } else { "no" }), "{stage}: {line}");
+    }
+  }
+
+  assert!(
+    judged_lines(&ground, "room-memories")
+      .await
+      .iter()
+      .any(|(line, _)| line == "- call-back [promise] \u{2014} Call back once the deploy lands.")
   );
 
   // Every picker's request closes on its own answer file, right after the turn's messages.
@@ -668,5 +726,75 @@ async fn a_memory_for_the_speaker_is_not_offered_for_that_alone_but_a_piece_the_
       )
       .await,
     ["library-knowledge NONE", "room-memories SKIP: no candidates"]
+  );
+}
+
+#[tokio::test]
+async fn the_memory_picker_reads_a_row_by_its_key_keeps_each_line_as_asked_and_hits_the_row_by_its_id() {
+  let ground = ground("memories-named", picking(&["birthday-record"])).await;
+
+  *ground.brain.standing.lock().unwrap() = vec![
+    memory(51, "followup", "birthday-record", "Follow up on the lamp."),
+    memory(52, "followup", "", "Follow up on the door."),
+  ];
+
+  let entries = select(&ground.reference, &remembering()).await.unwrap();
+
+  assert_eq!(carried(memories_of(&entries).unwrap()), [51]);
+
+  let lines = judged_lines(&ground, "room-memories").await;
+
+  assert_eq!(
+    lines,
+    [
+      (
+        "- birthday-record [followup] \u{2014} Follow up on the lamp.".to_owned(),
+        Some("yes".to_owned())
+      ),
+      (
+        "- memory-52 [followup] \u{2014} Follow up on the door.".to_owned(),
+        Some("no".to_owned())
+      ),
+    ]
+  );
+
+  let input = ground.gateway.asked.lock().unwrap()[0].input.clone();
+
+  assert!(lines.iter().all(|(line, _)| input.lines().any(|read| read == line)), "{input}");
+  assert_eq!(
+    ground
+      .scratch
+      .texts(
+        "SELECT slug FROM reference_verdicts WHERE stage = 'room-memories' ORDER BY slug",
+        vec![]
+      )
+      .await,
+    ["birthday-record", "memory-52"]
+  );
+
+  let hits: Vec<(String, String)> = ground
+    .brain
+    .hits
+    .lock()
+    .unwrap()
+    .iter()
+    .map(|hit| (hit.key.clone(), hit.slug.clone()))
+    .collect();
+
+  assert_eq!(hits, [("51".to_owned(), "birthday-record".to_owned())]);
+}
+
+#[tokio::test]
+async fn a_memory_pick_whose_answer_is_not_read_keeps_its_lines_with_no_answer() {
+  let ground = ground("memories-lines-unread", |_| Some("I cannot tell.".into())).await;
+
+  *ground.brain.standing.lock().unwrap() =
+    vec![memory(51, "followup", "birthday-record", "Follow up on the lamp.")];
+
+  select(&ground.reference, &remembering()).await.unwrap();
+
+  assert_eq!(
+    judged_lines(&ground, "room-memories").await,
+    [("- birthday-record [followup] \u{2014} Follow up on the lamp.".to_owned(), None)]
   );
 }

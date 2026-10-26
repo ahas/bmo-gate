@@ -20,6 +20,10 @@ pub struct Model {
   #[sea_orm(column_type = "Text")]
   pub round: Option<String>,
   pub rowid: i64,
+  /// The lines a gate's model was asked of its candidates, each with what it answered, as JSON; none where it
+  /// was asked none.
+  #[sea_orm(column_type = "Text")]
+  pub lines: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

@@ -5,6 +5,7 @@
 mod m20261019_000001_tables;
 mod m20261023_000001_translation_failures;
 mod m20261024_000001_offer_rules;
+mod m20261026_000001_judgement_lines;
 
 use sea_orm_migration::prelude::*;
 
@@ -38,6 +39,7 @@ impl MigratorTrait for Migrator {
       Box::new(m20261019_000001_tables::Migration),
       Box::new(m20261023_000001_translation_failures::Migration),
       Box::new(m20261024_000001_offer_rules::Migration),
+      Box::new(m20261026_000001_judgement_lines::Migration),
     ]
   }
 
