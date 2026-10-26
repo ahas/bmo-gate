@@ -1,0 +1,30 @@
+{
+  "type": "object",
+  "properties": {
+    "groups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "group": { "type": "string" },
+          "unread": { "type": "integer", "description": "How many of its entries this session has not read." },
+          "hint": { "type": ["string", "null"], "description": "What changed in the last three days, or null." },
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "slug": { "type": "string" },
+                "holds": { "type": "string" },
+                "readWhen": { "type": ["string", "null"] }
+              },
+              "required": ["slug", "holds", "readWhen"]
+            }
+          }
+        },
+        "required": ["group", "unread", "hint", "entries"]
+      }
+    }
+  },
+  "required": ["groups"]
+}

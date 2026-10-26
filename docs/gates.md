@@ -78,18 +78,18 @@
 
 - **The gate order** is where each gate stands against a chat turn. It is declared once, beside the list of
   gates, and the list of gates is derived from it, so a gate cannot exist without a place.
-- The gate order has three parts:
+- The gate order has four parts:
   - **the pre-gate** — the gates that run before the chat agent writes its reply;
   - **the post-gate** — the gates that run after the reply is written, before it reaches the room;
-  - **off-turn** — the gates that run outside any chat turn.
+  - **off-turn** — the gates that run outside any chat turn;
+  - **shelved** — the gates no turn and no caller asks.
 - A part is a list of steps in the order a turn passes them. A step holds one gate, or several gates the turn
-  starts together and waits on together.
+  starts together and waits on together. The shelved part is a list of gates, each marked where it is one of
+  the reference pickers.
 - A step may carry a condition: it runs only in the turns the condition names.
 - A gate that runs in both the pre-gate and the post-gate part stands in each, at the step where it does that
-  part's work. A gate never stands twice within one part, and an off-turn gate stands in neither of the other
-  two. A gate another gate calls on for its own answer — the session summary is cleaned by the sanitizer
-  before it is carried over — belongs to the calling gate's step and gives the called gate no place of its
-  own there.
+  part's work. A gate never stands twice within one part, and an off-turn or a shelved gate stands in no other
+  part.
 - The gate order is checked against the turn by tests that drive a turn and record the order the gates are
   called in, so a turn that moves a gate fails its tests until the gate order moves with it.
 
@@ -98,38 +98,48 @@
 1. `session-summary` — only when the turn replaces the chat agent's session, and the summary of the session
    being let go is written before the new one is asked anything. It stands at the head of the turn, before
    every other gate.
-2. Together, in one step: the three reference gates (`system-documents`, `room-rules`,
-   `library-knowledge`), `people-search`, `room-memories` and `situation-rules`. The turn starts all six at once
-   and builds the prompt when the last one answers (`POST /reference/selected`). They read the turn's messages and its
-   quiet instructions as they were written, and they stand in every turn of the chat agent's, whatever
-   brought it (the receiver's `docs/bmo-window.md`).
-3. `sanitizer` — cleans everything the prompt carries once the reference is chosen: the work handed back to
-   the session, every reference entry the step picked, and every formatted message (`POST /sanitised`).
+
+A turn's reference is asked of no gate: `POST /reference/selected` carries what no gate picks, and the agent reads
+the brain's index and its pieces itself (`docs/reference-selection.md`).
 
 ### The post-gate
 
-1. `sanitizer` — one pass over the whole outgoing text. The same outgoing clean then replaces, in code and
-   with no agent, a dash left between words (the agency's `prompts/rules/plain-writing.md`): a colon after a
-   name, commas around an aside (brackets where it holds commas of its own), a range between digits. Code
-   blocks and spans, quoted lines, words in double quotes, web addresses and a dash standing alone in a table
-   cell keep theirs.
-2. `output-format` — only in a room whose dialect folds (bmo-chat's `docs/protocol.md`): it decides the fold
+1. `output-format` — only in a room whose dialect folds (bmo-chat's `docs/protocol.md`): it decides the fold
    for each part of the reply, one part after another. A room whose dialect does not fold sends the plain
    text and never reaches this step.
 
 ### Off-turn
 
-- `document-seek` — picks the document or heading that answers a question asked in the console's document
-  viewer (`POST /documents/sought`).
 - `translator` — translates a document the console's document viewer shows, what reaches a job worker into
   English, and what a worker writes onto an item into the owner's language (bmo-job's
-  `docs/worker-language.md`).
-- `voice-polish` — rephrases the script of a line's full reading for the ear, before its names and the
-  reading gate; the one gate the owner may switch off (the voice unit's documents).
-- `voice-reading` — writes the roman words and figures of a line the way the room language's voice says
-  them, before a briefing is spoken.
-- The sanitizer and the output gate also run on a message the chat agent sends to a room outside any turn.
-  That does not give either a place in this part: each stands where it runs within a turn.
+  `docs/worker-language.md`). Its runs go out on the agency's work key `translate` wherever the agency serves
+  that key, and on its own work key otherwise (「Where a gate's runs go out」).
+- The output gate also runs on a message the chat agent sends to a room outside any turn. That does not give
+  it a place in this part: it stands where it runs within a turn.
+
+### Shelved
+
+`system-documents`, `room-rules`, `library-knowledge`, `people-search`, `room-memories`, `situation-rules`,
+`sanitizer`, `document-seek`, `voice-polish` and `voice-reading`.
+
+- **A shelved gate is never asked,** in a turn or out of one. Its profile, its options and its judgement history
+  stay readable (`GET /gates`, `GET /options/{gateName}`, `GET /judgements`), and `GET /gates` lists it under the
+  part `shelved`.
+- **What a route answers in its place:** `POST /stages/{gateName}/runs` answers null, as for a gate switched
+  off; the sanitiser's routes answer the text as it came, unchanged; the knowledge routes answer no piece; and
+  `POST /documents/sought` is 409 `shelved` (`docs/api.md`).
+- **The evaluation and replay commands** still read a shelved picker's libraries and score it on a stored turn
+  (`docs/gate-eval.md`); nothing they do reaches a turn.
+
+### Where a gate's runs go out
+
+- **A gate's runs go out under its own work key,** the gate's name, which the agency resolves to a provider, a
+  model and an effort (`docs/boundary-api.md`, 「How a gate run reaches a model」).
+- **A gate whose profile names a forwarding key** goes out under that key instead wherever the agency serves it:
+  each run asks the agency for the key (`GET /work-keys/{key}`), and where it answers, the run's mode, its
+  mapping and its turn are the key's; where it answers none, the run goes out under the gate's own key. The
+  translator forwards to `translate`, the agency's translator runner line, so the translation moves onto that
+  line the moment the agency serves it, with no change here.
 
 ## Each agent's own gates
 

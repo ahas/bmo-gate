@@ -1,0 +1,45 @@
+# The brain's index offered to an agent: the gate's own reference routes, called with the gate's address and token
+# the record carries, for the turn's agent, room and session (docs/api.md, 「The tools a tool host places」). The
+# repository's tools test holds this manifest to the executable answering it.
+
+[tool]
+name = "reference"
+protocol = 1
+language = "rust"
+build = 'cargo build --release -p gate-reference-tool && cp "$BMO_CARGO_TARGET/release/gate-reference-tool" "$BMO_TOOL_OUT/"'
+check = 'cargo test --test tools'
+run = ["gate-reference-tool"]
+timeout = 30
+
+[[entry]]
+namespace = "gate"
+name = "reference_index"
+title = "Brain index"
+description = "The brain's index for the room: five groups (system documents, room rules, knowledge, people, room memories), each with how many of its entries this session has not read, a hint where something changed lately, and its entries, each what it holds and when to read it. Read it when the answer needs something the turn did not carry; reading it is never required."
+manual = "manual.md"
+input = "index.json"
+output = "index-answer.json"
+hints = { read_only = true, idempotent = true }
+capabilities = ["gate.reference"]
+
+[[entry]]
+namespace = "gate"
+name = "reference_piece"
+title = "Brain piece"
+description = "One piece of the brain's index read whole, by its slug and its group, and recorded as read in this session so the index counts it read."
+manual = "manual.md"
+input = "piece.json"
+output = "piece-answer.json"
+hints = { read_only = false, idempotent = true }
+capabilities = ["gate.reference"]
+
+[[entry]]
+namespace = "gate"
+name = "reference_search"
+title = "Brain search"
+description = "The entries of the brain's index whose words match the query, across every group, the closest first, at most limit (8 where absent, 24 at most). No model is asked: name the words the entry would hold."
+manual = "manual.md"
+input = "search.json"
+output = "search-answer.json"
+hints = { read_only = true, idempotent = true }
+capabilities = ["gate.reference"]

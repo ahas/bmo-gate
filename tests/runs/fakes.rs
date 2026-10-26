@@ -13,6 +13,7 @@ use gate_ports::PortError;
 use gate_ports::agency::{
   Agency, Agent, Apart, GateTurn, Mapping, Provider, RoadWalked, Route, Rulebook, Session, TurnEnd,
 };
+use gate_ports::brain::Load;
 use gate_ports::gateway::{Ask, Completion, Gateway};
 use gate_ports::http::Answer;
 use gate_runs::Runs;
@@ -70,6 +71,7 @@ pub struct FakeAgency {
   pub turns: Mutex<Vec<GateTurn>>,
   pub stopped: Mutex<Vec<String>>,
   pub resolved: Mutex<Vec<(String, Option<String>, String)>>,
+  pub loads: Mutex<HashMap<String, Vec<Load>>>,
 }
 
 impl FakeAgency {
@@ -129,6 +131,18 @@ impl Agency for FakeAgency {
 
   fn work_key<'a>(&'a self, key: &'a str) -> BoxFuture<'a, Answer<Option<Route>>> {
     Box::pin(async move { Ok(self.routes.lock().unwrap().iter().find(|one| one.key == key).cloned()) })
+  }
+
+  fn session_loads<'a>(&'a self, session: &'a str) -> BoxFuture<'a, Answer<Vec<Load>>> {
+    Box::pin(async move { Ok(self.loads.lock().unwrap().get(session).cloned().unwrap_or_default()) })
+  }
+
+  fn keep_loads<'a>(&'a self, session: &'a str, loads: &'a [Load]) -> BoxFuture<'a, Answer<()>> {
+    Box::pin(async move {
+      self.loads.lock().unwrap().insert(session.to_owned(), loads.to_vec());
+
+      Ok(())
+    })
   }
 
   fn resolve<'a>(

@@ -28,6 +28,9 @@ pub enum Way {
 /// A gate's road as one run reads it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Route {
+  /// The agency's work key the run goes out under: the gate's own, or the key its profile forwards to where the
+  /// agency serves it.
+  pub key: String,
   /// Whether the gate stands on Laya, which no model run answers.
   pub laya: bool,
   /// The provider the road begins on.
@@ -44,6 +47,19 @@ impl Route {
   pub fn model(&self) -> &str {
     self.mapping.as_ref().and_then(|mapping| mapping.model.as_deref()).unwrap_or_default()
   }
+}
+
+/// The work key a gate's runs go out under (docs/gates.md, 「Where a gate's runs go out」): the key its profile
+/// forwards to where the agency serves that key, the gate's own otherwise.
+pub async fn key_of(runs: &Runs, stage: &str) -> Result<String, GateError> {
+  let Some(forward) = PROFILES.of(stage).and_then(|profile| profile.forwards_to.clone()) else {
+    return Ok(stage.to_owned());
+  };
+
+  Ok(match runs.agency.work_key(&forward).await.map_err(fault)? {
+    Some(_) => forward,
+    None => stage.to_owned(),
+  })
 }
 
 /// The tier a gate's profile names, which every mapping of it is resolved at.
@@ -114,11 +130,12 @@ pub async fn read(runs: &Runs, stage: &str) -> Result<Route, GateError> {
 /// serves the run nothing.
 pub async fn read_on(runs: &Runs, stage: &str, on: Option<&str>) -> Result<Route, GateError> {
   let tier = tier_of(stage)?;
+  let key = key_of(runs, stage).await?;
   let providers = runs.agency.providers().await.map_err(fault)?;
   let (laya, provider, mapping) = match on {
     Some(on) => {
       let mapping = if enabled(&providers, on) {
-        runs.agency.resolve(stage, Some(on), &tier).await.map_err(fault)?
+        runs.agency.resolve(&key, Some(on), &tier).await.map_err(fault)?
       } else {
         None
       };
@@ -126,13 +143,13 @@ pub async fn read_on(runs: &Runs, stage: &str, on: Option<&str>) -> Result<Route
       (false, on.to_owned(), mapping)
     }
     None => {
-      let mode = run_mode(runs, stage).await?;
+      let mode = run_mode(runs, &key).await?;
 
       // A gate on Laya runs no model, so no mapping is read for it.
       if mode == LAYA {
         (true, LAYA.to_owned(), None)
       } else {
-        let (provider, mapping) = road_provider(runs, stage, &mode, &providers, &tier).await?;
+        let (provider, mapping) = road_provider(runs, &key, &mode, &providers, &tier).await?;
 
         (false, provider, mapping)
       }
@@ -140,6 +157,7 @@ pub async fn read_on(runs: &Runs, stage: &str, on: Option<&str>) -> Result<Route
   };
 
   Ok(Route {
+    key,
     laya,
     way: way_of(&providers, &provider),
     provider,
@@ -171,6 +189,7 @@ pub async fn read_registered(runs: &Runs, stage: &str, registration: &str) -> Re
   };
 
   Ok(Route {
+    key: stage.to_owned(),
     laya: false,
     provider: provider.name.clone(),
     way: Way::Gateway,

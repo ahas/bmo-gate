@@ -185,6 +185,31 @@ impl GateClient {
     answer(self.post(&["reference", "selected"]).json(ask)).await
   }
 
+  /// The brain's index for an agent in a room.
+  pub async fn reference_index(
+    &self,
+    query: &ReferenceIndexQuery,
+  ) -> Result<ReferenceIndex, ClientFailure> {
+    answer(self.get(&["reference", "index"]).query(query)).await
+  }
+
+  /// One piece of the index read whole.
+  pub async fn reference_piece(
+    &self,
+    slug: &str,
+    query: &ReferencePieceQuery,
+  ) -> Result<ReferencePiece, ClientFailure> {
+    answer(self.get(&["reference", "pieces", slug]).query(query)).await
+  }
+
+  /// The index's entries whose words match a query.
+  pub async fn reference_search(
+    &self,
+    query: &ReferenceSearchQuery,
+  ) -> Result<ReferenceSearch, ClientFailure> {
+    answer(self.get(&["reference", "search"]).query(query)).await
+  }
+
   /// Defuse a text.
   pub async fn sanitise(&self, ask: &SanitiseAsk) -> Result<Sanitised, ClientFailure> {
     answer(self.post(&["sanitised"]).json(ask)).await

@@ -1,5 +1,5 @@
 # The translator offered to an agent: the gate's own POST /translations, called with the gate's address and token
-# the record carries (docs/api.md, 「The tool a tool host places」). The repository's tools test holds this
+# the record carries (docs/api.md, 「The tools a tool host places」). The repository's tools test holds this
 # manifest to the executable answering it.
 
 [tool]

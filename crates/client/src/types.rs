@@ -425,6 +425,102 @@ pub struct ReferenceAnswer {
   pub entries: Vec<Entry>,
 }
 
+/// The brain's index asked for: the room, the session whose loads count an entry read, and the agent, the chat
+/// agent's where none is named.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[schemars(inline)]
+pub struct ReferenceIndexQuery {
+  pub room: i64,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub session: Option<String>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub agent: Option<String>,
+}
+
+/// One entry of the index: its slug, what it holds and when it is read, null where its title says not.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct IndexEntry {
+  pub slug: String,
+  pub holds: String,
+  pub read_when: Option<String>,
+}
+
+/// One group of the index: `system-documents`, `room-rules`, `knowledge`, `people` or `room-memories`, how many of
+/// its entries the session has not read, one sentence of what changed in the last three days or null, and its
+/// entries.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct IndexGroup {
+  pub group: String,
+  pub unread: u64,
+  pub hint: Option<String>,
+  pub entries: Vec<IndexEntry>,
+}
+
+/// The brain's index, its groups in order.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ReferenceIndex {
+  pub groups: Vec<IndexGroup>,
+}
+
+/// A piece asked for by its slug: the room, its group, the session it is recorded among the loads of, and the
+/// agent.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[schemars(inline)]
+pub struct ReferencePieceQuery {
+  pub room: i64,
+  pub group: String,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub session: Option<String>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub agent: Option<String>,
+}
+
+/// One piece read whole.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ReferencePiece {
+  pub slug: String,
+  pub group: String,
+  pub path: String,
+  pub text: String,
+}
+
+/// A search of the index: its words, the room, at most how many entries (8 where absent, at most 24), and the
+/// agent.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[schemars(inline)]
+pub struct ReferenceSearchQuery {
+  pub q: String,
+  pub room: i64,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub limit: Option<u32>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub agent: Option<String>,
+}
+
+/// One entry a search found, with its group.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchEntry {
+  pub slug: String,
+  pub group: String,
+  pub holds: String,
+  pub read_when: Option<String>,
+}
+
+/// What a search found, the entries holding the most of its words first.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ReferenceSearch {
+  pub entries: Vec<SearchEntry>,
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // The sanitiser
 

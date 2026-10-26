@@ -24,12 +24,13 @@ pub struct Step {
   pub places: Vec<Place>,
 }
 
-/// Where a gate stands: before the reply is written, after it, or outside any turn.
+/// Where a gate stands: before the reply is written, after it, outside any turn, or shelved, asked by nobody.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Part {
   Pre,
   Post,
   Apart,
+  Shelved,
 }
 
 impl Part {
@@ -38,6 +39,7 @@ impl Part {
       Part::Pre => "pre",
       Part::Post => "post",
       Part::Apart => "apart",
+      Part::Shelved => "shelved",
     }
   }
 }
@@ -59,10 +61,14 @@ pub struct GateOrder {
   pub pre: Vec<Step>,
   pub post: Vec<Step>,
   pub apart: Vec<String>,
+  /// The gates nobody asks, each with its reference mark.
+  #[serde(default)]
+  pub shelved: Vec<Place>,
 }
 
 impl GateOrder {
-  /// Every place of the order, the turn's parts first and then the gates apart, in the order they stand.
+  /// Every place of the order, the turn's parts first, then the gates apart, then the shelved ones, in the order
+  /// they stand.
   pub fn standing(&self) -> Vec<Standing<'_>> {
     let turn = [(Part::Pre, &self.pre), (Part::Post, &self.post)]
       .into_iter()
@@ -85,7 +91,20 @@ impl GateOrder {
       reference: false,
     });
 
-    turn.chain(apart).collect()
+    let shelved = self.shelved.iter().enumerate().map(|(step, place)| Standing {
+      part: Part::Shelved,
+      step,
+      key: &place.key,
+      condition: None,
+      reference: place.reference,
+    });
+
+    turn.chain(apart).chain(shelved).collect()
+  }
+
+  /// Whether a gate is shelved, which nobody asks.
+  pub fn is_shelved(&self, key: &str) -> bool {
+    self.shelved.iter().any(|place| place.key == key)
   }
 
   /// Every gate once, where it first stands.

@@ -94,7 +94,7 @@ async fn a_workers_words_go_through_the_sanitiser_with_no_room() {
 }
 
 #[tokio::test]
-async fn a_jobs_work_is_handed_the_knowledge_its_lines_call_for() {
+async fn a_jobs_work_is_handed_no_piece_while_the_knowledge_picker_is_shelved() {
   let ground = ground("selected", picking(&["deploy-notes"])).await;
 
   ground.furnish();
@@ -107,15 +107,13 @@ async fn a_jobs_work_is_handed_the_knowledge_its_lines_call_for() {
     .await;
 
   assert_eq!(status, StatusCode::OK, "{body}");
-  assert_eq!(
-    body,
-    json!({ "pieces": [{ "path": "knowledge/deploy-notes.md", "text": "Deploys go through the testbed." }] })
-  );
+  assert_eq!(body, json!({ "pieces": [] }));
+  assert!(ground.gateway.asked.lock().unwrap().is_empty(), "no model was asked");
   assert_eq!(ground.scratch.count("SELECT count(*) FROM reference_offers", vec![]).await, 0);
 }
 
 #[tokio::test]
-async fn a_searchs_work_is_handed_the_chat_agents_knowledge() {
+async fn a_searchs_work_is_handed_no_piece_while_the_knowledge_picker_is_shelved() {
   let ground = ground("work", picking(&["deploy-notes"])).await;
 
   ground.furnish();
@@ -125,10 +123,8 @@ async fn a_searchs_work_is_handed_the_chat_agents_knowledge() {
     .await;
 
   assert_eq!(status, StatusCode::OK, "{body}");
-  assert_eq!(
-    body,
-    json!({ "pieces": [{ "path": "knowledge/deploy-notes.md", "text": "Deploys go through the testbed." }] })
-  );
+  assert_eq!(body, json!({ "pieces": [] }));
+  assert!(ground.gateway.asked.lock().unwrap().is_empty(), "no model was asked");
 
   let (status, body) = ground.post("/knowledge/work", json!({ "roomId": ROOM, "lines": [] })).await;
 

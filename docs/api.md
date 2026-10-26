@@ -33,7 +33,7 @@ the Laya relay's last answer; `busy` where it answers but its card was taken for
 
 | Route | Request | Answer |
 |---|---|---|
-| `GET /gates` | | a page of the gate order, each `gateName`, `part` (`pre`, `post` or `apart`), `step`, `condition` or null, `switchable`, `layaProbe`, `defaultLayaMode` and `answerTokens` |
+| `GET /gates` | | a page of the gate order, each `gateName`, `part` (`pre`, `post`, `apart` or `shelved`), `step`, `condition` or null, `switchable`, `layaProbe`, `defaultLayaMode` and `answerTokens` |
 | `GET /options/{gateName}` | | `timeoutMs`, `layaMode`, `layaTau`, `layaProbe`, `switchable`, `enabled`, `layaFallback`, `effective` (`thinking`, `answerTokens`, `timeoutMs`, `layaMode`, `layaTau`) and `defaults` |
 | `POST /options/{gateName}` | any of `timeoutMs`, `layaMode`, `layaTau`, `enabled`, `layaFallback`; a Laya field sent null goes back to the default | `gateName` and `options`, the gate's route as a run reads it (`provider`, `model`, `laya`, `timeoutMs`, `setAt`) |
 | `POST /options/{gateName}/agents/{agentName}` | as `POST /options/{gateName}` | as `POST /options/{gateName}`, its wait the agent's |
@@ -104,9 +104,24 @@ An agreement carries `gateName`, `unit` (`pair` or `question`), `pairs`, `failur
 It answers `entries`, each `path`, `text` and `source` (`document`, `person`, `rule`, `situation`,
 `knowledge`, `memory`, `room` or `archive`).
 
-- **A turn's reference** is the reference gates, the person-book search and the situation-rule matcher run
-  over the envelope, each on its own road, and the pieces they pick read from the brain. A gate named in
-  `offGates` is not asked. Where `records` is true the turn's offers and verdicts are written.
+- **A turn's reference** is what no gate picks (`docs/reference-selection.md`, 「What a turn is given」): the
+  head of each speaker's sheet, at most three due memories and the rows the turn's events wake. It asks no model.
+  The envelope's other fields are read for the speakers, the room, the agent and the events; `offGates`,
+  `holds`, `answered` and `lore` change nothing a turn is given. Where `records` is true what the turn attached is
+  handed to the brain to count.
+
+| Route | Query | Answer |
+|---|---|---|
+| `GET /reference/index` | `session?`, `room`, `agent?` | `groups`, each `group`, `unread`, `hint` (or null) and `entries`, each `slug`, `holds`, `readWhen` (or null) |
+| `GET /reference/pieces/{slug}` | `room`, `group`, `session?`, `agent?` | `slug`, `group`, `path`, `text` |
+| `GET /reference/search` | `q`, `room`, `limit?` (8 where absent, at most 24), `agent?` | `entries`, each `slug`, `group`, `holds`, `readWhen` (or null) |
+
+- **The index, a piece and a search** are the brain's reference as the agent reads it itself, with no model
+  (`docs/reference-selection.md`, 「The index an agent reads」). `group` is `system-documents`, `room-rules`,
+  `knowledge`, `people` or `room-memories`; any other is 400 `bad-request`, as is a `limit` outside 1 to 24 or an
+  empty `q`. An index asked with no `session` counts every entry unread. A slug its group does not hold is 404
+  `not-found`. A piece read with `session` is recorded among the
+  session's loads; a call on the agency that fails is 502 `upstream-failed`.
 
 ## Sanitiser
 
@@ -115,6 +130,8 @@ It answers `entries`, each `path`, `text` and `source` (`document`, `person`, `r
 | `POST /sanitised` | `text`, `label`, `roomId?`, `messageId?` | `text`, `changed` |
 | `POST /sanitiser/documents` | `path`, `text` | `text`, the text to keep |
 
+- **The sanitiser is shelved** (`docs/gates.md`, 「Shelved」): both routes answer the text as it came, `changed`
+  false, and ask no model. What follows is what the sanitiser does where it stands in the gate order.
 - **The sanitiser** defuses the smallest spans that carry security-intrusion material and leaves the rest as
   it was. Words with nothing worth judging come back as they are; where the sanitiser has no answer, the words
   that made them worth judging are blanked. A verdict is kept under the message where `messageId` names one.
@@ -160,9 +177,8 @@ It answers `entries`, each `path`, `text` and `source` (`document`, `person`, `r
 | `POST /knowledge/selected` | `agentName`, `roomId`, `lines` | `pieces`, each `path` and `text` |
 | `POST /knowledge/work` | `roomId`, `lines` | the same pick for the chat agent |
 
-Both pick, from the brain's libraries the agent may be offered in the room, the pieces a piece of work's own
-lines call for. The narrowing, the pick and the count of what was attached are the gate's. A pick that fails
-costs the work its reference and nothing else.
+Both answer `pieces` empty: the knowledge picker is shelved (`docs/gates.md`, 「Shelved」), and a piece of work
+reads the brain's index itself (「Reference」).
 
 ## Runs
 
@@ -173,7 +189,7 @@ its road gave none) and `ms`.
 - **One run of one gate,** for a unit that reads the answer itself. The run goes on the gate's road with the
   gate's options and is recorded as a road like any gate run.
 - **The instructions** are the gate's own where `system` is absent. A name that is not a gate is 404
-  `no-gate`; a gate switched off answers null without asking any road.
+  `no-gate`; a gate switched off, or shelved, answers null without asking any road.
 
 ## Formats
 
@@ -200,7 +216,7 @@ characters; a longer one is 413 `too-large`.
 
 | Route | Request | Answer |
 |---|---|---|
-| `POST /documents/sought` | `question`, `entries` (each `slug`, `line`, `group?`) | `picks`, the slugs chosen; 502 `no-answer` where the seeker gave none |
+| `POST /documents/sought` | `question`, `entries` (each `slug`, `line`, `group?`) | `picks`, the slugs chosen; 502 `no-answer` where the seeker gave none; 409 `shelved` while the seeker is shelved |
 | `POST /documents/translations` | `document`, `version`, `target`, `partCount`, `wanted` (each `part` and `text`) | 202 with `taken`, the parts queued |
 | `GET /documents/translations/state` | `document`, `target` | `pending`, `failure` (`reason`, `provider`, `model`) or null |
 | `GET /documents/translations/parts` | `document`, `version`, `target` | a page of `part`, `text`, `failed` and `failure` |
@@ -267,16 +283,26 @@ console's, so nothing here names one.
 - **A trial put through the console** is kept with no user name, under the reader's `Owner-Key`, the account
   service's user id, where the call carries one; the trial answers its `userName` empty.
 
-## The tool a tool host places
+## The tools a tool host places
 
-The gate's translator is offered to an agent as one tool the tool host places: `tools/translate`, a folder with its
-own `tool.toml`, placed with the tool host and registered as the gate's own by the deployment (`docs/layout.md`,
-「The deployment」). It speaks version 1 of the tool host's call protocol (the tool host's `docs/api.md`, 「The call
-protocol」), a process a call.
+The gate is offered to an agent as two tools the tool host places: `tools/translate` and `tools/reference`, each a
+folder with its own `tool.toml`, placed with the tool host and registered as the gate's own by the deployment
+(`docs/layout.md`, 「The deployment」). Each speaks version 1 of the tool host's call protocol (the tool host's
+`docs/api.md`, 「The call protocol」), a process a call.
 
 | Entry | Capability | Reached by | What it does |
 |---|---|---|---|
 | `gate/translate` | `gate.translate` | `call`: it is read-only | Translates `texts` into `language` through `POST /translations` (「Translations」) and answers the readings |
+| `gate/reference_index` | `gate.reference` | `call`: it is read-only | The brain's index for `room` and the call's session, through `GET /reference/index` (「Reference」) |
+| `gate/reference_piece` | `gate.reference` | `call` | One piece by `slug` and `group` in `room`, through `GET /reference/pieces/{slug}`, recorded among the session's loads |
+| `gate/reference_search` | `gate.reference` | `call`: it is read-only | The entries whose words match `query` in `room`, at most `limit`, through `GET /reference/search` |
+
+- **The reference tools read the turn from the call's record** (the agency's `docs/tools.md`): the agent from
+  `BMO_TURN_AGENT`, the room from `BMO_TURN_CHAT` where the call names none, and the session from
+  `BMO_TURN_SESSION` where the record carries it; each is passed to the gate where it stands. A call with no room
+  named and none in the record is refused.
+- **Their answers** are the gate's, as the result's structured content and its one text piece, and their refusals
+  are told as the translator's are.
 
 - **Its input** is `language`, a language tag, and `texts`, one text or several, at most sixteen, the most one
   translation carries (「Translations」). It is handed on to the gate as the translation's `language` and

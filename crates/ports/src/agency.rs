@@ -10,6 +10,7 @@ use reqwest::Method;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+use crate::brain::Load;
 use crate::http::{Answer, Caller, Peer, PortError};
 
 /// One agent as the agency lists it: what the gate reads of it, and the rest of its row as it stands.
@@ -194,6 +195,23 @@ pub trait Agency: Send + Sync {
 
   /// The roads conversational turns walk, from the moment the stream opens.
   fn roads_walked(&self) -> BoxFuture<'_, Answer<BoxStream<'static, Answer<RoadWalked>>>>;
+
+  /// What a session was handed in full, each document by its path and version; none where it holds none.
+  fn session_loads<'a>(&'a self, _session: &'a str) -> BoxFuture<'a, Answer<Vec<Load>>> {
+    Box::pin(async { Ok(vec![]) })
+  }
+
+  /// A session's loads kept: every load it now holds, in place of those it held.
+  fn keep_loads<'a>(&'a self, _session: &'a str, _loads: &'a [Load]) -> BoxFuture<'a, Answer<()>> {
+    Box::pin(async { Ok(()) })
+  }
+}
+
+/// A session's loads as the agency answers and takes them.
+#[derive(Serialize, Deserialize)]
+struct Loads {
+  #[serde(default)]
+  documents: Vec<Load>,
 }
 
 /// The agency over HTTP.
@@ -456,6 +474,28 @@ impl Agency for HttpAgency {
     Box::pin(
       async move { self.caller.without("session ended", Method::DELETE, &["sessions", session]).await },
     )
+  }
+
+  fn session_loads<'a>(&'a self, session: &'a str) -> BoxFuture<'a, Answer<Vec<Load>>> {
+    Box::pin(async move {
+      let loads: Loads = self.caller.get("session loads", &["session-loads", session], &[]).await?;
+
+      Ok(loads.documents)
+    })
+  }
+
+  fn keep_loads<'a>(&'a self, session: &'a str, loads: &'a [Load]) -> BoxFuture<'a, Answer<()>> {
+    Box::pin(async move {
+      let body = Loads {
+        documents: loads.to_vec(),
+      };
+      let _: Value = self
+        .caller
+        .send_json("session loads kept", Method::PUT, &["session-loads", session], &body)
+        .await?;
+
+      Ok(())
+    })
   }
 
   fn roads_walked(&self) -> BoxFuture<'_, Answer<BoxStream<'static, Answer<RoadWalked>>>> {

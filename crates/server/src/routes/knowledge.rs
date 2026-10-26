@@ -12,6 +12,11 @@ use crate::App;
 use crate::answer::{Answered, Body};
 
 async fn pieces(app: &App, agent: &str, room_id: i64, lines: &[String]) -> Json<Pieces> {
+  // The knowledge picker is shelved: no piece is picked, and a piece of work reads the index itself.
+  if gate_policy::gates::GATE_ORDER.is_shelved(gate_reference::road::KNOWLEDGE_GATE) {
+    return Json(Pieces { pieces: vec![] });
+  }
+
   let entries = select_knowledge(&app.reference, agent, room_id, lines).await;
 
   Json(Pieces {

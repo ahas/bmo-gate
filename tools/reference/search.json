@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "properties": {
+    "query": { "type": "string", "minLength": 1, "description": "The words the entries are matched by." },
+    "room": { "type": "integer", "description": "The room; the turn's room where absent." },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 24, "description": "At most how many entries; 8 where absent." }
+  },
+  "required": ["query"],
+  "additionalProperties": false
+}

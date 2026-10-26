@@ -1,4 +1,4 @@
-//! The translator's tool (`docs/api.md`, 「The tool a tool host places」): a call of `gate/translate` read from
+//! The translator's tool (`docs/api.md`, 「The tools a tool host places」): a call of `gate/translate` read from
 //! what the tool host hands it, put to the gate's `POST /translations` with the address and token the record
 //! carries, and the readings answered as a tool result.
 

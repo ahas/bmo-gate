@@ -114,7 +114,7 @@ pub async fn ask(runs: &Runs, run: &Run<'_>) -> Result<Ended, GateError> {
       answer_tokens: mapping.answer_tokens,
     },
     name: run.name.clone(),
-    work_key: run.stage.to_owned(),
+    work_key: run.route.key.clone(),
     chat: request.chat_id,
     system: request.system.clone(),
     thinking: request.thinking,

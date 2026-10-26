@@ -20,6 +20,10 @@ use crate::App;
 use crate::answer::{Answered, Body, Query, Refused};
 
 pub async fn sought(State(app): State<Arc<App>>, Body(asked): Body<SeekAsk>) -> Answered<Json<Picks>> {
+  if gate_policy::gates::GATE_ORDER.is_shelved(document_seek::STAGE) {
+    return Err(Refused::new(Code::Shelved, "the document seeker is shelved and is never asked"));
+  }
+
   let entries: Vec<GateSeekEntry> = asked
     .entries
     .into_iter()

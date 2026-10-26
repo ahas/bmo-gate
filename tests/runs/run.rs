@@ -70,6 +70,37 @@ async fn a_registered_model_is_one_gateway_request_with_the_gates_room_thinking_
 }
 
 #[tokio::test]
+async fn a_gate_forwarding_to_a_key_the_agency_serves_goes_out_under_that_key_and_under_its_own_otherwise()
+{
+  let (scratch, agency, gateway) = ground().await;
+  let runs = runs_of(&scratch, &agency, &gateway);
+
+  agency.providers.lock().unwrap().push(provider("claude-code", false));
+  agency
+    .mappings
+    .lock()
+    .unwrap()
+    .insert("claude-code".into(), mapping("claude-code", "a-model", None, None));
+  *agency.end.lock().unwrap() = Some(turn_end("answered", Some("translated"), None));
+  wait(&runs, "translator", 30_000).await;
+
+  let request = GateRequest::new("translate", "a text");
+
+  runs.run("translator", &request).await.unwrap();
+  agency.route("translate", "auto");
+  runs.run("translator", &request).await.unwrap();
+
+  let keys: Vec<String> = agency.turns.lock().unwrap().iter().map(|turn| turn.work_key.clone()).collect();
+
+  assert_eq!(
+    keys,
+    ["translator", "translate"],
+    "its own key until the agency serves the forwarding one"
+  );
+  assert!(agency.resolved.lock().unwrap().iter().any(|(key, _, _)| key == "translate"));
+}
+
+#[tokio::test]
 async fn a_programs_provider_is_one_thrown_away_session_and_its_one_turn() {
   let (scratch, agency, gateway) = ground().await;
   let runs = runs_of(&scratch, &agency, &gateway);

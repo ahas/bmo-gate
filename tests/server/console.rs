@@ -17,7 +17,7 @@ async fn the_gate_order_is_served_with_each_gates_profile() {
   let gates = body["items"].as_array().unwrap();
   let sanitizer = gates.iter().find(|gate| gate["gateName"] == "sanitizer").expect("the sanitizer");
 
-  assert!(["pre", "post", "apart"].contains(&sanitizer["part"].as_str().unwrap()));
+  assert_eq!(sanitizer["part"], "shelved", "a shelved gate is listed, its profile readable");
   assert!(sanitizer["step"].is_u64());
   assert_eq!(sanitizer["layaProbe"], true);
   assert_eq!(sanitizer["defaultLayaMode"], "off");
@@ -264,23 +264,16 @@ async fn a_trial_is_kept_and_read_back() {
 }
 
 #[tokio::test]
-async fn the_seeker_picks_the_documents_a_question_calls_for() {
+async fn the_shelved_seeker_is_refused_and_never_asked() {
   let ground = ground("sought", |_| Some("deploys".into())).await;
-  let entries = json!([{ "slug": "deploys", "line": "how a deploy goes" }, { "slug": "kittens", "line": "the office cat", "group": "office" }]);
+  let entries = json!([{ "slug": "deploys", "line": "how a deploy goes" }]);
   let (status, body) = ground
     .post("/documents/sought", json!({ "question": "How do deploys go?", "entries": entries }))
     .await;
 
-  assert_eq!(status, StatusCode::OK, "{body}");
-  assert_eq!(body, json!({ "picks": ["deploys"] }));
-
-  let silent = crate::ground("unsought", |_| None).await;
-  let (status, body) = silent
-    .post("/documents/sought", json!({ "question": "How do deploys go?", "entries": entries }))
-    .await;
-
-  assert_eq!(status, StatusCode::BAD_GATEWAY);
-  refused(&body, "no-answer");
+  assert_eq!(status, StatusCode::CONFLICT, "{body}");
+  refused(&body, "shelved");
+  assert!(ground.gateway.asked.lock().unwrap().is_empty(), "no model was asked");
 }
 
 #[tokio::test]

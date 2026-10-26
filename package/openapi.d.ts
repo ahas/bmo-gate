@@ -381,6 +381,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reference/index": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The brain's index for an agent in a room: five groups, each its unread count against the session's loads, its hint and its entries. */
+        get: operations["reference_index"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reference/pieces/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One piece of the index read whole by its slug within its group, recorded among the session's loads where one is named. */
+        get: operations["reference_piece"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reference/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The index's entries whose words match a query, with no model, the ones holding the most of its words first. */
+        get: operations["reference_search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reference/selected": {
         parameters: {
             query?: never;
@@ -390,7 +441,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** The pieces a turn is handed: the reference gates, the person-book search and the situation rules. */
+        /** What a turn is handed with no model: the speakers' sheet heads, the due memories and the rows its events wake. */
         post: operations["reference_selected"];
         delete?: never;
         options?: never;
@@ -754,6 +805,24 @@ export interface components {
             reason: string | null;
             version: string;
         };
+        /** @description One entry of the index: its slug, what it holds and when it is read, null where its title says not. */
+        IndexEntry: {
+            holds: string;
+            readWhen: string | null;
+            slug: string;
+        };
+        /**
+         * @description One group of the index: `system-documents`, `room-rules`, `knowledge`, `people` or `room-memories`, how many of
+         *     its entries the session has not read, one sentence of what changed in the last three days or null, and its
+         *     entries.
+         */
+        IndexGroup: {
+            entries: components["schemas"]["IndexEntry"][];
+            group: string;
+            hint: string | null;
+            /** Format: uint64 */
+            unread: number;
+        };
         /** @description A decision written into a room's log. */
         Judgement: {
             /**
@@ -963,6 +1032,21 @@ export interface components {
             situation?: components["schemas"]["Situation"] | null;
             speakerIds: number[];
         };
+        /** @description The brain's index, its groups in order. */
+        ReferenceIndex: {
+            groups: components["schemas"]["IndexGroup"][];
+        };
+        /** @description One piece read whole. */
+        ReferencePiece: {
+            group: string;
+            path: string;
+            slug: string;
+            text: string;
+        };
+        /** @description What a search found, the entries holding the most of its words first. */
+        ReferenceSearch: {
+            entries: components["schemas"]["SearchEntry"][];
+        };
         /** @description One road a gate run walked. */
         Road: {
             /** Format: int64 */
@@ -987,6 +1071,13 @@ export interface components {
         Sanitised: {
             changed: boolean;
             text: string;
+        };
+        /** @description One entry a search found, with its group. */
+        SearchEntry: {
+            group: string;
+            holds: string;
+            readWhen: string | null;
+            slug: string;
         };
         /** @description A question put to the document seeker over an index. */
         SeekAsk: {
@@ -1703,6 +1794,85 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GateOptionsChanged"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    reference_index: {
+        parameters: {
+            query: {
+                agent?: string;
+                room: number;
+                session?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description the index */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReferenceIndex"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    reference_piece: {
+        parameters: {
+            query: {
+                agent?: string;
+                group: string;
+                room: number;
+                session?: string;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description the piece */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReferencePiece"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    reference_search: {
+        parameters: {
+            query: {
+                agent?: string;
+                limit?: number;
+                q: string;
+                room: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description the entries found */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReferenceSearch"];
                 };
             };
             default: components["responses"]["Error"];

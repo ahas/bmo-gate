@@ -231,12 +231,55 @@ pub fn document() -> Value {
     "/reference/selected",
     "reference_selected",
     "Reference",
-    "The pieces a turn is handed: the reference gates, the person-book search and the situation rules.",
+    "What a turn is handed with no model: the speakers' sheet heads, the due memories and the rows its events wake.",
     vec![],
     None,
     Some(made::<ReferenceAsk>),
     &[(200, "the pieces the turn is handed", Some(made::<ReferenceAnswer>))],
     &["unauthorized", "bad-request", "stopped", "failed", "upstream-failed"],
+  );
+
+  route(
+    &mut paths,
+    &mut generator,
+    "get",
+    "/reference/index",
+    "reference_index",
+    "Reference",
+    "The brain's index for an agent in a room: five groups, each its unread count against the session's loads, its hint and its entries.",
+    vec![],
+    Some(query_of::<ReferenceIndexQuery>),
+    None,
+    &[(200, "the index", Some(made::<ReferenceIndex>))],
+    &["unauthorized", "bad-request", "failed", "upstream-failed"],
+  );
+  route(
+    &mut paths,
+    &mut generator,
+    "get",
+    "/reference/pieces/{slug}",
+    "reference_piece",
+    "Reference",
+    "One piece of the index read whole by its slug within its group, recorded among the session's loads where one is named.",
+    vec![("slug", "string")],
+    Some(query_of::<ReferencePieceQuery>),
+    None,
+    &[(200, "the piece", Some(made::<ReferencePiece>))],
+    &["unauthorized", "bad-request", "not-found", "failed", "upstream-failed"],
+  );
+  route(
+    &mut paths,
+    &mut generator,
+    "get",
+    "/reference/search",
+    "reference_search",
+    "Reference",
+    "The index's entries whose words match a query, with no model, the ones holding the most of its words first.",
+    vec![],
+    Some(query_of::<ReferenceSearchQuery>),
+    None,
+    &[(200, "the entries found", Some(made::<ReferenceSearch>))],
+    &["unauthorized", "bad-request", "failed", "upstream-failed"],
   );
 
   route(

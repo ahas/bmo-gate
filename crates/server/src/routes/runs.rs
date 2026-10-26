@@ -1,5 +1,5 @@
 //! Gate runs (`docs/api.md`, 「Runs」): one run of one gate on its road, its instructions the gate's own where
-//! the caller names none; a gate switched off answers nothing without asking any road.
+//! the caller names none; a gate switched off or shelved answers nothing without asking any road.
 
 use std::sync::Arc;
 use std::time::Instant;
@@ -24,7 +24,10 @@ pub async fn run(
   let agent = asked.agent_name.clone().unwrap_or_else(|| runs.chat_agent.clone());
   let started = Instant::now();
 
-  if !options::switched_on(&runs.db, &gate_name, &agent).await.map_err(Refused::database)? {
+  // A shelved gate is never asked, as a gate switched off is not (docs/gates.md, 「Shelved」).
+  if gate_policy::gates::GATE_ORDER.is_shelved(&gate_name)
+    || !options::switched_on(&runs.db, &gate_name, &agent).await.map_err(Refused::database)?
+  {
     return Ok(Json(StageRun {
       answer: None,
       ms: 0,

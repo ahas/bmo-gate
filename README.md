@@ -33,7 +33,7 @@ Every other unit is reached through standard APIs alone, and of other repositori
 | `runtime/` | What serves Laya on its nodes: the decision server, its card turn client and the front, each a Python project of its own; and the GGUF engine's unit templates and node setup |
 | `src/` | The root package: the version, the `gate-server` and `laya-relay` binaries and the `bmo-gate` unit command |
 | `tests/` | Every test of the repository |
-| `tools/` | The tools a tool host places: the translator's tool, `gate/translate`, its manifest, schemas, manual and executable |
+| `tools/` | The tools a tool host places: the translator's tool, `gate/translate`, and the brain's index tool, `gate/reference_index`, `gate/reference_piece` and `gate/reference_search`, each with its manifest, schemas, manual and executable |
 | `training/` | What makes Laya's checkpoints: the dataset and training tooling, a Bun project of its own, and the training scripts and node scripts the training runs |
 | `weights/` | The declarations of Laya's weights: the card declarations of the service and its training, and where the checkpoints stand; never the weights themselves |
 

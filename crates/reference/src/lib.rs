@@ -6,6 +6,7 @@
 
 pub mod attachments;
 pub mod fragments;
+pub mod index;
 pub mod memories;
 pub mod narrow;
 pub mod pick;

@@ -1,0 +1,7 @@
+{
+  "type": "object",
+  "properties": {
+    "room": { "type": "integer", "description": "The room whose index is read; the turn's room where absent." }
+  },
+  "additionalProperties": false
+}

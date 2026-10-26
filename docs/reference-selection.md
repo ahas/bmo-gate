@@ -1,14 +1,63 @@
 # Reference selection
 
-What a chat turn is given to read beside the conversation, and who chooses it. The pieces themselves
-live in the brain, and the system documents among them are the ones the deployment ships; this document is
-the road that decides which of them a turn carries.
+What a chat turn is given to read beside the conversation, and how the agent reads the rest of its brain. The
+pieces themselves live in the brain, and the system documents among them are the ones the deployment ships.
 
-- **Every turn of the chat agent is selected for,** whatever brought it: the selection is composed by the one
-  window every turn passes (the receiver's `docs/bmo-window.md`), a quiet instruction's turn and a keepalive touch
-  alike.
+- **No model chooses a turn's reference.** `POST /reference/selected` carries what attaches by a fact of the row
+  alone, and asks no gate: the reference pickers are shelved (`docs/gates.md`, 「Shelved」).
+- **The agent chooses what it reads** from the brain's index, which a turn names as each group's count of unread
+  entries, through the index, piece and search routes and the tools that call them (「The index an agent reads」).
 
-## What a turn's lines are
+## What a turn is given
+
+- **The head of the standing sheet of everyone who spoke this turn,** what the brain knows of that person in
+  this room as the brain renders it from their facts, the most important first, held to the sheet's ceiling, under
+  the path `rooms/<room>/people/<user id>/sheet.md`, the turn's agent's own; a person the brain knows no fact of
+  in the room has none.
+- **The room's due memories,** the errands whose event has come, the latest come first and at most three, as one
+  entry under `memories/<room>`; a turn on which nothing is due carries no memories entry.
+- **The rows the turn's events wake,** by the event alone (the brain's `docs/memories.md`, 「A row with an
+  event」).
+- **Nothing else.** No room rule, no knowledge, no lore, no other person's sheet and no undue memory attaches to a
+  turn: each stands in the index, for the agent to read where the turn needs it.
+
+## The index an agent reads
+
+| Route | Query | Answer |
+|---|---|---|
+| `GET /reference/index` | `session?`, `room`, `agent?` | `groups`, each `group`, `unread`, `hint` and `entries` (each `slug`, `holds`, `readWhen`) |
+| `GET /reference/pieces/{slug}` | `room`, `group`, `session?`, `agent?` | `slug`, `group`, `path`, `text` |
+| `GET /reference/search` | `q`, `room`, `limit?`, `agent?` | `entries`, each `slug`, `group`, `holds`, `readWhen` |
+
+- **Five groups, in this order:** `system-documents` (the shipped reference documents and, in a room that reads
+  it, the lore of the agent's brain), `room-rules` (the room's rules and its situation rules), `knowledge`, `people`
+  (everyone the brain knows facts of in the room) and `room-memories` (the room's standing memories). The agent is
+  the one named, else the chat agent.
+- **An entry** is the row's `slug`, what it `holds` and when to read it, `readWhen`. A knowledge piece's or a
+  rule's title is split where it says when it is needed — at "; needed", "; consulted" and their kin up to the
+  "when" that follows — what stands before being `holds` and the rest `readWhen`; a title that says no such thing
+  is all `holds`, with `readWhen` null. A situation rule holds its action and is read when its condition holds; a
+  memory holds its words and is read when its condition holds; a person holds their name, and is read when they
+  speak or are spoken of.
+- **`unread`** counts a group's entries whose path the session's loads do not hold (the agency's
+  `GET /session-loads/{sessionId}`); with no session named, every entry is unread. **`hint`** is one sentence saying how many of the group's entries changed in
+  the last three days, and null where none did.
+- **A piece** is read by its slug within its group: its path and its whole text, a person as their sheet held to
+  its ceiling, a memory and a situation rule as the row carries them. Where `session` is given, the piece is
+  recorded among the session's loads at its version (the agency's `PUT /session-loads/{sessionId}`), so the next
+  index counts it read. A slug the group does not hold is 404 `not-found`.
+- **A search** matches the words of `q` against every group's entries, their slugs, what they hold and when they
+  are read, with no model; the entries holding the most of the words come first, at most `limit`, 8 where absent
+  and never more than 24.
+- **The tools.** `gate/reference_index`, `gate/reference_piece` and `gate/reference_search` call the three routes
+  for an agent, under the one capability `gate.reference` (`docs/api.md`, 「The tools a tool host places」).
+
+## The shelved pickers
+
+Everything below describes the reference pickers as the evaluation and replay commands drive them over stored
+turns (`docs/gate-eval.md`). They are shelved: no turn asks them, and nothing they pick reaches a turn.
+
+### What a turn's lines are
 
 - **A turn's lines are everything it brought:** the room's new words, each as its sender and text,
   and each quiet instruction as a line of the chat agent's own. A console talk's lines are what the owner said
@@ -52,7 +101,7 @@ the road that decides which of them a turn carries.
 - **The matcher reads the room's recent messages and the turn's lines,** and it is asked on every
   turn that has rows to offer it, lines or none.
 
-## Words pushed into a working round
+### Words pushed into a working round
 
 Words that reach a round while its turn works go into that turn (the agency's `docs/agent-control.md`, 「Words
 that arrive while a turn is working」), and the window selects for them too. That selection is made
@@ -89,7 +138,7 @@ flowchart TB
   in a push; or on such a turn over what the item rule alone keeps — and the road reads the
   declaration rather than the gate's name.
 
-## Whose turn it is
+### Whose turn it is
 
 - **Every turn is one designated agent's,** and everything below is read for that agent: its own
   memories, and of the fragment rows only those it owns and those marked for every agent
@@ -99,7 +148,7 @@ flowchart TB
   tuned apart.
 - **The budgets and the safety line are the road's,** the same for every agent's turn.
 
-## What attaches without a gate
+### What attaches without a gate
 
 - **The room's due memories** — the errands whose event has come — attach with no model choosing them: their
   time has come, which is a fact of the row rather than a judgement of the turn. The latest come stand first,
@@ -148,7 +197,7 @@ flowchart TB
 - **The memories entry is counted against the safety line below; the sheets are not.** It joins the turn's
   total like everything a gate picked. A sheet is held to its own ceiling (above).
 
-## The gates and what each reads
+### The gates and what each reads
 
 - **The three reference gates** are `system-documents`, `room-rules` and `library-knowledge`, and
   the person-book search runs beside them over an index of its own. The situation-rule matcher runs
@@ -220,7 +269,7 @@ flowchart TB
   distilled data and its checkpoints use (`docs/laya-gates.md`), so nothing between the data and the
   runs has to translate.
 
-## What the code narrows before a gate is asked
+### What the code narrows before a gate is asked
 
 - **No gate is handed a whole library.** The rows a room may see are narrowed by code first, and a
   gate is asked only about what is left. The same narrowing picks the pieces an editor is handed
@@ -285,7 +334,7 @@ flowchart TB
 - **Why the code and not the gate:** a gate reading every piece of a large book spends its time and
   its budget on pieces the turn has nothing to do with, and every candidate asked about costs Laya
   a question and the model a line of its index.
-## What the three reference gates are asked, and what they answer
+### What the three reference gates are asked, and what they answer
 
 - **One question per candidate, answered yes or no.** A gate is given its own library's lines, one
   for each fragment row it is offered, and the turn's messages, and answers for every candidate it
@@ -317,7 +366,7 @@ flowchart TB
   with the three is the road around it — it runs beside them, falls back to its index the same way,
   and declares a probe of the same shape.
 
-## The safety line
+### The safety line
 
 - **Each gate has its own allowance**, counted in characters of attached text: 24,000 for
   `system-documents`, 12,000 for `room-rules`, 12,000 for `library-knowledge`, 12,000 for
@@ -340,9 +389,9 @@ flowchart TB
   against the three. It is a separate gate over a separate index; the two lines together bound what
   any turn attaches on a gate's word.
 
-## Loaded once per session
+### Loaded once per session
 
-### One full load per version
+#### One full load per version
 
 - **Every document the reference attaches goes to a chat session in full once per version**, and as a
   one-line mark on every later turn of that session that attaches the same version. That is all of them:
@@ -354,7 +403,7 @@ flowchart TB
   goes in full again. An index filtered for one room is a different version from the same file filtered for
   another.
 
-### What stands on every turn
+#### What stands on every turn
 
 - **Only the body is replaced by the mark.** What says where a reference came from stands on every turn,
   whether the document went in full or as a mark:
@@ -370,7 +419,7 @@ flowchart TB
 - **Budgets count the full text.** The allowances above and the person-book search's are measured where the
   picks are made, before it is known which of them will go as marks.
 
-### The record
+#### The record
 
 - **What was loaded is recorded per session in the brain** (its `/sessions/loads`), one line per session,
   document path and version.
@@ -380,7 +429,7 @@ flowchart TB
 - **Failures record nothing,** so the next turn sends the same version in full again.
 - **Survives restarts:** the record is the brain's.
 
-### Full or mark is decided late
+#### Full or mark is decided late
 
 - **At prompt-building time** it is not known whether the session will simply continue: just before the
   request it may be summarised and handed over, or the road may change.
@@ -389,7 +438,7 @@ flowchart TB
 - **No session to continue:** a request with none, and every request on a sessionless road, carries every
   document in full and records nothing.
 
-### When the record empties
+#### When the record empties
 
 - **New sessions:** a newly opened session, a session summarised and handed over, and one opened anew because
   the road or model changed have no record under their names, so they load everything from the start.
@@ -404,7 +453,7 @@ flowchart TB
   session's record of that path is deleted, so no session is left marked as holding a version of it. The
   next turn that attaches it sends the current version in full.
 
-### Rooms sharing one session
+#### Rooms sharing one session
 
 - **Only the room's own picks stand on its turn,** full or mark, so a room-only document never stands on
   another room's turn in either form.
@@ -414,7 +463,7 @@ flowchart TB
   the room's path.
 - **An index is filtered per room,** so after a switch that room's version goes in full once.
 
-### Notices carry only the path
+#### Notices carry only the path
 
 - **A notice about a changed document the reference attaches names it and carries no text**: what the session
   remembers of it is stale, and the current version comes in full with the next turn that attaches it. So
@@ -427,7 +476,7 @@ flowchart TB
     needs no rule here.
 - **Every other document's notice** carries its current text.
 
-### What the log and the console show
+#### What the log and the console show
 
 - **The selection line names what was put forward** — `reference: chat <id> selected …` — before the session
   is settled.
@@ -440,7 +489,7 @@ flowchart TB
 - **A document that went as a mark is not counted as attached.** The console's documents-read count leaves it out,
   and the list under it marks each document with which of the two it was (the web unit's `docs/web.md`).
 
-## Work beyond a turn
+### Work beyond a turn
 
 - **A job, a search and a browse are handed the knowledge their own words call for,** by the same
   `library-knowledge` gate a turn asks, so a fact the chat agent keeps or a rule every room keeps reaches the work
@@ -477,7 +526,7 @@ flowchart TB
   held-out jobs of the reference data it finds 6 of the 13 pieces the judge found needed, and on the ten
   job prompts of 10 October it attaches pieces to eight.
 
-## What is recorded
+### What is recorded
 
 - **One row per candidate** for every run of the three: the gate, the room, the message, the slug,
   and what the LLM answered for it. Where Laya was asked, its answer for the same candidate sits on
@@ -511,7 +560,7 @@ flowchart TB
   candidate was offered by, each beside what the model answered of it (`docs/gates.md`, 「What a turn records」).
 - The Laya verdict record stands beside it as it is (`docs/laya.md`).
 
-## Replaying a stored turn's inputs
+### Replaying a stored turn's inputs
 
 - **What a gate would be handed today for a turn already answered** is read with
   `bmo reference inputs`: each line of its standard input names a room, the messages the
@@ -543,7 +592,7 @@ flowchart TB
   gates' Laya checkpoints on, so they learn the input the gates are handed rather than a copy of it
   (`docs/reference-data.md`).
 
-## Watching what attaches
+### Watching what attaches
 
 - **Every hour the gate counts,** for each of the four gates over the last day, the turns the gate
   was asked and how many of them attached each piece, out of the verdict record.
@@ -569,7 +618,7 @@ flowchart TB
 - **Once a day at most per piece.** A piece raised is left alone for a day, so the watch looks at
   it again the next day and not every hour.
 
-## The filter beside each gate
+### The filter beside each gate
 
 - **Each of the four declares a probe**, so Laya can be asked one yes/no per candidate whatever
   shape the LLM answered in (`docs/laya.md`). The four read one probe shape, told apart by the gate
@@ -596,7 +645,7 @@ flowchart TB
   and `docs/laya-server.md`) — and a rewritten index line changes it only
   through the next training.
 
-## What it picks and what it costs, measured
+### What it picks and what it costs, measured
 
 `bmo reference compare` takes real stored turns, puts the same messages to the three gates, and sets what
 they answer beside what an earlier pick recorded on that very turn. The stored runs are the agency's run log's,

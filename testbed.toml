@@ -38,13 +38,13 @@ lane = "wide"
 id = "fmt"
 command = "cargo fmt --all --check"
 
-# Each tool under tools/ is checked by its own manifest (docs/api.md, 「The tool a tool host places」).
+# Each tool under tools/ is checked by its own manifest (docs/api.md, 「The tools a tool host places」).
 [tools]
 dir = "tools"
 
 [build]
-# The service, the unit command, the Laya relay and the translator's tool, into the release's bin/.
-binaries = ["gate-server", "bmo-gate", "laya-relay", "gate-translate-tool"]
+# The service, the unit command, the Laya relay and the two tools, into the release's bin/.
+binaries = ["gate-server", "bmo-gate", "laya-relay", "gate-translate-tool", "gate-reference-tool"]
 
 # The gate's own deploy tree and the shared data root its settings, its runtime data and the tooling's settings
 # stand under (docs/layout.md, 「The deployment」). The Python services stand on the nodes the Laya service's
@@ -99,4 +99,16 @@ rm -rf tools/translate/.placed
 mkdir -p tools/translate/.placed
 cp bin/gate-translate-tool tools/translate/tool.toml tools/translate/*.json tools/translate/manual.md tools/translate/.placed/
 bmo pocket put tools/translate/.placed --placed --service bmo-gate --allow gate.translate
+'''
+
+# The brain's index tool placed as the translator's is, allowing the capability its three entries ask for.
+[[deploy.step]]
+id = "register-reference"
+phase = "before-flip"
+command = '''
+set -eu
+rm -rf tools/reference/.placed
+mkdir -p tools/reference/.placed
+cp bin/gate-reference-tool tools/reference/tool.toml tools/reference/*.json tools/reference/manual.md tools/reference/.placed/
+bmo pocket put tools/reference/.placed --placed --service bmo-gate --allow gate.reference
 '''

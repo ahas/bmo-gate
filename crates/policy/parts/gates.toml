@@ -7,32 +7,30 @@
 # it runs in some turns only.
 
 # The off-turn part: the gates that run outside any chat turn, in the order the console lists them.
-apart = ["document-seek", "translator", "voice-polish", "voice-reading"]
+apart = ["translator"]
 
-# The pre-gate part: the gates that run before the reply is written.
-
-[[pre]]
-places = [{ key = "session-summary", condition = "fresh-session" }]
-
-# The three gates that pick a turn's reference, one library each, are marked as such
-# (docs/reference-selection.md): every roster that lists a gate reads the three of them from these marks.
-[[pre]]
-places = [
+# The shelved part: the gates no turn and no caller asks (docs/gates.md, 「Shelved」). Their profiles, options and
+# judgements stay readable. The three gates that picked a turn's reference, one library each, keep their marks
+# (docs/reference-selection.md, 「The shelved pickers」): the evaluation and replay commands read the three from them.
+shelved = [
   { key = "system-documents", reference = true },
   { key = "room-rules", reference = true },
   { key = "library-knowledge", reference = true },
   { key = "people-search" },
   { key = "room-memories" },
   { key = "situation-rules" },
+  { key = "sanitizer" },
+  { key = "document-seek" },
+  { key = "voice-polish" },
+  { key = "voice-reading" },
 ]
 
+# The pre-gate part: the gates that run before the reply is written.
+
 [[pre]]
-places = [{ key = "sanitizer" }]
+places = [{ key = "session-summary", condition = "fresh-session" }]
 
 # The post-gate part: the gates that run after the reply is written, before it reaches the room.
-
-[[post]]
-places = [{ key = "sanitizer" }]
 
 [[post]]
 places = [{ key = "output-format", condition = "folding-dialect" }]

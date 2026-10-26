@@ -16,6 +16,7 @@ pub enum Code {
   Stopped,
   NoGate,
   NoAnswer,
+  Shelved,
   NothingToChange,
   OwnLlm,
   TimeoutOutOfRange,
@@ -37,7 +38,7 @@ pub enum Code {
 
 impl Code {
   /// Every code, in the order `docs/codes.md` lists them.
-  pub const ALL: [Code; 29] = [
+  pub const ALL: [Code; 30] = [
     Code::BadRequest,
     Code::Unauthorized,
     Code::NoRoute,
@@ -50,6 +51,7 @@ impl Code {
     Code::Stopped,
     Code::NoGate,
     Code::NoAnswer,
+    Code::Shelved,
     Code::NothingToChange,
     Code::OwnLlm,
     Code::TimeoutOutOfRange,
@@ -84,6 +86,7 @@ impl Code {
       Code::Stopped => "stopped",
       Code::NoGate => "no-gate",
       Code::NoAnswer => "no-answer",
+      Code::Shelved => "shelved",
       Code::NothingToChange => "nothing-to-change",
       Code::OwnLlm => "own-llm",
       Code::TimeoutOutOfRange => "timeout-out-of-range",
@@ -111,7 +114,7 @@ impl Code {
       Code::Unauthorized => 401,
       Code::Forbidden => 403,
       Code::NoRoute | Code::NotFound | Code::NoGate => 404,
-      Code::Conflict | Code::Stopped => 409,
+      Code::Conflict | Code::Stopped | Code::Shelved => 409,
       Code::TooLarge => 413,
       Code::OwnLlm
       | Code::TimeoutOutOfRange

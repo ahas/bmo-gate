@@ -47,6 +47,10 @@ pub struct Profile {
   /// The most of its runs out at once, where its callers keep more parts out than the pool's default.
   #[serde(default)]
   pub pool: Option<usize>,
+  /// The agency's work key its runs go out under wherever the agency serves it, in place of the gate's own
+  /// (docs/gates.md, 「Where a gate's runs go out」).
+  #[serde(default)]
+  pub forwards_to: Option<String>,
 }
 
 impl Profile {

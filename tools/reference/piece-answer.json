@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "properties": {
+    "slug": { "type": "string" },
+    "group": { "type": "string" },
+    "path": { "type": "string" },
+    "text": { "type": "string", "description": "The piece whole." }
+  },
+  "required": ["slug", "group", "path", "text"]
+}

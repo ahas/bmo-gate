@@ -3,7 +3,7 @@
 
 use futures_util::StreamExt;
 use reqwest::StatusCode;
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::{ROOM, TOKEN, ground, refused};
 
@@ -122,12 +122,25 @@ async fn a_part_of_a_reply_is_answered_with_the_markup_it_goes_out_as() {
 async fn one_run_of_a_gate_answers_on_its_road() {
   let ground = ground("voice", |ask| (!ask.system.is_empty()).then(|| "Read slowly.".into())).await;
   let (status, body) = ground
-    .post("/stages/voice-reading/runs", json!({ "prompt": "Read this aloud.", "roomId": ROOM }))
+    .post(
+      "/stages/translator/runs",
+      json!({ "prompt": "Read this aloud.", "system": "Translate.", "roomId": ROOM }),
+    )
     .await;
 
   assert_eq!(status, StatusCode::OK, "{body}");
   assert_eq!(body["answer"], "Read slowly.");
   assert!(body["ms"].is_i64());
+
+  let (status, body) = ground
+    .post("/stages/voice-reading/runs", json!({ "prompt": "Read this aloud.", "roomId": ROOM }))
+    .await;
+
+  assert_eq!(
+    (status, body["answer"].clone()),
+    (StatusCode::OK, Value::Null),
+    "a shelved gate is never asked"
+  );
 
   let (status, body) =
     ground.post("/stages/no-such-gate/runs", json!({ "prompt": "Read this aloud." })).await;

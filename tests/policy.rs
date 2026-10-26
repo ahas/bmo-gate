@@ -21,6 +21,8 @@ fn the_gate_order_reads_every_gate_once_where_it_first_stands() {
     GATE_ORDER.keys(),
     [
       "session-summary",
+      "output-format",
+      "translator",
       "system-documents",
       "room-rules",
       "library-knowledge",
@@ -28,9 +30,7 @@ fn the_gate_order_reads_every_gate_once_where_it_first_stands() {
       "room-memories",
       "situation-rules",
       "sanitizer",
-      "output-format",
       "document-seek",
-      "translator",
       "voice-polish",
       "voice-reading",
     ]
@@ -39,7 +39,7 @@ fn the_gate_order_reads_every_gate_once_where_it_first_stands() {
 }
 
 #[test]
-fn a_gate_standing_in_two_parts_is_listed_at_each() {
+fn a_shelved_gate_stands_in_the_shelved_part_alone() {
   let sanitizer: Vec<(Part, usize)> = GATE_ORDER
     .standing()
     .into_iter()
@@ -47,7 +47,8 @@ fn a_gate_standing_in_two_parts_is_listed_at_each() {
     .map(|one| (one.part, one.step))
     .collect();
 
-  assert_eq!(sanitizer, [(Part::Pre, 2), (Part::Post, 0)]);
+  assert_eq!(sanitizer, [(Part::Shelved, 6)]);
+  assert!(GATE_ORDER.is_shelved("room-memories") && !GATE_ORDER.is_shelved("translator"));
   assert!(GATE_ORDER.holds("translator") && !GATE_ORDER.holds("content-judge"));
 }
 

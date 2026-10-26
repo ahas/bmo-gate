@@ -151,15 +151,23 @@ In the agency's conventions (its `docs/api.md`): camelCase, the agency's control
 | the agents | `GET /agents` | the registrations a gate run names and the agents a turn is for |
 | shared rulebooks | `GET /rulebooks?names=` | `plain-writing` and `recollection`, the rulebooks the translator's record and the session summariser stand on |
 | the providers | `GET /providers` | the provider order a gate's road begins on and whether each is on |
-| a gate's route | `GET /work-keys/{workKey}` | the run mode the gate's work key stands on |
+| a gate's route | `GET /work-keys/{workKey}` | the run mode the gate's work key stands on, and whether the agency serves the key a gate's runs forward to (`docs/gates.md`, 「Where a gate's runs go out」) |
 | a mapping | `GET /work-keys/{workKey}?provider=&tier=` | the `provider`, `model`, `effort` and `answerTokens` a gate run goes out on |
 | a stand-in | `GET /agents/{agentName}` | `standInAvailable`, whether a stand-in answers while Claude Code's road is closed |
 | a session | `POST /sessions` | `agentName`, `scope` `conversation`, `options` `{provider, model, cwd}`: one thrown-away conversation for one gate run on a provider's program |
 | a turn | `POST /sessions/{sessionId}/turns` | `prompt`, and the `gate` part: `system`, the gate's whole system prompt; `thinking`, whether the run thinks; and `model`, `effort` and `answerTokens`, the mapping its tier resolved to |
 | a session ended | `DELETE /sessions/{sessionId}` | a run of the gate's somebody stopped, its turn cut short |
+| a session's loads | `GET /session-loads/{sessionId}` | `documents`, each `path` and `version`: what the session was handed in full, which the index counts read |
+| a session's loads kept | `PUT /session-loads/{sessionId}` | `documents`, every load the session now holds, the piece just read added at its version |
 | the events | `GET /events?kinds=road-walked` | the road each conversational turn walked, which the gate writes into its road records |
 
 The gate registers no hook at any of the agency's hook points and answers none.
+
+- **The translator's forwarding.** The translator's profile names `translate` as its forwarding key: each
+  translation run asks `GET /work-keys/translate`, and where the agency answers it, the run's mode, its mapping
+  (`GET /work-keys/translate?provider=&tier=`) and its turn's work key are `translate`, the agency's translator
+  runner line; a 404 there leaves the run on the gate's own `translator` key. The agency lands its half by
+  serving that key, with nothing changed here.
 
 The training tooling's claude road hands a batch to the agency's command for a run apart, as the tooling's settings
 name it (`docs/gate-data.md`, 「The claude road」), with `--model`, `--effort`, `--config-dir`, `--system-file`,

@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 use crate::{ROOM, ground, picking};
 
 #[tokio::test]
-async fn a_turn_is_handed_the_reference_its_envelope_calls_for() {
+async fn a_turn_is_handed_only_what_no_gate_picks_and_no_model_is_asked() {
   let ground = ground("reference", picking(&["deploy-notes"])).await;
 
   ground.furnish();
@@ -32,15 +32,69 @@ async fn a_turn_is_handed_the_reference_its_envelope_calls_for() {
   assert_eq!(status, StatusCode::OK, "{body}");
 
   let entries = body["entries"].as_array().unwrap();
-  let deploy = entries
-    .iter()
-    .find(|entry| entry["path"] == "knowledge/deploy-notes.md")
-    .expect("the deploy note");
 
-  assert_eq!(deploy["source"], "knowledge");
-  assert_eq!(deploy["text"], "Deploys go through the testbed.");
-  assert!(entries.iter().all(|entry| entry.get("fragment").is_none()), "{body}");
-  assert!(ground.scratch.count("SELECT count(*) FROM reference_offers", vec![]).await > 0);
+  assert!(
+    entries.iter().all(|entry| entry["path"] != "knowledge/deploy-notes.md"),
+    "no picked piece: {body}"
+  );
+  assert!(ground.gateway.asked.lock().unwrap().is_empty(), "no model was asked");
+  assert_eq!(ground.scratch.count("SELECT count(*) FROM reference_offers", vec![]).await, 0);
+}
+
+#[tokio::test]
+async fn the_index_counts_what_the_session_read_a_piece_records_its_read_and_a_search_finds_it_by_its_words()
+ {
+  let ground = ground("index", |_| None).await;
+
+  ground.furnish();
+
+  let (status, index) = ground.get(&format!("/reference/index?room={ROOM}&session=session-a")).await;
+
+  assert_eq!(status, StatusCode::OK, "{index}");
+
+  let groups: Vec<&str> = index["groups"]
+    .as_array()
+    .unwrap()
+    .iter()
+    .map(|group| group["group"].as_str().unwrap())
+    .collect();
+
+  assert_eq!(groups, ["system-documents", "room-rules", "knowledge", "people", "room-memories"]);
+
+  let knowledge = &index["groups"][2];
+
+  assert_eq!(knowledge["unread"], 2, "{index}");
+  assert_eq!(knowledge["entries"][0]["slug"], "deploy-notes");
+  assert_eq!(knowledge["entries"][0]["holds"], "how a deploy goes");
+
+  let (status, piece) = ground
+    .get(&format!("/reference/pieces/deploy-notes?room={ROOM}&group=knowledge&session=session-a"))
+    .await;
+
+  assert_eq!(status, StatusCode::OK, "{piece}");
+  assert_eq!(piece["text"], "Deploys go through the testbed.");
+
+  let (_, index) = ground.get(&format!("/reference/index?room={ROOM}&session=session-a")).await;
+
+  assert_eq!(index["groups"][2]["unread"], 1, "the piece read is counted read");
+
+  let (status, found) = ground.get(&format!("/reference/search?q=deploy&room={ROOM}")).await;
+
+  assert_eq!(status, StatusCode::OK, "{found}");
+  assert_eq!(found["entries"][0]["slug"], "deploy-notes");
+  assert_eq!(found["entries"][0]["group"], "knowledge");
+
+  for (asked, code) in [
+    (format!("/reference/pieces/no-such?room={ROOM}&group=knowledge"), StatusCode::NOT_FOUND),
+    (
+      format!("/reference/pieces/deploy-notes?room={ROOM}&group=no-group"),
+      StatusCode::BAD_REQUEST,
+    ),
+    (format!("/reference/search?q=deploy&room={ROOM}&limit=25"), StatusCode::BAD_REQUEST),
+  ] {
+    assert_eq!(ground.get(&asked).await.0, code, "{asked}");
+  }
+  assert!(ground.gateway.asked.lock().unwrap().is_empty(), "no model was asked");
 }
 
 #[tokio::test]

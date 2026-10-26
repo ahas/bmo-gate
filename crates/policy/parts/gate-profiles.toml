@@ -90,6 +90,8 @@ sampling = { temperature = 0.1, top_p = 0.8, top_k = 20, min_p = 0 }
 [[profile]]
 key = "translator"
 tier = "Reliable"
+# Its runs move onto the agency's translator runner line once the agency serves the key.
+forwards_to = "translate"
 sampling = { temperature = 0.3, top_p = 0.8, top_k = 20, min_p = 0 }
 answer_tokens = 2048
 pool = 4

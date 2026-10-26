@@ -25,6 +25,7 @@ the camelCase keys.
 | `stopped` | 409 | the run the request asked for was stopped by somebody |
 | `no-gate` | 404 | the gate named is none of the gate order |
 | `no-answer` | 502 | the document seeker gave no answer where the route needs one |
+| `shelved` | 409 | the gate the route serves is shelved and is never asked (`docs/gates.md`, 「Shelved」) |
 
 ## Gate options
 

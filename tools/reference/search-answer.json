@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "properties": {
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "slug": { "type": "string" },
+          "group": { "type": "string" },
+          "holds": { "type": "string" },
+          "readWhen": { "type": ["string", "null"] }
+        },
+        "required": ["slug", "group", "holds", "readWhen"]
+      }
+    }
+  },
+  "required": ["entries"]
+}

@@ -433,7 +433,8 @@ fn probe(stage: &str) -> Result<ReferenceProbe, GateError> {
 }
 
 // The gate the knowledge a piece of work beyond a turn is handed is picked by.
-const KNOWLEDGE_GATE: &str = "library-knowledge";
+/// The knowledge picker's gate.
+pub const KNOWLEDGE_GATE: &str = "library-knowledge";
 
 /// Every picker of a room for one agent's turn: the three reference gates in their order, then the person-book
 /// search, their libraries read at once.
@@ -713,6 +714,61 @@ pub async fn select(reference: &Reference, turn: &Turn) -> Result<Vec<Entry>, Ga
   }
 
   Ok(composed.entries)
+}
+
+/// What a turn is handed (`docs/api.md`, 「Reference」): what `given` composes, handed to the brain to count where the
+/// turn's records are written.
+pub async fn handed(reference: &Reference, turn: &Turn) -> Vec<Entry> {
+  let composed = given(reference, turn).await;
+
+  if turn.records {
+    note_attached(reference, turn, &composed).await;
+  }
+
+  composed.entries
+}
+
+/// What a turn is given with no model (`docs/reference-selection.md`, 「What a turn is given」): the head of each
+/// speaker's sheet, the room's due memories and the rows the turn's events wake, held to the turn's total. No gate
+/// is asked.
+pub async fn given(reference: &Reference, turn: &Turn) -> Composed {
+  let agent = turn.agent(reference);
+  let woken = async {
+    match &turn.situation {
+      Some(situation) => situation::event_entries(reference, situation).await,
+      None => vec![],
+    }
+  };
+  let (woken, standing, sheets) = tokio::join!(
+    woken,
+    memories::standing(reference, turn.chat_id, agent),
+    standing_entries(reference, turn.chat_id, &turn.speaker_ids, agent)
+  );
+  let (due, _) = memories::due_first(&standing);
+  let carried: Vec<&MemoryRow> = due.iter().collect();
+  let memory = memories::memories_entry(turn.chat_id, standing.len(), &carried);
+  let kept = within_turn_budget(
+    turn.chat_id,
+    vec![(memory.clone().into_iter().collect(), SITUATION_HOLD), (woken, SITUATION_HOLD)],
+  );
+  let mut entries: Vec<Entry> =
+    kept.iter().filter(|entry| memory.as_ref() == Some(*entry)).cloned().collect();
+  let mut seen: HashSet<String> = entries.iter().map(|entry| entry.path.clone()).collect();
+
+  for entry in sheets
+    .into_iter()
+    .chain(kept.into_iter().filter(|entry| memory.as_ref() != Some(entry)))
+  {
+    if seen.insert(entry.path.clone()) {
+      entries.push(entry);
+    }
+  }
+
+  Composed {
+    entries,
+    attached: vec![],
+    verdicts: vec![],
+  }
 }
 
 /// What the road composed for a turn: the entries its prompt is given, the fragment rows among them, and what each

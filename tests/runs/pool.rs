@@ -8,6 +8,7 @@ use tokio::time::{Duration, Instant};
 
 fn route(way: Way) -> Route {
   Route {
+    key: "a-gate".into(),
     laya: false,
     provider: "a-provider".into(),
     way,

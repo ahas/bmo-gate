@@ -9,6 +9,7 @@ mod fakes;
 mod scratch;
 
 mod attachments;
+mod index;
 mod memories;
 mod narrow;
 mod pick;
