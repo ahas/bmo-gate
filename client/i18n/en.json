@@ -15,6 +15,7 @@
       "system_documents": "System documents classifier",
       "room_rules": "Room rules classifier",
       "library_knowledge": "Library knowledge classifier",
+      "room_memories": "Room memories",
       "people_search": "People search",
       "situation_rules": "Situation rules matcher",
       "sanitizer": "Sanitiser",
