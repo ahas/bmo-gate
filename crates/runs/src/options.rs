@@ -295,11 +295,22 @@ pub fn checkpoint_folders(model: &str) -> Vec<(String, String)> {
     .collect()
 }
 
-/// The gates the last health check of the Laya server named a checkpoint for.
-pub async fn checkpoints(db: &DatabaseConnection) -> Result<Vec<String>, DbErr> {
+// What the last health check of the Laya server named each gate's checkpoint, as its model line says.
+async fn served(db: &DatabaseConnection) -> Result<Vec<(String, String)>, DbErr> {
   let model = laya_health::Entity::find().one(db).await?.and_then(|row| row.model).unwrap_or_default();
 
-  Ok(checkpoint_folders(&model).into_iter().map(|(gate, _)| gate).collect())
+  Ok(checkpoint_folders(&model))
+}
+
+/// The gates the last health check of the Laya server named a checkpoint for.
+pub async fn checkpoints(db: &DatabaseConnection) -> Result<Vec<String>, DbErr> {
+  Ok(served(db).await?.into_iter().map(|(gate, _)| gate).collect())
+}
+
+/// The folder of the checkpoint the last health check of the Laya server named for a gate; none where it named
+/// none or no check has been made.
+pub async fn checkpoint_folder(db: &DatabaseConnection, gate: &str) -> Result<Option<String>, DbErr> {
+  Ok(served(db).await?.into_iter().find(|(named, _)| named == gate).map(|(_, folder)| folder))
 }
 
 /// Why a gate could not run in a mode, or none where it could: a mode other than off for a gate with no probe,

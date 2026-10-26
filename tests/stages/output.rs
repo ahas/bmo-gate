@@ -82,3 +82,49 @@ async fn a_short_part_asks_nothing_and_a_part_with_no_answer_goes_out_open() {
     1
   );
 }
+
+// The fold's question as the Laya stub was asked it.
+fn fold_asked(stub: &crate::stub::Stub) -> String {
+  stub.one("/decide").json()["questions"][gate_stages::fold::FOLD_QUESTION]["instructions"]
+    .as_str()
+    .unwrap_or_default()
+    .to_owned()
+}
+
+#[tokio::test]
+async fn the_gate_asks_laya_in_the_wording_its_served_checkpoint_learnt() {
+  let learnt = &gate_policy::laya::LEARNT["checkpoints/output-format/real-2-fold"]["fold"];
+  let answer =
+    serde_json::json!({ "answers": { "fold": { "type": "noul", "noul": 0.9, "confidence": 0.97 } } });
+
+  // The checkpoint the last check names learnt the earlier wording, and is asked it beside the gate's model.
+  let stub = crate::stub::Stub::start().await;
+  let ground = ground("fold-learnt", Some(&stub), Default::default()).await;
+
+  stub.answer(axum::http::Method::POST, "/decide", 200, answer.clone());
+  ground
+    .scratch
+    .run(
+      "INSERT INTO laya_health (state, model) VALUES ('up', $1)",
+      vec![format!("output-decide=checkpoints/output-format/real-1-hand/step-000152, {GATE_KEY}=checkpoints/output-format/real-2-fold/step-000048").into()],
+    )
+    .await
+    .unwrap();
+
+  ground.gateway.answers(vec![completion("FOLD")]);
+  decided(&ground.stages, 7, &long_part()).await;
+  gate_stages::laya::settled().await;
+
+  assert_eq!(fold_asked(&stub), *learnt);
+
+  // With no check made, the gate's own wording is asked.
+  let stub = crate::stub::Stub::start().await;
+  let own = crate::ground("fold-own", Some(&stub), Default::default()).await;
+
+  stub.answer(axum::http::Method::POST, "/decide", 200, answer);
+  own.gateway.answers(vec![completion("FOLD")]);
+  decided(&own.stages, 7, &long_part()).await;
+  gate_stages::laya::settled().await;
+
+  assert_eq!(fold_asked(&stub), gate_policy::laya::QUESTIONS.fold);
+}

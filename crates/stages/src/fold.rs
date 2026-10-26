@@ -7,7 +7,7 @@
 use std::sync::LazyLock;
 
 use gate_markup::js;
-use gate_policy::laya::QUESTIONS;
+use gate_policy::laya::{QUESTIONS, wording_for};
 use regex::Regex;
 
 use crate::laya::{self, Failure, Probe, Question, Reading, Reply, Request, estimated_tokens};
@@ -132,10 +132,35 @@ pub fn fold_state(original: &str) -> Ordered {
   state_at(text, SCALES[SCALES.len() - 1])
 }
 
+/// The fold's one question's id, which names it among a checkpoint's learnt wordings too.
+pub const FOLD_QUESTION: &str = "fold";
+
 /// The fold as Laya asks it: one yes/no over the markdown reduced to its opening, its closing and its counts, the
-/// shape the fold checkpoint was trained on. Laya's yes is FOLD and its no is OPEN.
-#[derive(Clone, Copy)]
-pub struct FoldProbe;
+/// shape the fold checkpoint was trained on, in the wording that checkpoint learnt (`docs/laya.md`, 「Each gate's
+/// probe」). Laya's yes is FOLD and its no is OPEN.
+#[derive(Clone)]
+pub struct FoldProbe {
+  pub question: String,
+}
+
+impl Default for FoldProbe {
+  /// The fold asked in its gate's own wording.
+  fn default() -> Self {
+    Self {
+      question: QUESTIONS.fold.clone(),
+    }
+  }
+}
+
+impl FoldProbe {
+  /// The fold as the checkpoint in this folder is asked it, the folder as the Laya server's health names it; the
+  /// gate's own wording where none is named or the checkpoint learnt that one.
+  pub fn for_checkpoint(folder: Option<&str>) -> Self {
+    Self {
+      question: wording_for(folder, FOLD_QUESTION, &QUESTIONS.fold),
+    }
+  }
+}
 
 impl Probe for FoldProbe {
   type Input = String;
@@ -145,16 +170,16 @@ impl Probe for FoldProbe {
     Ok(Request {
       state: fold_state(input),
       questions: vec![(
-        "fold".to_owned(),
+        FOLD_QUESTION.to_owned(),
         Question::Noul {
-          instructions: QUESTIONS.fold.clone(),
+          instructions: self.question.clone(),
         },
       )],
     })
   }
 
   fn read(&self, reply: &Reply) -> Result<Reading, Failure> {
-    laya::noul_reading(reply, "fold", "FOLD", "OPEN")
+    laya::noul_reading(reply, FOLD_QUESTION, "FOLD", "OPEN")
   }
 
   fn verdict_of(&self, label: &str) -> Option<String> {
@@ -166,7 +191,7 @@ impl Probe for FoldProbe {
   }
 
   fn truth_of(&self, label: &str, _request: &Request) -> Option<Ordered> {
-    Some(Ordered::map([("fold", Ordered::Flag(label == "FOLD"))]))
+    Some(Ordered::map([(FOLD_QUESTION, Ordered::Flag(label == "FOLD"))]))
   }
 
   fn safe_label(&self) -> Option<&str> {

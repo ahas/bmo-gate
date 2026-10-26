@@ -1985,7 +1985,7 @@
   "info": {
     "description": "The gate stage of a turn: sanitising words on their way into a model's context, choosing the reference a turn is handed, checking an answer on its way out, translating, seeking documents and reading voice lines. Every answer is data in the common wire format; the console bundle carries its screens' words.",
     "title": "bmo-gate",
-    "version": "0.17.0"
+    "version": "0.17.1"
   },
   "openapi": "3.1.0",
   "paths": {

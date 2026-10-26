@@ -99,15 +99,16 @@ asks (`docs/laya.md`).
 
   | Training gate (`docs/laya-gates.md`) | The gate asking | Checkpoint |
   |---|---|---|
-  | `output-format` | `output-format` — the gate whose provider is Laya, asked the reduced state | served (`real-2-fold`) |
-  | `library-knowledge` | `library-knowledge` | served (`lkdk8-s42-p0001`, seed 42, chosen among seeds 42, 7 and 1234), trained on the input that carries the message the turn follows on from, and on the jobs and searches it is asked for with their labels distilled from a teacher |
-  | `room-rules` | `room-rules` | served (`ref895-answered-s2-p0001`), trained on the input that carries the message the turn follows on from |
-  | `situation-rules` | `situation-rules` | served |
-  | `system-documents` | `system-documents` | served (`ref852-p0001`) |
-  | `people-search` | `people-search` | served (`ref895-plain-p0001`), trained on the input that carries the message the turn follows on from |
+  | `output-format` | `output-format` — the gate whose provider is Laya, asked the reduced state | served (`real-2-fold`), trained on the Korean wording of the fold question and asked it (`docs/laya.md`, 「Each gate's probe」) |
+  | `output-format` | `output-decide` — no gate of this repository asks it | served (`real-1-hand`) |
+  | `library-knowledge` | `library-knowledge` | not served; its checkpoint (`lkdk8-s42-p0001`, seed 42, chosen among seeds 42, 7 and 1234), trained on the input that carries the message the turn follows on from, and on the jobs and searches it is asked for with their labels distilled from a teacher, is kept on the node and in the collection |
+  | `room-rules` | `room-rules` | not served; its checkpoint (`ref895-answered-s2-p0001`), trained on the input that carries the message the turn follows on from, is kept on the node and in the collection |
+  | `situation-rules` | `situation-rules` | not served; its checkpoint (`real-1-hand`) is kept on the node and in the collection |
+  | `system-documents` | `system-documents` | not served; its checkpoint (`ref852-p0001`) is kept on the node and in the collection |
+  | `people-search` | `people-search` | not served; its checkpoint (`ref895-plain-p0001`), trained on the input that carries the message the turn follows on from, is kept on the node and in the collection |
   | `content-judge` | none — no gate asks it | not served; its checkpoint (`content-judge-1.content-judge-topup-1-p0001`) is kept in the collection and on the nodes |
   | `reply-wanted` | none — the reply-or-not gate has no code | trained, not served |
-  | `sanitizer` | `sanitizer` | not trained |
+  | `sanitizer` | `sanitizer` | not trained; its Laya work is shelved |
 
 - **A checkpoint answers only the shape it was trained on.** The state a gate's probe sends must be
   the state its training rows carry, to the character. A checkpoint asked in another shape still

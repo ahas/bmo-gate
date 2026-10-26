@@ -18,7 +18,7 @@ use gate_policy::fill_marks;
 use gate_policy::output_gate::OUTPUT_GATE;
 use gate_policy::prompts;
 use gate_runs::records::{self, Judgement, now};
-use gate_runs::{GateError, GateRequest, route};
+use gate_runs::{GateError, GateRequest, options, route};
 use regex::Regex;
 
 use crate::Stages;
@@ -378,10 +378,19 @@ pub async fn instructions(stages: &Stages) -> Option<String> {
 /// One part of a reply in the dialect's markdown as it goes out (`POST /formats/decided`): the markup to send, or
 /// none to send its plain text.
 pub async fn decided(stages: &Stages, chat_id: i64, text: &str) -> Option<String> {
+  let folder = match options::checkpoint_folder(&stages.runs.db, GATE_KEY).await {
+    Ok(folder) => folder,
+    Err(why) => {
+      eprintln!(
+        "{GATE_KEY}: the last Laya health check could not be read, so the gate's own wording is asked: {why}"
+      );
+      None
+    }
+  };
   let gate = OutputGate {
     key: GATE_KEY.to_owned(),
     system: instructions(stages).await,
-    probe: FoldProbe,
+    probe: FoldProbe::for_checkpoint(folder.as_deref()),
   };
 
   gate_message(stages, &gate, chat_id, &convert_markdown(text)).await

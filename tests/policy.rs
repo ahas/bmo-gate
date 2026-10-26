@@ -8,7 +8,7 @@ use gate_policy::fill_marks;
 use gate_policy::gate_pool::GATE_POOL;
 use gate_policy::gates::{GATE_ORDER, Part};
 use gate_policy::handover::HANDOVER;
-use gate_policy::laya::QUESTIONS;
+use gate_policy::laya::{LEARNT, QUESTIONS, wording_for};
 use gate_policy::memories::MEMORIES;
 use gate_policy::output_gate::OUTPUT_GATE;
 use gate_policy::profiles::PROFILES;
@@ -255,4 +255,30 @@ fn the_translators_two_languages_differ_and_each_is_named() {
   }
 
   assert_eq!(TRANSLATION.language_name("xx"), None);
+}
+
+#[test]
+fn a_wording_a_checkpoint_learnt_is_one_of_its_gates_earlier_wordings() {
+  let file: toml::Value = toml::from_str(
+    &std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/prompts/tooling/laya-wordings.toml"))
+      .unwrap(),
+  )
+  .unwrap();
+
+  assert!(!LEARNT.is_empty());
+
+  for (run, questions) in LEARNT.iter() {
+    // A run's folder is `checkpoints/<training gate>/<run>`, and its gate's earlier wordings are listed by that name.
+    let parts: Vec<&str> = run.split('/').collect();
+
+    assert!(parts.len() == 3 && parts[0] == "checkpoints", "{run}");
+
+    for (id, wording) in questions {
+      let earlier = file["gates"][parts[1]]["questions"][id.as_str()].as_array().unwrap();
+
+      assert!(earlier.iter().any(|one| one.as_str() == Some(wording.as_str())), "{run} {id}");
+      assert_eq!(wording_for(Some(&format!("{run}/step-000001")), id, "own"), *wording);
+      assert_eq!(wording_for(Some(&format!("{run}x/step-000001")), id, "own"), "own");
+    }
+  }
 }

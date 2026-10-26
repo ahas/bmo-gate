@@ -51,8 +51,9 @@ the gates' client is written against.
   service's card, so no call pays for a move.
 - **Which checkpoint answers which gate** is the service's own setting on its node, one checkpoint per gate
   and none shared, and naming one there is the owner's as τ is. `/health` names each gate's checkpoint in
-  its model line; nothing here holds a checkpoint name. A gate the server holds no checkpoint for is
-  turned away, and its pair is recorded as `refused`.
+  its model line, and the gate reads it from the last health check (「The health watcher」); nothing here
+  chooses a checkpoint. A gate the server holds no checkpoint for is turned away, and its pair is recorded as
+  `refused`.
 ## The client
 
 - **One module of the gate** asks the server; nothing else speaks to it.
@@ -241,12 +242,21 @@ mode other than `off`.
 - **Where the pairs are written** is the gate's own database, by whichever route the gate runs for.
 - **Tests never reach the server:** every test run starts with the address empty, and a test of Laya
   passes its own.
-- **A probe's questions are English.** Each question's fixed wording and the word a candidate is named by
-  stand in the gate's Laya question data, the same words the distilled data carries
-  (`docs/laya-gates.md`); only the state is the room's words, as written. The situation-rule matcher's two
-  questions are the two its LLM is asked, in the same words. The checkpoints in service now were trained on
-  Korean wordings and have not learnt the English ones; the checkpoints retrained on the English questions
-  supersede them, and moving a gate's mode meanwhile is the owner's (「Who decides」).
+- **A gate asks its checkpoint the wording that checkpoint was trained on.** A gate's own wording is English:
+  each question's fixed wording and the word a candidate is named by stand in the gate's Laya question data,
+  the same words the distilled data carries (`docs/laya-gates.md`); only the state is the room's words, as
+  written. The situation-rule matcher's two questions are the two its LLM is asked, in the same words.
+  - **A checkpoint that learnt an earlier wording is asked that wording,** word for word. Which ones did is
+    a table beside the earlier wordings, the `learnt` table of `prompts/tooling/laya-wordings.toml`: a
+    checkpoint's run — the folder `/health` names for the gate, without its step — and the wording each of
+    its questions learnt.
+  - **The checkpoint is the one the last health check names for the gate.** A gate whose checkpoint the
+    table does not list, or for which no check has named one yet, asks its own wording.
+  - **The formatting gate's probe is the one that reads the table,** the one gate here Laya serves
+    (`docs/laya-gates.md`, 「Which gates Laya serves」); every other probe asks its own wording. Its checkpoint
+    in service (`real-2-fold`) learnt the Korean wording of the fold question and is asked it. A checkpoint
+    retrained on the English question is asked the English one once it serves, and moving a gate's mode
+    meanwhile is the owner's (「Who decides」).
 
 - **Formatting gate (`output-format`)** — one yes/no question: should this message be folded. Laya's
   yes is FOLD and its no is OPEN. The state is the markdown as written, reduced to its opening, its

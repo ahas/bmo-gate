@@ -16,13 +16,27 @@ beside those, the language mix and the answer balance its distilled training dat
   (`docs/laya.md`, 「Who decides」).
 - **The questions' own wording is English**, and stands in the gate's Laya question data, one entry per gate
   key and question, with the word a candidate is named by. The distilled data carries the same words, and a
-  checkpoint is trained on them, so a gate asks exactly the wording its checkpoint learnt. Only a row's state is
-  the rooms' own words, as they were written. This document gives each question's meaning; the data holds its
-  wording.
-- **A checkpoint trained on the questions in Korean has not learnt them.** The checkpoints in service now
-  were trained on Korean wordings of these questions; each is superseded by the checkpoint retrained on the
-  English ones, and none is put back in service after it. Rows written in a Korean wording stay usable: the
-  tooling reads them as asking the English one (`docs/gate-data.md`, 「A question reworded」).
+  checkpoint is trained on them. Only a row's state is the rooms' own words, as they were written. This
+  document gives each question's meaning; the data holds its wording.
+- **A gate asks its checkpoint the wording that checkpoint was trained on.** A checkpoint trained on an
+  earlier, Korean wording of its gate's question has not learnt the English one, so while it serves it is
+  asked the Korean wording it learnt, word for word (`docs/laya.md`, 「Each gate's probe」). The formatting
+  gate's checkpoint in service is one such, and stays in service as it is. A checkpoint retrained on the
+  English wording is asked the English one. Rows written in a Korean wording stay usable: the tooling reads
+  them as asking the English one (`docs/gate-data.md`, 「A question reworded」).
+
+## Which gates Laya serves
+
+- **The formatting gate alone:** `output-format`, whose provider is Laya, with its companion
+  `output-decide`, an earlier fold checkpoint served beside it under that name that no gate of this
+  repository asks (`docs/laya-server.md`, 「Which checkpoint answers which gate」).
+- **The sanitiser's Laya work is shelved.** Its gate runs on its model with its probe as it stands, and no
+  checkpoint of it is trained or served.
+- **The five picker gates are moving to the agent:** `system-documents`, `room-rules`, `library-knowledge`,
+  `situation-rules` and `people-search`. Their checkpoints are off the service and kept where they were carried,
+  so a call any of them still makes is turned away as `refused` and its model decides, as on any failure.
+- **Every gate's specification stands below as it is,** served or not: it is what the gate's data was drawn
+  to and what any checkpoint of it would be trained on.
 
 ## Question types
 
