@@ -144,8 +144,9 @@ It answers `entries`, each `path`, `text` and `source` (`document`, `person`, `r
 - **One call carries at most 16 originals;** more is 400 `too-many-originals`, and a caller with more asks again
   for the rest.
 - **The translator's work is queued, not refused.** The parts in another language of every call standing go to
-  the translator together, no more at once than the translator's pool bound (`docs/gates.md`, 「How many runs
-  stand at once」), and a part waits its turn behind those asked before it, whichever call it came in.
+  the agency's translation line together (`docs/boundary-api.md`, 「The translation line」), no more at once than
+  the translation policy's bound, four (`lanes`), and a part waits its turn behind those asked before it,
+  whichever call it came in.
   At most 64 originals stand at once across the calls, read or waiting; a call that would take the count past
   that is 503 `translator-busy`, with `Retry-After` naming the seconds to wait, 5, and nothing of it is read.
 - **Keeping a translation** keeps `text` as the reading of `original` in the language, in place of any kept

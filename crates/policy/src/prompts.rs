@@ -9,13 +9,10 @@ macro_rules! prompt {
 }
 
 /// Every instruction file, by its path under `prompts/`.
-pub const FILES: [(&str, &str); 6] = [
+pub const FILES: [(&str, &str); 3] = [
   prompt!("output-gate/telegram-html/format.md"),
   prompt!("session-summary/chat.md"),
   prompt!("session-summary/worker.md"),
-  prompt!("translator/instructions.md"),
-  prompt!("translator/record.md"),
-  prompt!("translator/worker.md"),
 ];
 
 /// The file at a path under `prompts/`, trimmed; none where no such file is compiled in.

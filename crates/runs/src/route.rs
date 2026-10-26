@@ -28,8 +28,7 @@ pub enum Way {
 /// A gate's road as one run reads it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Route {
-  /// The agency's work key the run goes out under: the gate's own, or the key its profile forwards to where the
-  /// agency serves it.
+  /// The agency's work key the run goes out under: the gate's own.
   pub key: String,
   /// Whether the gate stands on Laya, which no model run answers.
   pub laya: bool,
@@ -47,19 +46,6 @@ impl Route {
   pub fn model(&self) -> &str {
     self.mapping.as_ref().and_then(|mapping| mapping.model.as_deref()).unwrap_or_default()
   }
-}
-
-/// The work key a gate's runs go out under (docs/gates.md, 「Where a gate's runs go out」): the key its profile
-/// forwards to where the agency serves that key, the gate's own otherwise.
-pub async fn key_of(runs: &Runs, stage: &str) -> Result<String, GateError> {
-  let Some(forward) = PROFILES.of(stage).and_then(|profile| profile.forwards_to.clone()) else {
-    return Ok(stage.to_owned());
-  };
-
-  Ok(match runs.agency.work_key(&forward).await.map_err(fault)? {
-    Some(_) => forward,
-    None => stage.to_owned(),
-  })
 }
 
 /// The tier a gate's profile names, which every mapping of it is resolved at.
@@ -130,7 +116,8 @@ pub async fn read(runs: &Runs, stage: &str) -> Result<Route, GateError> {
 /// serves the run nothing.
 pub async fn read_on(runs: &Runs, stage: &str, on: Option<&str>) -> Result<Route, GateError> {
   let tier = tier_of(stage)?;
-  let key = key_of(runs, stage).await?;
+  // A gate's runs go out under its own work key, the gate's name (docs/gates.md, 「Where a gate's runs go out」).
+  let key = stage.to_owned();
   let providers = runs.agency.providers().await.map_err(fault)?;
   let (laya, provider, mapping) = match on {
     Some(on) => {

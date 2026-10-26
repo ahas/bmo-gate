@@ -15,7 +15,7 @@ fn of(key: &str) -> &'static gate_policy::profiles::Profile {
 
 #[test]
 fn a_gate_runs_off_without_a_probe_and_in_shadow_where_laya_would_decide_unfounded() {
-  assert_eq!(effective_mode(of("translator"), Some("filter"), Some(0.9)), "off");
+  assert_eq!(effective_mode(of("session-summary"), Some("filter"), Some(0.9)), "off");
   assert_eq!(effective_mode(of("output-format"), None, None), "shadow");
   assert_eq!(effective_mode(of("output-format"), Some("filter"), None), "shadow");
   assert_eq!(effective_mode(of("output-format"), Some("filter"), Some(0.9)), "filter");
@@ -24,9 +24,9 @@ fn a_gate_runs_off_without_a_probe_and_in_shadow_where_laya_would_decide_unfound
 
 #[test]
 fn the_defaults_carry_the_gates_own_answer_room_and_mode() {
-  assert_eq!(defaults(of("translator")).answer_tokens, 2048);
+  assert_eq!(defaults(of("session-summary")).answer_tokens, options::DEFAULT_ANSWER_TOKENS);
   assert_eq!(defaults(of("output-format")).laya_mode, "shadow");
-  assert_eq!(defaults(of("translator")).laya_mode, "off");
+  assert_eq!(defaults(of("session-summary")).laya_mode, "off");
   assert_eq!(defaults(of("output-format")).answer_tokens, options::DEFAULT_ANSWER_TOKENS);
 }
 
@@ -58,7 +58,7 @@ async fn a_change_is_refused_with_the_code_that_says_why() {
     ("output-format", json!({ "timeoutMs": 999 }), Code::TimeoutOutOfRange),
     ("output-format", json!({ "layaMode": "loud" }), Code::LayaModeUnknown),
     ("output-format", json!({ "layaTau": 1.5 }), Code::LayaTauOutOfRange),
-    ("translator", json!({ "layaMode": "shadow" }), Code::NoProbe),
+    ("session-summary", json!({ "layaMode": "shadow" }), Code::NoProbe),
     (
       "output-format",
       json!({ "layaMode": "asymmetric", "layaTau": 0.9 }),
@@ -105,10 +105,10 @@ async fn each_field_is_written_on_its_own_for_the_chat_agent_and_read_back_by_th
     .lock()
     .unwrap()
     .insert("registry".into(), mapping("registry", "a-registration", Some("thinking"), Some(4000)));
-  wait(&runs, "translator", 20_000).await;
-  change(&runs, "translator", &json!({ "layaFallback": "none" }), 9).await.unwrap();
+  wait(&runs, "session-summary", 20_000).await;
+  change(&runs, "session-summary", &json!({ "layaFallback": "none" }), 9).await.unwrap();
 
-  let shown = view(&runs, "translator").await.unwrap();
+  let shown = view(&runs, "session-summary").await.unwrap();
 
   assert_eq!(shown.timeout_ms, Some(20_000));
   assert!(shown.enabled && !shown.switchable && !shown.laya_probe);
@@ -116,14 +116,14 @@ async fn each_field_is_written_on_its_own_for_the_chat_agent_and_read_back_by_th
   assert!(shown.effective.thinking);
   assert_eq!(shown.effective.answer_tokens, 4000, "the mapping's room, larger than the gate's own");
   assert_eq!(shown.effective.laya_mode, "off");
-  assert!(options::switched_on(scratch.db(), "translator", "the-chat-agent").await.unwrap());
+  assert!(options::switched_on(scratch.db(), "session-summary", "the-chat-agent").await.unwrap());
   assert!(options::switched_on(scratch.db(), "output-format", "the-chat-agent").await.unwrap());
   assert_eq!(
     scratch.texts("SELECT agent || ' ' || set_at::text FROM gate_options", vec![]).await,
     ["the-chat-agent 9"]
   );
 
-  let route = options::route_view(&runs, "translator").await.unwrap();
+  let route = options::route_view(&runs, "session-summary").await.unwrap();
 
   assert_eq!(
     (route.provider.as_str(), route.model.as_str(), route.laya),

@@ -1,8 +1,9 @@
 //! The translator's languages and how its readings weigh a text (`docs/api.md`, 「Translations」;
 //! `docs/boundary-api.md`, 「For bmo-job」): the language a worker reads and the owner's language, which the two
 //! readers put a text into, the name each language the translator takes is asked for by, how many Latin letters a
-//! Hangul syllable is weighed against before a text counts as English, and how many times a part put into the
-//! owner's language is asked for before what is still wrong with it decides.
+//! Hangul syllable is weighed against before a text counts as English, how many times a part put into the owner's
+//! language is asked for before what is still wrong with it decides, and how many parts of the readings standing
+//! are out at the agency's translation line at once.
 
 use std::collections::BTreeMap;
 
@@ -15,6 +16,7 @@ pub struct Translation {
   pub owner_language: String,
   pub latin_per_hangul: usize,
   pub record_attempts: usize,
+  pub lanes: usize,
   pub language_names: BTreeMap<String, String>,
 }
 

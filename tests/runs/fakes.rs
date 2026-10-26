@@ -11,7 +11,8 @@ use futures_util::future::BoxFuture;
 use futures_util::stream::BoxStream;
 use gate_ports::PortError;
 use gate_ports::agency::{
-  Agency, Agent, Apart, GateTurn, Mapping, Provider, RoadWalked, Route, Rulebook, Session, TurnEnd,
+  Agency, Agent, Apart, GateTurn, Mapping, Provider, RoadWalked, Route, Rulebook, Session, TranslationAsk,
+  TranslationRun, TurnEnd,
 };
 use gate_ports::brain::Load;
 use gate_ports::gateway::{Ask, Completion, Gateway};
@@ -72,9 +73,23 @@ pub struct FakeAgency {
   pub stopped: Mutex<Vec<String>>,
   pub resolved: Mutex<Vec<(String, Option<String>, String)>>,
   pub loads: Mutex<HashMap<String, Vec<Load>>>,
+  /// What the translation line answers, one text an ask, in order; none left is no answer.
+  pub translated: Mutex<std::collections::VecDeque<String>>,
+  /// A text longer than so many characters is refused as past the line's window.
+  pub window_chars: Mutex<Option<usize>>,
+  pub translations: Mutex<Vec<TranslationAsk>>,
 }
 
 impl FakeAgency {
+  /// The translation line's answers, one an ask, in order.
+  pub fn translates(&self, answers: &[&str]) {
+    self
+      .translated
+      .lock()
+      .unwrap()
+      .extend(answers.iter().map(|answer| (*answer).to_owned()));
+  }
+
   pub fn route(&self, key: &str, mode: &str) {
     self.routes.lock().unwrap().push(Route {
       key: key.to_owned(),
@@ -108,6 +123,31 @@ impl Agency for FakeAgency {
         recollector_registration: None,
         rest: Map::new(),
       }])
+    })
+  }
+
+  fn translation_run<'a>(&'a self, ask: &'a TranslationAsk) -> BoxFuture<'a, Answer<TranslationRun>> {
+    Box::pin(async move {
+      self.translations.lock().unwrap().push(ask.clone());
+
+      if self.window_chars.lock().unwrap().is_some_and(|most| ask.text.chars().count() > most) {
+        return Err(PortError::Refused {
+          unit: "bmo-agency",
+          call: "translation run",
+          status: 502,
+          code: "no-answer".to_owned(),
+          error: "the request is past the model's context window".to_owned(),
+        });
+      }
+
+      match self.translated.lock().unwrap().pop_front() {
+        Some(text) => Ok(TranslationRun {
+          text,
+          provider: "registry".to_owned(),
+          model: "translation-model".to_owned(),
+        }),
+        None => unanswered("translation run"),
+      }
     })
   }
 

@@ -123,7 +123,7 @@ async fn one_run_of_a_gate_answers_on_its_road() {
   let ground = ground("voice", |ask| (!ask.system.is_empty()).then(|| "Read slowly.".into())).await;
   let (status, body) = ground
     .post(
-      "/stages/translator/runs",
+      "/stages/session-summary/runs",
       json!({ "prompt": "Read this aloud.", "system": "Translate.", "roomId": ROOM }),
     )
     .await;

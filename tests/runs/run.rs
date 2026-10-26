@@ -70,37 +70,6 @@ async fn a_registered_model_is_one_gateway_request_with_the_gates_room_thinking_
 }
 
 #[tokio::test]
-async fn a_gate_forwarding_to_a_key_the_agency_serves_goes_out_under_that_key_and_under_its_own_otherwise()
-{
-  let (scratch, agency, gateway) = ground().await;
-  let runs = runs_of(&scratch, &agency, &gateway);
-
-  agency.providers.lock().unwrap().push(provider("claude-code", false));
-  agency
-    .mappings
-    .lock()
-    .unwrap()
-    .insert("claude-code".into(), mapping("claude-code", "a-model", None, None));
-  *agency.end.lock().unwrap() = Some(turn_end("answered", Some("translated"), None));
-  wait(&runs, "translator", 30_000).await;
-
-  let request = GateRequest::new("translate", "a text");
-
-  runs.run("translator", &request).await.unwrap();
-  agency.route("translate", "auto");
-  runs.run("translator", &request).await.unwrap();
-
-  let keys: Vec<String> = agency.turns.lock().unwrap().iter().map(|turn| turn.work_key.clone()).collect();
-
-  assert_eq!(
-    keys,
-    ["translator", "translate"],
-    "its own key until the agency serves the forwarding one"
-  );
-  assert!(agency.resolved.lock().unwrap().iter().any(|(key, _, _)| key == "translate"));
-}
-
-#[tokio::test]
 async fn a_programs_provider_is_one_thrown_away_session_and_its_one_turn() {
   let (scratch, agency, gateway) = ground().await;
   let runs = runs_of(&scratch, &agency, &gateway);
@@ -159,12 +128,12 @@ async fn a_turn_somebody_stopped_is_raised_and_its_road_says_so() {
     .unwrap()
     .insert("codex".into(), mapping("codex", "a-codex-model", None, None));
   *agency.end.lock().unwrap() = Some(turn_end("stopped", None, None));
-  wait(&runs, "translator", 30_000).await;
+  wait(&runs, "session-summary", 30_000).await;
 
-  let stopped = runs.run("translator", &GateRequest::new("translate", "words")).await;
+  let stopped = runs.run("session-summary", &GateRequest::new("summarise", "words")).await;
 
   assert!(matches!(stopped, Err(GateError::Stopped(_))), "{stopped:?}");
-  assert_eq!(roads(&scratch).await, ["translator codex a-codex-model stopped - - - - - -"]);
+  assert_eq!(roads(&scratch).await, ["session-summary codex a-codex-model stopped - - - - - -"]);
 }
 
 #[tokio::test]
@@ -247,13 +216,13 @@ async fn a_registration_named_by_the_caller_is_run_on_alone() {
     .unwrap()
     .insert("registry".into(), mapping("registry", "the-tier-model", None, Some(9000)));
   gateway.answers(vec![completion("a reading")]);
-  wait(&runs, "translator", 30_000).await;
+  wait(&runs, "session-summary", 30_000).await;
 
   let mut request = GateRequest::new("translate the part", "the part");
 
   request.registration = Some("an-agents-model".into());
 
-  assert_eq!(runs.run("translator", &request).await.unwrap().as_deref(), Some("a reading"));
+  assert_eq!(runs.run("session-summary", &request).await.unwrap().as_deref(), Some("a reading"));
 
   let asked = gateway.asked.lock().unwrap()[0].clone();
 
@@ -268,12 +237,12 @@ async fn a_provider_that_maps_the_gate_to_nothing_leaves_it_unavailable() {
   let runs = runs_of(&scratch, &agency, &gateway);
 
   agency.providers.lock().unwrap().push(provider("codex", false));
-  agency.route("translator", "codex");
-  wait(&runs, "translator", 30_000).await;
+  agency.route("session-summary", "codex");
+  wait(&runs, "session-summary", 30_000).await;
 
-  assert_eq!(runs.run("translator", &GateRequest::new("s", "p")).await.unwrap(), None);
+  assert_eq!(runs.run("session-summary", &GateRequest::new("s", "p")).await.unwrap(), None);
   assert!(agency.started.lock().unwrap().is_empty());
-  assert_eq!(roads(&scratch).await, ["translator codex  unavailable - - - - - -"]);
+  assert_eq!(roads(&scratch).await, ["session-summary codex  unavailable - - - - - -"]);
 }
 
 // A caller's cut: the first part answered by the caller itself, the other two asked, the answers joined.
@@ -283,8 +252,8 @@ impl Split for Halves {
   fn halve(&self) -> Option<Vec<Piece>> {
     Some(vec![
       Piece::Answered("kept".into()),
-      Piece::Asked(GateRequest::new("translate", "first half")),
-      Piece::Asked(GateRequest::new("translate", "second half")),
+      Piece::Asked(GateRequest::new("summarise", "first half")),
+      Piece::Asked(GateRequest::new("summarise", "second half")),
     ])
   }
 
@@ -315,19 +284,19 @@ async fn a_request_past_the_registrations_window_is_cut_by_its_caller_and_each_p
     completion("one"),
     completion("two"),
   ]);
-  wait(&runs, "translator", 30_000).await;
+  wait(&runs, "session-summary", 30_000).await;
 
-  let mut request = GateRequest::new("translate", "the whole");
+  let mut request = GateRequest::new("summarise", "the whole");
 
   request.split = Some(Arc::new(Halves));
 
-  assert_eq!(runs.run("translator", &request).await.unwrap().as_deref(), Some("kept|one|two"));
+  assert_eq!(runs.run("session-summary", &request).await.unwrap().as_deref(), Some("kept|one|two"));
   assert_eq!(
     roads(&scratch).await,
     [
-      "translator registry a-registration too-large - - - - - -",
-      "translator registry a-registration answered 20 7 100 - - -",
-      "translator registry a-registration answered 20 7 100 - - -",
+      "session-summary registry a-registration too-large - - - - - -",
+      "session-summary registry a-registration answered 20 7 100 - - -",
+      "session-summary registry a-registration answered 20 7 100 - - -",
     ]
   );
 }

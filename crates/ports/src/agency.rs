@@ -158,6 +158,27 @@ pub struct RoadWalked {
   pub context_ratio: Option<f64>,
 }
 
+/// One part asked of the agency's translation line: what it is for, the target language's name and the text.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TranslationAsk {
+  /// `document`, `worker` or `record`.
+  pub purpose: String,
+  pub language: String,
+  pub text: String,
+}
+
+/// A part translated whole by the agency's translation line, with the road it went out on.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TranslationRun {
+  pub text: String,
+  #[serde(default)]
+  pub provider: String,
+  #[serde(default)]
+  pub model: String,
+}
+
 /// Every call the gate makes on the agency.
 pub trait Agency: Send + Sync {
   /// Every agent of the store, the resting among them.
@@ -204,6 +225,17 @@ pub trait Agency: Send + Sync {
   /// A session's loads kept: every load it now holds, in place of those it held.
   fn keep_loads<'a>(&'a self, _session: &'a str, _loads: &'a [Load]) -> BoxFuture<'a, Answer<()>> {
     Box::pin(async { Ok(()) })
+  }
+
+  /// One part translated by the agency's translation line; an agency that serves none refuses it.
+  fn translation_run<'a>(&'a self, _ask: &'a TranslationAsk) -> BoxFuture<'a, Answer<TranslationRun>> {
+    Box::pin(async {
+      Err(PortError::Unreachable {
+        unit: "bmo-agency",
+        call: "translation run",
+        why: "this agency serves no translation line".to_owned(),
+      })
+    })
   }
 }
 
@@ -349,6 +381,10 @@ impl Agency for HttpAgency {
 
       Ok(rulebooks.rulebooks)
     })
+  }
+
+  fn translation_run<'a>(&'a self, ask: &'a TranslationAsk) -> BoxFuture<'a, Answer<TranslationRun>> {
+    Box::pin(async move { self.caller.post("translation run", &["translation-runs"], ask).await })
   }
 
   fn providers(&self) -> BoxFuture<'_, Answer<Vec<Provider>>> {

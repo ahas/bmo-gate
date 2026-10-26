@@ -1,41 +1,47 @@
 //! A record put into the owner's language: which texts count as English, each rendering checked before it stands
-//! and asked again with what is wrong named, a part kept and read back for the same English, and a part left in
-//! its original where it stays wrong. The stand-in gate answers a part with its Latin letters in their fullwidth
+//! and asked again where something is wrong, a part kept and read back for the same English, and a part left in
+//! its original where it stays wrong. The stand-in translation line answers a part with its Latin letters in their fullwidth
 //! forms, which no reading of the language takes for English; a Korean text a test needs is made of Hangul
 //! syllables counted out, never written into the test.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use gate_runs::GateRequest;
 use gate_stages::Reading;
-use gate_stages::records::{Record, plain_words, record_system};
-use gate_stages::translator::Ask;
+use gate_stages::records::{Record, plain_words};
+use gate_stages::translator::{Ask, Purpose, Ran};
 
 use crate::{Ground, ground};
 
-// What the stand-in gate was asked: the part, and the instructions it came under.
+// What the stand-in line was asked: the part, what for and into which language.
 struct Asked {
   part: String,
-  system: String,
+  purpose: Purpose,
+  target: String,
 }
 
 type Asking = Arc<Mutex<Vec<Asked>>>;
 
-// A stand-in for the translator gate: what each part comes back as, by the part and the instructions, and
-// everything it was asked.
-fn gate(answer: impl Fn(&str, &str) -> Option<String> + Send + Sync + 'static) -> (Ask, Asking) {
+// A stand-in for the agency's translation line: what each part comes back as, by the part and how many asks came
+// before it and this one, and everything it was asked.
+fn gate(answer: impl Fn(&str, usize) -> Option<String> + Send + Sync + 'static) -> (Ask, Asking) {
   let asked: Asking = Arc::default();
   let held = Arc::clone(&asked);
-  let ask: Ask = Arc::new(move |request: GateRequest| {
-    let part = request.prompt.split_once("\n\n").map_or("", |(_, part)| part).to_owned();
-    let answered = answer(&part, &request.system);
+  let ask: Ask = Arc::new(move |request| {
+    let mut asked = held.lock().unwrap();
+    let answered = answer(&request.text, asked.len() + 1);
 
-    held.lock().unwrap().push(Asked {
-      part,
-      system: request.system,
+    asked.push(Asked {
+      part: request.text,
+      purpose: request.purpose,
+      target: request.target,
     });
-    Box::pin(async move { answered })
+    Box::pin(async move {
+      match answered {
+        Some(text) => Ran::Translated(text),
+        None => Ran::Unanswered("the stand-in gave no answer".to_owned()),
+      }
+    })
   });
 
   (ask, asked)
@@ -92,8 +98,7 @@ async fn record_ground(test: &str, wording: Option<&str>) -> Ground {
 
 async fn render(ground: &Ground, ask: Ask, text: &str) -> (Result<String, String>, Vec<String>) {
   let english = ground.stages.reading.english();
-  let system = record_system(&ground.stages).await.unwrap();
-  let mut record = Record::new(&ground.stages, system, ground.stages.reading.glossary(), &english, ask);
+  let mut record = Record::new(&ground.stages, ground.stages.reading.glossary(), &english, ask);
   let read = record.korean_of_record(text, None).await;
 
   (read, record.log)
@@ -138,22 +143,29 @@ async fn a_rendering_is_kept_under_its_english_and_read_back_rather_than_asked_a
   assert_eq!(render(&ground, ask, report).await.0, Ok(rendered(report)));
   assert_eq!(asked.lock().unwrap().len(), 1);
   assert_eq!(asked.lock().unwrap()[0].part, report);
-  assert!(asked.lock().unwrap()[0].system.starts_with("the plain-writing rulebook\n\n"));
+  assert_eq!(
+    {
+      let asked = asked.lock().unwrap();
+
+      (asked[0].purpose, asked[0].target.clone())
+    },
+    (Purpose::Record, "ko".to_owned())
+  );
 }
 
 #[tokio::test]
-async fn a_text_the_gate_did_not_answer_stays_english() {
+async fn a_text_the_line_did_not_answer_stays_english() {
   let ground = record_ground("unanswered", None).await;
   let (ask, _) = gate(|_, _| None);
 
   assert_eq!(
     render(&ground, ask, "The close passed.").await.0,
-    Err("the gate did not answer".to_owned())
+    Err("the translation line did not answer".to_owned())
   );
 }
 
 #[tokio::test]
-async fn a_rendering_using_a_banned_term_is_asked_again_with_the_term_named() {
+async fn a_rendering_using_a_banned_term_is_asked_again() {
   let term = hangul(2);
   let ground = record_ground(
     "banned",
@@ -167,7 +179,7 @@ async fn a_rendering_using_a_banned_term_is_asked_again_with_the_term_named() {
   let (ask, asked) = gate(move |_, _| Some(answers[calls.fetch_add(1, Ordering::SeqCst).min(1)].clone()));
 
   assert_eq!(render(&ground, ask, "Tidied the toolbar.").await.0, Ok(second));
-  assert!(asked.lock().unwrap()[1].system.contains(&term));
+  assert_eq!(asked.lock().unwrap().len(), 2, "asked once more after the banned term");
 }
 
 #[tokio::test]
@@ -216,10 +228,10 @@ async fn a_paragraph_handed_back_in_english_is_asked_again() {
     render(&ground, ask, &format!("{summary}\n\nFixed\n1. Renders into Korean.")).await.0,
     Ok(korean)
   );
-  assert!(
-    asked.lock().unwrap()[1]
-      .system
-      .contains(&format!("It left these in English; translate them too:\n- {summary}"))
+  assert_eq!(
+    asked.lock().unwrap().len(),
+    2,
+    "asked once more after the paragraph came back in English"
   );
 }
 
@@ -293,12 +305,12 @@ async fn a_rendering_that_changed_a_fenced_quote_is_asked_again_and_stays_where_
   let (report, quote) = quoting_report();
   let mended = format!("{report} Mended.");
   let changed = format!("{report} Changed.");
-  // A gate putting its own words in place of the quote, and minding the fence once told so where the part is the
-  // mended one.
-  let (ask, asked) = gate(move |part, system| {
-    let told = system.contains("It changed a fenced block.");
+  // A line putting its own words in place of the quote, and minding the fence when asked again where the part is
+  // the mended one.
+  let (ask, asked) = gate(move |part, call| {
+    let again = call == 2;
 
-    Some(if told && part.ends_with("Mended.") {
+    Some(if again && part.ends_with("Mended.") {
       fences_kept(part)
     } else {
       fences_kept(part).replace(&quote, &hangul(9))

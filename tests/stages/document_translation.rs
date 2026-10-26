@@ -7,14 +7,24 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use gate_stages::document_translation::{Kept, Lost, Order, Outcome, Queue, translate_part};
+use gate_stages::translator::{Ask, Purpose, Ran};
 
-use crate::fakes::completion;
 use crate::ground;
+
+// A stand-in translation line answering each ask with the next of `answers`, and no answer once they run out.
+fn line(answers: Vec<String>) -> Ask {
+  let asked = Arc::new(AtomicUsize::new(0));
+
+  Arc::new(move |_| {
+    let answer = answers.get(asked.fetch_add(1, Ordering::SeqCst)).cloned();
+
+    Box::pin(async move { answer.map_or_else(|| Ran::Unanswered("none left".to_owned()), Ran::Translated) })
+  })
+}
 
 #[tokio::test]
 async fn the_gates_own_words_are_no_translation() {
   let order = "Item #7 Keep the report on the item.\n\nRead it with `todo --show 7`.\n\nTo do\n1. Attach tests.\n2. Report back.";
-  let system = Arc::new(String::new());
   let own = [
     format!("English translation:\n\n---\n\n{order}"),
     format!("{order}\n\nLet me know if anything else needs translating."),
@@ -25,19 +35,13 @@ async fn the_gates_own_words_are_no_translation() {
 
   for answer in &own {
     let outcome =
-      translate_part(order, "en", &system, Kept::Whole, |_| async { Some(answer.clone()) }).await;
+      translate_part(order, "en", Purpose::Document, Kept::Whole, &line(vec![answer.clone(); 2])).await;
 
     assert!(matches!(outcome, Outcome::Mismatch(_)), "{answer}");
   }
 
-  let asked = AtomicUsize::new(0);
-  let answers = [own[0].clone(), order.to_owned()];
-  let outcome = translate_part(order, "en", &system, Kept::Whole, |_| {
-    let answer = answers.get(asked.fetch_add(1, Ordering::SeqCst)).cloned();
-
-    async move { answer }
-  })
-  .await;
+  let answers = vec![own[0].clone(), order.to_owned()];
+  let outcome = translate_part(order, "en", Purpose::Document, Kept::Whole, &line(answers)).await;
 
   assert_eq!(outcome, Outcome::Translated(order.to_owned()));
 }
@@ -92,7 +96,7 @@ async fn a_part_that_lost_its_structure_twice_is_kept_as_failed_with_why() {
   let mut heard = ground.stages.events.subscribe();
   let introduced = format!("Here is the translation:\n\n{PLAN}");
 
-  ground.gateway.answers(vec![completion(&introduced), completion(&introduced)]);
+  ground.agency.translates(&[&introduced, &introduced]);
   queue.order(
     &ground.stages,
     Order {
@@ -123,9 +127,7 @@ async fn an_order_is_queued_each_part_written_and_told_to_the_screens() {
   let queue = Queue::default();
   let mut heard = ground.stages.events.subscribe();
 
-  ground
-    .gateway
-    .answers(vec![completion("First, in Korean."), completion("Second, in Korean.")]);
+  ground.agency.translates(&["First, in Korean.", "Second, in Korean."]);
 
   let taken = queue.order(
     &ground.stages,
@@ -157,5 +159,42 @@ async fn an_order_is_queued_each_part_written_and_told_to_the_screens() {
       )
       .await,
     2
+  );
+}
+
+#[tokio::test]
+async fn a_part_past_the_lines_window_is_asked_in_halves_and_joined() {
+  let ground = ground("document-halves", None, Default::default()).await;
+  let queue = Queue::default();
+  let mut heard = ground.stages.events.subscribe();
+  let part = "The first paragraph of the part.\n\nThe second paragraph of the part.";
+
+  *ground.agency.window_chars.lock().unwrap() = Some(40);
+  ground.agency.translates(&["First, in Korean.", "Second, in Korean."]);
+  queue.order(
+    &ground.stages,
+    Order {
+      document: "docs/b.md".into(),
+      version: "v1".into(),
+      target: "ko".into(),
+      parts: 1,
+      wanted: vec![(0, part.into())],
+    },
+  );
+  tokio::time::timeout(Duration::from_secs(10), heard.recv()).await.unwrap().unwrap();
+
+  let asked = ground.agency.translations.lock().unwrap().clone();
+
+  assert_eq!(asked.len(), 3, "the whole refused, then each half: {asked:?}");
+  assert!(asked.iter().all(|ask| ask.purpose == "document" && ask.language == "Korean"));
+  assert_eq!(
+    ground
+      .scratch
+      .texts(
+        "SELECT text FROM document_translations WHERE document = 'docs/b.md' AND failed = 0",
+        vec![]
+      )
+      .await,
+    ["First, in Korean.\n\nSecond, in Korean."]
   );
 }

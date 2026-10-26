@@ -16,7 +16,7 @@ use gate_policy::translation::TRANSLATION;
 
 #[test]
 fn the_gate_order_reads_every_gate_once_where_it_first_stands() {
-  assert_eq!(GATE_ORDER.keys(), ["session-summary", "output-format", "translator",]);
+  assert_eq!(GATE_ORDER.keys(), ["session-summary", "output-format"]);
 }
 
 #[test]
@@ -24,15 +24,12 @@ fn each_gate_stands_in_its_part_and_no_other_gate_stands() {
   let parts: Vec<(&str, Part, usize)> =
     GATE_ORDER.standing().into_iter().map(|one| (one.key, one.part, one.step)).collect();
 
-  assert_eq!(
-    parts,
-    [
-      ("session-summary", Part::Pre, 0),
-      ("output-format", Part::Post, 0),
-      ("translator", Part::Apart, 0)
-    ]
+  assert_eq!(parts, [("session-summary", Part::Pre, 0), ("output-format", Part::Post, 0),]);
+  assert!(
+    GATE_ORDER.holds("output-format")
+      && !GATE_ORDER.holds("translator")
+      && !GATE_ORDER.holds("content-judge")
   );
-  assert!(GATE_ORDER.holds("translator") && !GATE_ORDER.holds("content-judge"));
 }
 
 #[test]
@@ -47,12 +44,12 @@ fn every_gate_of_the_order_has_one_profile_and_nothing_else_has_one() {
 
 #[test]
 fn a_profile_bounds_its_pool_and_names_its_probe() {
-  let translator = PROFILES.of("translator").unwrap();
+  let summary = PROFILES.of("session-summary").unwrap();
   let output = PROFILES.of("output-format").unwrap();
 
-  assert_eq!(translator.pool_bound(), 4);
+  assert_eq!(summary.pool_bound(), GATE_POOL.size);
   assert_eq!(output.pool_bound(), GATE_POOL.size);
-  assert!(output.laya_probe() && !translator.laya_probe());
+  assert!(output.laya_probe() && !summary.laya_probe());
 }
 
 #[test]
@@ -108,7 +105,7 @@ fn marks_are_filled_at_once_and_an_unnamed_one_stays() {
 
 #[test]
 fn every_instruction_file_under_the_prompts_is_compiled_in_and_marks_fill() {
-  use gate_policy::prompts::{FILES, instructions, read, render};
+  use gate_policy::prompts::{FILES, read, render};
 
   let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("prompts");
   let mut found = vec![];
@@ -131,7 +128,7 @@ fn every_instruction_file_under_the_prompts_is_compiled_in_and_marks_fill() {
   let listed: Vec<&str> = FILES.iter().map(|(path, _)| *path).collect();
 
   assert_eq!(found, listed);
-  assert!(instructions("translator").is_some_and(|text| text == text.trim()));
+  assert!(read("session-summary/chat.md").is_some_and(|text| text == text.trim()));
   assert_eq!(read("no-such/file.md"), None);
   assert_eq!(render("{{a}} {{b}} {{ c}} {{", &[("a", "{{b}}"), ("b", "2")]), "{{b}} 2 {{ c}} {{");
 }
@@ -139,7 +136,7 @@ fn every_instruction_file_under_the_prompts_is_compiled_in_and_marks_fill() {
 #[test]
 fn every_gate_names_its_tier() {
   assert!(PROFILES.profile.iter().all(|one| !one.tier.is_empty()));
-  assert_eq!(PROFILES.of("translator").map(|one| one.tier.as_str()), Some("Reliable"));
+  assert_eq!(PROFILES.of("output-format").map(|one| one.tier.as_str()), Some("Simple"));
 }
 
 #[test]

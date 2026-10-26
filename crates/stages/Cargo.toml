@@ -10,6 +10,7 @@ publish = false
 futures-util.workspace = true
 gate-markup.workspace = true
 gate-policy.workspace = true
+gate-ports.workspace = true
 gate-runs.workspace = true
 gate-store.workspace = true
 gate-words.workspace = true

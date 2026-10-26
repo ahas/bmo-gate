@@ -16,6 +16,10 @@ latin_per_hangul = 20
 # together, English left, a fenced block changed — leaves it in its original.
 record_attempts = 3
 
+# How many parts of every reading standing are out at the agency's translation line at once; the rest wait their
+# turn (docs/api.md, 「Translations」). A document's translation keeps its own three.
+lanes = 4
+
 # Every language a text or a document is put into, by its tag, and the name the translator is asked for it by; the
 # worker's and the owner's language among them. A tag named nowhere here is a language the translator does not take.
 [language_names]

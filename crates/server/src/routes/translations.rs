@@ -38,7 +38,7 @@ pub async fn translate(
     )
     .retry_after(BUSY_WAIT_SECONDS),
   })?;
-  let ask = translator::by_gate(app.stages.clone());
+  let ask = translator::by_agency(app.stages.clone());
   let read = translator::readings(&app.stages, &app.translations, &asked.language, &asked.originals, &ask)
     .await
     .ok_or_else(|| Refused::new(Code::LanguageUnknown, format!("no reader takes {}", asked.language)))?;

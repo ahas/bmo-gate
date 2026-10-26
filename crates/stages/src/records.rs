@@ -1,11 +1,11 @@
 //! A record put into the owner's language (bmo-job's `docs/worker-language.md`, 「What a worker writes onto an
 //! item」): an agent writes English and the owner reads the item in Korean, so each English part of what bmo-job
-//! hands over is rendered by the translator gate and checked before it stands. A rendering whose numbered or
-//! bulleted lines ran together, which handed a paragraph back in English, changed a fenced block or used a term the
-//! owner banned is asked for again with its own answer and what is wrong named; one still wrong after the last ask
-//! leaves the part in its original, and a banned term that stays is said in the log. A rendering that passed every
-//! check is kept under the English part and what it was told it is, and read back before the gate is asked, so the
-//! same English is rendered once.
+//! hands over is rendered by the agency's translation line under its `record` purpose and checked before it stands.
+//! A rendering whose numbered or bulleted lines ran together, which handed a paragraph back in English, changed a
+//! fenced block or used a term the owner banned is asked for again; one still wrong after the last ask leaves the
+//! part in its original, and a banned term that stays is said in the log. A rendering that passed every check is
+//! kept under the English part and what it was told it is, and read back before the line is asked, so the same
+//! English is rendered once.
 
 use std::collections::HashSet;
 use std::sync::{Arc, LazyLock};
@@ -14,47 +14,17 @@ use gate_markup::dashes::without_dashes;
 use gate_markup::english::EnglishTest;
 use gate_markup::text::fenced_blocks;
 use gate_markup::wording::{BannedTerm, banned_terms_in, banned_terms_line};
-use gate_policy::prompts;
 use gate_policy::translation::TRANSLATION;
-use gate_runs::GateError;
 use regex::Regex;
 
 use crate::Stages;
 use crate::document_translation::{Kept, Outcome, translate_part};
 use crate::markdown::{TRANSLATION_PART_TOKENS, shown_part, translation_parts};
 use crate::markdown_shape::{list_shape, prose_blocks};
-use crate::translator::{Ask, STAGE, keep_under, recalled_under};
-
-/// The rulebook the record instructions stand on.
-pub const PLAIN_WRITING: &str = "plain-writing";
+use crate::translator::{Ask, Purpose, keep_under, recalled_under};
 
 // The documents a part's rendering is kept under, each named also for what the part was told it is.
 const KEPT_KOREAN: &str = "record-ko";
-
-/// The instructions a text is read by into the language a worker reads.
-pub fn worker_system() -> Option<&'static str> {
-  prompts::read(&format!("{STAGE}/worker.md"))
-}
-
-/// The instructions a record is read by into the owner's language: the plain-writing rulebook ahead of the record
-/// instructions.
-pub async fn record_system(stages: &Stages) -> Result<String, GateError> {
-  let path = format!("{STAGE}/record.md");
-  let record =
-    prompts::read(&path).ok_or_else(|| GateError::Fault(format!("{path} is not among the prompts")))?;
-  let rulebooks = stages
-    .runs
-    .agency
-    .rulebooks(&[PLAIN_WRITING])
-    .await
-    .map_err(|why| GateError::Fault(why.to_string()))?;
-  let rulebook = rulebooks
-    .into_iter()
-    .find(|rulebook| rulebook.name == PLAIN_WRITING)
-    .ok_or_else(|| GateError::Fault(format!("the agency holds no {PLAIN_WRITING} rulebook")))?;
-
-  Ok(format!("{}\n\n{record}", rulebook.text.trim()))
-}
 
 // What is wrong with a part's rendering: numbered or bulleted lines run together, a paragraph of the English handed
 // back as it came, a fenced block not handed back byte for byte in its place, or a term the owner bans.
@@ -75,45 +45,25 @@ pub fn plain_words(block: &str) -> usize {
   block.split_whitespace().filter(|token| PLAIN_WORD.is_match(token)).count()
 }
 
-// The note a part is asked for again under: the last answer, and each thing wrong with it.
-fn correction(korean: &str, faults: &PartFaults) -> String {
-  let mut lines = vec![
-    "Your last translation of this part was:".to_owned(),
-    String::new(),
-    korean.to_owned(),
-    String::new(),
-  ];
-
-  if faults.lists_lost {
-    lines.push("It did not keep the lists: every numbered or bulleted item of the source stays an item of its own, on its own line, with its own number or marker.".to_owned());
+// A one-line text's rendering as it stands: its first line alone, with no full stop the English does not end on.
+fn one_line(part: &str, korean: &str, line: Option<&str>) -> String {
+  if line.is_none() {
+    return korean.to_owned();
   }
 
-  if !faults.left_english.is_empty() {
-    lines.push("It left these in English; translate them too:".to_owned());
-    lines.extend(faults.left_english.iter().map(|block| format!("- {block}")));
-  }
+  let first = korean.trim().lines().next().unwrap_or_default().trim_end();
 
-  if faults.fences_changed {
-    lines.push("It changed a fenced block. Every fenced block of the source stays exactly as written, byte for byte, its opening and closing lines included, in the same order, and no fenced block is added.".to_owned());
+  if part.trim_end().ends_with('.') {
+    first.to_owned()
+  } else {
+    first.trim_end_matches('.').to_owned()
   }
-
-  if !faults.banned.is_empty() {
-    lines.push(format!(
-      "It used words the owner has set aside: {}. Write each as its replacement says.",
-      banned_terms_line(&faults.banned)
-    ));
-  }
-
-  lines.push("Translate the part again, whole.".to_owned());
-  lines.join("\n")
 }
 
-/// One record's reading under way: the gate's instructions, the glossary the rendering is held to, the English
-/// test, what each part is asked of, and what the log says of it — which part stayed in its original and why, and
-/// a banned term a rendering kept.
+/// One record's reading under way: the glossary the rendering is held to, the English test, what each part is asked
+/// of, and what the log says of it — which part stayed in its original and why, and a banned term a rendering kept.
 pub struct Record<'a> {
   stages: &'a Stages,
-  system: String,
   glossary: Vec<BannedTerm>,
   english: &'a EnglishTest,
   ask: Ask,
@@ -121,16 +71,9 @@ pub struct Record<'a> {
 }
 
 impl<'a> Record<'a> {
-  pub fn new(
-    stages: &'a Stages,
-    system: String,
-    glossary: Vec<BannedTerm>,
-    english: &'a EnglishTest,
-    ask: Ask,
-  ) -> Self {
+  pub fn new(stages: &'a Stages, glossary: Vec<BannedTerm>, english: &'a EnglishTest, ask: Ask) -> Self {
     Self {
       stages,
-      system,
       glossary,
       english,
       ask,
@@ -162,8 +105,8 @@ impl<'a> Record<'a> {
   }
 
   /// One part into the owner's language, or what kept it from coming back. `line` names what a one-line text is
-  /// — a title, a state line — so the gate answers it as one. A dash the gate left between words is set right as
-  /// every notice's is.
+  /// — a title, a state line — whose rendering is kept apart and ends on no full stop the English does not end on.
+  /// A dash the line left between words is set right as every notice's is.
   pub async fn korean_part(&mut self, part: &str, line: Option<&str>) -> Result<String, String> {
     let stages = self.stages;
     let shelf = format!("{KEPT_KOREAN}:{}", line.unwrap_or("text").replace(' ', "-"));
@@ -174,28 +117,17 @@ impl<'a> Record<'a> {
       return Ok(kept);
     }
 
-    let own = match line {
-      None => self.system.clone(),
-      Some(line) => format!(
-        "{}\n\nThis text is the item's {line}: answer one short line in the plain written style, with no full stop the English does not have.",
-        self.system
-      ),
-    };
     let attempts = TRANSLATION.record_attempts.max(1);
     let ask = Arc::clone(&self.ask);
-    let mut system = own.clone();
     let mut attempt = 1;
 
     loop {
       let outcome =
-        translate_part(part, &TRANSLATION.owner_language, &Arc::new(system), Kept::Headings, |request| {
-          ask(request)
-        })
-        .await;
+        translate_part(part, &TRANSLATION.owner_language, Purpose::Record, Kept::Headings, &ask).await;
       let korean = match outcome {
-        Outcome::Translated(text) => without_dashes(&text, false),
+        Outcome::Translated(text) => one_line(part, &without_dashes(&text, false), line),
         Outcome::Mismatch(lost) => return Err(lost.to_string()),
-        Outcome::Unanswered => return Err("the gate did not answer".to_owned()),
+        Outcome::Unanswered => return Err("the translation line did not answer".to_owned()),
       };
       let faults = self.faults_of(part, &korean);
       let whole = !faults.lists_lost && faults.left_english.is_empty() && !faults.fences_changed;
@@ -227,7 +159,6 @@ impl<'a> Record<'a> {
         return Ok(korean);
       }
 
-      system = format!("{own}\n\n{}", correction(&korean, &faults));
       attempt += 1;
     }
   }

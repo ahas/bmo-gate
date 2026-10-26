@@ -6,8 +6,9 @@
 # starts together and waits on together. A place names its gate, and the one condition its step runs under where
 # it runs in some turns only.
 
-# The off-turn part: the gates that run outside any chat turn, in the order they are listed.
-apart = ["translator"]
+# The off-turn part: the gates that run outside any chat turn, in the order they are listed. None does: a
+# translation is the agency's translation line's (docs/gates.md, 「Off-turn」).
+apart = []
 
 # The pre-gate part: the gates that run before the reply is written.
 

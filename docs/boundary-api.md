@@ -122,9 +122,9 @@ In the agency's conventions (its `docs/api.md`): camelCase, the agency's control
 | Call | Route | What the gate needs it for |
 |---|---|---|
 | the agents | `GET /agents` | the registrations a gate run names and the agents a turn is for |
-| shared rulebooks | `GET /rulebooks?names=` | `plain-writing` and `recollection`, the rulebooks the translator's record and the session summariser stand on |
+| shared rulebooks | `GET /rulebooks?names=` | `recollection`, the rulebook the session summariser stands on |
 | the providers | `GET /providers` | the provider order a gate's road begins on and whether each is on |
-| a gate's route | `GET /work-keys/{workKey}` | the run mode the gate's work key stands on, and whether the agency serves the key a gate's runs forward to (`docs/gates.md`, 「Where a gate's runs go out」) |
+| a gate's route | `GET /work-keys/{workKey}` | the run mode the gate's work key stands on (`docs/gates.md`, 「Where a gate's runs go out」) |
 | a mapping | `GET /work-keys/{workKey}?provider=&tier=` | the `provider`, `model`, `effort` and `answerTokens` a gate run goes out on |
 | a stand-in | `GET /agents/{agentName}` | `standInAvailable`, whether a stand-in answers while Claude Code's road is closed |
 | a session | `POST /sessions` | `agentName`, `scope` `conversation`, `options` `{provider, model, cwd}`: one thrown-away conversation for one gate run on a provider's program |
@@ -132,15 +132,25 @@ In the agency's conventions (its `docs/api.md`): camelCase, the agency's control
 | a session ended | `DELETE /sessions/{sessionId}` | a run of the gate's somebody stopped, its turn cut short |
 | a session's loads | `GET /session-loads/{sessionId}` | `documents`, each `path` and `version`: what the session was handed in full, which the index counts read |
 | a session's loads kept | `PUT /session-loads/{sessionId}` | `documents`, every load the session now holds, the piece just read added at its version |
+| a translation | `POST /translation-runs` | `purpose` (`document`, `worker` or `record`), `language` (the target's name as the policy names it) and `text`, one part: answered with `text`, the part translated whole, and the `provider` and `model` it went out on (「The translation line」) |
 | the events | `GET /events?kinds=road-walked` | the road each conversational turn walked, which the gate writes into its road records |
 
 The gate registers no hook at any of the agency's hook points and answers none.
 
-- **The translator's forwarding.** The translator's profile names `translate` as its forwarding key: each
-  translation run asks `GET /work-keys/translate`, and where the agency answers it, the run's mode, its mapping
-  (`GET /work-keys/translate?provider=&tier=`) and its turn's work key are `translate`, the agency's translator
-  runner line; a 404 there leaves the run on the gate's own `translator` key. The agency lands its half by
-  serving that key, with nothing changed here.
+### The translation line
+
+- **Every translation the gate makes is one ask of the agency's translation line,** `POST /translation-runs`, a
+  part at a time: the agency runs it as a run apart on its `translate` work key, under the instructions of the
+  purpose asked, which are the agency's (its `docs/launch-lines.md`, 「Translate runner」). The purpose is
+  `document` for a part of a document the viewer asked for, `worker` for a text read into the worker's language
+  and `record` for a worker's record read into the owner's language.
+- **What stays the gate's:** the translations route, the kept translations, a document's queue, the cutting into
+  parts, the structure each answer is held to and the asks again, how many parts stand out at once, and the
+  halving of a part too large for the line's road: a part the line refuses as past its road's window is cut in
+  two, at a paragraph else a line, each half asked on its own and the two joined in order, a half with no answer
+  leaving the part unanswered. Any other refusal leaves the part unanswered.
+- **What is the agency's:** the road each translation walked and what it spent, kept in the agency's ledger; the
+  gate keeps of a document's translation only its rows and, where a part failed, why.
 
 The training tooling's claude road hands a batch to the agency's command for a run apart, as the tooling's settings
 name it (`docs/gate-data.md`, 「The claude road」), with `--model`, `--effort`, `--config-dir`, `--system-file`,
@@ -181,8 +191,9 @@ settings name, an ssh node by a batch login.
 
 ## How a gate run reaches a model
 
-Gate runs are the gate's own: the agency starts none and holds no gate's line. A gate runs on its one road, one
-ask and nothing behind it (the agency's `docs/own-llm.md`, 「A gate has one road」):
+Gate runs are the gate's own: the agency starts none and holds no gate's line. A translation is no gate run: the
+gate asks the agency's translation line, which the agency runs as a run apart (「The translation line」). A gate
+runs on its one road, one ask and nothing behind it (the agency's `docs/own-llm.md`, 「A gate has one road」):
 
 - **The road** is the gate's work key's run mode where it names a provider that is on, else the first provider
   on in the provider order; the mapping comes from `POST /routes/resolve` at the tier the gate's profile names.
@@ -214,8 +225,8 @@ the service sweeps the table as it starts and once a day after.
 - **The gate order** — which gates stand, the part and step each takes against a turn, and each gate's profile
   (whether it may be switched off, its Laya probe and default mode, its answer floor) — is the gate's, and
   `GET /gates` serves it.
-- **The instructions,** six files in three folders, one folder a gate: `translator` (three),
-  `output-gate/telegram-html` and `session-summary` (two).
+- **The instructions,** three files in two folders, one folder a gate: `output-gate/telegram-html` and
+  `session-summary` (two).
 
 ### The policy it reads
 

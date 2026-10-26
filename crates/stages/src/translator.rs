@@ -1,21 +1,22 @@
 //! The translator's readings (`docs/boundary-api.md`, 「For bmo-job」): a text read in a language its reader takes,
-//! its parts in another language alone put into it by the translator gate, no more out at once across every reading
-//! standing than the translator's pool bound (`docs/api.md`, 「Translations」), each part standing beside
+//! its parts in another language alone put into it by the agency's translation line (`docs/boundary-api.md`, 「The
+//! translation line」), no more out at once across every reading standing than the translation policy's bound
+//! (`docs/api.md`, 「Translations」), each part standing beside
 //! the rest as it did in the original, and the reading kept under the digest of the original exactly as written, so
 //! the same original is never translated twice into one language. A text the translator could not render whole has
 //! every part that came back read and the rest in its original, and nothing is kept for it, so the next reading asks
 //! again.
 //!
-//! Two readers stand: into the language a worker reads by the worker instructions; and into the owner's language by
-//! the record instructions and the checks a record is held to (`crate::records`). Which language each reads into is
+//! Two readers stand: into the language a worker reads, the line's `worker` purpose; and into the owner's language,
+//! its `record` purpose, with the checks a record is held to (`crate::records`). Which language each reads into is
 //! the policy's (`gate_policy::translation`).
 
 use std::sync::Arc;
 
 use futures_util::future::BoxFuture;
-use gate_policy::profiles::PROFILES;
 use gate_policy::translation::{TRANSLATION, Translation};
-use gate_runs::GateRequest;
+use gate_ports::PortError;
+use gate_ports::agency::TranslationAsk;
 use sha2::{Digest, Sha256};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
@@ -25,7 +26,7 @@ use crate::markdown::{TRANSLATION_PART_TOKENS, korean_parts, shown_part, transla
 use crate::records::Record;
 use crate::sql::{one, run};
 
-/// The gate's key.
+/// The name the translation's lines are told under.
 pub const STAGE: &str = "translator";
 
 /// The most originals one reading carries.
@@ -65,9 +66,10 @@ impl Intake {
     }
   }
 
-  /// The intake the policy bounds: as many parts out as the translator's pool, and `STANDING_ORIGINALS`.
+  /// The intake the policy bounds: as many parts out as the translation policy's `lanes`, and
+  /// `STANDING_ORIGINALS`.
   pub fn of_policy() -> Self {
-    Self::new(PROFILES.of(STAGE).map_or(1, |profile| profile.pool_bound()), STANDING_ORIGINALS)
+    Self::new(TRANSLATION.lanes, STANDING_ORIGINALS)
   }
 
   /// The originals of one reading taken in, or why not: never more than `CALL_ORIGINALS`, and never past the
@@ -87,22 +89,80 @@ impl Intake {
   }
 }
 
-/// What a part is asked of: the translator gate, or whatever stands in for it.
-pub type Ask = Arc<dyn Fn(GateRequest) -> BoxFuture<'static, Option<String>> + Send + Sync>;
+/// What a part is translated for, as the agency's translation line takes it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Purpose {
+  /// A part of a document the viewer asked for.
+  Document,
+  /// A text read into the language a worker reads.
+  Worker,
+  /// A worker's record read into the owner's language.
+  Record,
+}
 
-/// Each part asked of the translator gate on its own road; a part it could not answer, or a run somebody stopped,
-/// comes back with nothing.
-pub fn by_gate(stages: Arc<Stages>) -> Ask {
-  Arc::new(move |request: GateRequest| {
+impl Purpose {
+  /// The line's word for it.
+  pub fn word(self) -> &'static str {
+    match self {
+      Self::Document => "document",
+      Self::Worker => "worker",
+      Self::Record => "record",
+    }
+  }
+}
+
+/// One part asked of the line: what it is for, the target language by its tag, and the text.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Asked {
+  pub purpose: Purpose,
+  pub target: String,
+  pub text: String,
+}
+
+/// What the line made of one part: its translation, a refusal saying it is past the window of the line's road, or
+/// no answer with why.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Ran {
+  Translated(String),
+  TooLarge,
+  Unanswered(String),
+}
+
+/// What a part is asked of: the agency's translation line, or whatever stands in for it.
+pub type Ask = Arc<dyn Fn(Asked) -> BoxFuture<'static, Ran> + Send + Sync>;
+
+// The words a refusal of the line names a request past its road's window by.
+const PAST_WINDOW: [&str; 5] = ["context", "window", "too large", "too long", "maximum"];
+
+/// Whether the line refused a part as past its road's window: `no-answer`, its sentence naming the window.
+pub fn past_window(why: &PortError) -> bool {
+  match why {
+    PortError::Refused { code, error, .. } if code == "no-answer" => {
+      let said = error.to_lowercase();
+
+      PAST_WINDOW.iter().any(|word| said.contains(word))
+    }
+    _ => false,
+  }
+}
+
+/// Each part asked of the agency's translation line, the target named as the policy names it.
+pub fn by_agency(stages: Arc<Stages>) -> Ask {
+  Arc::new(move |asked: Asked| {
     let stages = Arc::clone(&stages);
 
     Box::pin(async move {
-      match stages.runs.run(STAGE, &request).await {
-        Ok(answer) => answer,
-        Err(why) => {
-          eprintln!("{STAGE}: a part could not be translated: {why}");
-          None
-        }
+      let language = TRANSLATION.language_name(&asked.target).unwrap_or(&asked.target).to_owned();
+      let ask = TranslationAsk {
+        purpose: asked.purpose.word().to_owned(),
+        language,
+        text: asked.text,
+      };
+
+      match stages.runs.agency.translation_run(&ask).await {
+        Ok(run) => Ran::Translated(run.text),
+        Err(why) if past_window(&why) => Ran::TooLarge,
+        Err(why) => Ran::Unanswered(why.to_string()),
       }
     })
   })
@@ -241,21 +301,18 @@ async fn part_into(
   reader: Reader,
   part: &str,
   language: &str,
-  worker: &Arc<String>,
   record: &mut Record<'_>,
   ask: &Ask,
 ) -> Option<String> {
   match reader {
-    Reader::Worker => {
-      match translate_part(part, language, worker, Kept::Whole, |request| ask(request)).await {
-        Outcome::Translated(text) => Some(text),
-        Outcome::Mismatch(lost) => {
-          eprintln!("{STAGE}: a part stays in its original: {lost}");
-          None
-        }
-        Outcome::Unanswered => None,
+    Reader::Worker => match translate_part(part, language, Purpose::Worker, Kept::Whole, ask).await {
+      Outcome::Translated(text) => Some(text),
+      Outcome::Mismatch(lost) => {
+        eprintln!("{STAGE}: a part stays in its original: {lost}");
+        None
       }
-    }
+      Outcome::Unanswered => None,
+    },
     Reader::Record => match record.korean_part(part, None).await {
       Ok(text) => Some(text),
       Err(fault) => {
@@ -313,20 +370,6 @@ pub async fn readings(
     return Some(read.into_iter().map(|one| one.unwrap_or_else(unread)).collect());
   }
 
-  let worker = Arc::new(match crate::records::worker_system() {
-    Some(system) => system.to_owned(),
-    None => {
-      eprintln!("{STAGE}: the worker instructions are not among the prompts");
-      String::new()
-    }
-  });
-  let system = match reader {
-    Reader::Record => crate::records::record_system(stages).await.unwrap_or_else(|why| {
-      eprintln!("{STAGE}: the record instructions could not be had: {why}");
-      String::new()
-    }),
-    Reader::Worker => String::new(),
-  };
   let glossary = stages.reading.glossary();
   let lanes = &intake.lanes;
   let mut asking = Vec::new();
@@ -340,12 +383,12 @@ pub async fn readings(
         continue;
       }
 
-      let (worker, system, glossary, english) = (&worker, &system, &glossary, &english);
+      let (glossary, english) = (&glossary, &english);
 
       asking.push(async move {
         let _lane = lanes.acquire().await.ok();
-        let mut record = Record::new(stages, system.clone(), glossary.clone(), english, Arc::clone(ask));
-        let answer = part_into(reader, part, language, worker, &mut record, ask).await;
+        let mut record = Record::new(stages, glossary.clone(), english, Arc::clone(ask));
+        let answer = part_into(reader, part, language, &mut record, ask).await;
 
         for line in &record.log {
           eprintln!("{STAGE}: {line}");

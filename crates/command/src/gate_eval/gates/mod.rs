@@ -2,7 +2,6 @@
 //! added by adding its file and its words and declaring it here (docs/gate-eval.md, 「The members」).
 
 pub mod session_summary;
-pub mod translator;
 
 use super::member::{EvalGate, Registered};
 

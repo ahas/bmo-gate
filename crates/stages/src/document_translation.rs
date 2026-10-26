@@ -6,13 +6,12 @@
 //! drops the older version's parts still waiting, and its own go first.
 
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::future::Future;
 use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
+use futures_util::future::BoxFuture;
+use gate_policy::fill_marks;
 use gate_policy::translation::TRANSLATION;
-use gate_policy::{fill_marks, prompts};
 use gate_runs::records::now;
-use gate_runs::{GateError, GateRequest, Piece, Split, route};
 use gate_words::translation as words;
 use regex::Regex;
 use sea_orm::TransactionTrait;
@@ -22,8 +21,9 @@ use crate::Stages;
 use crate::markdown::{halve_text, heading_shape, inline_code};
 use crate::markdown_shape::block_shape;
 use crate::sql::{one, run};
+use crate::translator::{Ask, Asked, Purpose, Ran};
 
-/// The gate's key, the worker translation's own.
+/// The name the translation's lines are told under.
 pub const STAGE: &str = crate::translator::STAGE;
 
 // How many parts are out at the translator at once.
@@ -48,50 +48,40 @@ fn unwrap(answer: &str, source: &str) -> String {
   }
 }
 
-/// One part as the translator is asked it: beside the gate's other runs, and cut in two at a paragraph where its
-/// road finds it too large, the halves joined in order and a half with no answer leaving the whole unanswered.
-pub fn request(text: &str, target: &str, system: &Arc<String>) -> GateRequest {
-  let language = language(target).unwrap_or(target);
-  let mut asked = GateRequest::new(system.as_str(), format!("Translate into {language}.\n\n{text}"));
+/// A part's answer from the line: its translation; where the line refuses it as past its road's window, the part cut in
+/// two at a paragraph else a line, each half asked on its own and the two joined in order, a half with no answer
+/// leaving the whole unanswered; none where the line gave no answer.
+fn answered<'a>(
+  text: &'a str,
+  target: &'a str,
+  purpose: Purpose,
+  ask: &'a Ask,
+) -> BoxFuture<'a, Option<String>> {
+  Box::pin(async move {
+    let asked = Asked {
+      purpose,
+      target: target.to_owned(),
+      text: text.to_owned(),
+    };
 
-  asked.thinking = false;
-  asked.alongside = true;
-  asked.split = Some(Arc::new(Halves {
-    text: text.to_owned(),
-    target: target.to_owned(),
-    system: Arc::clone(system),
-  }));
-  asked
-}
+    match ask(asked).await {
+      Ran::Translated(answer) => Some(unwrap(&answer, text)),
+      Ran::TooLarge => {
+        let (halves, joint) = halve_text(text)?;
+        let mut joined = Vec::with_capacity(halves.len());
 
-struct Halves {
-  text: String,
-  target: String,
-  system: Arc<String>,
-}
+        for half in &halves {
+          joined.push(answered(half, target, purpose, ask).await?);
+        }
 
-impl Split for Halves {
-  fn halve(&self) -> Option<Vec<Piece>> {
-    let (halves, _) = halve_text(&self.text)?;
-
-    Some(
-      halves
-        .iter()
-        .map(|half| Piece::Asked(request(half, &self.target, &self.system)))
-        .collect(),
-    )
-  }
-
-  fn join(&self, answers: Vec<Option<String>>) -> Option<String> {
-    let (halves, joint) = halve_text(&self.text)?;
-    let answered: Option<Vec<String>> = answers
-      .into_iter()
-      .enumerate()
-      .map(|(at, answer)| answer.map(|answer| unwrap(&answer, halves.get(at).map_or("", String::as_str))))
-      .collect();
-
-    answered.map(|answered| answered.join(joint))
-  }
+        Some(joined.join(joint))
+      }
+      Ran::Unanswered(why) => {
+        eprintln!("{STAGE}: a part could not be translated: {why}");
+        None
+      }
+    }
+  })
 }
 
 /// What one part came to: its translation, its structure lost twice with what the last answer lost, or no answer.
@@ -211,25 +201,15 @@ impl Kept {
   }
 }
 
-/// One part translated through `run`, its answer standing where it keeps what `kept` names.
-pub async fn translate_part<F, Fut>(
-  text: &str,
-  target: &str,
-  system: &Arc<String>,
-  kept: Kept,
-  run: F,
-) -> Outcome
-where
-  F: Fn(GateRequest) -> Fut,
-  Fut: Future<Output = Option<String>>,
-{
+/// One part translated through `ask` for `purpose`, its answer standing where it keeps what `kept` names: asked
+/// once more where it lost it.
+pub async fn translate_part(text: &str, target: &str, purpose: Purpose, kept: Kept, ask: &Ask) -> Outcome {
   let mut asked = 1;
 
   loop {
-    let Some(answer) = run(request(text, target, system)).await else {
+    let Some(translated) = answered(text, target, purpose, ask).await else {
       return Outcome::Unanswered;
     };
-    let translated = unwrap(&answer, text);
 
     match kept.lost(text, &translated) {
       None => return Outcome::Translated(translated),
@@ -379,55 +359,23 @@ impl Queue {
     }
   }
 
-  async fn translate(&self, stages: &Stages, part: Part) {
-    let system = prompts::instructions(STAGE)
-      .map(|system| Arc::new(system.to_owned()))
-      .ok_or_else(|| format!("{STAGE}: its instructions are not among the prompts"));
-    // A run somebody stopped ends the part with nothing kept and no failure: it was asked to stop.
-    let stopped = Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let outcome = match &system {
-      Ok(system) => {
-        let outcome = translate_part(&part.text, &part.target, system, Kept::Whole, |request| {
-          let stopped = Arc::clone(&stopped);
-
-          async move {
-            match stages.runs.run(STAGE, &request).await {
-              Ok(answer) => answer,
-              Err(GateError::Stopped(_)) => {
-                stopped.store(true, std::sync::atomic::Ordering::SeqCst);
-                None
-              }
-              Err(why) => {
-                eprintln!("translator: {why}");
-                None
-              }
-            }
-          }
-        })
-        .await;
-
-        (!stopped.load(std::sync::atomic::Ordering::SeqCst)).then_some(outcome)
-      }
-      Err(why) => {
-        eprintln!("translator: {why}");
-        None
-      }
-    };
+  async fn translate(&self, stages: &Arc<Stages>, part: Part) {
+    let ask = crate::translator::by_agency(Arc::clone(stages));
+    let outcome = translate_part(&part.text, &part.target, Purpose::Document, Kept::Whole, &ask).await;
+    // The road a part walked is the agency's ledger's: a part with no answer is kept as such, with no road named.
     let detail: Option<String> = match outcome {
-      None if stopped.load(std::sync::atomic::Ordering::SeqCst) => Some(words::STOPPED.to_owned()),
-      Some(Outcome::Unanswered) => {
-        let route = route::read(&stages.runs, STAGE).await.ok();
+      Outcome::Unanswered => {
         let failure = Failure {
           reason: words::UNANSWERED.to_owned(),
-          provider: route.as_ref().map(|route| route.provider.clone()),
-          model: route.as_ref().map(|route| route.model().to_owned()),
+          provider: None,
+          model: None,
         };
 
         self.held().states.entry(state_key(&part.document, &part.target)).or_default().failure =
           Some(failure);
         Some(words::UNANSWERED.to_owned())
       }
-      Some(outcome) => {
+      outcome => {
         let (text, failure) = match outcome {
           Outcome::Translated(text) => (Some(text), None),
           Outcome::Mismatch(lost) => {
@@ -450,15 +398,6 @@ impl Queue {
             Some(words::UNWRITTEN.to_owned())
           }
         }
-      }
-      None => {
-        self.held().states.entry(state_key(&part.document, &part.target)).or_default().failure =
-          Some(Failure {
-            reason: words::UNWRITTEN.to_owned(),
-            provider: None,
-            model: None,
-          });
-        Some(words::UNWRITTEN.to_owned())
       }
     };
 

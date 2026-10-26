@@ -19,9 +19,9 @@ fn route(way: Way) -> Route {
 
 #[test]
 fn a_programs_road_stands_its_pools_bound_and_the_gateway_takes_turns() {
-  assert_eq!(bound("translator", Way::Session), 4);
+  assert_eq!(bound("session-summary", Way::Session), GATE_POOL.size);
   assert_eq!(bound("output-format", Way::Session), GATE_POOL.size);
-  assert_eq!(bound("translator", Way::Gateway), 1);
+  assert_eq!(bound("session-summary", Way::Gateway), 1);
 }
 
 #[tokio::test]

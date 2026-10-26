@@ -902,6 +902,7 @@ dependencies = [
  "futures-util",
  "gate-markup",
  "gate-policy",
+ "gate-ports",
  "gate-runs",
  "gate-store",
  "gate-words",

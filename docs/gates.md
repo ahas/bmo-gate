@@ -12,10 +12,11 @@
   of the same gate never stand at the road together while different gates do. A gate whose road is a
   provider's program takes as many runs at once as its pool's bound (「How many runs stand at once」 below). A
   caller that bounds how many of its own requests are out at once marks each request to stand beside the
-  gate's other runs instead, and the bound is then the caller's alone — the translator's: a document's
-  translation keeps three parts out at a time (the web unit's `docs/documents-viewer.md`), and the translations
-  route keeps no more parts out than the translator's pool bound across every call standing (`docs/api.md`,
-  「Translations」).
+  gate's other runs instead, and the bound is then the caller's alone.
+- **A translation is no gate.** The gate keeps the translations route, the kept translations and a document's
+  translation queue, cuts a text into parts and holds each answer to its structure, and asks each part of the
+  agency's translation line (`docs/boundary-api.md`, 「The translation line」), which the agency runs as a run
+  apart; the gate order holds no translator.
 - A gate whose caller has a way of its own without it declares so in its profile, and only such a gate may
   be switched off for the whole deployment: its switch is its row of the gate options table (the agency's
   `docs/own-llm.md`, 「Per-gate time limit」), and a gate switched off is never asked. No gate of the order
@@ -56,8 +57,7 @@
 ### How many runs stand at once
 
 - **A gate stands no more runs at once than its pool's bound:** the default in the gate's `gate-pool`
-  policy, three, or the bound the gate's own profile names. The translator names four, the most parts the
-  translations route has out at once.
+  policy, three, or the bound the gate's own profile names.
 - **No run free:** while every place of a full pool is taken, the judgement waits for one to come free until
   the gate's own wait (its gate options row) runs out. The gate then has no answer, its road records
   `timeout`, and its caller's own way without it stands (the agency's `docs/own-llm.md`, 「A gate that did
@@ -106,10 +106,7 @@ agent reads the brain's index and its pieces itself (`docs/reference-selection.m
 
 ### Off-turn
 
-- `translator` — translates a document the console's document viewer shows, what reaches a job worker into
-  English, and what a worker writes onto an item into the owner's language (bmo-job's
-  `docs/worker-language.md`). Its runs go out on the agency's work key `translate` wherever the agency serves
-  that key, and on its own work key otherwise (「Where a gate's runs go out」).
+- No gate stands off-turn: the order's off-turn part is empty.
 - The output gate also runs on a message the chat agent sends to a room outside any turn. That does not give
   it a place in this part: it stands where it runs within a turn.
 
@@ -117,11 +114,6 @@ agent reads the brain's index and its pieces itself (`docs/reference-selection.m
 
 - **A gate's runs go out under its own work key,** the gate's name, which the agency resolves to a provider, a
   model and an effort (`docs/boundary-api.md`, 「How a gate run reaches a model」).
-- **A gate whose profile names a forwarding key** goes out under that key instead wherever the agency serves it:
-  each run asks the agency for the key (`GET /work-keys/{key}`), and where it answers, the run's mode, its
-  mapping and its turn are the key's; where it answers none, the run goes out under the gate's own key. The
-  translator forwards to `translate`, the agency's translator runner line, so the translation moves onto that
-  line the moment the agency serves it, with no change here.
 
 ## Each agent's own gates
 

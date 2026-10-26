@@ -8,9 +8,9 @@
 use std::sync::{Arc, Mutex};
 
 use gate_policy::translation::{TRANSLATION, Translation};
-use gate_runs::GateRequest;
 use gate_stages::translator::{
-  Ask, CALL_ORIGINALS, Intake, Read, Reader, STANDING_ORIGINALS, Turned, keep, readings, recalled,
+  Ask, Asked, CALL_ORIGINALS, Intake, Purpose, Ran, Read, Reader, STANDING_ORIGINALS, Turned, keep,
+  readings, recalled,
 };
 
 use crate::ground;
@@ -19,18 +19,20 @@ fn hangul(syllables: u32) -> String {
   (0..syllables).map(|at| char::from_u32(0xac00 + at * 29).unwrap()).collect()
 }
 
-// A stand-in translator answering each part asked into English as `answer` makes it, and the parts asked.
-fn gate(
-  answer: impl Fn(&str) -> Option<String> + Send + Sync + 'static,
-) -> (Ask, Arc<Mutex<Vec<GateRequest>>>) {
-  let asked: Arc<Mutex<Vec<GateRequest>>> = Arc::default();
+// A stand-in translation line answering each part asked as `answer` makes it, and the parts asked.
+fn gate(answer: impl Fn(&str) -> Option<String> + Send + Sync + 'static) -> (Ask, Arc<Mutex<Vec<Asked>>>) {
+  let asked: Arc<Mutex<Vec<Asked>>> = Arc::default();
   let held = Arc::clone(&asked);
-  let ask: Ask = Arc::new(move |request: GateRequest| {
-    let part = request.prompt.split_once("\n\n").map_or("", |(_, part)| part).to_owned();
-    let answered = answer(&part);
+  let ask: Ask = Arc::new(move |request: Asked| {
+    let answered = answer(&request.text);
 
     held.lock().unwrap().push(request);
-    Box::pin(async move { answered })
+    Box::pin(async move {
+      match answered {
+        Some(text) => Ran::Translated(text),
+        None => Ran::Unanswered("the stand-in gave no answer".to_owned()),
+      }
+    })
   });
 
   (ask, asked)
@@ -60,8 +62,15 @@ async fn a_korean_text_is_read_into_english_kept_and_read_back() {
     ]
   );
   assert_eq!(asked.lock().unwrap().len(), 1);
-  assert!(asked.lock().unwrap()[0].prompt.starts_with("Translate into English.\n\n"));
-  assert!(asked.lock().unwrap()[0].alongside && !asked.lock().unwrap()[0].thinking);
+  assert_eq!(
+    {
+      let asked = asked.lock().unwrap();
+
+      (asked[0].purpose, asked[0].target.clone())
+    },
+    (Purpose::Worker, "en".to_owned()),
+    "a part read into the worker's language is the line's worker purpose"
+  );
   assert_eq!(recalled(stages, "en", &korean).await.as_deref(), Some("In English."));
 
   let again = readings(stages, &Intake::of_policy(), "en", &originals, &ask).await.unwrap();
@@ -145,8 +154,15 @@ async fn an_english_text_is_read_into_the_owners_language_by_the_record_reader()
       whole: true
     }
   );
-  assert!(asked.lock().unwrap()[0].prompt.starts_with("Translate into Korean.\n\n"));
-  assert!(asked.lock().unwrap()[0].system.starts_with("the plain-writing rulebook\n\n"));
+  assert_eq!(
+    {
+      let asked = asked.lock().unwrap();
+
+      (asked[0].purpose, asked[0].target.clone())
+    },
+    (Purpose::Record, "ko".to_owned()),
+    "a part read into the owner's language is the line's record purpose"
+  );
 }
 
 #[test]
@@ -156,6 +172,7 @@ fn a_deployment_whose_owner_reads_another_language_has_the_record_reader_take_th
     owner_language: "ja".to_owned(),
     latin_per_hangul: TRANSLATION.latin_per_hangul,
     record_attempts: TRANSLATION.record_attempts,
+    lanes: TRANSLATION.lanes,
     language_names: [("en", "English"), ("ja", "Japanese")]
       .into_iter()
       .map(|(tag, name)| (tag.to_owned(), name.to_owned()))
@@ -191,7 +208,7 @@ async fn readings_standing_together_hold_no_more_parts_out_than_the_intakes_lane
   let ground = ground("lanes", None, Default::default()).await;
   let out = Arc::new(Mutex::new((0usize, 0usize)));
   let held = Arc::clone(&out);
-  let ask: Ask = Arc::new(move |_: GateRequest| {
+  let ask: Ask = Arc::new(move |_: Asked| {
     let held = Arc::clone(&held);
 
     Box::pin(async move {
@@ -204,7 +221,7 @@ async fn readings_standing_together_hold_no_more_parts_out_than_the_intakes_lane
       tokio::time::sleep(std::time::Duration::from_millis(20)).await;
       held.lock().unwrap().0 -= 1;
 
-      Some("In English.".to_owned())
+      Ran::Translated("In English.".to_owned())
     })
   });
   let intake = Intake::new(2, STANDING_ORIGINALS);

@@ -9,8 +9,7 @@
   own terms (a transcript, a part of a document), and the gate's own code builds
   the request from it: the gate's system prompt and the prompt its caller writes. What the gate
   answers is read by the reader its caller uses.
-- **The gates it covers** are the off-turn gate and the session summariser: `session-summary` and
-  `translator`.
+- **The gate it covers** is the session summariser, `session-summary`.
 
 ## The members
 
@@ -44,10 +43,6 @@
   by the gate's own code. The key is the facts the note must carry, the strings it must not, or `none`
   for a tail with nothing to carry. Passes where the note keeps to its 1,200 characters and meets the
   key.
-- **translator** — one part of a document under one of the three translators (the document
-  viewer's, a worker's text into English, a worker's record into Korean). The key is the strings
-  that must come through unchanged, the phrases with the renderings accepted for them and strings
-  that must not appear. Passes where the translator's own structure check holds and the key is met.
 - **Every member's score is a pass and a share:** the share of the key's checks the answer met, so a
   gate that misses one fact in ten is told apart from one that misses all of them.
 - **Literal matching is the whole of the scoring.** A fact is matched by any of its accepted
