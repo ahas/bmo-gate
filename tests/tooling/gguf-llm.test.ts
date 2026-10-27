@@ -221,11 +221,13 @@ describe("the units", () => {
     expect(tunnelName).toBe("echo-model-tunnel.service");
     expect(engine).not.toContain("{{");
     expect(tunnel).not.toContain("{{");
-    expect(engine).toContain("ExecStart=%h/engine/build/bin/llama-server \\\n  --model %h/echo-model/models/${MODEL_FILE} --alias ${MODEL_NAME} \\\n");
+    expect(engine).toContain("ExecStart=flock %h/.gpu.lock %h/engine/build/bin/llama-server \\\n  --model %h/echo-model/models/${MODEL_FILE} --alias ${MODEL_NAME} \\\n");
     expect(engine).toContain("--host 127.0.0.1 --port 8051 --api-key-file %h/.config/echo-model/key \\\n");
     expect(engine).toContain("--n-gpu-layers 99 --ctx-size 16384 --parallel 2 --kv-unified-per-slot 8192 \\\n");
     expect(engine).toContain("--flash-attn on --cache-type-k q8_0 --cache-type-v q8_0 \\\n  --jinja --repeat-penalty 1.05 --no-webui\n");
     expect(engine).toContain("(the registration echo-model-7b behind agency's gateway)");
+    // The process says whose it is to the node's card arbiter, as the occupant the master places it as.
+    expect(engine).toContain("Environment=BMO_CARD_SERVICE=gguf-llm\n");
     expect(tunnel).toContain('"-oProxyCommand=%h/engine/.venv/bin/python %h/engine/ws-dial.py ${TUNNEL_URL}"');
     expect(tunnel).toContain("-R ${LISTEN}:127.0.0.1:8051 ${TUNNEL_LOGIN}\n");
     expect(tunnel).toContain("its loopback 18051 to this node's engine on 8051");

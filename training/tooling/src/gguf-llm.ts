@@ -346,6 +346,9 @@ export function templateValues(instance: GgufInstance): Record<string, string> {
     name: serving.name,
     folder: serving.name,
     config: configDir(serving),
+    // The word the engine's process declares itself to the node's card arbiter as: the engine's own name, which
+    // is the occupant the card master places it as.
+    service: ENGINE,
     llama_server: tools.llamaServer,
     dial_python: tools.dialPython,
     dial_script: tools.dialScript,

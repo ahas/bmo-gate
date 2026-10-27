@@ -4,7 +4,8 @@ Any model file in llama.cpp's GGUF format, stood up on one node under llama.cpp'
 operations machine through the tunnel door, from configuration alone: the file is an entry of the agency's model
 catalogue, and where and how it is served is the installer's settings. No unit is written by hand and no model,
 node or address stands in the code. The engine's name is `gguf-llm`: the name an entry gives as its engine, the
-name the installer is called by and the service a node's row in the node list may reserve the node for.
+name the installer is called by, the service a node's row in the node list may reserve the node for, and the word
+its process declares itself to the node's card arbiter as.
 
 ## What the installer is
 
@@ -75,6 +76,16 @@ name the installer is called by and the service a node's row in the node list ma
   the node's loopback at the registration's port, with the key file in the settings folder as its API key, and the
   registration's context, slots, store, card layers, flash attention and further arguments. The file and the
   served name are read from the settings folder's `engine.env`.
+- **The card the engine stands on is the node's card arbiter's to keep,** as it is for every service that puts a
+  model there (`docs/llm-server.md`, 「The shared card lock」). The server's process declares itself as the engine's
+  name, `BMO_CARD_SERVICE=gguf-llm`, the one way a process says whose it is, so the arbiter names it the occupant
+  the node's occupants file gives a place and the card master reads it as that occupant (the arbiter's
+  `docs/api.md`, 「The service a process declares」). It takes the node's card lock, `~/.gpu.lock`, before the server
+  starts and holds it while its model is on the card, so another occupant's ticket waits behind it and the card
+  master stops the engine before that ticket's turn is granted: the card is free when the turn comes. A lock
+  another occupant holds as the unit starts is waited for. It asks the arbiter for no ticket and keeps no unit of
+  its own there, yielding its card by its process, stopped and started through the adapter of the declaration
+  beside the engine (the arbiter's `docs/placement.md`, 「Yielding by the process」).
 - **The tunnel** holds one `ssh -N` remote forward from `LISTEN` on the operations machine to the engine's port, riding
   the WebSocket dial to `TUNNEL_URL` with `LLM_KEY` as its bearer, logged in as `TUNNEL_LOGIN` and checking the host
   key pinned under `TUNNEL_HOST`. Every value of the door is read from the settings folder's `env`; no unit names a

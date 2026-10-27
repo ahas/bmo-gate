@@ -8,10 +8,15 @@ Type=simple
 WorkingDirectory=%h/{{folder}}
 # The model file and its served name come from here (MODEL_FILE, MODEL_NAME).
 EnvironmentFile=%h/{{config}}/engine.env
+# Declared to the node's card arbiter as the occupant the card master places this engine as
+# (docs/gguf-llm.md, 「The units」; the arbiter's docs/api.md, 「The service a process declares」).
+Environment=BMO_CARD_SERVICE={{service}}
 # The slots, the store they share and its type, and the engine's own sampling defaults are the
 # registration's in the installer's settings (docs/gguf-llm.md in the gate's repository); every other
 # sampling setting is the caller's.
-ExecStart=%h/{{llama_server}} \
+# The node's card lock is taken before the server starts and held while its model is on the card, so
+# another occupant's turn waits behind it (the arbiter's docs/node-arbiter.md, 「The hold」).
+ExecStart=flock %h/.gpu.lock %h/{{llama_server}} \
   --model %h/{{folder}}/models/${MODEL_FILE} --alias ${MODEL_NAME} \
   --host 127.0.0.1 --port {{port}} --api-key-file %h/{{config}}/key \
   --n-gpu-layers {{gpu_layers}} --ctx-size {{context}} --parallel {{parallel}}{{slot_context}} \
