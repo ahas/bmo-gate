@@ -27,6 +27,7 @@ pub fn provider(name: &str, registered: bool) -> Provider {
     name: name.to_owned(),
     enabled: true,
     registered,
+    gateway: registered,
     coworker: false,
     lines: vec!["chat".to_owned(), "gate".to_owned()],
   }

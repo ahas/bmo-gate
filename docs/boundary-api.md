@@ -203,13 +203,14 @@ runs on its one road, one ask and nothing behind it (the agency's `docs/own-llm.
 - **The road** is the gate's work key's run mode where it names a provider that is on, else the first provider
   on in the provider order; the mapping comes from `POST /routes/resolve` at the tier the gate's profile names.
   A run its caller puts on another provider or on one registration goes there alone.
-- **A provider whose program carries the run** — Claude Code, Codex, OpenRouter, every provider the agency
-  does not mark `registered` — is a thrown-away agency session each run: started apart on the provider and
-  model, sent one turn with the gate's instructions as its whole system prompt, a fresh session, no tools, and
-  thinking as the run asks. The gate knows no pane, no terminal and no backend.
-- **A provider whose models are registrations** is one request through the agency's model gateway, on the
-  registration the mapping names. A request the gateway refuses as past the registration's window is cut by
-  its caller where the caller can cut it, each part asked on its own, and is the gate having no answer
+- **A provider whose program carries the run** — Claude Code, and any provider the agency does not mark
+  `gateway` — is a thrown-away agency session each run: started apart on the provider and model, sent one
+  turn with the gate's instructions as its whole system prompt, a fresh session, no tools, and thinking as
+  the run asks. The gate knows no pane, no terminal and no backend.
+- **A provider whose models the agency marks `gateway`** — the registry's registrations and the member
+  roads of the providers agency carries on the gateway — is one request through the agency's model
+  gateway, on the model the mapping names. A request the gateway refuses as past the model's window is cut
+  by its caller where the caller can cut it, each part asked on its own, and is the gate having no answer
   otherwise.
 - **Laya** is one call to the relay. A gate whose provider is Laya asks its fallback LLM once where Laya gave no
   verdict, on that LLM's own road.

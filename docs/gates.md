@@ -43,16 +43,16 @@
 
 ## A gate on a provider's program
 
-- **Each judgement on Claude Code, Codex or OpenRouter is one thrown-away agency session:** started apart on
-  the provider and the model the gate's tier maps to there, sent one turn with the gate's instructions as its
-  whole system prompt, a fresh session, no tool, no MCP server and thinking off where the request asks (the
-  agency's `docs/launch-lines.md`, 「Gate runs」). The gate knows no pane, no program and no backend, and a gate
-  run keeps no session from one judgement to the next.
+- **Each judgement on Claude Code, and on any provider the agency does not mark `gateway`, is one
+  thrown-away agency session:** started apart on the provider and the model the gate's tier maps to there,
+  sent one turn with the gate's instructions as its whole system prompt, a fresh session, no tool, no MCP
+  server and thinking off where the request asks (the agency's `docs/launch-lines.md`, 「Gate runs」). The gate
+  knows no pane, no program and no backend, and a gate run keeps no session from one judgement to the next.
 - **A login that fails** is the agency's login walk's failure, and the next login the gate's key is offered
   takes the judgement.
-- **A judgement on a registered model** is one request through the agency's model gateway, answered room as the
-  gate's tier names it, never less than the gate's own floor (`docs/boundary-api.md`, 「How a gate run reaches a
-  model」).
+- **A judgement on a provider whose models the agency marks `gateway`** — its registered models and its
+  member roads alike — is one request through the agency's model gateway, on the model the gate's tier names
+  it, never less than the gate's own floor (`docs/boundary-api.md`, 「How a gate run reaches a model」).
 
 ### How many runs stand at once
 

@@ -58,7 +58,7 @@ pub fn tier_of(stage: &str) -> Result<String, GateError> {
 
 fn way_of(providers: &[Provider], provider: &str) -> Way {
   match providers.iter().find(|one| one.name == provider) {
-    Some(one) if one.registered => Way::Gateway,
+    Some(one) if one.gateway || one.registered => Way::Gateway,
     _ => Way::Session,
   }
 }

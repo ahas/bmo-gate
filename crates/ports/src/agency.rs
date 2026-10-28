@@ -39,6 +39,9 @@ pub struct Provider {
   pub name: String,
   pub enabled: bool,
   pub registered: bool,
+  /// Whether the agency serves its models on its gateway, where a gate's judgement is one request.
+  #[serde(default)]
+  pub gateway: bool,
   pub coworker: bool,
   pub lines: Vec<String>,
 }
