@@ -225,7 +225,14 @@ and nothing behind it (the agency's `docs/own-llm.md`, 「A gate has one road」
 ## The unit command
 
 `bmo-gate` is the gate's unit command (bmo-cli's `docs/boundary.md`, 「Unit commands」). Asked `nouns`, it
-declares the nouns it carries, one a line. It carries none; its own `health`, `records` and `import` are no noun.
+declares the nouns it carries, one a line. It carries one, `translate`, marked `home`: the mouth group's
+first-class verb, which asks the running gate's `POST /translations` for the text in the language named. Its
+own `health`, `records` and `import` are no noun.
+
+| Noun | Words | What it asks |
+|---|---|---|
+| `translate` | `[--language <code>] [--text <words>]` | `POST /translations`; the words come from standard input where `--text` names none, and the language is `ko` where none is named; the first reading is printed |
+
 
 - **Every command prints English** and ends with 0, with 1 where its work failed, and with 2 where the words it was
   given are wrong; `--help` prints a noun's whole usage.

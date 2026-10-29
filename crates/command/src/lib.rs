@@ -4,6 +4,7 @@
 
 pub mod health;
 pub mod records;
+pub mod translate;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -16,8 +17,9 @@ use sea_orm::DatabaseConnection;
 pub const SETTINGS_VARIABLE: &str = "BMO_GATE_SETTINGS";
 pub const SETTINGS_FILE: &str = "settings.toml";
 
-/// Every noun this command carries, as `nouns` prints them.
-pub const NOUNS: [&str; 0] = [];
+/// Every noun this command carries, as `nouns` prints them: the mouth group's `translate`, whose translator
+/// stands on the operations machine beside the gate.
+pub const NOUNS: [&str; 1] = ["translate\thome"];
 
 // How many database connections a noun holds.
 const CONNECTIONS: u32 = 2;
@@ -57,6 +59,8 @@ pub enum Noun {
   Nouns,
   /// Whether the service the settings name answers ready: the deployment's check, and no noun.
   Health,
+  /// One text translated into a language: the mouth group's first-class verb.
+  Translate(translate::TranslateArgs),
   /// Every row of one of the gate's own tables, one JSON object a line, and no noun.
   Records(records::RecordsArgs),
   /// Moves the old archive's gate tables from the item's export into this store (TODO #1923), and no noun.
@@ -105,6 +109,7 @@ pub async fn dispatch(noun: Noun) -> Answered {
   match noun {
     Noun::Nouns => Ok(NOUNS.iter().map(|noun| (*noun).to_owned()).collect()),
     Noun::Health => health::health(&settings_path()).await,
+    Noun::Translate(args) => translate::translate(&settings_path(), args).await,
     Noun::Records(args) => records::records(args).await,
     Noun::Import(args) => moved(args).await,
   }
