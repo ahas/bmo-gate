@@ -10,8 +10,6 @@ pub mod pool;
 pub mod records;
 pub mod route;
 pub mod session;
-pub mod summary;
-pub mod tried;
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -58,14 +56,11 @@ pub struct GateRequest {
   pub thinking: bool,
   pub alongside: bool,
   pub split: Option<Arc<dyn Split>>,
-  /// Whether the run is a gate on Laya asking its fallback LLM, where Laya gave no verdict: its road then reads
-  /// as that LLM's.
-  pub laya_fallback: bool,
   /// The registration the run goes out on in place of the gate's own road, with nothing behind it: the model of
   /// the agent whose memory a recollector writes.
   pub registration: Option<String>,
   /// The provider the run goes out on in place of the one the gate's road begins on, with nothing behind it:
-  /// the road a gate evaluation scores the gate on.
+  /// the road a caller scores the run on.
   pub provider: Option<String>,
 }
 
@@ -83,7 +78,6 @@ impl GateRequest {
       thinking: true,
       alongside: false,
       split: None,
-      laya_fallback: false,
       registration: None,
       provider: None,
     }
@@ -102,7 +96,6 @@ impl GateRequest {
       thinking: self.thinking,
       alongside: self.alongside,
       split: None,
-      laya_fallback: self.laya_fallback,
       registration: self.registration.clone(),
       provider: self.provider.clone(),
     }
@@ -184,26 +177,11 @@ impl Runs {
 
   /// The gate's judgement on its one road, or none where the road gave none.
   pub async fn run(&self, stage: &str, request: &GateRequest) -> Result<Option<String>, GateError> {
-    let mut route = match (&request.registration, &request.provider) {
+    let route = match (&request.registration, &request.provider) {
       (Some(registration), _) => route::read_registered(self, stage, registration).await?,
       (None, Some(provider)) => route::read_on(self, stage, Some(provider)).await?,
       (None, None) => route::read(self, stage).await?,
     };
-
-    // A gate on Laya asking its fallback LLM runs on that LLM's road, where its row leaves it one.
-    if route.laya
-      && request.laya_fallback
-      && let Some(fallback) = options::laya_fallback(self, stage).await?
-    {
-      route = route::read_on(self, stage, Some(&fallback)).await?;
-    }
-
-    // A gate on Laya has no model to run: whoever asked for one is told so and given no answer, never a run on
-    // another road in Laya's place.
-    if route.laya {
-      println!("{stage}: this gate stands on Laya, so no model is run for it");
-      return Ok(None);
-    }
 
     // A gate whose row holds no wait is not run.
     let agent = request.agent.as_deref().unwrap_or(&self.chat_agent);

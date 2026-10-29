@@ -1,5 +1,5 @@
 //! The wire every route shares: the bearer token, a route that is not there, a body that is not JSON or not as
-//! asked, the health, the event stream, the output gate and one run of a gate.
+//! asked, the health, the event stream, the gate order and the stage runs it does not carry.
 
 use futures_util::StreamExt;
 use reqwest::StatusCode;
@@ -59,7 +59,7 @@ async fn a_body_not_json_or_not_as_asked_is_refused() {
 }
 
 #[tokio::test]
-async fn the_health_says_the_version_the_database_and_laya() {
+async fn the_health_says_the_version_and_the_database() {
   let ground = ground("health", |_| None).await;
   let (status, body) = ground.get("/health").await;
 
@@ -67,7 +67,7 @@ async fn the_health_says_the_version_the_database_and_laya() {
   assert_eq!(body["version"], gate_server::routes::health::bmo_version());
   assert_eq!(body["ready"], true);
   assert_eq!(body["reason"], serde_json::Value::Null);
-  assert!(["up", "down", "off"].contains(&body["laya"].as_str().unwrap()), "{body}");
+  assert!(body.get("laya").is_none(), "{body}");
 }
 
 #[tokio::test]
@@ -107,34 +107,19 @@ async fn the_event_stream_tells_of_a_judgement_written() {
 }
 
 #[tokio::test]
-async fn a_part_of_a_reply_is_answered_with_the_markup_it_goes_out_as() {
-  let ground = ground("formats", |_| None).await;
-  let (status, body) = ground
-    .post("/formats/decided", json!({ "roomId": ROOM, "text": "Plain words, **one** bold." }))
-    .await;
+async fn no_gate_stands_and_no_run_of_one_is_served() {
+  let ground = ground("voice", |_| None).await;
+  let (status, body) = ground.get("/gates").await;
 
-  assert_eq!(status, StatusCode::OK, "{body}");
-  assert!(body.as_object().unwrap().contains_key("markup"), "{body}");
-  assert!(body["markup"].is_null() || body["markup"].is_string());
-}
+  assert_eq!(status, StatusCode::OK);
+  assert_eq!(body["items"], json!([]));
 
-#[tokio::test]
-async fn one_run_of_a_gate_answers_on_its_road() {
-  let ground = ground("voice", |ask| (!ask.system.is_empty()).then(|| "Read slowly.".into())).await;
-  let (status, body) = ground
-    .post(
-      "/stages/session-summary/runs",
-      json!({ "prompt": "Read this aloud.", "system": "Translate.", "roomId": ROOM }),
-    )
-    .await;
+  for gate in ["output-format", "session-summary", "no-such-gate"] {
+    let (status, body) = ground
+      .post(&format!("/stages/{gate}/runs"), json!({ "prompt": "Read this aloud." }))
+      .await;
 
-  assert_eq!(status, StatusCode::OK, "{body}");
-  assert_eq!(body["answer"], "Read slowly.");
-  assert!(body["ms"].is_i64());
-
-  let (status, body) =
-    ground.post("/stages/no-such-gate/runs", json!({ "prompt": "Read this aloud." })).await;
-
-  assert_eq!(status, StatusCode::NOT_FOUND);
-  refused(&body, "no-gate");
+    assert_eq!(status, StatusCode::NOT_FOUND, "{gate}: {body}");
+    refused(&body, "no-gate");
+  }
 }

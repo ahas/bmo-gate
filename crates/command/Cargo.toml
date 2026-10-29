@@ -1,33 +1,16 @@
 [package]
 name = "gate-command"
-description = "The gate's unit command, bmo-gate: the nouns it declares, and the evaluation set, the replay bench, the Laya agreement and the format cases it carries."
+description = "The gate's unit command, bmo-gate: its health, its records and the old archive's import."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish = false
 
 [dependencies]
-chrono = { workspace = true, features = ["clock"] }
 clap.workspace = true
-futures-util.workspace = true
-gate-markup.workspace = true
-gate-policy.workspace = true
-gate-ports.workspace = true
-gate-reference.workspace = true
-gate-runs.workspace = true
 gate-server.workspace = true
-gate-stages.workspace = true
 gate-store.workspace = true
-gate-words.workspace = true
-indexmap.workspace = true
-# Each member of the evaluation set registers itself, so the folder is the list.
-inventory.workspace = true
-regex.workspace = true
 reqwest.workspace = true
 sea-orm.workspace = true
 serde.workspace = true
-serde_json.workspace = true
-tempfile.workspace = true
 tokio.workspace = true
-toml.workspace = true
-unicode-normalization.workspace = true

@@ -1,9 +1,0 @@
-# Laya's training as the card master places it: below the services that answer on a card it shares
-# (the arbiter's docs/placement.md, 「A service declares itself」; docs/training.md, 「The nodes」).
-# The adapter runs from this folder.
-service = "laya-train"
-card_mib = 7000
-priority = 20
-spread = "many"
-alone = false
-adapter = ["bun", "../training/tooling/scripts/laya-train-adapter.ts"]

@@ -1,8 +1,0 @@
-# The questions Laya is asked (docs/laya.md), in English, word for word as Laya's checkpoints are trained
-# on them: a question worded otherwise is one no checkpoint has learnt, so a change here is a change of what Laya is
-# trained on. The training tooling's own copy of each question (`prompts/tooling/laya-synth.toml`) is the same
-# text, and its tests hold the two together. A served checkpoint that learnt an earlier wording is asked that one
-# instead, as the `learnt` table of `prompts/tooling/laya-wordings.toml` names it.
-
-# The one yes/no the fold asks over a message's state: yes is FOLD, no is OPEN.
-fold = "Should this message be sent to the chat room folded (wrapped in an expandable quote)?"

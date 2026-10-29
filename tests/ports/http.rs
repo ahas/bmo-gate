@@ -29,8 +29,8 @@ fn a_path_is_built_from_its_segments_each_encoded_on_the_base() {
 
   assert_eq!(caller.url(&["rooms", "titles"]).as_str(), "http://example-host:7000/base/rooms/titles");
   assert_eq!(
-    caller.url(&["descriptions", "laya train"]).as_str(),
-    "http://example-host:7000/base/descriptions/laya%20train"
+    caller.url(&["descriptions", "a service"]).as_str(),
+    "http://example-host:7000/base/descriptions/a%20service"
   );
 }
 

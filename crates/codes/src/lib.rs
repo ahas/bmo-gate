@@ -20,13 +20,6 @@ pub enum Code {
   TimeoutOutOfRange,
   SwitchNotBoolean,
   AlwaysOn,
-  LayaModeUnknown,
-  LayaTauOutOfRange,
-  LayaFallbackUnknown,
-  NoProbe,
-  NoSafeVerdict,
-  NoCheckpoint,
-  NeedsTau,
   DocumentUnknown,
   LanguageUnknown,
   TooManyOriginals,
@@ -35,7 +28,7 @@ pub enum Code {
 
 impl Code {
   /// Every code, in the order `docs/codes.md` lists them.
-  pub const ALL: [Code; 27] = [
+  pub const ALL: [Code; 20] = [
     Code::BadRequest,
     Code::Unauthorized,
     Code::NoRoute,
@@ -52,13 +45,6 @@ impl Code {
     Code::TimeoutOutOfRange,
     Code::SwitchNotBoolean,
     Code::AlwaysOn,
-    Code::LayaModeUnknown,
-    Code::LayaTauOutOfRange,
-    Code::LayaFallbackUnknown,
-    Code::NoProbe,
-    Code::NoSafeVerdict,
-    Code::NoCheckpoint,
-    Code::NeedsTau,
     Code::DocumentUnknown,
     Code::LanguageUnknown,
     Code::TooManyOriginals,
@@ -84,13 +70,6 @@ impl Code {
       Code::TimeoutOutOfRange => "timeout-out-of-range",
       Code::SwitchNotBoolean => "switch-not-boolean",
       Code::AlwaysOn => "always-on",
-      Code::LayaModeUnknown => "laya-mode-unknown",
-      Code::LayaTauOutOfRange => "laya-tau-out-of-range",
-      Code::LayaFallbackUnknown => "laya-fallback-unknown",
-      Code::NoProbe => "no-probe",
-      Code::NoSafeVerdict => "no-safe-verdict",
-      Code::NoCheckpoint => "no-checkpoint",
-      Code::NeedsTau => "needs-tau",
       Code::DocumentUnknown => "document-unknown",
       Code::LanguageUnknown => "language-unknown",
       Code::TooManyOriginals => "too-many-originals",
@@ -110,13 +89,6 @@ impl Code {
       | Code::TimeoutOutOfRange
       | Code::SwitchNotBoolean
       | Code::AlwaysOn
-      | Code::LayaModeUnknown
-      | Code::LayaTauOutOfRange
-      | Code::LayaFallbackUnknown
-      | Code::NoProbe
-      | Code::NoSafeVerdict
-      | Code::NoCheckpoint
-      | Code::NeedsTau
       | Code::DocumentUnknown
       | Code::LanguageUnknown => 422,
       Code::Failed => 500,

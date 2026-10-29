@@ -5,12 +5,11 @@ unit, the unit command it carries, and what it owns. A unit reaches the gate onl
 reaches another unit only by the calls below. A route or a call that is not in `docs/api.md` or here is not
 part of the boundary.
 
-The gate is the gate stage of a turn. The receiver builds a turn's envelope; the gate summarises a replaced
-session, hands the turn what attaches with no pick and serves the brain's index the agent reads the rest
-through, and checks the answer on its way out; the agency carries the turn; the brain serves the rows. Beside
-a turn the gate translates for the units that ask, and it records every judgement it makes and the road each
-run walked. Laya, the decision filter some gates ask
-first, is the gate's own service, reached through the gate's own relay.
+The gate is the gate stage of a turn. The receiver builds a turn's envelope; the gate hands the turn what
+attaches with no pick and serves the brain's index the agent reads the rest through; the agency carries the
+turn; the brain serves the rows. Beside a turn the gate translates for the units that ask, and it records every
+judgement it is told and the road each run walked. The gate order holds no gate: the agent formats its own reply
+and keeps its own session (`docs/gates.md`).
 
 ## Configuration
 
@@ -23,14 +22,12 @@ each release links to the data root's `env/gate.toml`. It names:
 | `address` | the base address the service is reached at, which its `health` asks |
 | `token_file` | the name of the file under the data root's `env/` holding the bearer token every caller presents |
 | `database` | the address of the gate's own database, holding the tables under 「What the gate owns」 and nothing else |
-| `data_root` | where the gate's runtime data lives: Laya's checkpoints, datasets and run output, and the gate's run files |
+| `data_root` | where the gate's runtime data lives: its files and the tooling's settings |
 | `chat_agent` | the registration name whose gate options stand for the deployment, and which a companion's are copied from |
 | `run_agent` | the registration name a gate run's own session stands under, so its program keeps a place apart from the agent whose turn it judges; absent, the caller's agent stands, or the stage's name where the caller names none |
 | `session_folder` | the folder a gate run's thrown-away session is started in |
 | `[agency]`, `[brain]`, `[receiver]` | each unit's `address`, and the `token_file` under `env/` holding the token it is called with |
-| `[arbiter]` | the card master's `address` |
 | `[gateway]` | the agency's model gateway: its `address`, and the `key_file` under `env/` |
-| `[laya]` | the gate's own Laya relay, where one stands: its `address`, and the `token_file` under `env/` |
 | `[shipped]` | `folder`, under which the shipped pieces' bodies are read — the system's reference documents, as the deployment places them — a row's path read relative to it |
 | `[reading]` | what the translator's checks read a text by: `set_aside`, the words the English test reads past — the names of people and agents and the marks a note's strands open with — and `wording`, the file the owner's banned words are read from, where the deployment keeps one |
 
@@ -45,10 +42,8 @@ console screen: a console reads its routes as any caller does.
 
 - **Records.** `bmo-gate records <table>` prints every row of one of the gate's own tables, from the database the
   settings name or the one `--db` names, one JSON object a line with every column under its own name, in the
-  order the rows were written. It is how the training tooling reads the gate's own records into its
-  conversation snapshot (`docs/gate-data.md`, 「The conversation source」). A name that is not one of the gate's
-  own tables ends with 2. It reads and writes nothing else, and like `health` it is no noun, so `nouns` does not
-  declare it.
+  order the rows were written. A name that is not one of the gate's own tables ends with 2. It reads and writes
+  nothing else, and like `health` it is no noun, so `nouns` does not declare it.
 
 ## Calls the gate makes
 
@@ -122,7 +117,6 @@ In the agency's conventions (its `docs/api.md`): camelCase, the agency's control
 | Call | Route | What the gate needs it for |
 |---|---|---|
 | the agents | `GET /agents` | the registrations a gate run names and the agents a turn is for |
-| shared rulebooks | `GET /rulebooks?names=` | `recollection`, the rulebook the session summariser stands on |
 | the providers | `GET /providers` | the provider order a gate's road begins on and whether each is on |
 | a gate's route | `GET /work-keys/{workKey}` | the run mode the gate's work key stands on (`docs/gates.md`, 「Where a gate's runs go out」) |
 | a mapping | `GET /work-keys/{workKey}?provider=&tier=` | the `provider`, `model`, `effort` and `answerTokens` a gate run goes out on |
@@ -157,11 +151,6 @@ The gate registers no hook at any of the agency's hook points and answers none.
 - **What is the agency's:** the road each translation walked and what it spent, kept in the agency's ledger; the
   gate keeps of a document's translation only its rows and, where a part failed, why.
 
-The training tooling's claude road hands a batch to the agency's command for a run apart, as the tooling's settings
-name it (`docs/gate-data.md`, 「The claude road」), with `--model`, `--effort`, `--config-dir`, `--system-file`,
-`--title` and `--bound-seconds` after it, the batch on its standard input, and one JSON object back: `text`,
-`model` and `spend`, each model's `inputTokens`, `outputTokens`, `cacheReadTokens` and `cacheWriteTokens`.
-
 ### The model gateway
 
 A gate run on a registered model has no tools and no session: it is one request to the gateway's
@@ -170,35 +159,23 @@ the input, `max_tokens` and `enable_thinking` as the run says, and the caller's 
 per-request wait headers (the agency's `docs/own-llm.md`, 「A request with no tools」, 「The gateway」). The
 key is read from its file for each request.
 
-### The Laya relay
 
-The gate's own relay, `laya-relay` (`docs/laya.md`), which hands a call to the first node of the service's
-placement able to take it: `POST /decide` with `gate`, `state` and `questions`, answering each question's
-verdict and its confidence, and `GET /health` for the health row. The relay hands both on to the front on the
-node, and the front to the decision server behind it.
-
-### bmo-arbiter
-
-| Call | Route | What for |
-|---|---|---|
-| a placement | `POST /place`, `POST /remove` (the card master) | `service` (`laya` or `laya-train`) and `node`: moving the Laya service or its training to a node; the answer is the master's lines, the last `== done` or `== failed: <why>` |
-| the units' description | `PUT /descriptions/{service}` (the card master) | `units`: what the Laya service says of its units on a card |
-| a card turn | `POST /turns`, `GET /turns/{ticket}`, `DELETE /turns/{ticket}` (the node arbiter, on the node's loopback) | the Laya server's and the training's hold on the card, asked by the gate's own turn client on the node, `runtime/laya-server/turn.py` |
 
 ### bmo-node
 
-The training tooling and the Laya service's installer reach a node by its registered name through the node unit's
-command, as the tooling's settings name it (`docs/training.md`, 「The tooling and its settings」): `node --target
-<node>` prints the node's connection as JSON (the node unit's `docs/nodes.md`, 「Registering and changing a
-node」), its connection type with an ssh node's address, port, account, key path and shell, or a hub node's agent,
-hub and token file, and its role. No credential is in it. A hub node is then driven through the node console the
-settings name, an ssh node by a batch login.
+The GGUF engine's installer reaches a node by its registered name through the node unit's command, as the
+tooling's settings name it (`docs/training.md`, 「The tooling and its settings」): `node --target <node>` prints the
+node's connection as JSON (the node unit's `docs/nodes.md`, 「Registering and changing a node」), its connection
+type with an ssh node's address, port, account, key path and shell, or a hub node's agent, hub and token file, and
+its role. No credential is in it. A hub node is then driven through the node console the settings name, an ssh
+node by a batch login (`docs/gguf-llm.md`).
 
 ## How a gate run reaches a model
 
 Gate runs are the gate's own: the agency starts none and holds no gate's line. A translation is no gate run: the
-gate asks the agency's translation line, which the agency runs as a run apart (「The translation line」). A gate
-runs on its one road, one ask and nothing behind it (the agency's `docs/own-llm.md`, 「A gate has one road」):
+gate asks the agency's translation line, which the agency runs as a run apart (「The translation line」). No gate
+stands in the order, so no gate of a turn reaches a model. A run that a caller names goes on its one road, one ask
+and nothing behind it (the agency's `docs/own-llm.md`, 「A gate has one road」):
 
 - **The road** is the gate's work key's run mode where it names a provider that is on, else the first provider
   on in the provider order; the mapping comes from `POST /routes/resolve` at the tier the gate's profile names.
@@ -212,37 +189,30 @@ runs on its one road, one ask and nothing behind it (the agency's `docs/own-llm.
   gateway, on the model the mapping names. A request the gateway refuses as past the model's window is cut
   by its caller where the caller can cut it, each part asked on its own, and is the gate having no answer
   otherwise.
-- **Laya** is one call to the relay. A gate whose provider is Laya asks its fallback LLM once where Laya gave no
-  verdict, on that LLM's own road.
 - **What a run walked** is written into the gate's road records, and what it spent is the agency's `usage-spent`.
 
 ## What the gate owns
 
 ### Its tables
 
-`gate_options`, `gate_roads`, `judgements`, `laya_health`, `laya_verdicts`, `reference_offers`,
-`reference_verdicts`, `document_translations`, `format_cases` and `web_gate_chats`, in its own database and its
-own migrations. Every row of `gate_options` names its agent. `reference_offers` and `reference_verdicts` hold
-records the history reads (`docs/api.md`, 「Judgements」) and nothing writes. A format case is kept ninety days:
-the service sweeps the table as it starts and once a day after.
+`gate_options`, `gate_roads`, `judgements`, `reference_offers`, `reference_verdicts`,
+`document_translations` and `web_gate_chats`, in its own database and its own migrations. Every row of
+`gate_options` names its agent. `reference_offers` and `reference_verdicts` hold records the history reads
+(`docs/api.md`, 「Judgements」) and nothing writes.
 
 ### Its gates and their instructions
 
 - **The gate order** — which gates stand, the part and step each takes against a turn, and each gate's profile
-  (whether it may be switched off, its Laya probe and default mode, its answer floor) — is the gate's, and
-  `GET /gates` serves it.
-- **The instructions,** three files in two folders, one folder a gate: `output-gate/telegram-html` and
-  `session-summary` (two).
+  (whether it may be switched off, its answer floor) — is the gate's, and `GET /gates` serves it. It holds no gate.
+- **The instructions:** no gate stands, so no gate carries instructions.
 
 ### The policy it reads
 
 | Values | Owner | How the gate reads them |
 |---|---|---|
 | the gate pool: how many runs of one gate stand at once | the gate | its own policy file |
-| the output gate's folding dialects and checks | the gate | its own policy file |
 | what a turn is handed: the sheet's head and ceiling, the due memories' count, the woken rows' and the turn's totals | the gate | its own policy file |
 | the memories entry's lines | the gate | its own policy file |
-| the session summariser's transcript and summary: their lengths and the line the transcript rides under | the gate | its own policy file |
 | the gate order and the gates' profiles | the gate | its own policy file, served by `GET /gates` |
 | the prompt ceilings | the gate | its own policy file |
 | the translator's languages: the worker's, the owner's and each language's name | the gate | its own policy file |
@@ -255,22 +225,15 @@ the service sweeps the table as it starts and once a day after.
 ## The unit command
 
 `bmo-gate` is the gate's unit command (bmo-cli's `docs/boundary.md`, 「Unit commands」). Asked `nouns`, it
-declares the nouns it carries, one a line. These are its four nouns:
+declares the nouns it carries, one a line. It carries none; its own `health`, `records` and `import` are no noun.
 
-| Noun | What it does |
-|---|---|
-| `gate eval` | runs the gate evaluation set over a gate and scores it |
-| `gate bench` | benches a gate's road against recorded turns |
-| `gate laya-agreement` | counts each Laya gate's agreement with its LLM |
-| `gate format-cases` | reads the output gate's format failure cases |
-
-- **Every noun prints English** and ends with 0, with 1 where its work failed, and with 2 where the words it was
+- **Every command prints English** and ends with 0, with 1 where its work failed, and with 2 where the words it was
   given are wrong; `--help` prints a noun's whole usage.
 - **It reads the settings the service reads** (「Configuration」): the file `BMO_GATE_SETTINGS` names, else
   `settings.toml` in the folder it runs in. A noun that reads nothing but its own files under the data root
   reads only the data root from them.
 - **It is the gate's own,** so it reads the gate's database and data root as the service does, and reaches the
-  other units only through the routes above. A noun that reads another unit's records whose owner serves no
+  other units only through the routes above. A command that reads another unit's records whose owner serves no
   route for them says so and reads nothing in their place.
 
 The service binary itself is `gate-server`, which is installed under no `bmo-` name.
@@ -287,36 +250,20 @@ Statements here that a sibling's document does not yet match, each for that sibl
 
 - **The agency names the gate among the registrants of its `turn-submitting` hook point** (the agency's
   `docs/api.md`, 「hooks」); the gate registers no hook (「bmo-agency」 above), for the agency to drop the name.
-- **No unit asks the session summariser:** the agency keeps no session summary (its `docs/sessions.md`) and
-  resolves no road for the `session-summary` work key, so the gate's `session-summary` stands in the gate order
-  and the evaluation set and runs only there, until the owner retires it or a unit asks it again.
 - **The brain's layers are listed by position but paged after the last id seen,** so a page boundary can
   pass over a layer whose id is lower than one already read. The gate reads the layers at the route's
   ceiling of a page and asks each later page after the largest id it has read, until the brain pages its
   layers in the order it lists them.
-- **The agency publishes no command that runs one batch apart** with the words the training tooling's claude road
-  hands it (「bmo-agency」 above); the road runs whatever command the tooling's settings name until the agency
-  states one.
 - **The upstreams' published clients do not carry the calls the gate makes.** bmo-brain's client serves memory
   rows, notes, watches, reminders, fragments and libraries, and not the subject, sheet and tally routes the gate
   reads; bmo-agency's client serves sessions and turns, and not the work-key route the gate resolves. The
   gate's hand-written ports in `crates/ports` stand for these calls until their owners serve them, and the
   gate takes the client of each one as soon as it does.
-- **No unit but the gate serves its part of the training tooling's conversation snapshot:** the receiver's messages
-  and sent messages, the agency's run log, bmo-job's items and job runs, and bmo-artifact's searches stand
-  unavailable in every snapshot (`docs/gate-data.md`, 「The conversation source」) until each owner serves a route
-  for its part.
-- **The agency keeps copies of gate-owned files:** the gate order (its `policy/gates.toml` and the policy crate's
-  module of it), the prompt ceilings (its `policy/gate-prompts.toml` and its module), and gate instruction files
-  under its `prompts/agents/`. Its gate switch route validates a gate's name against its own copy of the order;
-  the copies are for the agency to retire, reading the order through `GET /gates`.
-- **No chat unit asks the output gate yet:** the telegram unit's send path folds a reply's parts by its own
-  code; it is to ask `POST /formats/decided` for each part where the send asks for the gate.
+- **The agency keeps a copy of the gate order:** its `policy/gates.toml` and the policy crate's module of it. Its
+  gate switch route validates a gate's name against its own copy; the copy is for the agency to retire, reading
+  the order through `GET /gates`.
 - **The brain's knowledge read** answers the knowledge chunks a room may read; the gate reads a room rule's piece
   through it as well, for the brain to take the room's room-rule chunks there.
 - **The receiver sends no `lore`** with a turn's reference, so every room's index lists the lore.
 - **The document viewer counts a part kept as failed and says no more:** the parts page answers each such part's
   `failure` (`docs/api.md`, 「Documents」), for the web unit to show beside the count.
-- **The receiver serves no route for a room's latest messages:** the output gate's replay bench makes its set out
-  of the chat agent's latest answers, and says the source is unavailable until the receiver serves them
-  (`docs/output-gate.md`, 「The replay bench」).

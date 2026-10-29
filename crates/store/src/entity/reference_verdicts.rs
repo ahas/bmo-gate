@@ -1,4 +1,4 @@
-//! One candidate's verdict on one turn of a reference gate: the LLM's, Laya's, and whether it attached.
+//! One candidate's verdict on one turn of a reference gate: the LLM's, and whether it attached.
 
 use sea_orm::entity::prelude::*;
 
@@ -14,7 +14,6 @@ pub struct Model {
   #[sea_orm(column_type = "Text")]
   pub slug: String,
   pub llm: Option<i64>,
-  pub laya: Option<i64>,
   pub attached: Option<i64>,
   pub created_at: i64,
   pub rowid: i64,

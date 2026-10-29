@@ -89,7 +89,6 @@ async fn record_ground(test: &str, wording: Option<&str>) -> Ground {
 
   ground(
     test,
-    None,
     Reading {
       set_aside: vec![share_mark(2), share_mark(3)],
       wording: file,

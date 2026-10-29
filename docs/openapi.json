@@ -13,101 +13,6 @@
       }
     },
     "schemas": {
-      "Agreement": {
-        "description": "How often Laya agrees with a gate's LLM.",
-        "properties": {
-          "agreement": {
-            "format": "double",
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "byTau": {
-            "items": {
-              "$ref": "#/components/schemas/AgreementAt"
-            },
-            "type": "array"
-          },
-          "failures": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "gateName": {
-            "type": "string"
-          },
-          "pairs": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "settled": {
-            "format": "double",
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "unit": {
-            "description": "`pair` or `question`: what the figures are counted over.",
-            "type": "string"
-          }
-        },
-        "required": [
-          "gateName",
-          "unit",
-          "pairs",
-          "failures",
-          "agreement",
-          "byTau",
-          "settled"
-        ],
-        "type": "object"
-      },
-      "AgreementAt": {
-        "description": "One tau where a gate's agreement was counted.",
-        "properties": {
-          "agreement": {
-            "format": "double",
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "coverage": {
-            "format": "double",
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "safeAgreement": {
-            "format": "double",
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "safeCount": {
-            "format": "int64",
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "tau": {
-            "format": "double",
-            "type": "number"
-          }
-        },
-        "required": [
-          "tau",
-          "coverage",
-          "agreement",
-          "safeCount",
-          "safeAgreement"
-        ],
-        "type": "object"
-      },
       "AttachJudgements": {
         "additionalProperties": false,
         "description": "A round's judgements put under the message that answered it.",
@@ -140,25 +45,13 @@
             "format": "int64",
             "type": "integer"
           },
-          "layaMode": {
-            "type": "string"
-          },
-          "layaTau": {
-            "format": "double",
-            "type": [
-              "number",
-              "null"
-            ]
-          },
           "thinking": {
             "type": "boolean"
           }
         },
         "required": [
           "thinking",
-          "answerTokens",
-          "layaMode",
-          "layaTau"
+          "answerTokens"
         ],
         "type": "object"
       },
@@ -279,16 +172,6 @@
             "format": "int64",
             "type": "integer"
           },
-          "layaMode": {
-            "type": "string"
-          },
-          "layaTau": {
-            "format": "double",
-            "type": [
-              "number",
-              "null"
-            ]
-          },
           "thinking": {
             "type": "boolean"
           },
@@ -303,9 +186,7 @@
         "required": [
           "thinking",
           "answerTokens",
-          "timeoutMs",
-          "layaMode",
-          "layaTau"
+          "timeoutMs"
         ],
         "type": "object"
       },
@@ -346,39 +227,6 @@
         ],
         "type": "object"
       },
-      "FormatAnswer": {
-        "description": "The markup the part goes out as, or none to send its plain text.",
-        "properties": {
-          "markup": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "markup"
-        ],
-        "type": "object"
-      },
-      "FormatAsk": {
-        "additionalProperties": false,
-        "description": "One part of a reply, in markdown.",
-        "properties": {
-          "roomId": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "text": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "roomId",
-          "text"
-        ],
-        "type": "object"
-      },
       "Gate": {
         "description": "One gate of the gate order, and the profile it runs under.",
         "properties": {
@@ -395,17 +243,8 @@
               "null"
             ]
           },
-          "defaultLayaMode": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "gateName": {
             "type": "string"
-          },
-          "layaProbe": {
-            "type": "boolean"
           },
           "part": {
             "description": "`pre`, `post` or `apart`: where the gate stands against a turn.",
@@ -425,15 +264,13 @@
           "step",
           "condition",
           "switchable",
-          "layaProbe",
-          "defaultLayaMode",
           "answerTokens"
         ],
         "type": "object"
       },
       "GateOptionChange": {
         "additionalProperties": false,
-        "description": "A change of a gate's options: a field left out stays, a Laya field sent null goes back to the default.",
+        "description": "A change of a gate's options: a field left out stays.",
         "properties": {
           "answerTokens": {
             "description": "Not a gate option: its tier's. A change naming it is refused `own-llm`.",
@@ -446,25 +283,6 @@
           "enabled": {
             "type": [
               "boolean",
-              "null"
-            ]
-          },
-          "layaFallback": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "layaMode": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "layaTau": {
-            "format": "double",
-            "type": [
-              "number",
               "null"
             ]
           },
@@ -497,28 +315,6 @@
           "enabled": {
             "type": "boolean"
           },
-          "layaFallback": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "layaMode": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "layaProbe": {
-            "type": "boolean"
-          },
-          "layaTau": {
-            "format": "double",
-            "type": [
-              "number",
-              "null"
-            ]
-          },
           "switchable": {
             "type": "boolean"
           },
@@ -532,12 +328,8 @@
         },
         "required": [
           "timeoutMs",
-          "layaMode",
-          "layaTau",
-          "layaProbe",
           "switchable",
           "enabled",
-          "layaFallback",
           "effective",
           "defaults"
         ],
@@ -581,9 +373,6 @@
       "GateRoute": {
         "description": "The gate's route as a run reads it.",
         "properties": {
-          "laya": {
-            "type": "boolean"
-          },
           "model": {
             "type": "string"
           },
@@ -606,19 +395,14 @@
         "required": [
           "provider",
           "model",
-          "laya",
           "timeoutMs",
           "setAt"
         ],
         "type": "object"
       },
       "Health": {
-        "description": "Readiness, version and Laya's last state.",
+        "description": "Readiness and version.",
         "properties": {
-          "laya": {
-            "description": "`up`, `busy`, `down` or `off`.",
-            "type": "string"
-          },
           "ready": {
             "type": "boolean"
           },
@@ -635,8 +419,7 @@
         "required": [
           "ready",
           "reason",
-          "version",
-          "laya"
+          "version"
         ],
         "type": "object"
       },
@@ -909,187 +692,6 @@
         "required": [
           "items",
           "more"
-        ],
-        "type": "object"
-      },
-      "LayaGate": {
-        "description": "One probed gate as Laya's screen reads it.",
-        "properties": {
-          "agreement": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Agreement"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "checkpoint": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "gateName": {
-            "type": "string"
-          },
-          "mode": {
-            "type": "string"
-          },
-          "refused": {
-            "items": {
-              "$ref": "#/components/schemas/ModeRefusal"
-            },
-            "type": "array"
-          },
-          "tau": {
-            "format": "double",
-            "type": [
-              "number",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "gateName",
-          "mode",
-          "tau",
-          "agreement",
-          "checkpoint",
-          "refused"
-        ],
-        "type": "object"
-      },
-      "LayaHealth": {
-        "description": "The last health check of the Laya relay.",
-        "properties": {
-          "address": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "answeredAt": {
-            "description": "Epoch milliseconds.",
-            "format": "int64",
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "checkMs": {
-            "format": "int64",
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "checkedAt": {
-            "description": "Epoch milliseconds.",
-            "format": "int64",
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "device": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "loadMs": {
-            "format": "int64",
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "model": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "state": {
-            "type": "string"
-          },
-          "versions": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "type": "object"
-          },
-          "vramBytes": {
-            "format": "int64",
-            "type": [
-              "integer",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "state",
-          "model",
-          "device",
-          "vramBytes",
-          "loadMs",
-          "versions",
-          "address",
-          "checkMs",
-          "checkedAt",
-          "answeredAt"
-        ],
-        "type": "object"
-      },
-      "LayaView": {
-        "description": "Laya as `GET /laya` answers it.",
-        "properties": {
-          "gates": {
-            "items": {
-              "$ref": "#/components/schemas/LayaGate"
-            },
-            "type": "array"
-          },
-          "health": {
-            "$ref": "#/components/schemas/LayaHealth"
-          },
-          "modes": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "taus": {
-            "items": {
-              "format": "double",
-              "type": "number"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "health",
-          "gates",
-          "modes",
-          "taus"
-        ],
-        "type": "object"
-      },
-      "ModeRefusal": {
-        "description": "A Laya mode a gate may not run in, and the code that says why.",
-        "properties": {
-          "code": {
-            "type": "string"
-          },
-          "mode": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "mode",
-          "code"
         ],
         "type": "object"
       },
@@ -1940,45 +1542,6 @@
         ]
       }
     },
-    "/formats/decided": {
-      "post": {
-        "operationId": "format_decided",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FormatAsk"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FormatAnswer"
-                }
-              }
-            },
-            "description": "the markup, or none"
-          },
-          "default": {
-            "$ref": "#/components/responses/Error"
-          }
-        },
-        "summary": "The markup one part of a reply goes out as, or none for its plain text.",
-        "tags": [
-          "Formats"
-        ],
-        "x-codes": [
-          "unauthorized",
-          "bad-request",
-          "failed"
-        ]
-      }
-    },
     "/gates": {
       "get": {
         "operationId": "gates",
@@ -2025,7 +1588,7 @@
             "$ref": "#/components/responses/Error"
           }
         },
-        "summary": "Readiness, version and Laya's last state.",
+        "summary": "Readiness, reason and version.",
         "tags": [
           "Health"
         ],
@@ -2192,34 +1755,6 @@
         ]
       }
     },
-    "/laya": {
-      "get": {
-        "operationId": "laya",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LayaView"
-                }
-              }
-            },
-            "description": "Laya as the gate reads it"
-          },
-          "default": {
-            "$ref": "#/components/responses/Error"
-          }
-        },
-        "summary": "Laya's last health check, and each probed gate's mode, agreement and checkpoint.",
-        "tags": [
-          "Laya"
-        ],
-        "x-codes": [
-          "unauthorized",
-          "failed"
-        ]
-      }
-    },
     "/options/copied": {
       "post": {
         "operationId": "options_copied",
@@ -2328,7 +1863,7 @@
             "$ref": "#/components/responses/Error"
           }
         },
-        "summary": "Change a gate's wait, switch, Laya mode, tau or fallback; a Laya field sent null goes back to the default.",
+        "summary": "Change a gate's wait or switch.",
         "tags": [
           "Gates"
         ],
@@ -2341,13 +1876,6 @@
           "timeout-out-of-range",
           "switch-not-boolean",
           "always-on",
-          "laya-mode-unknown",
-          "laya-tau-out-of-range",
-          "laya-fallback-unknown",
-          "no-probe",
-          "no-safe-verdict",
-          "no-checkpoint",
-          "needs-tau",
           "failed",
           "upstream-failed"
         ]
@@ -2412,13 +1940,6 @@
           "timeout-out-of-range",
           "switch-not-boolean",
           "always-on",
-          "laya-mode-unknown",
-          "laya-tau-out-of-range",
-          "laya-fallback-unknown",
-          "no-probe",
-          "no-safe-verdict",
-          "no-checkpoint",
-          "needs-tau",
           "failed",
           "upstream-failed"
         ]
@@ -2970,12 +2491,10 @@
   "tags": [
     "Health",
     "Gates",
-    "Laya",
     "Judgements",
     "Reference",
     "Translations",
     "Runs",
-    "Formats",
     "Trials",
     "Documents",
     "Events"

@@ -34,18 +34,6 @@ the camelCase keys.
 | `timeout-out-of-range` | 422 | a wait outside one second to five minutes |
 | `switch-not-boolean` | 422 | a switch sent as anything but true or false |
 | `always-on` | 422 | a switch for a gate whose profile lets it not be switched off |
-| `laya-mode-unknown` | 422 | a Laya mode that is none of `off`, `shadow`, `filter`, `asymmetric` |
-| `laya-tau-out-of-range` | 422 | a τ outside the grid the gate's agreement is counted at |
-| `laya-fallback-unknown` | 422 | a fallback LLM that is neither `none` nor a provider |
-
-## Laya modes a gate may be refused
-
-| Code | Status | When |
-|---|---|---|
-| `no-probe` | 422 | the gate declares no Laya probe |
-| `no-safe-verdict` | 422 | an asymmetric mode for a gate whose probe names no safe verdict |
-| `no-checkpoint` | 422 | the Laya server named no checkpoint for the gate in its latest health check |
-| `needs-tau` | 422 | a deciding mode with no τ to stand on |
 
 ## Documents and translations
 

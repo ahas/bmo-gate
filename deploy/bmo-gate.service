@@ -1,26 +1,12 @@
 [Unit]
-Description=bmo-gate: the distilled data of the split gates, written by the roster driver
-After=network-online.target
-Wants=network-online.target
-# A gate that cannot be written at all — a model the account may not use, a login gone — fails the
-# same way however often it is tried. Ten tries an hour and then the unit stays failed, where it is
-# visible, rather than asking codex the same impossible thing for a day.
-StartLimitIntervalSec=3600
-StartLimitBurst=10
+Description=A retired unit, taken out by the deployment that stopped, disabled and unlinked it (docs/layout.md)
 
 [Service]
 Type=oneshot
-WorkingDirectory=%h/.local/share/bmo-gate/deploy/training/tooling
-Environment=BMO_DATA_DIR=%h/.local/share/bmo/data
-Environment=PATH=%h/.bun/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
-# Always resumed, never overwritten: the unit is restarted by a crash, a failure or a reboot, and
-# every one of those must take up at the batch after the last one frozen. An overwrite here would
-# throw away a day's work on the first restart.
-ExecStart=%h/.bun/bin/bun scripts/laya-synth.ts --run full-1 --rows 9000 --batch 20 --resume
-Restart=on-failure
-RestartSec=60
+ExecStart=/bin/true
 
 [Install]
 WantedBy=default.target
-# Started by hand, never by the deployment, which links it and nothing more.
-X-BMO-Deploy=link
+# Retired: the deployment stops, disables and unlinks it once the service is up, and a later commit
+# removes this file.
+X-BMO-Deploy=retire

@@ -3,9 +3,7 @@
 testbed = 0
 name = "bmo-gate"
 
-# The Cargo workspace, and the Bun projects of their own found by their manifests and lockfiles. The testbed has no
-# Python language: the Python suites of the Laya runtime and training are run by Cargo tests of their own under
-# `tests/`, so one `cargo test` gathers them with the rest.
+# The Cargo workspace, and the Bun projects of their own found by their manifests and lockfiles.
 [test]
 languages = ["cargo", "bun"]
 # The two Bun projects' packages, which their checks stand on.
@@ -43,13 +41,11 @@ command = "cargo fmt --all --check"
 dir = "tools"
 
 [build]
-# The service, the unit command, the Laya relay and the two tools, into the release's bin/.
-binaries = ["gate-server", "bmo-gate", "laya-relay", "gate-translate-tool", "gate-reference-tool"]
+# The service, the unit command and the two tools, into the release's bin/.
+binaries = ["gate-server", "bmo-gate", "gate-translate-tool", "gate-reference-tool"]
 
 # The gate's own deploy tree and the shared data root its settings, its runtime data and the tooling's settings
-# stand under (docs/layout.md, 「The deployment」). The Python services stand on the nodes the Laya service's
-# placement names, put there by its installer from the release, so no unit of theirs is installed here: the
-# units are deploy/'s alone, never runtime/front/'s.
+# stand under (docs/layout.md, 「The deployment」). The units are deploy/'s alone.
 [deploy]
 root = "~/.local/share/bmo-gate"
 link = "deploy"
@@ -62,7 +58,6 @@ units = ["deploy/*.service", "deploy/*.timer"]
 # Answers 0 once the service the deployed settings name answers ready (docs/boundary-api.md, 「Health」).
 health = "cd ~/.local/share/bmo-gate/deploy && bin/bmo-gate health"
 
-# The training tooling's packages, which a release's tooling units run on.
 # The unit command, linked into the folder holding `bmo`, the first folder `bmo` looks for unit commands in. The
 # link names this repository's deploy tree, whose own link stands across releases; a link made to the release
 # being deployed would dangle once a later deployment prunes that release (docs/layout.md, 「The deployment」).
@@ -75,6 +70,7 @@ bmo_dir="$(dirname "$(command -v bmo)")"
 ln -sfn "$HOME/.local/share/bmo-gate/deploy/bin/bmo-gate" "$bmo_dir/bmo-gate"
 '''
 
+# The tooling's packages, which a release's tooling commands run on.
 [[deploy.step]]
 id = "tooling-packages"
 phase = "before-flip"

@@ -116,7 +116,7 @@ impl GateClient {
     self.request(Method::PUT, segments)
   }
 
-  /// Readiness, version and Laya's last state.
+  /// Readiness and version.
   pub async fn health(&self) -> Result<Health, ClientFailure> {
     answer(self.get(&["health"])).await
   }
@@ -153,11 +153,6 @@ impl GateClient {
   /// Copy the chat agent's rows under a companion's name.
   pub async fn copy_options(&self, copied: &OptionsCopied) -> Result<(), ClientFailure> {
     empty(self.post(&["options", "copied"]).json(copied)).await
-  }
-
-  /// Laya's health and each probed gate's figures.
-  pub async fn laya(&self) -> Result<LayaView, ClientFailure> {
-    answer(self.get(&["laya"])).await
   }
 
   /// A page of judgements, newest first.
@@ -226,10 +221,6 @@ impl GateClient {
   }
 
   /// The markup one part of a reply goes out as.
-  pub async fn decide_format(&self, ask: &FormatAsk) -> Result<FormatAnswer, ClientFailure> {
-    answer(self.post(&["formats", "decided"]).json(ask)).await
-  }
-
   /// A page of trials, oldest first.
   pub async fn trials(&self, query: &TrialQuery) -> Result<Page<Trial>, ClientFailure> {
     answer(self.get(&["trials"]).query(query)).await

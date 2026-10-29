@@ -260,8 +260,6 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
- "laya-relay",
- "libc",
  "pulldown-cmark",
  "regex",
  "reqwest",
@@ -769,29 +767,13 @@ version = "0.1.0-rev.1"
 name = "gate-command"
 version = "0.1.0-rev.1"
 dependencies = [
- "chrono",
  "clap",
- "futures-util",
- "gate-markup",
- "gate-policy",
- "gate-ports",
- "gate-reference",
- "gate-runs",
  "gate-server",
- "gate-stages",
  "gate-store",
- "gate-words",
- "indexmap",
- "inventory",
- "regex",
  "reqwest",
  "sea-orm",
  "serde",
- "serde_json",
- "tempfile",
  "tokio",
- "toml",
- "unicode-normalization",
 ]
 
 [[package]]
@@ -906,7 +888,6 @@ dependencies = [
  "gate-runs",
  "gate-store",
  "gate-words",
- "indexmap",
  "markdown",
  "regex",
  "reqwest",
@@ -1302,8 +1283,6 @@ checksum = "cc4e190f5d26ca7051642629da2c52fc03bde85a03197c99408dcd291734c855"
 dependencies = [
  "equivalent",
  "hashbrown 0.17.1",
- "serde",
- "serde_core",
 ]
 
 [[package]]
@@ -1315,15 +1294,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.9",
-]
-
-[[package]]
-name = "inventory"
-version = "0.3.25"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6928282826c822ad91bf1c9a1cb90a30ba1c26770749929b4656cd6be829cd7c"
-dependencies = [
- "rustversion",
 ]
 
 [[package]]
@@ -1412,19 +1382,6 @@ dependencies = [
  "cfg-if",
  "futures-util",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "laya-relay"
-version = "0.1.0-rev.1"
-dependencies = [
- "axum",
- "futures-util",
- "http-body-util",
- "hyper",
- "hyper-util",
- "serde_json",
- "tokio",
 ]
 
 [[package]]

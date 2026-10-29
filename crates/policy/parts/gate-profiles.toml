@@ -1,12 +1,7 @@
-# Each gate's profile (docs/gates.md, docs/laya.md): one for every gate of the gate order and for nothing else. A
-# profile's values are defaults only: an owner's explicit choice is a row of the gate options table and survives
-# a later change here. A profile names its tier, the gate's word for its work, which the agency maps to a
-# provider's model and effort for each run. It may also name:
-# - laya_mode: its Laya mode where the owner chose none (docs/laya.md, 「Mode and τ per gate」); a gate without
-#   one has no probe;
-# - laya_road: Laya may be its provider, since its probe reads every verdict it gives;
-# - laya_each: Laya settles it one question at a time;
-# - laya_safe: its probe names a safe verdict, which lets it be filtered asymmetrically;
+# Each gate's profile (docs/gates.md): one for every gate of the gate order and for nothing else. A profile's
+# values are defaults only: an owner's explicit choice is a row of the gate options table and survives a later
+# change here. A profile names its tier, the gate's word for its work, which the agency maps to a provider's
+# model and effort for each run. It may also name:
 # - switchable: the owner may switch it off, since its caller has a way of its own without it;
 # - holds_no_session: its runs are asked about a session rather than held as one;
 # - answer_tokens: the room its answer is given, where its answer is not the shape the common default was
@@ -15,17 +10,7 @@
 #   verdict at 0.1, a faithful rewrite at 0.3, a polished one at 0.5;
 # - pool: the most of its runs out at once, where its callers keep more parts out at once than the pool's default
 #   bound (gate-pool.toml).
+#
+# No gate stands in the order, so no profile stands here.
 
-[[profile]]
-key = "session-summary"
-tier = "Simple"
-sampling = { temperature = 0.3, top_p = 0.8, top_k = 20, min_p = 0 }
-holds_no_session = true
-
-[[profile]]
-key = "output-format"
-tier = "Simple"
-sampling = { temperature = 0.1, top_p = 0.8, top_k = 20, min_p = 0 }
-laya_mode = "shadow"
-laya_road = true
-
+profile = []

@@ -1,5 +1,5 @@
-//! The old archive's eleven gate tables moved into the store (TODO #1923): the mapping, the refusal of a
-//! store already holding rows, the dry run, and the count-and-sample compare.
+//! The old archive's gate tables moved into the store (TODO #1923): the mapping, the refusal of a store
+//! already holding rows, the dry run, and the count-and-sample compare.
 
 use std::path::Path;
 
@@ -7,12 +7,12 @@ use sea_orm::{ConnectionTrait, DbBackend, Statement};
 
 use crate::scratch::Scratch;
 
-/// The ten tables, each with the row its fixture writes, or none.
-fn export() -> [(&'static str, &'static str, &'static [&'static str]); 10] {
+/// The seven tables, each with the row its fixture writes, or none.
+fn export() -> [(&'static str, &'static str, &'static [&'static str]); 7] {
   [
     (
       "gate_options",
-      r#"{"key":"input","agent":"bmo","thinking":1,"answer_tokens":800,"timeout_ms":1000,"set_at":1791866256,"enabled":1,"laya_mode":null,"laya_tau":null,"laya_fallback":null,"rowid":1}"#,
+      r#"{"key":"input","agent":"bmo","thinking":1,"answer_tokens":800,"timeout_ms":1000,"set_at":1791866256,"enabled":1,"rowid":1}"#,
       &["\"key\"", "\"agent\""],
     ),
     (
@@ -25,12 +25,6 @@ fn export() -> [(&'static str, &'static str, &'static [&'static str]); 10] {
       r#"{"id":1,"chat_id":1,"message_id":2,"stage":"input","verdict":"pass","detail":null,"created_at":1791866256,"ms":12,"round":null,"rowid":1}"#,
       &["\"id\""],
     ),
-    (
-      "laya_health",
-      r#"{"id":1,"state":"ready","model":"laya","device":"cuda","vram_bytes":100,"load_ms":20,"versions":"{}","check_ms":2,"checked_at":1791866256,"healthy_at":1791866256,"address":"127.0.0.1:7431","rowid":1}"#,
-      &["\"id\""],
-    ),
-    ("laya_verdicts", "", &["\"id\""]),
     ("reference_offers", "", &["\"id\""]),
     ("reference_verdicts", "", &["\"id\""]),
     (
@@ -38,7 +32,6 @@ fn export() -> [(&'static str, &'static str, &'static [&'static str]); 10] {
       r#"{"document":"one","version":"1","target":"ko","part":1,"parts":2,"text":"번역","failed":0,"translated_at":1791866256,"rowid":1}"#,
       &["\"document\"", "\"target\"", "\"version\"", "\"part\""],
     ),
-    ("format_cases", "", &["\"id\""]),
     (
       "web_gate_chats",
       r#"{"id":1,"stage":"input","user_name":"ahas","prompt":"hello","answer":"hi","ms":10,"created_at":1791866256,"user_id":1,"rowid":1}"#,
@@ -71,7 +64,7 @@ fn write(folder: &Path) -> Vec<(&'static str, u64)> {
 }
 
 #[tokio::test]
-async fn the_ten_tables_are_moved_and_compared() {
+async fn the_seven_tables_are_moved_and_compared() {
   let folder = tempfile::tempdir().expect("a scratch folder");
   let counts = write(folder.path());
   let scratch = Scratch::new().await;
@@ -81,7 +74,7 @@ async fn the_ten_tables_are_moved_and_compared() {
     .expect("the import runs");
 
   let expected: u64 = counts.iter().map(|(_, count)| count).sum();
-  assert_eq!(report.tables.len(), 10);
+  assert_eq!(report.tables.len(), 7);
   assert_eq!(report.tables.iter().map(|table| table.written).sum::<u64>(), expected);
   assert_eq!(report.sample.checked as u64, expected);
   assert_eq!(report.sample.failures, Vec::<String>::new());

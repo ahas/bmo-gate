@@ -46,7 +46,7 @@ its process declares itself to the node's card arbiter as.
   - `[nodes.<node>]`, one table for each node an engine may stand on, by its name in the node list, giving paths
     under the account's home on that node: `llama_server`, the llama.cpp server the engine runs; `dial_python`, an
     interpreter that imports `websockets`; and `dial_script`, the WebSocket dial the tunnel's ssh rides
-    (`docs/llm-server.md`, 「The tunnel」).
+    (「The tunnel and the key」).
   - `[registrations.<registration>]`, one table for each registration served, giving:
     - `name`, the instance's name: its folder `~/<name>` and settings folder `~/.config/<name>` on the node, its units
       `<name>-engine.service` and `<name>-tunnel.service`, and its key `env/<name>.token` under the data root;
@@ -77,7 +77,7 @@ its process declares itself to the node's card arbiter as.
   registration's context, slots, store, card layers, flash attention and further arguments. The file and the
   served name are read from the settings folder's `engine.env`.
 - **The card the engine stands on is the node's card arbiter's to keep,** as it is for every service that puts a
-  model there (`docs/llm-server.md`, 「The shared card lock」). The server's process declares itself as the engine's
+  model there (the arbiter's `docs/node-arbiter.md`, 「The shared card lock」). The server's process declares itself as the engine's
   name, `BMO_CARD_SERVICE=gguf-llm`, the one way a process says whose it is, so the arbiter names it the occupant
   the node's occupants file gives a place and the card master reads it as that occupant (the arbiter's
   `docs/api.md`, 「The service a process declares」). It takes the node's card lock, `~/.gpu.lock`, before the server
@@ -91,13 +91,29 @@ its process declares itself to the node's card arbiter as.
   key pinned under `TUNNEL_HOST`. Every value of the door is read from the settings folder's `env`; no unit names a
   host, an account or an address.
 
+## The tunnel and the key
+
+- **Each node dials the operations machine; the operations machine never dials a node.** The network a node stands on
+  lets only HTTPS out, so the node's `ssh -N` remote forward rides inside a WebSocket to the door's public name:
+  ssh's ProxyCommand is the node's `dial_python` running its `dial_script`, which opens the WebSocket with the
+  instance's key as its bearer and pipes ssh through it. The forward broadcasts the node's `LISTEN` on the operations
+  machine to the engine's loopback port.
+- **The door** is the node unit's `llm-bridge`, which pipes a WebSocket both ways to the operations machine's own ssh
+  only when its bearer is the key of a service that rides the door. The door's list of keys stands under the data
+  root's `env/`, one key file's path a line, and the installer adds its own. An ssh entry in the account's
+  `authorized_keys` lets the key forward the node's own listen alone and forces a nologin command.
+- **The key** is the service's one bearer: 32 random bytes as hex, kept at `0600` under the data root's `env/`,
+  made once by the installer and never overwritten. It is carried to the node only inside a file — `LLM_KEY` in the
+  settings folder's `env` — and never written into a command, an answer or a log line.
+- **The host key** the tunnel checks is the operations machine's, pinned under the tooling's `tunnel_host` in the
+  node's `known_hosts`; trust on first use is never used.
+
 ## Installing and updating
 
 Each run, for the entry's registration, in order:
 
 1. Refuses a node reserved for other services.
-2. Makes the instance's key under the data root's `env/` if there is none, as the Laya service's key is made
-   (`docs/llm-server.md`, 「The key」).
+2. Makes the instance's key under the data root's `env/` if there is none (「The tunnel and the key」).
 3. Makes `~/<name>/models` and `~/.config/<name>` on the node, the latter the account's alone.
 4. Carries the settings folder's files across, each made privately here first and set to `0600` there: `env`, with
    the key as `LLM_KEY`, the listen as `LISTEN` and the door's three; `key`, the key alone, which the engine reads;
@@ -110,8 +126,8 @@ Each run, for the entry's registration, in order:
    hashes it and records the hash beside it. A file whose hash does not match is set aside under a `.mismatch`
    name and the setup fails at `sha256`.
 7. Makes the tunnel's key on the node if there is none, lets it in on the operations machine for the listen alone,
-   names the instance's key file in the door's list and pins the operations machine's host key on the node, as the
-   Laya service's install does (`docs/llm-server.md`, 「Installing and updating」, steps 7 to 10).
+   names the instance's key file in the door's list and pins the operations machine's host key on the node
+   (「The tunnel and the key」).
 8. Installs the two units, reloads the user manager, enables them and restarts them.
 9. Waits until the listen answers `/health` on the operations machine, then records the node in the entry with the
    catalogue's `--placed <entry> <node>`.

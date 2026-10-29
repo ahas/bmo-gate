@@ -1,8 +1,6 @@
 //! Every body and answer the gate's routes carry, in the common wire format: camelCase keys, epoch milliseconds,
 //! signed 64-bit identifiers, a page of `items` and `more`, and a refusal of `code` and `error`.
 
-use std::collections::BTreeMap;
-
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -52,8 +50,6 @@ pub struct Gate {
   pub step: i64,
   pub condition: Option<String>,
   pub switchable: bool,
-  pub laya_probe: bool,
-  pub default_laya_mode: Option<String>,
   pub answer_tokens: Option<i64>,
 }
 
@@ -64,8 +60,6 @@ pub struct EffectiveOptions {
   pub thinking: bool,
   pub answer_tokens: i64,
   pub timeout_ms: Option<i64>,
-  pub laya_mode: String,
-  pub laya_tau: Option<f64>,
 }
 
 /// The values a blank setting stands for.
@@ -74,8 +68,6 @@ pub struct EffectiveOptions {
 pub struct DefaultOptions {
   pub thinking: bool,
   pub answer_tokens: i64,
-  pub laya_mode: String,
-  pub laya_tau: Option<f64>,
 }
 
 /// One gate's options as it stands for the chat agent.
@@ -83,30 +75,20 @@ pub struct DefaultOptions {
 #[serde(rename_all = "camelCase")]
 pub struct GateOptions {
   pub timeout_ms: Option<i64>,
-  pub laya_mode: Option<String>,
-  pub laya_tau: Option<f64>,
-  pub laya_probe: bool,
   pub switchable: bool,
   pub enabled: bool,
-  pub laya_fallback: Option<String>,
   pub effective: EffectiveOptions,
   pub defaults: DefaultOptions,
 }
 
-/// A change of a gate's options: a field left out stays, a Laya field sent null goes back to the default.
+/// A change of a gate's options: a field left out stays.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct GateOptionChange {
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub timeout_ms: Option<i64>,
-  #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "sends_null")]
-  pub laya_mode: Option<Option<String>>,
-  #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "sends_null")]
-  pub laya_tau: Option<Option<f64>>,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub enabled: Option<bool>,
-  #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "sends_null")]
-  pub laya_fallback: Option<Option<String>>,
   /// Not a gate option: its tier's. A change naming it is refused `own-llm`.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub thinking: Option<bool>,
@@ -115,23 +97,12 @@ pub struct GateOptionChange {
   pub answer_tokens: Option<i64>,
 }
 
-/// A field that may be left out, set, or sent as null: null is `Some(None)`, which tells the gate to go back to
-/// the default, while a field left out is `None` and stays as it was.
-fn sends_null<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
-where
-  D: serde::Deserializer<'de>,
-  T: Deserialize<'de>,
-{
-  Option::<T>::deserialize(deserializer).map(Some)
-}
-
 /// The gate's route as a run reads it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GateRoute {
   pub provider: String,
   pub model: String,
-  pub laya: bool,
   pub timeout_ms: Option<i64>,
   /// Epoch milliseconds.
   pub set_at: i64,
@@ -151,82 +122,6 @@ pub struct GateOptionsChanged {
 pub struct OptionsCopied {
   pub agent_name: String,
   pub from_agent_name: String,
-}
-
-// ---------------------------------------------------------------------------------------------------------------
-// Laya
-
-/// One tau where a gate's agreement was counted.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct AgreementAt {
-  pub tau: f64,
-  pub coverage: Option<f64>,
-  pub agreement: Option<f64>,
-  pub safe_count: Option<i64>,
-  pub safe_agreement: Option<f64>,
-}
-
-/// How often Laya agrees with a gate's LLM.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct Agreement {
-  pub gate_name: String,
-  /// `pair` or `question`: what the figures are counted over.
-  pub unit: String,
-  pub pairs: i64,
-  pub failures: i64,
-  pub agreement: Option<f64>,
-  pub by_tau: Vec<AgreementAt>,
-  pub settled: Option<f64>,
-}
-
-/// A Laya mode a gate may not run in, and the code that says why.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct ModeRefusal {
-  pub mode: String,
-  pub code: String,
-}
-
-/// One probed gate as Laya's screen reads it.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct LayaGate {
-  pub gate_name: String,
-  pub mode: String,
-  pub tau: Option<f64>,
-  pub agreement: Option<Agreement>,
-  pub checkpoint: Option<String>,
-  pub refused: Vec<ModeRefusal>,
-}
-
-/// The last health check of the Laya relay.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct LayaHealth {
-  pub state: String,
-  pub model: Option<String>,
-  pub device: Option<String>,
-  pub vram_bytes: Option<i64>,
-  pub load_ms: Option<i64>,
-  pub versions: BTreeMap<String, String>,
-  pub address: Option<String>,
-  pub check_ms: Option<i64>,
-  /// Epoch milliseconds.
-  pub checked_at: Option<i64>,
-  /// Epoch milliseconds.
-  pub answered_at: Option<i64>,
-}
-
-/// Laya as `GET /laya` answers it.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct LayaView {
-  pub health: LayaHealth,
-  pub gates: Vec<LayaGate>,
-  pub modes: Vec<String>,
-  pub taus: Vec<f64>,
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -600,24 +495,6 @@ pub struct StageRun {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// The output gate
-
-/// One part of a reply, in markdown.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct FormatAsk {
-  pub room_id: i64,
-  pub text: String,
-}
-
-/// The markup the part goes out as, or none to send its plain text.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct FormatAnswer {
-  pub markup: Option<String>,
-}
-
-// ---------------------------------------------------------------------------------------------------------------
 // Trials
 
 /// One prompt put to one gate as a turn would put it.
@@ -738,13 +615,11 @@ pub struct DocumentPartsQuery {
 // ---------------------------------------------------------------------------------------------------------------
 // Health
 
-/// Readiness, version and Laya's last state.
+/// Readiness and version.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Health {
   pub ready: bool,
   pub reason: Option<String>,
   pub version: String,
-  /// `up`, `busy`, `down` or `off`.
-  pub laya: String,
 }

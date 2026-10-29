@@ -20,18 +20,6 @@ pub struct Profile {
   pub key: String,
   /// The gate's word for its work, which the agency maps to a provider's model and effort.
   pub tier: String,
-  /// Its Laya mode where the owner chose none; a gate without one has no probe.
-  #[serde(default)]
-  pub laya_mode: Option<String>,
-  /// Laya may be its provider, since its probe reads every verdict it gives.
-  #[serde(default)]
-  pub laya_road: bool,
-  /// Laya settles it one question at a time.
-  #[serde(default)]
-  pub laya_each: bool,
-  /// Its probe names a safe verdict, which lets it be filtered asymmetrically.
-  #[serde(default)]
-  pub laya_safe: bool,
   /// The owner may switch it off, since its caller has a way of its own without it.
   #[serde(default)]
   pub switchable: bool,
@@ -50,11 +38,6 @@ pub struct Profile {
 }
 
 impl Profile {
-  /// Whether a Laya probe reads its verdicts.
-  pub fn laya_probe(&self) -> bool {
-    self.laya_mode.is_some()
-  }
-
   /// The most of its runs out at once.
   pub fn pool_bound(&self) -> usize {
     self.pool.unwrap_or(GATE_POOL.size)

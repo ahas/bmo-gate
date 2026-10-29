@@ -9,7 +9,7 @@ import { settingText } from "./settings";
 
 import type { NodeCalls, NodeRunner } from "./node-calls";
 
-// Putting a service that answers through the tunnel door on a node (docs/llm-server.md, 「Installing and
+// Putting a service that answers through the tunnel door on a node (docs/gguf-llm.md, 「Installing and
 // updating」). Every such service is installed by the same steps; what it carries, what it calls its
 // folders and units, and where it listens on the operations machine are its own, and it answers them as a
 // TunnelledService. The node is reached through the calls its caller hands over, the node console by the
@@ -55,7 +55,7 @@ export interface TunnelledService {
 
 /** Where a node's tunnel dials and whom it logs in as: the tunnel's public name, the login on the operations
  * machine, and the name the operations machine's host key is pinned under on every node, as the tooling's
- * settings name them (docs/llm-server.md, 「The tunnel」). */
+ * settings name them (docs/gguf-llm.md, 「The tunnel」). */
 export interface TunnelEnds {
   url: string;
   login: string;

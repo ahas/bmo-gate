@@ -5,7 +5,6 @@
 mod stub;
 
 mod agency;
-mod arbiter;
 mod brain;
 mod gateway;
 mod http;

@@ -23,12 +23,6 @@ pub struct Gateway {
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Arbiter {
-  pub address: String,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Shipped {
   pub folder: PathBuf,
 }
@@ -58,12 +52,16 @@ pub struct Settings {
   pub agency: Unit,
   pub brain: Unit,
   pub receiver: Unit,
-  pub arbiter: Option<Arbiter>,
   pub gateway: Gateway,
-  pub laya: Option<Unit>,
   pub shipped: Option<Shipped>,
   #[serde(default)]
   pub reading: Reading,
+  /// A deployed settings file may still carry the retired `[laya]` and `[arbiter]` tables. They are read and
+  /// ignored, so a release starts on such a file; nothing of them reaches the service.
+  #[serde(default)]
+  pub laya: Option<toml::Value>,
+  #[serde(default)]
+  pub arbiter: Option<toml::Value>,
 }
 
 /// Why the settings would not stand.

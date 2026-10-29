@@ -17,13 +17,10 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use gate_policy::profiles::PROFILES;
 use gate_ports::gateway::Ask;
 use gate_reference::Reference;
 use gate_runs::Runs;
-use gate_stages::laya::Side;
 use gate_stages::{Reading, Stages};
-use serde_json::json;
 
 use crate::agency::{FakeAgency, mapping, provider};
 use crate::fakes::{AnsweringGateway, FakeBrain, FakeReceiver, PausingGateway};
@@ -74,18 +71,11 @@ pub async fn paused_ground(
     .unwrap()
     .insert("registry".into(), mapping("registry", "a-registration", None, None));
 
-  for profile in &PROFILES.profile {
-    gate_runs::options::change(&runs, &profile.key, &json!({ "timeoutMs": 30_000 }), 1)
-      .await
-      .unwrap();
-  }
-
   let shipped = std::env::temp_dir().join(format!("gate-reference-{}-{test}", std::process::id()));
 
   std::fs::create_dir_all(&shipped).unwrap();
 
-  let side = Side::new(scratch.db().clone(), None, None, "the-chat-agent");
-  let stages = Arc::new(Stages::new(runs, side, Reading::default()));
+  let stages = Arc::new(Stages::new(runs, Reading::default()));
   let brain = Arc::new(FakeBrain::default());
   let receiver = Arc::new(FakeReceiver::default());
   let reference = Reference {

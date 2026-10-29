@@ -1,4 +1,0 @@
-# The words every member's brief shares (docs/gate-eval.md, 「What each gate is asked and how it is scored」):
-# the rule an accepted form is written to, `{chars}` the most characters a form may run to.
-
-form_rule = "Each accepted form is one distinctive word, or two at most, of at most {chars} characters: a name, a figure with its unit (8시, 27,500원, 16GB), a date, a distinctive noun or a verb stem (세미나실, 예약, 고쳤). Never a phrase or a sentence: answers are matched literally, so the words around a fact are worded differently by every correct answer and must be left out. Give two to four forms where the word has variants (예약/예약해, rollback/roll back)."

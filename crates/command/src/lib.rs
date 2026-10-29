@@ -1,22 +1,15 @@
 //! The gate's unit command, `bmo-gate` (`docs/boundary-api.md`, 「The unit command」): the nouns it declares when
-//! asked `nouns` — the gate's own — each read into its verb from the words it is given and its answer printed in
-//! English. A noun reads the settings the service reads, and with them the gate's own database and data root.
+//! asked `nouns` — none — and its own `health`, `records` and `import`, each answering in English. A run reads the
+//! settings the service reads, and with them the gate's own database and data root.
 
-pub mod ceiling;
-pub mod format_cases;
-pub mod gate_bench;
-pub mod gate_eval;
 pub mod health;
-pub mod laya_agreement;
 pub mod records;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
-use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
 use gate_server::settings::Settings;
-use gate_stages::Stages;
 use sea_orm::DatabaseConnection;
 
 /// The variable naming the settings file, and the file read where it names none, in the folder the command runs in.
@@ -24,7 +17,7 @@ pub const SETTINGS_VARIABLE: &str = "BMO_GATE_SETTINGS";
 pub const SETTINGS_FILE: &str = "settings.toml";
 
 /// Every noun this command carries, as `nouns` prints them.
-pub const NOUNS: [&str; 4] = ["gate eval", "gate bench", "gate laya-agreement", "gate format-cases"];
+pub const NOUNS: [&str; 0] = [];
 
 // How many database connections a noun holds.
 const CONNECTIONS: u32 = 2;
@@ -50,32 +43,21 @@ impl Fault {
 /// What a noun answers: its lines, or why it ended short.
 pub type Answered = Result<Vec<String>, Fault>;
 
-/// The command's words: `nouns`, or one noun and what it takes.
+/// The command's words: `nouns`, or one of its own.
 #[derive(Parser, Debug)]
-#[command(
-  name = "bmo-gate",
-  version,
-  about = "The gate's evaluation set, replay bench, Laya agreement and format cases"
-)]
+#[command(name = "bmo-gate", version, about = "The gate's health, records and archive import")]
 pub struct Cli {
   #[command(subcommand)]
   pub noun: Noun,
 }
 
 #[derive(Subcommand, Debug)]
-#[allow(
-  clippy::large_enum_variant,
-  reason = "the words are read once a run, so their size costs nothing"
-)]
 pub enum Noun {
   /// Every noun this command carries, one a line.
   Nouns,
-  /// The gate's nouns.
-  #[command(subcommand)]
-  Gate(GateNoun),
   /// Whether the service the settings name answers ready: the deployment's check, and no noun.
   Health,
-  /// Every row of one of the gate's own tables, one JSON object a line: the training tooling's read, and no noun.
+  /// Every row of one of the gate's own tables, one JSON object a line, and no noun.
   Records(records::RecordsArgs),
   /// Moves the old archive's gate tables from the item's export into this store (TODO #1923), and no noun.
   #[command(disable_help_flag = true)]
@@ -94,22 +76,6 @@ pub struct ImportArgs {
   /// Reads the export and reports what it would write, writing nothing.
   #[arg(long)]
   pub dry_run: bool,
-}
-
-#[derive(Subcommand, Debug)]
-pub enum GateNoun {
-  /// The gates' evaluation set: its generation on Codex, how far it has come, and its scoring on a road.
-  #[command(disable_help_flag = true)]
-  Eval(gate_eval::GateEvalArgs),
-  /// The output gate's replay bench: a pinned set made, replayed under a label, and a label's run summed up.
-  #[command(disable_help_flag = true)]
-  Bench(gate_bench::GateBenchArgs),
-  /// How often Laya agrees with each gate's LLM, over everything recorded.
-  #[command(name = "laya-agreement", disable_help_flag = true)]
-  LayaAgreement(laya_agreement::LayaAgreementArgs),
-  /// The output gate's format cases, newest first.
-  #[command(name = "format-cases", disable_help_flag = true)]
-  FormatCases(format_cases::FormatCasesArgs),
 }
 
 /// The settings file this run reads.
@@ -134,21 +100,10 @@ pub async fn database(settings: &Settings, other: Option<&str>) -> Result<Databa
     .map_err(|why| Fault::failed(format!("the database: {why}")))
 }
 
-/// The gates over the gate's database, as the service stands them.
-pub async fn stages(settings: &Settings) -> Result<Arc<Stages>, Fault> {
-  let db = database(settings, None).await?;
-
-  gate_server::stages(settings, db).map_err(Fault::failed)
-}
-
 /// One noun run on its words, its answer printed.
 pub async fn dispatch(noun: Noun) -> Answered {
   match noun {
     Noun::Nouns => Ok(NOUNS.iter().map(|noun| (*noun).to_owned()).collect()),
-    Noun::Gate(GateNoun::Eval(args)) => gate_eval::gate_eval(args).await,
-    Noun::Gate(GateNoun::Bench(args)) => gate_bench::gate_bench(args).await,
-    Noun::Gate(GateNoun::LayaAgreement(args)) => laya_agreement::laya_agreement(args).await,
-    Noun::Gate(GateNoun::FormatCases(args)) => format_cases::format_cases(args).await,
     Noun::Health => health::health(&settings_path()).await,
     Noun::Records(args) => records::records(args).await,
     Noun::Import(args) => moved(args).await,

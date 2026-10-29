@@ -24,40 +24,27 @@ written for one caller.
 
 ## Health
 
-`GET /health` answers `ready`, `reason` (null when ready), `version` and `laya` (`up`, `busy`, `down` or `off`,
-the Laya relay's last answer; `busy` where it answers but its card was taken for the last call to decide,
-`docs/laya.md`, 「The health watcher」).
+`GET /health` answers `ready`, `reason` (null when ready) and `version`.
 
 ## Gates
 
 | Route | Request | Answer |
 |---|---|---|
-| `GET /gates` | | a page of the gate order, each `gateName`, `part` (`pre`, `post` or `apart`), `step`, `condition` or null, `switchable`, `layaProbe`, `defaultLayaMode` and `answerTokens` |
-| `GET /options/{gateName}` | | `timeoutMs`, `layaMode`, `layaTau`, `layaProbe`, `switchable`, `enabled`, `layaFallback`, `effective` (`thinking`, `answerTokens`, `timeoutMs`, `layaMode`, `layaTau`) and `defaults` |
-| `POST /options/{gateName}` | any of `timeoutMs`, `layaMode`, `layaTau`, `enabled`, `layaFallback`; a Laya field sent null goes back to the default | `gateName` and `options`, the gate's route as a run reads it (`provider`, `model`, `laya`, `timeoutMs`, `setAt`) |
+| `GET /gates` | | a page of the gate order, each `gateName`, `part` (`pre`, `post` or `apart`), `step`, `condition` or null, `switchable` and `answerTokens`; the order holds no gate, so the page is empty |
+| `GET /options/{gateName}` | | `timeoutMs`, `switchable`, `enabled`, `effective` (`thinking`, `answerTokens`, `timeoutMs`) and `defaults` |
+| `POST /options/{gateName}` | any of `timeoutMs` and `enabled` | `gateName` and `options`, the gate's route as a run reads it (`provider`, `model`, `timeoutMs`, `setAt`) |
 | `POST /options/{gateName}/agents/{agentName}` | as `POST /options/{gateName}` | as `POST /options/{gateName}`, its wait the agent's |
 | `POST /options/copied` | `agentName` (the companion), `fromAgentName` (the chat agent) | 204 |
 
-- **A gate's options** are its wait, its switch where its profile lets it be switched off (none of the order's
-  does), its Laya mode, τ
-  and fallback LLM (`docs/laya.md`). What it thinks and how much it may answer are its tier's on its road; a
-  change naming either is refused `own-llm`.
+- **A gate's options** are its wait and its switch where its profile lets it be switched off. What it thinks and
+  how much it may answer are its tier's on its road; a change naming either is refused `own-llm`. No gate stands
+  in the order, so no options row is read or written.
 - **A change names whose options it writes.** `POST /options/{gateName}` writes the chat agent's row of the gate;
   `POST /options/{gateName}/agents/{agentName}` writes the named agent's, with the same fields and refusals, and
   no other agent's row is touched by either.
 - **Copying options** writes the `fromAgentName` agent's rows under `agentName` as they stand, so the
   companion's gates run on the same options from its first turn. An agent with no rows copies nothing and is
   no refusal.
-- **A mode the gate cannot run in** is refused with the reason's own code: `no-probe`, `no-safe-verdict`,
-  `no-checkpoint` or `needs-tau`.
-
-## Laya
-
-`GET /laya` answers `health` (`state`, `model`, `device`, `vramBytes`, `loadMs`, `versions`, `address`,
-`checkMs`, `checkedAt`, `answeredAt`), `gates` (each `gateName`, `mode`, `tau`, `agreement` or null,
-`checkpoint` or null, and `refused`, each mode the gate may not run in with its code), `modes` and `taus`.
-An agreement carries `gateName`, `unit` (`pair` or `question`), `pairs`, `failures`, `agreement`, `byTau`
-(each `tau`, `coverage`, `agreement`, `safeCount`, `safeAgreement`) and `settled`.
 
 ## Judgements
 
@@ -163,16 +150,6 @@ its road gave none) and `ms`.
 - **The instructions** are the gate's own where `system` is absent. A name that is not a gate is 404
   `no-gate`; a gate switched off answers null without asking any road.
 
-## Formats
-
-`POST /formats/decided` takes `roomId` and `text`, one part of a reply as the dialect divided it, in markdown.
-It answers `markup`, the markup the part goes out as, or null to send its plain text.
-
-- **The output gate** (`docs/output-gate.md`) reads the part as the `telegram-html` dialect reads it, folds it
-  where the gate says FOLD, and hands back the first candidate the structure check passes. Its decision is
-  written into the room's log, and a candidate the check refuses is kept as a format case. It never fails a
-  part.
-
 ## Trials
 
 | Route | Request | Answer |
@@ -210,7 +187,7 @@ characters; a longer one is 413 `too-large`.
 
 `GET /events` is the gate's one stream, as server-sent events. An event's `event` field is its kind and its
 `id` field its number; its data is `{"id", "kind", "at", "data"}`, the inner `data` being the member the
-event tells of. The kinds are `judgement.created`, `document-translation.changed` and `laya.changed`. A
+event tells of. The kinds are `judgement.created` and `document-translation.changed`. A
 reader that falls behind loses what it missed and reads the collections again.
 
 ## The tools a tool host places

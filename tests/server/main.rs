@@ -19,17 +19,15 @@ mod work;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use gate_policy::profiles::PROFILES;
 use gate_ports::gateway::Ask;
 use gate_reference::Reference;
 use gate_runs::Runs;
 use gate_server::App;
 use gate_stages::document_translation::Queue;
-use gate_stages::laya::Side;
 use gate_stages::translator::Intake;
 use gate_stages::{Reading, Stages};
 use reqwest::{Method, StatusCode};
-use serde_json::{Value, json};
+use serde_json::Value;
 
 use crate::agency::{FakeAgency, mapping, provider};
 use crate::fakes::{AnsweringGateway, FakeBrain, FakeReceiver, fragment};
@@ -76,18 +74,11 @@ pub async fn ground(test: &str, answer: impl Fn(&Ask) -> Option<String> + Send +
     .unwrap()
     .insert("registry".into(), mapping("registry", "a-registration", None, None));
 
-  for profile in &PROFILES.profile {
-    gate_runs::options::change(&runs, &profile.key, &json!({ "timeoutMs": 30_000 }), 1)
-      .await
-      .unwrap();
-  }
-
   let data_root = std::env::temp_dir().join(format!("gate-server-{}-{test}", std::process::id()));
 
   std::fs::create_dir_all(&data_root).unwrap();
 
-  let side = Side::new(scratch.db().clone(), None, None, "the-chat-agent");
-  let stages = Arc::new(Stages::new(runs, side, Reading::default()));
+  let stages = Arc::new(Stages::new(runs, Reading::default()));
   let brain = Arc::new(FakeBrain::default());
   let reference = Arc::new(Reference {
     stages: stages.clone(),

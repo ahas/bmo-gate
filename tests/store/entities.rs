@@ -2,8 +2,8 @@
 //! through an entity reads back as it was written.
 
 use gate_store::entity::{
-  document_translations, format_cases, gate_options, gate_roads, judgements, laya_health, laya_verdicts,
-  reference_offers, reference_verdicts, web_gate_chats,
+  document_translations, gate_options, gate_roads, judgements, reference_offers, reference_verdicts,
+  web_gate_chats,
 };
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, EntityTrait, IdenStatic, Iterable};
 
@@ -32,12 +32,9 @@ async fn every_entity_names_its_tables_columns_in_their_order() {
   let scratch = Scratch::new().await;
   let entities = [
     entity_columns::<document_translations::Entity>(),
-    entity_columns::<format_cases::Entity>(),
     entity_columns::<gate_options::Entity>(),
     entity_columns::<gate_roads::Entity>(),
     entity_columns::<judgements::Entity>(),
-    entity_columns::<laya_health::Entity>(),
-    entity_columns::<laya_verdicts::Entity>(),
     entity_columns::<reference_offers::Entity>(),
     entity_columns::<reference_verdicts::Entity>(),
     entity_columns::<web_gate_chats::Entity>(),
@@ -58,7 +55,7 @@ async fn a_judgement_written_through_its_entity_reads_back_with_its_id_and_rowid
   let written = judgements::ActiveModel {
     chat_id: Set(-1007),
     message_id: Set(None),
-    stage: Set("output-format".into()),
+    stage: Set("a-stage".into()),
     verdict: Set("OPEN".into()),
     detail: Set(Some("the default, the road gave none".into())),
     created_at: Set(1_760_000_000),
@@ -82,19 +79,17 @@ async fn a_row_of_every_other_table_is_written_and_read_through_its_entity() {
   let db = scratch.db();
 
   let option = gate_options::ActiveModel {
-    key: Set("output-format".into()),
+    key: Set("a-gate".into()),
     agent: Set("chat-agent".into()),
     timeout_ms: Set(Some(30_000)),
     set_at: Set(1),
-    laya_mode: Set(Some("shadow".into())),
-    laya_tau: Set(Some(0.9)),
     ..Default::default()
   }
   .insert(db)
   .await
   .unwrap();
   assert_eq!(
-    gate_options::Entity::find_by_id(("output-format".to_owned(), "chat-agent".to_owned()))
+    gate_options::Entity::find_by_id(("a-gate".to_owned(), "chat-agent".to_owned()))
       .one(db)
       .await
       .unwrap(),
@@ -102,7 +97,7 @@ async fn a_row_of_every_other_table_is_written_and_read_through_its_entity() {
   );
 
   let road = gate_roads::ActiveModel {
-    stage: Set("output-format".into()),
+    stage: Set("a-stage".into()),
     chat_id: Set(Some(7)),
     provider: Set("registered".into()),
     model: Set("a-registration".into()),
@@ -117,33 +112,6 @@ async fn a_row_of_every_other_table_is_written_and_read_through_its_entity() {
   .await
   .unwrap();
   assert_eq!(gate_roads::Entity::find_by_id(road.id).one(db).await.unwrap(), Some(road));
-
-  let health = laya_health::ActiveModel {
-    id: Set(1),
-    state: Set("up".into()),
-    model: Set(Some("output-format=checkpoints/output-format/run/step-000025".into())),
-    checked_at: Set(Some(3)),
-    ..Default::default()
-  }
-  .insert(db)
-  .await
-  .unwrap();
-  assert_eq!(laya_health::Entity::find_by_id(1).one(db).await.unwrap(), Some(health));
-
-  let pair = laya_verdicts::ActiveModel {
-    stage: Set("output-format".into()),
-    input_hash: Set("abc".into()),
-    input: Set("{}".into()),
-    confidence: Set(Some(0.97)),
-    mode: Set("road".into()),
-    used: Set("laya".into()),
-    created_at: Set(4),
-    ..Default::default()
-  }
-  .insert(db)
-  .await
-  .unwrap();
-  assert_eq!(laya_verdicts::Entity::find_by_id(pair.id).one(db).await.unwrap(), Some(pair));
 
   let offer = reference_offers::ActiveModel {
     stage: Set("library-knowledge".into()),
@@ -205,22 +173,8 @@ async fn a_row_of_every_other_table_is_written_and_read_through_its_entity() {
     Some(part)
   );
 
-  let case = format_cases::ActiveModel {
-    at: Set(9),
-    stage: Set("output-format".into()),
-    attempt: Set(1),
-    reason: Set("an unclosed tag".into()),
-    text: Set("**bold".into()),
-    markup: Set("<b>bold".into()),
-    ..Default::default()
-  }
-  .insert(db)
-  .await
-  .unwrap();
-  assert_eq!(format_cases::Entity::find_by_id(case.id).one(db).await.unwrap(), Some(case));
-
   let trial = web_gate_chats::ActiveModel {
-    stage: Set("translator".into()),
+    stage: Set("translate".into()),
     user_name: Set("a user".into()),
     prompt: Set("which heading answers this".into()),
     answer: Set(None),

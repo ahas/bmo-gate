@@ -1,4 +1,4 @@
-//! A gate's own options for one agent: its wait, its switch, and its Laya mode, threshold and fallback LLM.
+//! A gate's own options for one agent: its wait and its switch.
 
 use sea_orm::entity::prelude::*;
 
@@ -14,11 +14,6 @@ pub struct Model {
   pub timeout_ms: Option<i64>,
   pub set_at: i64,
   pub enabled: Option<i64>,
-  #[sea_orm(column_type = "Text")]
-  pub laya_mode: Option<String>,
-  pub laya_tau: Option<f64>,
-  #[sea_orm(column_type = "Text")]
-  pub laya_fallback: Option<String>,
   pub rowid: i64,
 }
 

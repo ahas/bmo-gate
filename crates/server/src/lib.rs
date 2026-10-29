@@ -1,7 +1,6 @@
 //! The gate's service (`docs/boundary-api.md`): every route the boundary states, behind the gate's bearer token,
 //! and the watches the service keeps going beside them — the agency's road events written into the road records,
-//! the receiver's draft rows written as the `draft` stage, Laya's health asked once a minute, and the attachments
-//! counted every hour.
+//! and the receiver's draft rows written as the `draft` stage.
 
 pub mod answer;
 pub mod drafts;
@@ -26,7 +25,6 @@ use gate_ports::receiver::HttpReceiver;
 use gate_reference::Reference;
 use gate_runs::Runs;
 use gate_stages::document_translation::Queue;
-use gate_stages::laya::Side;
 use gate_stages::translator::Intake;
 use gate_stages::{Reading, Stages};
 use sea_orm::DatabaseConnection;
@@ -84,8 +82,8 @@ pub async fn database(settings: &Settings, connections: u32) -> Result<DatabaseC
     .map_err(|why| Unread(format!("the database: {why}")))
 }
 
-/// The gates as the settings make them over `db`: the runs on the agency and its gateway, Laya's side and the
-/// readings the translator's checks stand on.
+/// The stages as the settings make them over `db`: the runs on the agency and its gateway, and the readings the
+/// translator's checks stand on.
 pub fn stages(settings: &Settings, db: DatabaseConnection) -> Result<Arc<Stages>, Unread> {
   let agency =
     Arc::new(HttpAgency::new(peer(&settings.agency.address, settings.unit_token(&settings.agency)?)?));
@@ -102,22 +100,12 @@ pub fn stages(settings: &Settings, db: DatabaseConnection) -> Result<Arc<Stages>
   );
 
   runs.run_agent = settings.run_agent.clone();
-  let side = Side::new(
-    db,
-    settings.laya.as_ref().map(|laya| laya.address.as_str()),
-    settings
-      .laya
-      .as_ref()
-      .and_then(|laya| laya.token_file.as_deref())
-      .map(|name| settings.env_file(name)),
-    settings.chat_agent.clone(),
-  );
   let reading = Reading {
     set_aside: settings.reading.set_aside.clone(),
     wording: settings.reading.wording.clone(),
   };
 
-  Ok(Arc::new(Stages::new(runs, side, reading)))
+  Ok(Arc::new(Stages::new(runs, reading)))
 }
 
 /// The reference road as the settings make it over the gates: the brain and the receiver it reads, and the folder

@@ -21,11 +21,11 @@ describe("a node's connection, read from the node unit's node list", () => {
   });
 
   test("a node reserved for one service carries that service alone", () => {
-    expect(reservedAgainst("laya", "bravo", { role: "engine" })).toBe("bravo is reserved for engine in the node list, so laya may not stand on it");
+    expect(reservedAgainst("voice", "bravo", { role: "engine" })).toBe("bravo is reserved for engine in the node list, so voice may not stand on it");
     expect(reservedAgainst("engine", "bravo", { role: "engine" })).toBeNull();
-    expect(reservedAgainst("laya", "office-pc", { role: null })).toBeNull();
-    expect(reservedAgainst("laya", "foxtrot", { role: "engine+laya" })).toBeNull();
-    expect(reservedAgainst("voice", "foxtrot", { role: "engine+laya" })).toBe("foxtrot is reserved for engine+laya in the node list, so voice may not stand on it");
+    expect(reservedAgainst("voice", "office-pc", { role: null })).toBeNull();
+    expect(reservedAgainst("voice", "foxtrot", { role: "engine+voice" })).toBeNull();
+    expect(reservedAgainst("song", "foxtrot", { role: "engine+voice" })).toBe("foxtrot is reserved for engine+voice in the node list, so song may not stand on it");
   });
 
   test("an answer that is not a whole connection is none", () => {

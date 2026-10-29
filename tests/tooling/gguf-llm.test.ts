@@ -304,7 +304,7 @@ describe("the install on a stand-in node", () => {
     const at = stage();
     const { runner, seen } = fakeNode();
 
-    const outcome = await installGguf(instance(), installing(runner, at, "laya+other"));
+    const outcome = await installGguf(instance(), installing(runner, at, "engine+other"));
 
     expect(outcome.ok).toBe(false);
     expect(outcome.step).toBe("reserved");

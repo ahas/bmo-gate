@@ -7,7 +7,8 @@ import { settingWords } from "./settings";
 
 import type { NodeCalls, NodeRunner, RunLimit, RunResult } from "./node-calls";
 
-// How this project reaches a node by its registered name (docs/llm-server.md, 「The placement」).
+// How this project reaches a node by its registered name (the node unit's docs/nodes.md, 「Registering and
+// changing a node」).
 // What a node is reached by belongs to the node unit's node list, so it is asked of the node unit's own
 // command at every run; each connection type answers the same three calls — a command, a file carried to
 // the node and a file brought back.

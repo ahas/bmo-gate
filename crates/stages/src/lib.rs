@@ -1,18 +1,10 @@
-//! The gates themselves, each on the runs `gate-runs` carries: Laya and the probes it asks, the output gate, the
-//! translator and a document's translation, the reading of a record into the owner's language, Laya's health and
-//! how often it agrees with each gate's LLM.
+//! The gates a turn's text passes: the translator and a document's translation, and the reading of a record into
+//! the owner's language.
 
 pub mod document_translation;
-pub mod fold;
-pub mod laya;
-pub mod laya_agreement;
-pub mod laya_health;
 pub mod markdown;
 pub mod markdown_shape;
-pub mod ordered;
-pub mod output;
 pub mod records;
-pub mod retention;
 pub mod sql;
 pub mod translator;
 
@@ -60,22 +52,20 @@ pub struct Event {
   pub data: Value,
 }
 
-/// What every gate stands on: the runs, the Laya side, what a text is read by, and the events its readers hear.
+/// What every gate stands on: the runs, what a text is read by, and the events its readers hear.
 pub struct Stages {
   pub runs: Runs,
-  pub laya: laya::Side,
   pub reading: Reading,
   pub events: broadcast::Sender<Event>,
   next_event: std::sync::atomic::AtomicI64,
 }
 
 impl Stages {
-  pub fn new(runs: Runs, laya: laya::Side, reading: Reading) -> Self {
+  pub fn new(runs: Runs, reading: Reading) -> Self {
     let (events, _) = broadcast::channel(256);
 
     Self {
       runs,
-      laya,
       reading,
       events,
       next_event: std::sync::atomic::AtomicI64::new(1),

@@ -6,37 +6,31 @@ These rules hold every change to this repository.
 
 - `docs/` is the canonical statement of what the gate does; the code is one realisation of it. Before
   changing code, read the document covering that area, `docs/layout.md` first.
-- A change that would make a document wrong or incomplete repairs the document first, stating what is
-  true now, and the code is written to match.
-- A document states what is true now: no change history, no rationale told through an earlier design,
-  no pasted source, signature or config fragment, and no file-and-line pins.
+- A change that would make a document wrong or incomplete repairs the document first, stating what is true now,
+  and the code is written to match.
+- A document states what is true now: no change history, no rationale told through an earlier design, no pasted
+  source, signature or config fragment, and no file-and-line pins.
 
 ## Boundaries
 
 - **Other units are reached only through their published routes and commands,** as
-  `docs/boundary-api.md` states. Nothing here imports another unit's code or reads its files, its paths
-  or its database.
+  `docs/boundary-api.md` states. Nothing here imports another unit's code or reads its files, its paths or its
+  database.
 - **Dependencies:** crates and packages from their registries, pinned in their manifests, and of other
   repositories only the base libraries `bmo-chat`, `bmo-chat-client` and `bmo-ui`. The repository test
   in `tests/` holds this for Cargo, Bun and Python manifests alike.
-- **No agent is known by name.** The code handles a registered agent by its id; its name, label and
-  persona come from the registration.
+- **No agent is known by name.** The code handles a registered agent by its id; its name, label and persona come
+  from the registration.
 - **No lookup table standing in for polymorphism,** and no hand-written parser for a general format:
   TOML, YAML, JSON, markdown, command lines and their kin are read by a maintained library.
 
 ## Language
 
 - Everything in this repository is English: code, comments, strings, tests, documents, commit messages
-  and branch names, with one exception below. The gate answers in English sentences and snake_case codes;
-  words a person reads in another language are a console's language pack.
-- `prompts/` is the one folder Korean stands in: in what the gates are told only as data (the words of a room's
-  messages a gate recognises, the marks and terms it leaves as written, the words its answer is written in), the
-  instructions themselves being English; the questions Laya is asked and what the training tooling tells the
-  model writing a gate's rows and its judges, English with Korean standing in them only as conversation; the
-  briefs the evaluation set's items are written from, the stand-ins its rows carry and the earlier wordings of Laya's questions they may ask (`prompts/tooling/`), worded as the models
-  read them or the rows hold them. Nothing else holds Korean: the repository test holds every file outside
-  `prompts/`, and the testbed's `korean` check every code file, to `korean-ledger.json`, which allows none.
-  Korean a test feeds the code is written by its unicode escapes.
+  and branch names, with the one exception below.
+- Korean stands only in what a test feeds the code, a pattern reads or a bench sends as a sample state, written
+  by its unicode escapes and recorded in `korean-ledger.json`, which the testbed's language check reads. Nothing
+  else holds Korean.
 - No personal data: no user names, home directories, machine names, domains, network addresses or names
   of any agent. What the gate needs at runtime comes from its settings and the other units' answers.
   Tests and documents use neutral names.

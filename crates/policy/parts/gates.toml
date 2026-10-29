@@ -5,17 +5,16 @@
 # A turn part is a list of steps in the order a turn passes them; a step holds the places of the gates the turn
 # starts together and waits on together. A place names its gate, and the one condition its step runs under where
 # it runs in some turns only.
+#
+# No gate stands: the agent formats its own reply and keeps its own session, and no other work is a gate of a
+# turn.
 
 # The off-turn part: the gates that run outside any chat turn, in the order they are listed. None does: a
 # translation is the agency's translation line's (docs/gates.md, 「Off-turn」).
 apart = []
 
 # The pre-gate part: the gates that run before the reply is written.
-
-[[pre]]
-places = [{ key = "session-summary", condition = "fresh-session" }]
+pre = []
 
 # The post-gate part: the gates that run after the reply is written, before it reaches the room.
-
-[[post]]
-places = [{ key = "output-format", condition = "folding-dialect" }]
+post = []

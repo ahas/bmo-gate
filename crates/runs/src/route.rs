@@ -1,15 +1,11 @@
 //! A gate's one road as its run reads it (`docs/boundary-api.md`, 「How a gate run reaches a model」): the
 //! provider it begins on, as the work key's run mode names it or the agency's walk finds it; the mapping the
-//! gate's tier resolves to there; whether the provider's program carries the run or the gateway does; and
-//! whether the gate stands on Laya.
+//! gate's tier resolves to there; and whether the provider's program carries the run or the gateway does.
 
 use gate_policy::profiles::PROFILES;
 use gate_ports::agency::{Mapping, Provider};
 
 use crate::{GateError, Runs, fault};
-
-/// The run mode of a work key that stands on Laya.
-pub const LAYA: &str = "laya";
 
 /// The run mode of a work key that walks the providers in the owner's order.
 pub const AUTO: &str = "auto";
@@ -30,8 +26,6 @@ pub enum Way {
 pub struct Route {
   /// The agency's work key the run goes out under: the gate's own.
   pub key: String,
-  /// Whether the gate stands on Laya, which no model run answers.
-  pub laya: bool,
   /// The provider the road begins on.
   pub provider: String,
   pub way: Way,
@@ -85,7 +79,7 @@ pub async fn road_provider(
   providers: &[Provider],
   tier: &str,
 ) -> Result<(String, Option<Mapping>), GateError> {
-  if mode != AUTO && mode != LAYA && enabled(providers, mode) {
+  if mode != AUTO && enabled(providers, mode) {
     let mapping = runs.agency.resolve(stage, Some(mode), tier).await.map_err(fault)?;
 
     return Ok((mode.to_owned(), mapping));
@@ -111,15 +105,14 @@ pub async fn read(runs: &Runs, stage: &str) -> Result<Route, GateError> {
   read_on(runs, stage, None).await
 }
 
-/// The gate's road as it reads on a provider its caller names in place of the one it begins on — a gate on Laya
-/// asking its fallback LLM, a gate evaluation scoring it — which is never Laya. A provider named that is off
-/// serves the run nothing.
+/// The gate's road as it reads on a provider its caller names in place of the one it begins on — a gate
+/// evaluation scoring it, for one. A provider named that is off serves the run nothing.
 pub async fn read_on(runs: &Runs, stage: &str, on: Option<&str>) -> Result<Route, GateError> {
   let tier = tier_of(stage)?;
   // A gate's runs go out under its own work key, the gate's name (docs/gates.md, 「Where a gate's runs go out」).
   let key = stage.to_owned();
   let providers = runs.agency.providers().await.map_err(fault)?;
-  let (laya, provider, mapping) = match on {
+  let (provider, mapping) = match on {
     Some(on) => {
       let mapping = if enabled(&providers, on) {
         runs.agency.resolve(&key, Some(on), &tier).await.map_err(fault)?
@@ -127,25 +120,18 @@ pub async fn read_on(runs: &Runs, stage: &str, on: Option<&str>) -> Result<Route
         None
       };
 
-      (false, on.to_owned(), mapping)
+      (on.to_owned(), mapping)
     }
     None => {
       let mode = run_mode(runs, &key).await?;
+      let (provider, mapping) = road_provider(runs, &key, &mode, &providers, &tier).await?;
 
-      // A gate on Laya runs no model, so no mapping is read for it.
-      if mode == LAYA {
-        (true, LAYA.to_owned(), None)
-      } else {
-        let (provider, mapping) = road_provider(runs, &key, &mode, &providers, &tier).await?;
-
-        (false, provider, mapping)
-      }
+      (provider, mapping)
     }
   };
 
   Ok(Route {
     key,
-    laya,
     way: way_of(&providers, &provider),
     provider,
     tier,
@@ -177,7 +163,6 @@ pub async fn read_registered(runs: &Runs, stage: &str, registration: &str) -> Re
 
   Ok(Route {
     key: stage.to_owned(),
-    laya: false,
     provider: provider.name.clone(),
     way: Way::Gateway,
     tier,

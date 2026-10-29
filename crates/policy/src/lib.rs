@@ -1,18 +1,13 @@
 //! The gate's own policy, one part a file under `parts/`, each compiled in and read once on first use. A
 //! part whose file does not read as its type is a fault of the build, which the policy's tests meet before
-//! anything runs on it. The questions Laya is asked stand under the repository's `prompts/`, the one folder
-//! Korean stands in, since Laya's checkpoints were trained on them as written.
+//! anything runs on it.
 
 use serde::de::DeserializeOwned;
 
 pub mod gate_pool;
 pub mod gates;
-pub mod handover;
-pub mod laya;
 pub mod memories;
-pub mod output_gate;
 pub mod profiles;
-pub mod prompts;
 pub mod reference;
 pub mod translation;
 

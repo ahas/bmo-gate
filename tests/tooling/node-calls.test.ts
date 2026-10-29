@@ -87,11 +87,11 @@ describe("the calls on one node", () => {
     writeFileSync(local, "x".repeat(3_000_000));
     const { runner, seen } = recording([{ code: 1, stdout: "", stderr: "hub closed" }, { code: 0, stdout: "", stderr: "" }]);
 
-    const carried = await nodeCalls(runner, CONSOLE, "alpha").upload(local, "/srv/trainer/bmo-laya/train.jsonl");
+    const carried = await nodeCalls(runner, CONSOLE, "alpha").upload(local, "/srv/trainer/a-project/train.jsonl");
 
     expect(carried.code).toBe(0);
     expect(seen.map((one) => one.limit)).toEqual([{ ms: 63_000, bytes: 3_000_000 }, { ms: 63_000, bytes: 3_000_000 }]);
-    expect(seen[0]!.argv).toEqual(["bun", CONSOLE, "upload", local, "/srv/trainer/bmo-laya/train.jsonl", "-a", "alpha"]);
+    expect(seen[0]!.argv).toEqual(["bun", CONSOLE, "upload", local, "/srv/trainer/a-project/train.jsonl", "-a", "alpha"]);
   });
 
   test("a transfer failed twice says it was the second time", async () => {

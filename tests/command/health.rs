@@ -24,7 +24,7 @@ async fn serve(ready: bool) -> String {
         return Err(StatusCode::UNAUTHORIZED);
       }
 
-      Ok::<Json<Value>, StatusCode>(Json(json!({ "version": "9.9.9", "ready": ready, "laya": "off" })))
+      Ok::<Json<Value>, StatusCode>(Json(json!({ "version": "9.9.9", "ready": ready })))
     }),
   );
   let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("a loopback port");

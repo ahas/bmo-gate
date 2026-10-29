@@ -14,7 +14,6 @@ export type GatePage = Schemas["GatePage"];
 export type GateOptions = Schemas["GateOptions"];
 export type GateRoute = Schemas["GateRoute"];
 export type GateOptionChange = Schemas["GateOptionChange"];
-export type LayaView = Schemas["LayaView"];
 export type Judgement = Schemas["Judgement"];
 export type JudgementPage = Schemas["JudgementPage"];
 export type NewJudgement = Schemas["NewJudgement"];

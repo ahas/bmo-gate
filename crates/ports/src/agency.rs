@@ -46,7 +46,7 @@ pub struct Provider {
   pub lines: Vec<String>,
 }
 
-/// A work key's route as the fallback settings hold it: the run mode it stands on, `laya` among them.
+/// A work key's route as the fallback settings hold it: the run mode it stands on.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Route {

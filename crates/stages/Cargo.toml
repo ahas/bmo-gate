@@ -1,6 +1,6 @@
 [package]
 name = "gate-stages"
-description = "The gates themselves: Laya and its probes, the output gate, the translator and the document translation, the record reading into the owner's language, Laya's health and its agreement."
+description = "The stages a text passes: the translator and the document translation, and the reading of a record into the owner's language."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -14,7 +14,6 @@ gate-ports.workspace = true
 gate-runs.workspace = true
 gate-store.workspace = true
 gate-words.workspace = true
-indexmap.workspace = true
 # A worker's record put into the owner's language is checked by its lists and its prose a block at a time, as
 # mdast reads them: pulldown-cmark's events carry no paragraph inside a tight list's item.
 markdown.workspace = true

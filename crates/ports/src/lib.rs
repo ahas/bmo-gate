@@ -3,7 +3,6 @@
 //! test hands the code a stand-in of its own.
 
 pub mod agency;
-pub mod arbiter;
 pub mod brain;
 pub mod brain_rows;
 pub mod gateway;

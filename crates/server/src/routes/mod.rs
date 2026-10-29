@@ -2,7 +2,6 @@
 
 pub mod documents;
 pub mod events;
-pub mod formats;
 pub mod gates;
 pub mod health;
 pub mod judgements;
@@ -25,7 +24,6 @@ pub fn all() -> Router<Arc<App>> {
     .route("/options/{gateName}", get(gates::options).post(gates::change))
     .route("/options/copied", post(gates::copy))
     .route("/options/{gateName}/agents/{agentName}", post(gates::change_for))
-    .route("/laya", get(gates::laya))
     .route("/judgements", get(judgements::list).post(judgements::add))
     .route("/judgements/attached", post(judgements::attached))
     .route("/reference/selected", post(reference::reference))
@@ -35,7 +33,6 @@ pub fn all() -> Router<Arc<App>> {
     .route("/translations", post(translations::translate))
     .route("/translations/kept", get(translations::kept).put(translations::keep))
     .route("/stages/{gateName}/runs", post(runs::run))
-    .route("/formats/decided", post(formats::decided))
     .route("/trials", get(trials::list).post(trials::add))
     .route("/documents/translations", post(documents::translate))
     .route("/documents/translations/state", get(documents::state))

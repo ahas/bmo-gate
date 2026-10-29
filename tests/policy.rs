@@ -1,79 +1,33 @@
-//! The gate's policy: every part reads as its type, the gate order and the profiles name the same gates, each
-//! probing gate has its Laya question, and each line names the marks it is filled with.
+//! The gate's policy: every part reads as its type, no gate stands in the order, and each line names the marks it
+//! is filled with.
 
 use std::collections::BTreeSet;
 
 use gate_policy::fill_marks;
-use gate_policy::gate_pool::GATE_POOL;
-use gate_policy::gates::{GATE_ORDER, Part};
-use gate_policy::handover::HANDOVER;
-use gate_policy::laya::{LEARNT, QUESTIONS, wording_for};
+use gate_policy::gates::GATE_ORDER;
 use gate_policy::memories::MEMORIES;
-use gate_policy::output_gate::OUTPUT_GATE;
 use gate_policy::profiles::PROFILES;
 use gate_policy::reference::REFERENCE;
 use gate_policy::translation::TRANSLATION;
 
 #[test]
-fn the_gate_order_reads_every_gate_once_where_it_first_stands() {
-  assert_eq!(GATE_ORDER.keys(), ["session-summary", "output-format"]);
+fn no_gate_stands_in_the_order() {
+  assert!(GATE_ORDER.keys().is_empty());
+  assert!(GATE_ORDER.standing().is_empty());
+  for key in ["output-format", "session-summary", "translator", "sanitizer"] {
+    assert!(!GATE_ORDER.holds(key), "{key}");
+  }
 }
 
 #[test]
-fn each_gate_stands_in_its_part_and_no_other_gate_stands() {
-  let parts: Vec<(&str, Part, usize)> =
-    GATE_ORDER.standing().into_iter().map(|one| (one.key, one.part, one.step)).collect();
-
-  assert_eq!(parts, [("session-summary", Part::Pre, 0), ("output-format", Part::Post, 0),]);
-  assert!(
-    GATE_ORDER.holds("output-format")
-      && !GATE_ORDER.holds("translator")
-      && !GATE_ORDER.holds("content-judge")
-  );
+fn no_gate_has_a_profile() {
+  assert!(PROFILES.profile.is_empty());
+  assert!(PROFILES.of("output-format").is_none());
+  assert!(PROFILES.of("session-summary").is_none());
 }
 
 #[test]
-fn every_gate_of_the_order_has_one_profile_and_nothing_else_has_one() {
-  let gates: BTreeSet<&str> = GATE_ORDER.keys().into_iter().collect();
-  let profiled: Vec<&str> = PROFILES.profile.iter().map(|one| one.key.as_str()).collect();
-  let unique: BTreeSet<&str> = profiled.iter().copied().collect();
-
-  assert_eq!(unique.len(), profiled.len(), "a gate has two profiles");
-  assert_eq!(unique, gates);
-}
-
-#[test]
-fn a_profile_bounds_its_pool_and_names_its_probe() {
-  let summary = PROFILES.of("session-summary").unwrap();
-  let output = PROFILES.of("output-format").unwrap();
-
-  assert_eq!(summary.pool_bound(), GATE_POOL.size);
-  assert_eq!(output.pool_bound(), GATE_POOL.size);
-  assert!(output.laya_probe() && !summary.laya_probe());
-}
-
-#[test]
-fn every_question_laya_is_asked_is_english() {
-  assert!(!QUESTIONS.fold.is_empty() && QUESTIONS.fold.is_ascii(), "{}", QUESTIONS.fold);
-}
-
-#[test]
-fn each_line_names_the_marks_it_is_filled_with() {
-  let faults = &OUTPUT_GATE.faults;
-
-  assert!(faults.unescaped.contains("{character}"));
-  assert!(
-    [&faults.unsupported, &faults.unclosed, &faults.unopened, &faults.nested]
-      .iter()
-      .all(|line| line.contains("{tag}"))
-  );
-  assert!(faults.crossed.contains("{open}") && faults.crossed.contains("{tag}"));
-  assert!(faults.nested.contains("{inside}"));
-  assert!(
-    OUTPUT_GATE.decided.by_fallback.contains("{failure}")
-      && OUTPUT_GATE.decided.by_fallback.contains("{answer}")
-  );
-
+fn the_reference_and_translation_parts_read() {
   assert!(
     REFERENCE.due > 0 && REFERENCE.sheet_lines > 0 && REFERENCE.sheet_chars < REFERENCE.turn_budget_chars
   );
@@ -81,66 +35,7 @@ fn each_line_names_the_marks_it_is_filled_with() {
   for mark in ["{id}", "{type}", "{written}", "{moved}", "{for}", "{from}", "{action}"] {
     assert!(MEMORIES.entry.line.contains(mark), "{mark}");
   }
-}
 
-#[test]
-fn the_summariser_reads_two_conversation_blocks_under_a_heading() {
-  assert_eq!(HANDOVER.conversation.len(), 2);
-  assert!(HANDOVER.summary_heading.ends_with(':'));
-}
-
-#[test]
-fn the_summarisers_instructions_name_the_room_as_the_transcript_does() {
-  let chat = include_str!("../prompts/session-summary/chat.md");
-
-  assert!(chat.contains(&format!("`{}:`", HANDOVER.room_speaker)));
-}
-
-#[test]
-fn marks_are_filled_at_once_and_an_unnamed_one_stays() {
-  assert_eq!(fill_marks("<{tag}>", &[("tag", "b")]), "<b>");
-  assert_eq!(fill_marks("{a} {b} {c}", &[("a", "{b}"), ("b", "2")]), "{b} 2 {c}");
-  assert_eq!(fill_marks("{ x} {", &[("x", "y")]), "{ x} {");
-}
-
-#[test]
-fn every_instruction_file_under_the_prompts_is_compiled_in_and_marks_fill() {
-  use gate_policy::prompts::{FILES, read, render};
-
-  let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("prompts");
-  let mut found = vec![];
-  let mut folders = vec![root.clone()];
-
-  while let Some(folder) = folders.pop() {
-    for entry in std::fs::read_dir(&folder).unwrap().flatten() {
-      let path = entry.path();
-
-      if path.is_dir() {
-        folders.push(path);
-      } else if path.extension().is_some_and(|extension| extension == "md") {
-        found.push(path.strip_prefix(&root).unwrap().to_string_lossy().into_owned());
-      }
-    }
-  }
-
-  found.sort();
-
-  let listed: Vec<&str> = FILES.iter().map(|(path, _)| *path).collect();
-
-  assert_eq!(found, listed);
-  assert!(read("session-summary/chat.md").is_some_and(|text| text == text.trim()));
-  assert_eq!(read("no-such/file.md"), None);
-  assert_eq!(render("{{a}} {{b}} {{ c}} {{", &[("a", "{{b}}"), ("b", "2")]), "{{b}} 2 {{ c}} {{");
-}
-
-#[test]
-fn every_gate_names_its_tier() {
-  assert!(PROFILES.profile.iter().all(|one| !one.tier.is_empty()));
-  assert_eq!(PROFILES.of("output-format").map(|one| one.tier.as_str()), Some("Simple"));
-}
-
-#[test]
-fn the_translators_two_languages_differ_and_each_is_named() {
   assert_ne!(TRANSLATION.worker_language, TRANSLATION.owner_language);
 
   for language in [&TRANSLATION.worker_language, &TRANSLATION.owner_language] {
@@ -154,27 +49,15 @@ fn the_translators_two_languages_differ_and_each_is_named() {
 }
 
 #[test]
-fn a_wording_a_checkpoint_learnt_is_one_of_its_gates_earlier_wordings() {
-  let file: toml::Value = toml::from_str(
-    &std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/prompts/tooling/laya-wordings.toml"))
-      .unwrap(),
-  )
-  .unwrap();
+fn marks_are_filled_at_once_and_an_unnamed_one_stays() {
+  assert_eq!(fill_marks("<{tag}>", &[("tag", "b")]), "<b>");
+  assert_eq!(fill_marks("{a} {b} {c}", &[("a", "{b}"), ("b", "2")]), "{b} 2 {c}");
+  assert_eq!(fill_marks("{ x} {", &[("x", "y")]), "{ x} {");
+}
 
-  assert!(!LEARNT.is_empty());
+#[test]
+fn no_old_shared_names_stand_in_the_policy() {
+  let names: BTreeSet<&str> = PROFILES.profile.iter().map(|one| one.key.as_str()).collect();
 
-  for (run, questions) in LEARNT.iter() {
-    // A run's folder is `checkpoints/<training gate>/<run>`, and its gate's earlier wordings are listed by that name.
-    let parts: Vec<&str> = run.split('/').collect();
-
-    assert!(parts.len() == 3 && parts[0] == "checkpoints", "{run}");
-
-    for (id, wording) in questions {
-      let earlier = file["gates"][parts[1]]["questions"][id.as_str()].as_array().unwrap();
-
-      assert!(earlier.iter().any(|one| one.as_str() == Some(wording.as_str())), "{run} {id}");
-      assert_eq!(wording_for(Some(&format!("{run}/step-000001")), id, "own"), *wording);
-      assert_eq!(wording_for(Some(&format!("{run}x/step-000001")), id, "own"), "own");
-    }
-  }
+  assert!(names.is_empty());
 }

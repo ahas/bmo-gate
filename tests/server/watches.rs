@@ -14,7 +14,6 @@ use gate_reference::Reference;
 use gate_runs::Runs;
 use gate_server::App;
 use gate_stages::document_translation::Queue;
-use gate_stages::laya::Side;
 use gate_stages::translator::Intake;
 use gate_stages::{Reading, Stages};
 use reqwest::StatusCode;
@@ -38,8 +37,7 @@ fn app_on(ground: &crate::Ground, stub: &Stub, receiver: Arc<dyn Receiver>) -> A
     "the-chat-agent",
     "/a/folder",
   );
-  let side = Side::new(ground.scratch.db().clone(), None, None, "the-chat-agent");
-  let stages = Arc::new(Stages::new(runs, side, Reading::default()));
+  let stages = Arc::new(Stages::new(runs, Reading::default()));
 
   Arc::new(App {
     stages: stages.clone(),

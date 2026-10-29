@@ -1,14 +1,14 @@
-//! A gate's own options (`docs/boundary-api.md`, 「For the console」; `docs/laya.md`, 「Mode and τ per gate」): its
-//! wait, which only its row sets, its Laya mode, tau and fallback LLM, and its switch where its profile lets it be
-//! switched off, kept for each agent. What a gate runs on beside them — its thinking and answer room — is its
-//! tier's on its own road. The screen reads and writes the chat agent's rows; a companion's are copied from them.
+//! A gate's own options (`docs/boundary-api.md`, 「For the console」): its wait, which only its row sets, and its
+//! switch where its profile lets it be switched off, kept for each agent. What a gate runs on beside them — its
+//! thinking and answer room — is its tier's on its own road. The screen reads and writes the chat agent's rows; a
+//! companion's are copied from them.
 
 use gate_codes::Code;
 use gate_policy::fill_marks;
 use gate_policy::gates::GATE_ORDER;
 use gate_policy::profiles::{PROFILES, Profile};
 use gate_ports::agency::Mapping;
-use gate_store::entity::{gate_options, laya_health};
+use gate_store::entity::gate_options;
 use gate_words::options as words;
 use sea_orm::{
   ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, NotSet,
@@ -27,12 +27,6 @@ pub const DEFAULT_ANSWER_TOKENS: i64 = 2048;
 pub const TIMEOUT_MIN_MS: i64 = 1_000;
 pub const TIMEOUT_MAX_MS: i64 = 300_000;
 
-/// Every Laya mode a gate may stand in.
-pub const LAYA_MODES: [&str; 4] = ["off", "shadow", "filter", "asymmetric"];
-
-/// What a gate's fallback setting says where it asks no LLM at all.
-pub const NO_LAYA_FALLBACK: &str = "none";
-
 /// Why a change was not taken: its code and the sentence naming why.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Refusal {
@@ -46,11 +40,6 @@ impl Refusal {
       code,
       error: error.into(),
     }
-  }
-
-  /// A mode the gate cannot run in: the reason's own code stands for the refusal.
-  fn mode(reason: Code, error: impl Into<String>) -> Self {
-    Self::of(reason, error)
   }
 
   fn database(why: DbErr) -> Self {
@@ -73,14 +62,11 @@ fn profile(key: &str) -> Result<&'static Profile, Refusal> {
     .ok_or_else(|| Refusal::of(Code::NoGate, fill_marks(words::NOT_GATE, &[("key", key)])))
 }
 
-/// What one gate's row holds for one agent. A Laya mode the row holds that is no mode reads as none.
+/// What one gate's row holds for one agent.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct GateRow {
   pub timeout_ms: Option<i64>,
-  pub laya_mode: Option<String>,
-  pub laya_tau: Option<f64>,
   pub enabled: Option<bool>,
-  pub laya_fallback: Option<String>,
 }
 
 /// One gate's row for one agent, where one stands.
@@ -89,10 +75,7 @@ pub async fn row(db: &DatabaseConnection, key: &str, agent: &str) -> Result<Opti
 
   Ok(found.map(|row| GateRow {
     timeout_ms: row.timeout_ms,
-    laya_mode: row.laya_mode.filter(|mode| LAYA_MODES.contains(&mode.as_str())),
-    laya_tau: row.laya_tau,
     enabled: row.enabled.map(|enabled| enabled != 0),
-    laya_fallback: row.laya_fallback,
   }))
 }
 
@@ -102,42 +85,18 @@ pub async fn timeout_ms(db: &DatabaseConnection, key: &str, agent: &str) -> Resu
   Ok(row(db, key, agent).await?.and_then(|row| row.timeout_ms))
 }
 
-/// Whether Laya's verdict may stand in a mode, which then needs a tau to stand on.
-pub fn decides(mode: &str) -> bool {
-  mode == "filter" || mode == "asymmetric"
-}
-
-/// The mode a gate actually runs in: off without a probe, and shadow where its row would let Laya decide with no
-/// tau, or asymmetric for a gate with no safe verdict.
-pub fn effective_mode(profile: &Profile, chosen: Option<&str>, tau: Option<f64>) -> String {
-  let Some(default) = profile.laya_mode.as_deref() else {
-    return "off".into();
-  };
-  let mode = chosen.unwrap_or(default);
-
-  if (mode == "asymmetric" && !profile.laya_safe) || (decides(mode) && tau.is_none()) {
-    return "shadow".into();
-  }
-
-  mode.into()
-}
-
-/// What a gate asks for where its tier says nothing and its row names no Laya mode.
+/// What a gate asks for where its tier says nothing.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Defaults {
   pub thinking: bool,
   pub answer_tokens: i64,
-  pub laya_mode: String,
-  pub laya_tau: Option<f64>,
 }
 
 pub fn defaults(profile: &Profile) -> Defaults {
   Defaults {
     thinking: false,
     answer_tokens: profile.answer_tokens.unwrap_or(DEFAULT_ANSWER_TOKENS),
-    laya_mode: profile.laya_mode.clone().unwrap_or_else(|| "off".into()),
-    laya_tau: None,
   }
 }
 
@@ -159,15 +118,13 @@ pub fn answer_room(stage: &str, mapping: Option<&Mapping>) -> i64 {
 }
 
 /// What a gate actually runs on: on a registered model what it asks that road for, the defaults otherwise; and
-/// its own row's wait, Laya mode and tau.
+/// its own row's wait.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Effective {
   pub thinking: bool,
   pub answer_tokens: i64,
   pub timeout_ms: Option<i64>,
-  pub laya_mode: String,
-  pub laya_tau: Option<f64>,
 }
 
 /// One gate's options as the screen reads them: what the owner chose, field by field, what the gate runs on,
@@ -176,12 +133,8 @@ pub struct Effective {
 #[serde(rename_all = "camelCase")]
 pub struct View {
   pub timeout_ms: Option<i64>,
-  pub laya_mode: Option<String>,
-  pub laya_tau: Option<f64>,
-  pub laya_probe: bool,
   pub switchable: bool,
   pub enabled: bool,
-  pub laya_fallback: Option<String>,
   pub effective: Effective,
   pub defaults: Defaults,
 }
@@ -201,31 +154,24 @@ pub async fn view(runs: &Runs, key: &str) -> Result<View, Refusal> {
 
   Ok(View {
     timeout_ms: row.timeout_ms,
-    laya_mode: row.laya_mode.clone(),
-    laya_tau: row.laya_tau,
-    laya_probe: profile.laya_probe(),
     switchable: profile.switchable,
     enabled: !profile.switchable || row.enabled != Some(false),
-    laya_fallback: row.laya_fallback.clone(),
     effective: Effective {
       thinking,
       answer_tokens,
       timeout_ms: row.timeout_ms,
-      laya_mode: effective_mode(profile, row.laya_mode.as_deref(), row.laya_tau),
-      laya_tau: row.laya_tau,
     },
     defaults: defaults(profile),
   })
 }
 
-/// A gate's route as a run reads it: the provider its road begins on, the model its tier maps there, whether it
-/// stands on Laya, its wait and when its route was last set.
+/// A gate's route as a run reads it: the provider its road begins on, the model its tier maps there, its wait
+/// and when its route was last set.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RouteView {
   pub provider: String,
   pub model: String,
-  pub laya: bool,
   pub timeout_ms: Option<i64>,
   pub set_at: i64,
 }
@@ -245,7 +191,6 @@ pub async fn route_view_for(runs: &Runs, key: &str, agent: &str) -> Result<Route
   Ok(RouteView {
     provider: road.provider.clone(),
     model: road.model().to_owned(),
-    laya: road.laya,
     timeout_ms: timeout_ms(&runs.db, key, agent).await.map_err(Refusal::database)?,
     set_at,
   })
@@ -257,79 +202,6 @@ pub async fn switched_on(db: &DatabaseConnection, key: &str, agent: &str) -> Res
   let Some(profile) = PROFILES.of(key) else { return Ok(false) };
 
   Ok(!profile.switchable || row(db, key, agent).await?.and_then(|row| row.enabled) != Some(false))
-}
-
-/// The provider a gate on Laya asks where Laya gives no verdict, as the chat agent's row says (`docs/laya.md`, 「A
-/// gate whose provider is Laya」): the one its road would begin on where the row names none, the one it names
-/// where that is on, and none where it says `none` or names one switched off.
-pub async fn laya_fallback(runs: &Runs, stage: &str) -> Result<Option<String>, GateError> {
-  let named = row(&runs.db, stage, &runs.chat_agent)
-    .await
-    .map_err(fault)?
-    .and_then(|row| row.laya_fallback);
-  let providers = runs.agency.providers().await.map_err(fault)?;
-
-  match named {
-    Some(named) if named == NO_LAYA_FALLBACK => Ok(None),
-    Some(named) => Ok(providers.iter().any(|one| one.name == named && one.enabled).then_some(named)),
-    None => {
-      let tier = route::tier_of(stage)?;
-      let (provider, _) = route::road_provider(runs, stage, route::AUTO, &providers, &tier).await?;
-
-      Ok(Some(provider))
-    }
-  }
-}
-
-/// Each gate a health check's model line names a checkpoint for, with its checkpoint's folder: each gate and its
-/// folder joined by `=`, a comma between them.
-pub fn checkpoint_folders(model: &str) -> Vec<(String, String)> {
-  model
-    .split(',')
-    .filter_map(|pair| {
-      let (gate, folder) = pair.split_once('=')?;
-      let (gate, folder) = (gate.trim(), folder.trim());
-
-      (!gate.is_empty() && !folder.is_empty()).then(|| (gate.to_owned(), folder.to_owned()))
-    })
-    .collect()
-}
-
-// What the last health check of the Laya server named each gate's checkpoint, as its model line says.
-async fn served(db: &DatabaseConnection) -> Result<Vec<(String, String)>, DbErr> {
-  let model = laya_health::Entity::find().one(db).await?.and_then(|row| row.model).unwrap_or_default();
-
-  Ok(checkpoint_folders(&model))
-}
-
-/// The gates the last health check of the Laya server named a checkpoint for.
-pub async fn checkpoints(db: &DatabaseConnection) -> Result<Vec<String>, DbErr> {
-  Ok(served(db).await?.into_iter().map(|(gate, _)| gate).collect())
-}
-
-/// The folder of the checkpoint the last health check of the Laya server named for a gate; none where it named
-/// none or no check has been made.
-pub async fn checkpoint_folder(db: &DatabaseConnection, gate: &str) -> Result<Option<String>, DbErr> {
-  Ok(served(db).await?.into_iter().find(|(named, _)| named == gate).map(|(_, folder)| folder))
-}
-
-/// Why a gate could not run in a mode, or none where it could: a mode other than off for a gate with no probe,
-/// asymmetric for one whose probe names no safe verdict, and a deciding mode for one the last health check named no
-/// checkpoint for among `checkpoints`.
-pub fn mode_refused(profile: &Profile, mode: &str, checkpoints: &[String]) -> Option<Code> {
-  if mode == "off" {
-    return None;
-  }
-
-  if !profile.laya_probe() {
-    return Some(Code::NoProbe);
-  }
-
-  if mode == "asymmetric" && !profile.laya_safe {
-    return Some(Code::NoSafeVerdict);
-  }
-
-  (decides(mode) && !checkpoints.contains(&profile.key)).then_some(Code::NoCheckpoint)
 }
 
 /// A whole number a field holds, as JSON gives it.
@@ -344,10 +216,8 @@ pub async fn change(runs: &Runs, key: &str, body: &Value, at: i64) -> Result<(),
   change_for(runs, key, &runs.chat_agent, body, at).await
 }
 
-/// One gate's wait, switch, Laya mode, tau and fallback LLM for one agent, each written into that agent's row
-/// where it is sent and left as the row had it otherwise; a Laya field sent as null goes back to the profile's
-/// default, and the wait is never cleared. A mode is taken only where the gate can run in it. No other agent's
-/// row is touched.
+/// One gate's wait and switch for one agent, each written into that agent's row where it is sent and left as the
+/// row had it otherwise; the wait is never cleared. No other agent's row is touched.
 pub async fn change_for(runs: &Runs, key: &str, agent: &str, body: &Value, at: i64) -> Result<(), Refusal> {
   let profile = profile(key)?;
   let sent = |field: &str| body.get(field);
@@ -356,25 +226,10 @@ pub async fn change_for(runs: &Runs, key: &str, agent: &str, body: &Value, at: i
     return Err(Refusal::of(Code::OwnLlm, words::OWN_LLM));
   }
 
-  let [timeout, mode, tau, enabled, fallback] =
-    ["timeoutMs", "layaMode", "layaTau", "enabled", "layaFallback"].map(sent);
+  let [timeout, enabled] = ["timeoutMs", "enabled"].map(sent);
 
-  if [timeout, mode, tau, enabled, fallback].iter().all(Option::is_none) {
+  if [timeout, enabled].iter().all(Option::is_none) {
     return Err(Refusal::of(Code::NothingToChange, words::NOTHING));
-  }
-
-  if let Some(fallback) = fallback.filter(|fallback| !fallback.is_null()) {
-    let providers = runs.agency.providers().await.map_err(|why| Refusal::unit(fault(why)))?;
-    let known = fallback
-      .as_str()
-      .is_some_and(|name| name == NO_LAYA_FALLBACK || providers.iter().any(|one| one.name == name));
-
-    if !known {
-      return Err(Refusal::of(
-        Code::LayaFallbackUnknown,
-        fill_marks(words::FALLBACK, &[("fallback", NO_LAYA_FALLBACK)]),
-      ));
-    }
   }
 
   if let Some(enabled) = enabled {
@@ -407,56 +262,7 @@ pub async fn change_for(runs: &Runs, key: &str, agent: &str, body: &Value, at: i
     ),
   };
 
-  if let Some(mode) = mode
-    && !mode.is_null()
-    && !mode.as_str().is_some_and(|mode| LAYA_MODES.contains(&mode))
-  {
-    return Err(Refusal::of(
-      Code::LayaModeUnknown,
-      fill_marks(words::MODE, &[("modes", &LAYA_MODES.join(", "))]),
-    ));
-  }
-
-  if let Some(tau) = tau
-    && !tau.is_null()
-    && !tau.as_f64().is_some_and(|tau| tau.is_finite() && (0.0..=1.0).contains(&tau))
-  {
-    return Err(Refusal::of(Code::LayaTauOutOfRange, words::TAU));
-  }
-
-  // What the row would say once written.
   let db = &runs.db;
-  let current = row(db, key, agent).await.map_err(Refusal::database)?.unwrap_or_default();
-  let chosen_mode = match mode {
-    None => current.laya_mode.clone(),
-    Some(mode) => mode.as_str().map(str::to_owned),
-  };
-  let chosen_tau = match tau {
-    None => current.laya_tau,
-    Some(tau) => tau.as_f64(),
-  };
-  let resulting = chosen_mode
-    .clone()
-    .unwrap_or_else(|| profile.laya_mode.clone().unwrap_or_else(|| "off".into()));
-
-  // A mode chosen now is taken only where the gate can run in it.
-  if mode.is_some()
-    && let Some(code) =
-      mode_refused(profile, &resulting, &checkpoints(db).await.map_err(Refusal::database)?)
-  {
-    let error = match code {
-      Code::NoProbe => fill_marks(words::NO_QUESTION, &[("key", key)]),
-      Code::NoSafeVerdict => fill_marks(words::NO_SAFETY, &[("key", key)]),
-      _ => fill_marks(words::NO_CHECKPOINT, &[("mode", &resulting), ("key", key)]),
-    };
-
-    return Err(Refusal::mode(code, error));
-  }
-
-  if decides(&resulting) && chosen_tau.is_none() {
-    return Err(Refusal::mode(Code::NeedsTau, fill_marks(words::NEEDS_TAU, &[("mode", &resulting)])));
-  }
-
   let written = db.begin().await.map_err(Refusal::database)?;
   let existing = gate_options::Entity::find_by_id((key.to_owned(), agent.to_owned()))
     .one(&written)
@@ -473,9 +279,6 @@ pub async fn change_for(runs: &Runs, key: &str, agent: &str, body: &Value, at: i
       timeout_ms: Set(None),
       set_at: Set(at),
       enabled: Set(None),
-      laya_mode: Set(None),
-      laya_tau: Set(None),
-      laya_fallback: Set(None),
       rowid: NotSet,
     },
   };
@@ -486,20 +289,8 @@ pub async fn change_for(runs: &Runs, key: &str, agent: &str, body: &Value, at: i
     changed.timeout_ms = Set(Some(timeout));
   }
 
-  if mode.is_some() {
-    changed.laya_mode = Set(chosen_mode);
-  }
-
-  if tau.is_some() {
-    changed.laya_tau = Set(chosen_tau);
-  }
-
   if let Some(enabled) = enabled.and_then(Value::as_bool) {
     changed.enabled = Set(Some(i64::from(enabled)));
-  }
-
-  if let Some(fallback) = fallback {
-    changed.laya_fallback = Set(fallback.as_str().map(str::to_owned));
   }
 
   if fresh {
@@ -539,9 +330,6 @@ pub async fn copy(db: &DatabaseConnection, agent: &str, from: &str, at: i64) -> 
       timeout_ms: Set(row.timeout_ms),
       set_at: Set(at),
       enabled: Set(row.enabled),
-      laya_mode: Set(row.laya_mode),
-      laya_tau: Set(row.laya_tau),
-      laya_fallback: Set(row.laya_fallback),
       rowid: NotSet,
     }
     .insert(&written)

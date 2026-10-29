@@ -67,10 +67,6 @@ const TESTBED_TABLES: [&str; 8] =
 /// The ledger of Korean lines each file may hold.
 const LEDGER: &str = "korean-ledger.json";
 
-/// The folder Korean stands in: what the gates are told and the questions Laya is asked, worded as the models
-/// read them. Every other file is held to the ledger.
-const PROMPTS: &str = "prompts/";
-
 /// The variable naming the file of names no tracked file may hold: agents', people's and machines'. No
 /// repository keeps such a list, so it is read from outside the checkout.
 const NAMES_LIST: &str = "BMO_NAMES_LIST";
@@ -433,9 +429,9 @@ fn tests_stand_only_in_tests() {
 
 #[test]
 fn a_test_is_told_by_its_name_and_its_attributes() {
-  assert!(is_test_file_by_name("training/tooling/src/laya.test.ts"));
-  assert!(is_test_file_by_name("runtime/laya-server/test_server.py"));
-  assert!(!is_test_file_by_name("runtime/laya-server/server.py"));
+  assert!(is_test_file_by_name("training/tooling/src/gguf-llm.test.ts"));
+  assert!(is_test_file_by_name("tools/translate/test_tool.py"));
+  assert!(!is_test_file_by_name("training/tooling/src/gguf-llm.ts"));
   assert!(holds_rust_test("fn a() {}\n  #[cfg(test)]\nmod tests {}"));
   assert!(!holds_rust_test("// a test of the clock\nfn a() {}"));
 }
@@ -445,7 +441,7 @@ fn no_file_outside_the_prompts_holds_more_hangul_than_the_ledger_allows() {
   let ledger = ledger();
   let found: Vec<String> = tracked_texts()
     .into_iter()
-    .filter(|(path, _)| !path.starts_with(PROMPTS))
+    .filter(|(path, _)| !path.starts_with("prompts/"))
     .filter_map(|(path, text)| {
       let held = hangul_lines(&text);
       let allowed = ledger.get(&path).copied().unwrap_or(0);

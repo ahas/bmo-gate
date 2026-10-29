@@ -1,5 +1,5 @@
-//! The gates' tests: each gate carried against a stand-in agency and gateway on a scratch database of the test's
-//! own, Laya asked of a stand-in relay on the loopback, and the readings and records each leaves.
+//! The stages' tests: the translator, a document's translation and the records they read, each carried against a
+//! stand-in agency on a scratch database of the test's own.
 
 #[path = "../runs/fakes.rs"]
 mod fakes;
@@ -9,32 +9,20 @@ mod scratch;
 mod stub;
 
 mod document_translation;
-mod fold;
-mod laya;
-mod laya_agreement;
-mod laya_health;
 mod markdown;
 mod markdown_shape;
-mod output;
 mod records;
-mod retention;
 mod translator;
 
-use std::os::unix::fs::PermissionsExt;
-use std::path::PathBuf;
 use std::sync::Arc;
 
-use gate_policy::profiles::PROFILES;
-use gate_stages::laya::Side;
 use gate_stages::{Reading, Stages};
-use serde_json::json;
 
 use crate::fakes::{FakeAgency, FakeGateway, mapping, provider};
 use crate::scratch::Scratch;
-use crate::stub::Stub;
 
-/// A migrated store, stand-ins for the agency and its gateway with one registered provider every gate maps to, a
-/// wait of thirty seconds for every gate, and the gates on them, asking Laya at `laya` where one is given.
+/// A migrated store, stand-ins for the agency and its gateway with one registered provider, and the stages on
+/// them.
 pub struct Ground {
   pub scratch: Scratch,
   pub agency: Arc<FakeAgency>,
@@ -42,20 +30,8 @@ pub struct Ground {
   pub stages: Arc<Stages>,
 }
 
-/// A token file of the test's own, private as the client takes one.
-pub fn token_file(test: &str) -> PathBuf {
-  let dir = std::env::temp_dir().join(format!("gate-stages-{}-{test}", std::process::id()));
-
-  std::fs::create_dir_all(&dir).unwrap();
-
-  let file = dir.join("laya.token");
-
-  std::fs::write(&file, "relay-token\n").unwrap();
-  std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600)).unwrap();
-  file
-}
-
-pub async fn ground(test: &str, laya: Option<&Stub>, reading: Reading) -> Ground {
+pub async fn ground(test: &str, reading: Reading) -> Ground {
+  let _ = test;
   let scratch = Scratch::new().await;
   let agency = Arc::new(FakeAgency::default());
   let gateway = Arc::new(FakeGateway::default());
@@ -68,19 +44,7 @@ pub async fn ground(test: &str, laya: Option<&Stub>, reading: Reading) -> Ground
     .unwrap()
     .insert("registry".into(), mapping("registry", "a-registration", None, None));
 
-  for profile in &PROFILES.profile {
-    gate_runs::options::change(&runs, &profile.key, &json!({ "timeoutMs": 30_000 }), 1)
-      .await
-      .unwrap();
-  }
-
-  let side = Side::new(
-    scratch.db().clone(),
-    laya.map(|stub| stub.address.as_str()),
-    Some(token_file(test)),
-    "the-chat-agent",
-  );
-  let stages = Arc::new(Stages::new(runs, side, reading));
+  let stages = Arc::new(Stages::new(runs, reading));
 
   Ground {
     scratch,

@@ -72,23 +72,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/formats/decided": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** The markup one part of a reply goes out as, or none for its plain text. */
-        post: operations["format_decided"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/gates": {
         parameters: {
             query?: never;
@@ -113,7 +96,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Readiness, version and Laya's last state. */
+        /** Readiness, reason and version. */
         get: operations["health"];
         put?: never;
         post?: never;
@@ -158,23 +141,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/laya": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Laya's last health check, and each probed gate's mode, agreement and checkpoint. */
-        get: operations["laya"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/options/copied": {
         parameters: {
             query?: never;
@@ -202,7 +168,7 @@ export interface paths {
         /** One gate's options as it stands for the chat agent. */
         get: operations["gate_options"];
         put?: never;
-        /** Change a gate's wait, switch, Laya mode, tau or fallback; a Laya field sent null goes back to the default. */
+        /** Change a gate's wait or switch. */
         post: operations["gate_options_change"];
         delete?: never;
         options?: never;
@@ -369,34 +335,6 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** @description How often Laya agrees with a gate's LLM. */
-        Agreement: {
-            /** Format: double */
-            agreement: number | null;
-            byTau: components["schemas"]["AgreementAt"][];
-            /** Format: int64 */
-            failures: number;
-            gateName: string;
-            /** Format: int64 */
-            pairs: number;
-            /** Format: double */
-            settled: number | null;
-            /** @description `pair` or `question`: what the figures are counted over. */
-            unit: string;
-        };
-        /** @description One tau where a gate's agreement was counted. */
-        AgreementAt: {
-            /** Format: double */
-            agreement: number | null;
-            /** Format: double */
-            coverage: number | null;
-            /** Format: double */
-            safeAgreement: number | null;
-            /** Format: int64 */
-            safeCount: number | null;
-            /** Format: double */
-            tau: number;
-        };
         /** @description A round's judgements put under the message that answered it. */
         AttachJudgements: {
             /** Format: int64 */
@@ -413,9 +351,6 @@ export interface components {
         DefaultOptions: {
             /** Format: int64 */
             answerTokens: number;
-            layaMode: string;
-            /** Format: double */
-            layaTau: number | null;
             thinking: boolean;
         };
         /** @description One part of a document's translation. */
@@ -454,9 +389,6 @@ export interface components {
         EffectiveOptions: {
             /** Format: int64 */
             answerTokens: number;
-            layaMode: string;
-            /** Format: double */
-            layaTau: number | null;
             thinking: boolean;
             /** Format: int64 */
             timeoutMs: number | null;
@@ -473,31 +405,19 @@ export interface components {
             code: string;
             error: string;
         };
-        /** @description The markup the part goes out as, or none to send its plain text. */
-        FormatAnswer: {
-            markup: string | null;
-        };
-        /** @description One part of a reply, in markdown. */
-        FormatAsk: {
-            /** Format: int64 */
-            roomId: number;
-            text: string;
-        };
         /** @description One gate of the gate order, and the profile it runs under. */
         Gate: {
             /** Format: int64 */
             answerTokens: number | null;
             condition: string | null;
-            defaultLayaMode: string | null;
             gateName: string;
-            layaProbe: boolean;
             /** @description `pre`, `post` or `apart`: where the gate stands against a turn. */
             part: string;
             /** Format: int64 */
             step: number;
             switchable: boolean;
         };
-        /** @description A change of a gate's options: a field left out stays, a Laya field sent null goes back to the default. */
+        /** @description A change of a gate's options: a field left out stays. */
         GateOptionChange: {
             /**
              * Format: int64
@@ -505,10 +425,6 @@ export interface components {
              */
             answerTokens?: number | null;
             enabled?: boolean | null;
-            layaFallback?: string | null;
-            layaMode?: string | null;
-            /** Format: double */
-            layaTau?: number | null;
             /** @description Not a gate option: its tier's. A change naming it is refused `own-llm`. */
             thinking?: boolean | null;
             /** Format: int64 */
@@ -519,11 +435,6 @@ export interface components {
             defaults: components["schemas"]["DefaultOptions"];
             effective: components["schemas"]["EffectiveOptions"];
             enabled: boolean;
-            layaFallback: string | null;
-            layaMode: string | null;
-            layaProbe: boolean;
-            /** Format: double */
-            layaTau: number | null;
             switchable: boolean;
             /** Format: int64 */
             timeoutMs: number | null;
@@ -540,7 +451,6 @@ export interface components {
         };
         /** @description The gate's route as a run reads it. */
         GateRoute: {
-            laya: boolean;
             model: string;
             provider: string;
             /**
@@ -551,10 +461,8 @@ export interface components {
             /** Format: int64 */
             timeoutMs: number | null;
         };
-        /** @description Readiness, version and Laya's last state. */
+        /** @description Readiness and version. */
         Health: {
-            /** @description `up`, `busy`, `down` or `off`. */
-            laya: string;
             ready: boolean;
             reason: string | null;
             version: string;
@@ -648,54 +556,6 @@ export interface components {
         KeptTranslationPage: {
             items: components["schemas"]["KeptTranslation"][];
             more: boolean;
-        };
-        /** @description One probed gate as Laya's screen reads it. */
-        LayaGate: {
-            agreement: components["schemas"]["Agreement"] | null;
-            checkpoint: string | null;
-            gateName: string;
-            mode: string;
-            refused: components["schemas"]["ModeRefusal"][];
-            /** Format: double */
-            tau: number | null;
-        };
-        /** @description The last health check of the Laya relay. */
-        LayaHealth: {
-            address: string | null;
-            /**
-             * Format: int64
-             * @description Epoch milliseconds.
-             */
-            answeredAt: number | null;
-            /** Format: int64 */
-            checkMs: number | null;
-            /**
-             * Format: int64
-             * @description Epoch milliseconds.
-             */
-            checkedAt: number | null;
-            device: string | null;
-            /** Format: int64 */
-            loadMs: number | null;
-            model: string | null;
-            state: string;
-            versions: {
-                [key: string]: string;
-            };
-            /** Format: int64 */
-            vramBytes: number | null;
-        };
-        /** @description Laya as `GET /laya` answers it. */
-        LayaView: {
-            gates: components["schemas"]["LayaGate"][];
-            health: components["schemas"]["LayaHealth"];
-            modes: string[];
-            taus: number[];
-        };
-        /** @description A Laya mode a gate may not run in, and the code that says why. */
-        ModeRefusal: {
-            code: string;
-            mode: string;
         };
         /** @description A judgement to write into a room's log. */
         NewJudgement: {
@@ -996,31 +856,6 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
-    format_decided: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["FormatAsk"];
-            };
-        };
-        responses: {
-            /** @description the markup, or none */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FormatAnswer"];
-                };
-            };
-            default: components["responses"]["Error"];
-        };
-    };
     gates: {
         parameters: {
             query?: never;
@@ -1138,27 +973,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-            default: components["responses"]["Error"];
-        };
-    };
-    laya: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Laya as the gate reads it */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LayaView"];
-                };
             };
             default: components["responses"]["Error"];
         };

@@ -92,7 +92,7 @@ fn what_an_answer_lost_of_the_parts_structure_is_said() {
 
 #[tokio::test]
 async fn a_part_that_lost_its_structure_twice_is_kept_as_failed_with_why() {
-  let ground = ground("document-failed", None, Default::default()).await;
+  let ground = ground("document-failed", Default::default()).await;
   let queue = Queue::default();
   let mut heard = ground.stages.events.subscribe();
   let introduced = format!("Here is the translation:\n\n{PLAN}");
@@ -124,7 +124,7 @@ async fn a_part_that_lost_its_structure_twice_is_kept_as_failed_with_why() {
 
 #[tokio::test]
 async fn an_order_is_queued_each_part_written_and_told_to_the_screens() {
-  let ground = ground("document", None, Default::default()).await;
+  let ground = ground("document", Default::default()).await;
   let queue = Queue::default();
   let mut heard = ground.stages.events.subscribe();
 
@@ -165,7 +165,7 @@ async fn an_order_is_queued_each_part_written_and_told_to_the_screens() {
 
 #[tokio::test]
 async fn a_part_past_the_lines_window_is_asked_in_halves_and_joined() {
-  let ground = ground("document-halves", None, Default::default()).await;
+  let ground = ground("document-halves", Default::default()).await;
   let queue = Queue::default();
   let mut heard = ground.stages.events.subscribe();
   let part = "The first paragraph of the part.\n\nThe second paragraph of the part.";
