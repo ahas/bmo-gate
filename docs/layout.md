@@ -47,9 +47,10 @@ The testbed deploys the repository as `testbed.toml` declares it (the testbed's 
   through `bmo-gate health`. Four units stand marked `retire` — `bmo-laya-relay.service`, `bmo-gate.service`,
   `bmo-gate-judge.service` and `bmo-gate-train.service` — which the deployment stops, disables and unlinks once
   the service is up; a later commit removes their files.
-- **The unit command stands beside `bmo`:** before the release is put live, `bmo-gate` is linked into the folder
-  holding `bmo`, the first folder `bmo` looks for unit commands in (`docs/boundary-api.md`, 「The unit command」). The
-  link names the deploy tree's own link, which stands across releases, so it names whichever release is live.
+- **The unit command stands beside `bmo`:** before the release is put live, `bmo-gate` is stood in the folder
+  holding `bmo`, the first folder `bmo` looks for unit commands in (`docs/boundary-api.md`, 「The unit command」). It
+  is a script that runs the deploy tree's own link, which stands across releases, and names the settings that tree
+  carries, so a command run from any folder reads them.
 - **The two tools are placed with the tool host** before the release is put live: each executable,
   `gate-translate-tool` and `gate-reference-tool`, binaries of the release's `bin/`, is copied beside its manifest,
   schemas and manual, and each folder is put with `bmo pocket put` as the gate's own, allowing the capability its

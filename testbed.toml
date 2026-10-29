@@ -58,16 +58,29 @@ units = ["deploy/*.service", "deploy/*.timer"]
 # Answers 0 once the service the deployed settings name answers ready (docs/boundary-api.md, 「Health」).
 health = "cd ~/.local/share/bmo-gate/deploy && bin/bmo-gate health"
 
-# The unit command, linked into the folder holding `bmo`, the first folder `bmo` looks for unit commands in. The
-# link names this repository's deploy tree, whose own link stands across releases; a link made to the release
-# being deployed would dangle once a later deployment prunes that release (docs/layout.md, 「The deployment」).
+# The unit command, stood in the folder holding `bmo`, the first folder `bmo` looks for unit commands in. It is a
+# script rather than a link: the command reads `BMO_GATE_SETTINGS` where it is set and `settings.toml` in the folder
+# it runs in otherwise, and a bare `bmo translate` runs from any folder, so the script names the settings this
+# repository's deploy tree carries. It runs the deploy tree's own link, whose link stands across releases; one made
+# to the release being deployed would dangle once a later deployment prunes that release (docs/layout.md, 「The
+# deployment」).
 [[deploy.step]]
 id = "link-unit-command"
 phase = "before-flip"
 command = '''
 set -eu
 bmo_dir="$(dirname "$(command -v bmo)")"
-ln -sfn "$HOME/.local/share/bmo-gate/deploy/bin/bmo-gate" "$bmo_dir/bmo-gate"
+settings="$HOME/.local/share/bmo-gate/deploy/settings.toml"
+script="$bmo_dir/.bmo-gate-command"
+cat > "$script" <<EOF
+#!/bin/sh
+# Written by bmo-gate's deployment: the command's settings stand in its deploy tree.
+BMO_GATE_SETTINGS="\${BMO_GATE_SETTINGS:-$settings}"
+export BMO_GATE_SETTINGS
+exec "\$HOME/.local/share/bmo-gate/deploy/bin/bmo-gate" "\$@"
+EOF
+chmod 755 "$script"
+mv "$script" "$bmo_dir/bmo-gate"
 '''
 
 # The tooling's packages, which a release's tooling commands run on.
