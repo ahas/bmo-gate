@@ -88,7 +88,7 @@ pub fn document() -> Value {
     "/options/{gateName}",
     "gate_options_change",
     "Gates",
-    "Change a gate's wait or switch.",
+    "Change a gate's switch.",
     vec![("gateName", "string")],
     None,
     Some(made::<GateOptionChange>),
@@ -99,7 +99,6 @@ pub fn document() -> Value {
       "no-gate",
       "own-llm",
       "nothing-to-change",
-      "timeout-out-of-range",
       "switch-not-boolean",
       "always-on",
       "failed",
@@ -129,7 +128,6 @@ pub fn document() -> Value {
       "no-gate",
       "own-llm",
       "nothing-to-change",
-      "timeout-out-of-range",
       "switch-not-boolean",
       "always-on",
       "failed",
@@ -274,7 +272,6 @@ pub fn document() -> Value {
       "stopped",
       "failed",
       "upstream-failed",
-      "translator-busy",
     ],
   );
   route(

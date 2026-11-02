@@ -1,6 +1,6 @@
 //! The agency port (`docs/boundary-api.md`, 「bmo-agency」 and 「How a gate run reaches a model」): the agents and
 //! the shared rulebooks, the providers, a work key's route and mapping, the stand-in, a thrown-away session and
-//! its one turn, a run stopped, and the roads a turn walked. Bodies are camelCase, but for a turn's work parts,
+//! its one turn, and the roads a turn walked. Bodies are camelCase, but for a turn's work parts,
 //! which go by the snake-case names a job's runner sends them.
 
 use futures_util::future::BoxFuture;
@@ -217,9 +217,6 @@ pub trait Agency: Send + Sync {
   /// A gate run's one turn, carried to its end.
   fn turn<'a>(&'a self, turn: &'a GateTurn) -> BoxFuture<'a, Answer<TurnEnd>>;
 
-  /// The run's session ended, its turn cut short where one is still going.
-  fn stop<'a>(&'a self, session: &'a str, reason: &'a str) -> BoxFuture<'a, Answer<()>>;
-
   /// The roads conversational turns walk, from the moment the stream opens.
   fn roads_walked(&self) -> BoxFuture<'_, Answer<BoxStream<'static, Answer<RoadWalked>>>>;
 
@@ -293,8 +290,6 @@ struct WorkKey {
   effort: Option<String>,
   #[serde(default)]
   answer_tokens: Option<i64>,
-  #[serde(default)]
-  cap_ms: i64,
   #[serde(default)]
   run_mode: String,
 }
@@ -510,12 +505,6 @@ impl Agency for HttpAgency {
         failure: None,
       })
     })
-  }
-
-  fn stop<'a>(&'a self, session: &'a str, _reason: &'a str) -> BoxFuture<'a, Answer<()>> {
-    Box::pin(
-      async move { self.caller.without("session ended", Method::DELETE, &["sessions", session]).await },
-    )
   }
 
   fn session_loads<'a>(&'a self, session: &'a str) -> BoxFuture<'a, Answer<Vec<Load>>> {

@@ -1,9 +1,10 @@
-//! How many runs of a gate stand at once, and the live board's hold on a run while it goes.
+//! How many runs of a gate stand at once, a run past them waiting in line, and the live board's hold on a run
+//! while it goes.
 
+use futures_util::FutureExt;
 use gate_runs::live::{self, GateRun};
 use gate_runs::pool::{Pools, bound};
 use gate_runs::route::{Route, Way};
-use tokio::time::{Duration, Instant};
 
 fn route(way: Way) -> Route {
   Route {
@@ -23,23 +24,22 @@ fn a_programs_road_stands_its_pools_bound_and_the_gateway_takes_turns() {
 }
 
 #[tokio::test]
-async fn a_run_waits_for_its_place_no_longer_than_its_wait() {
+async fn a_run_past_its_pool_waits_in_line_until_a_place_comes_free() {
   let pools = Pools::default();
   let gateway = route(Way::Gateway);
-  let soon = || Instant::now() + Duration::from_millis(50);
-  let first = pools.take("a-gate", &gateway, soon()).await;
+  let first = pools.take("a-gate", &gateway).await;
+  let mut waiting = Box::pin(pools.take("a-gate", &gateway));
 
-  assert!(first.is_some());
-  assert!(pools.take("a-gate", &gateway, soon()).await.is_none());
-  assert!(pools.take("another-gate", &gateway, soon()).await.is_some());
+  assert!((&mut waiting).now_or_never().is_none(), "a run was given a place another holds");
+  assert!(pools.take("another-gate", &gateway).now_or_never().is_some());
   drop(first);
-  assert!(pools.take("a-gate", &gateway, soon()).await.is_some());
+  let second = waiting.await;
 
   let session = route(Way::Session);
-  let held = pools.take("a-gate", &session, soon()).await;
+  let held = pools.take("a-gate", &session).await;
 
-  assert!(held.is_some());
-  assert!(pools.take("a-gate", &session, soon()).await.is_none());
+  assert!(pools.take("a-gate", &session).now_or_never().is_none());
+  drop((second, held));
 }
 
 #[test]
@@ -50,7 +50,6 @@ fn a_gate_run_stands_in_the_picture_while_it_is_held() {
     chat_id: Some(-5),
     message_id: Some(9),
     started_at: 1,
-    cap_seconds: 60,
   };
   let held = live::hold(run.clone());
 

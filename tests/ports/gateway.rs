@@ -1,7 +1,5 @@
-//! The model gateway: one chat completion with the instructions first, the caller's wait in the gateway's
-//! wait headers, the key read from its file, and the completion's text read back.
-
-use std::time::Duration;
+//! The model gateway: one chat completion with the instructions first, no wait named to the gateway, the key read
+//! from its file, and the completion's text read back.
 
 use axum::http::Method;
 use gate_ports::PortError;
@@ -18,7 +16,6 @@ fn ask() -> Ask {
     input: "the material".into(),
     max_tokens: 2048,
     thinking: false,
-    wait: Duration::from_secs(30),
     sampling: Some(r#"{"temperature":0.2}"#.into()),
   }
 }
@@ -34,7 +31,7 @@ fn key_file(test: &str) -> std::path::PathBuf {
 }
 
 #[tokio::test]
-async fn a_completion_names_its_registration_its_messages_and_its_wait() {
+async fn a_completion_names_its_registration_and_its_messages_and_no_wait() {
   let stub = Stub::start().await;
   let key = key_file("completion");
   let gateway = HttpGateway::new(peer(&stub, "unused"), key.clone());
@@ -61,8 +58,8 @@ async fn a_completion_names_its_registration_its_messages_and_its_wait() {
     })
   );
   assert_eq!(seen.bearer().as_deref(), Some("the-key"));
-  assert_eq!(seen.header("x-litellm-timeout").as_deref(), Some("30"));
-  assert_eq!(seen.header("x-litellm-stream-timeout").as_deref(), Some("30"));
+  assert_eq!(seen.header("x-litellm-timeout"), None);
+  assert_eq!(seen.header("x-litellm-stream-timeout"), None);
   assert_eq!(seen.header("x-bmo-sampling").as_deref(), Some(r#"{"temperature":0.2}"#));
 
   std::fs::remove_dir_all(key.parent().unwrap()).unwrap();

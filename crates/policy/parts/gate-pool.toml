@@ -1,4 +1,4 @@
-# The pool a gate's runs stand in (docs/gates.md, 「How many runs stand at once」): the most runs of one gate out
-# at once, where the gate's own profile names no other bound (`pool` in gate-profiles.toml). A judgement that
-# finds every place taken waits for one until the gate's own wait runs out.
+# The pool a gate's runs stand in (docs/boundary-api.md, 「How a gate run reaches a model」): the most runs of one
+# gate out at once, where the gate's own profile names no other bound (`pool` in gate-profiles.toml). A run that
+# finds every place taken waits in line for one however long that takes.
 size = 3

@@ -24,3 +24,13 @@ the operations machine. What it does now is place a GGUF model on a node, fillin
   updating」).
 - **A key a command needs and the file does not give** stops the command with a message naming the key and the
   file; no key falls back to a value of the tooling's own.
+
+## Calls on a node
+
+- **A call on a node waits for its end:** a command until it exits, a file carried either way until its copy
+  ends. No call is stopped for the time it takes; the hub's own end of a streamed command is the hub's, and comes
+  back as the call's failure.
+- **A transfer that failed is made once more** before its caller hears of it, since what breaks one is most often
+  the connection of the moment.
+- **An ssh node's login keeps its connection alive,** asking the node every thirty seconds, so a node that has gone
+  ends the call; connecting to it ends when ssh's own connect does.

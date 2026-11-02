@@ -1,4 +1,4 @@
-//! A gate's own options for one agent: its wait and its switch.
+//! A gate's own options for one agent: its switch.
 
 use sea_orm::entity::prelude::*;
 
@@ -11,7 +11,6 @@ pub struct Model {
   pub agent: String,
   pub thinking: Option<i64>,
   pub answer_tokens: Option<i64>,
-  pub timeout_ms: Option<i64>,
   pub set_at: i64,
   pub enabled: Option<i64>,
   pub rowid: i64,

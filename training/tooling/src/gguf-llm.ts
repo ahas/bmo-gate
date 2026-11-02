@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { COMMAND_LIMIT, nodeCalls, runFault } from "./node-calls";
+import { nodeCalls, runFault } from "./node-calls";
 import { reservedAgainst } from "./node-reach";
 import { dataPath, homeDir, repositoryRoot } from "./roots";
 import {
@@ -269,7 +269,7 @@ export function placedCommand(settings: Pick<GgufSettings, "catalogue">, name: s
 }
 
 export async function readEntry(settings: GgufSettings, name: string, runner: NodeRunner): Promise<CatalogueEntry | string> {
-  const asked = await runner(entryCommand(settings, name), COMMAND_LIMIT);
+  const asked = await runner(entryCommand(settings, name));
   if (asked.code !== 0) {
     return `the catalogue's ${name} could not be read — ${runFault(asked)}`;
   }
@@ -472,7 +472,7 @@ export async function installGguf(instance: GgufInstance, options: GgufOptions):
     writeRendered(instance, rendered, options.checkout);
     const calls = options.calls ?? nodeCalls(options.runner, options.console, serving.node);
     outcome = await installTunnelledService(ggufService(instance, rendered), {
-      ...options, calls, setupPolls: options.setupPolls ?? 480,
+      ...options, calls,
     });
   } finally {
     rmSync(rendered, { recursive: true, force: true });
@@ -480,7 +480,7 @@ export async function installGguf(instance: GgufInstance, options: GgufOptions):
   if (!outcome.ok) {
     return outcome;
   }
-  const placed = await options.runner(placedCommand(options.settings, entry.name, serving.node), COMMAND_LIMIT);
+  const placed = await options.runner(placedCommand(options.settings, entry.name, serving.node));
   if (placed.code !== 0) {
     return { ok: false, step: "placed", fault: `${serving.node} could not be recorded in ${entry.name} — ${runFault(placed)}`, done: outcome.done };
   }

@@ -2,15 +2,11 @@
 //! ready, at its own address with its own token, the deployment's check of a release it has just started.
 
 use std::path::Path;
-use std::time::Duration;
 
 use gate_server::settings::Settings;
 use serde::Deserialize;
 
 use crate::{Answered, Fault};
-
-/// The longest the service is waited on.
-pub const WAIT: Duration = Duration::from_secs(5);
 
 #[derive(Deserialize)]
 struct Health {
@@ -27,11 +23,7 @@ pub async fn health(path: &Path) -> Answered {
     .map_err(|why| Fault::failed(format!("the service's token: {why}")))?
     .ok_or_else(|| Fault::failed(format!("{} holds no token", settings.token_file)))?;
   let url = format!("{}/health", settings.address.trim_end_matches('/'));
-  let client = reqwest::Client::builder()
-    .timeout(WAIT)
-    .build()
-    .map_err(|why| Fault::failed(format!("no client: {why}")))?;
-  let answer = client
+  let answer = reqwest::Client::new()
     .get(&url)
     .bearer_auth(token)
     .send()

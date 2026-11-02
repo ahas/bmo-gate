@@ -1,7 +1,6 @@
-//! A gate's own options (`docs/boundary-api.md`, 「For the console」): its wait, which only its row sets, and its
-//! switch where its profile lets it be switched off, kept for each agent. What a gate runs on beside them — its
-//! thinking and answer room — is its tier's on its own road. The screen reads and writes the chat agent's rows; a
-//! companion's are copied from them.
+//! A gate's own options (`docs/api.md`, 「Gates」): its switch where its profile lets it be switched off, kept for
+//! each agent. What a gate runs on beside it — its thinking and answer room — is its tier's on its own road. The
+//! screen reads and writes the chat agent's rows; a companion's are copied from them.
 
 use gate_codes::Code;
 use gate_policy::fill_marks;
@@ -22,10 +21,6 @@ use crate::{GateError, Runs, fault};
 
 /// What a gate's answer is given where neither its tier nor its own work asks for more.
 pub const DEFAULT_ANSWER_TOKENS: i64 = 2048;
-
-/// The narrowest and widest wait worth storing.
-pub const TIMEOUT_MIN_MS: i64 = 1_000;
-pub const TIMEOUT_MAX_MS: i64 = 300_000;
 
 /// Why a change was not taken: its code and the sentence naming why.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -65,7 +60,6 @@ fn profile(key: &str) -> Result<&'static Profile, Refusal> {
 /// What one gate's row holds for one agent.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct GateRow {
-  pub timeout_ms: Option<i64>,
   pub enabled: Option<bool>,
 }
 
@@ -74,15 +68,8 @@ pub async fn row(db: &DatabaseConnection, key: &str, agent: &str) -> Result<Opti
   let found = gate_options::Entity::find_by_id((key.to_owned(), agent.to_owned())).one(db).await?;
 
   Ok(found.map(|row| GateRow {
-    timeout_ms: row.timeout_ms,
     enabled: row.enabled.map(|enabled| enabled != 0),
   }))
-}
-
-/// How long the gate waits for one agent: its row's value, which nothing else sets; none where the row holds
-/// none.
-pub async fn timeout_ms(db: &DatabaseConnection, key: &str, agent: &str) -> Result<Option<i64>, DbErr> {
-  Ok(row(db, key, agent).await?.and_then(|row| row.timeout_ms))
 }
 
 /// What a gate asks for where its tier says nothing.
@@ -117,14 +104,12 @@ pub fn answer_room(stage: &str, mapping: Option<&Mapping>) -> i64 {
     .max(floor.unwrap_or(0))
 }
 
-/// What a gate actually runs on: on a registered model what it asks that road for, the defaults otherwise; and
-/// its own row's wait.
+/// What a gate actually runs on: on a registered model what it asks that road for, the defaults otherwise.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Effective {
   pub thinking: bool,
   pub answer_tokens: i64,
-  pub timeout_ms: Option<i64>,
 }
 
 /// One gate's options as the screen reads them: what the owner chose, field by field, what the gate runs on,
@@ -132,7 +117,6 @@ pub struct Effective {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct View {
-  pub timeout_ms: Option<i64>,
   pub switchable: bool,
   pub enabled: bool,
   pub effective: Effective,
@@ -153,35 +137,27 @@ pub async fn view(runs: &Runs, key: &str) -> Result<View, Refusal> {
   };
 
   Ok(View {
-    timeout_ms: row.timeout_ms,
     switchable: profile.switchable,
     enabled: !profile.switchable || row.enabled != Some(false),
     effective: Effective {
       thinking,
       answer_tokens,
-      timeout_ms: row.timeout_ms,
     },
     defaults: defaults(profile),
   })
 }
 
-/// A gate's route as a run reads it: the provider its road begins on, the model its tier maps there, its wait
-/// and when its route was last set.
+/// A gate's route as a run reads it: the provider its road begins on, the model its tier maps there and when its
+/// route was last set.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RouteView {
   pub provider: String,
   pub model: String,
-  pub timeout_ms: Option<i64>,
   pub set_at: i64,
 }
 
 pub async fn route_view(runs: &Runs, key: &str) -> Result<RouteView, Refusal> {
-  route_view_for(runs, key, &runs.chat_agent).await
-}
-
-/// A gate's route as a run reads it for one agent, its wait that agent's.
-pub async fn route_view_for(runs: &Runs, key: &str, agent: &str) -> Result<RouteView, Refusal> {
   profile(key)?;
 
   let road = route::read(runs, key).await.map_err(Refusal::unit)?;
@@ -191,7 +167,6 @@ pub async fn route_view_for(runs: &Runs, key: &str, agent: &str) -> Result<Route
   Ok(RouteView {
     provider: road.provider.clone(),
     model: road.model().to_owned(),
-    timeout_ms: timeout_ms(&runs.db, key, agent).await.map_err(Refusal::database)?,
     set_at,
   })
 }
@@ -204,20 +179,13 @@ pub async fn switched_on(db: &DatabaseConnection, key: &str, agent: &str) -> Res
   Ok(!profile.switchable || row(db, key, agent).await?.and_then(|row| row.enabled) != Some(false))
 }
 
-/// A whole number a field holds, as JSON gives it.
-fn whole(value: &Value) -> Option<i64> {
-  value
-    .as_i64()
-    .or_else(|| value.as_f64().filter(|number| number.fract() == 0.0).map(|number| number as i64))
-}
-
 /// One gate's options for the chat agent, as `change_for` writes them.
 pub async fn change(runs: &Runs, key: &str, body: &Value, at: i64) -> Result<(), Refusal> {
   change_for(runs, key, &runs.chat_agent, body, at).await
 }
 
-/// One gate's wait and switch for one agent, each written into that agent's row where it is sent and left as the
-/// row had it otherwise; the wait is never cleared. No other agent's row is touched.
+/// One gate's switch for one agent, written into that agent's row where it is sent. No other agent's row is
+/// touched.
 pub async fn change_for(runs: &Runs, key: &str, agent: &str, body: &Value, at: i64) -> Result<(), Refusal> {
   let profile = profile(key)?;
   let sent = |field: &str| body.get(field);
@@ -226,41 +194,16 @@ pub async fn change_for(runs: &Runs, key: &str, agent: &str, body: &Value, at: i
     return Err(Refusal::of(Code::OwnLlm, words::OWN_LLM));
   }
 
-  let [timeout, enabled] = ["timeoutMs", "enabled"].map(sent);
-
-  if [timeout, enabled].iter().all(Option::is_none) {
+  let Some(enabled) = sent("enabled") else {
     return Err(Refusal::of(Code::NothingToChange, words::NOTHING));
-  }
-
-  if let Some(enabled) = enabled {
-    if !enabled.is_boolean() {
-      return Err(Refusal::of(Code::SwitchNotBoolean, words::SWITCH));
-    }
-
-    if !profile.switchable {
-      return Err(Refusal::of(Code::AlwaysOn, fill_marks(words::ALWAYS_ON, &[("key", key)])));
-    }
-  }
-
-  let timeout = match timeout {
-    None => None,
-    Some(value) => Some(
-      whole(value)
-        .filter(|ms| (TIMEOUT_MIN_MS..=TIMEOUT_MAX_MS).contains(ms))
-        .ok_or_else(|| {
-          Refusal::of(
-            Code::TimeoutOutOfRange,
-            fill_marks(
-              words::TIMEOUT,
-              &[
-                ("least", &(TIMEOUT_MIN_MS / 1000).to_string()),
-                ("most", &(TIMEOUT_MAX_MS / 1000).to_string()),
-              ],
-            ),
-          )
-        })?,
-    ),
   };
+  let Some(enabled) = enabled.as_bool() else {
+    return Err(Refusal::of(Code::SwitchNotBoolean, words::SWITCH));
+  };
+
+  if !profile.switchable {
+    return Err(Refusal::of(Code::AlwaysOn, fill_marks(words::ALWAYS_ON, &[("key", key)])));
+  }
 
   let db = &runs.db;
   let written = db.begin().await.map_err(Refusal::database)?;
@@ -276,7 +219,6 @@ pub async fn change_for(runs: &Runs, key: &str, agent: &str, body: &Value, at: i
       agent: Set(agent.to_owned()),
       thinking: Set(None),
       answer_tokens: Set(None),
-      timeout_ms: Set(None),
       set_at: Set(at),
       enabled: Set(None),
       rowid: NotSet,
@@ -284,14 +226,7 @@ pub async fn change_for(runs: &Runs, key: &str, agent: &str, body: &Value, at: i
   };
 
   changed.set_at = Set(at);
-
-  if let Some(timeout) = timeout {
-    changed.timeout_ms = Set(Some(timeout));
-  }
-
-  if let Some(enabled) = enabled.and_then(Value::as_bool) {
-    changed.enabled = Set(Some(i64::from(enabled)));
-  }
+  changed.enabled = Set(Some(i64::from(enabled)));
 
   if fresh {
     changed.insert(&written).await.map_err(Refusal::database)?;
@@ -327,7 +262,6 @@ pub async fn copy(db: &DatabaseConnection, agent: &str, from: &str, at: i64) -> 
       agent: Set(agent.to_owned()),
       thinking: Set(row.thinking),
       answer_tokens: Set(row.answer_tokens),
-      timeout_ms: Set(row.timeout_ms),
       set_at: Set(at),
       enabled: Set(row.enabled),
       rowid: NotSet,

@@ -1,8 +1,8 @@
 //! A gate asked on a provider's program (`docs/gates.md`, 「A gate on a provider's program」): one thrown-away
 //! agency session started apart on the provider and the model the gate's tier maps to there, and one turn into
 //! it with the gate's instructions as its whole system prompt, a fresh session, no tools and thinking as the run
-//! asks. A turn past the run's wait is stopped; a turn somebody stopped is raised; any other end with no answer
-//! is the gate having none.
+//! asks, waited for until it ends. A turn somebody stopped is raised; any other end with no answer is the gate
+//! having none.
 
 use gate_ports::agency::{Apart, GateTurn, Line, TurnEnd};
 
@@ -79,10 +79,6 @@ pub async fn ask(runs: &Runs, run: &Run<'_>) -> Result<Ended, GateError> {
   };
   let model = route.model().to_owned();
 
-  if run.left().is_zero() {
-    return Ok(unanswered(Outcome::Timeout, "its wait ran out before the turn went in"));
-  }
-
   // The run's session stands under the gate's own agent where the settings name one, its program's place kept
   // apart from the agent whose turn it judges; otherwise the caller's agent, and the stage's name where it names
   // none.
@@ -96,12 +92,10 @@ pub async fn ask(runs: &Runs, run: &Run<'_>) -> Result<Ended, GateError> {
     model: model.clone(),
     cwd: runs.session_folder.clone(),
   };
-  let session = match tokio::time::timeout_at(run.deadline, runs.agency.start_apart(&agent, &apart)).await {
-    Err(_) => return Ok(unanswered(Outcome::Timeout, "its wait ran out before its session stood")),
-    Ok(Err(why)) => return Ok(unanswered(Outcome::Error, format!("its session would not stand: {why}"))),
-    Ok(Ok(session)) => session,
+  let session = match runs.agency.start_apart(&agent, &apart).await {
+    Err(why) => return Ok(unanswered(Outcome::Error, format!("its session would not stand: {why}"))),
+    Ok(session) => session,
   };
-  let session_id = session.id.clone();
   let turn = GateTurn {
     session: session.id,
     prompt: request.prompt.clone(),
@@ -120,15 +114,8 @@ pub async fn ask(runs: &Runs, run: &Run<'_>) -> Result<Ended, GateError> {
     thinking: request.thinking,
   };
 
-  match tokio::time::timeout_at(run.deadline, runs.agency.turn(&turn)).await {
-    Err(_) => {
-      if let Err(why) = runs.agency.stop(&session_id, "its gate's wait ran out").await {
-        eprintln!("{}: {} could not be stopped: {why}", run.stage, run.name);
-      }
-
-      Ok(unanswered(Outcome::Timeout, "its wait ran out"))
-    }
-    Ok(Err(why)) => Ok(unanswered(Outcome::Error, why.to_string())),
-    Ok(Ok(end)) => ended(end, &model),
+  match runs.agency.turn(&turn).await {
+    Err(why) => Ok(unanswered(Outcome::Error, why.to_string())),
+    Ok(end) => ended(end, &model),
   }
 }

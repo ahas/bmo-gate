@@ -1,61 +1,26 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { COMMAND_LIMIT, nodeCalls, runFault, spawnRunner, transferLimit } from "../../training/tooling/src/node-calls";
+import { nodeCalls, runFault, spawnRunner } from "../../training/tooling/src/node-calls";
 import { scratchDir } from "./scratch";
 
-import type { NodeRunner, RunLimit, RunResult } from "../../training/tooling/src/node-calls";
+import type { NodeRunner, RunResult } from "../../training/tooling/src/node-calls";
 
 const root = scratchDir("bmo-node-calls-");
 const CONSOLE = "/opt/console/main.ts";
 
-const alive = (pid: number): boolean => {
-  try {
-    process.kill(pid, 0);
+describe("a call on a node", () => {
+  test("is waited for until it exits, whatever it took, and answers what it wrote", async () => {
+    const result = await spawnRunner(["sh", "-c", "printf half; sleep 0.3; echo fine"]);
 
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-describe("a call that outlives its limit", () => {
-  test("a transfer standing silent is killed and says the limit and the bytes it carried", async () => {
-    const pidFile = join(root, "stalled.pid");
-
-    const result = await spawnRunner(["sh", "-c", `echo $$ > ${pidFile}; exec sleep 30`], { ms: 200, bytes: 55_000_000 });
-    const pid = Number(readFileSync(pidFile, "utf8").trim());
-
-    expect(result.code).not.toBe(0);
-    expect(result.timedOut).toEqual({ seconds: 0, bytes: 55_000_000 });
-    expect(alive(pid)).toBe(false);
-    expect(runFault(result)).toBe("timed out (0s, 55,000,000 bytes), no output");
+    expect(result).toEqual({ code: 0, stdout: "halffine\n", stderr: "" });
   });
 
-  test("a command is measured by what it had answered", async () => {
-    const result = await spawnRunner(["sh", "-c", "printf half; exec sleep 30"], { ms: 200, bytes: null });
+  test("that failed answers its own exit and what it wrote", async () => {
+    const result = await spawnRunner(["sh", "-c", "echo refused >&2; exit 3"]);
 
-    expect(result.timedOut).toEqual({ seconds: 0, bytes: 4 });
-    expect(runFault(result)).toBe("timed out (0s, 4 bytes) — half");
-  });
-
-  test("a call inside its limit is left alone", async () => {
-    const result = await spawnRunner(["sh", "-c", "echo fine"], { ms: 10_000, bytes: null });
-
-    expect(result).toEqual({ code: 0, stdout: "fine\n", stderr: "" });
-  });
-});
-
-describe("the limits", () => {
-  test("a transfer's limit grows with what it carries", () => {
-    expect(transferLimit(0).ms).toBe(60_000);
-    expect(transferLimit(55_000_000).ms).toBe(115_000);
-    expect(transferLimit(678_000_000).ms).toBe(738_000);
-  });
-
-  test("a command outlasts the hub's own five minutes by one", () => {
-    expect(COMMAND_LIMIT).toEqual({ ms: 360_000, bytes: null });
+    expect(result).toEqual({ code: 3, stdout: "", stderr: "refused\n" });
   });
 });
 
@@ -72,9 +37,9 @@ describe("why a call failed", () => {
 
 describe("the calls on one node", () => {
   const recording = (answers: RunResult[]) => {
-    const seen: Array<{ argv: readonly string[]; limit: RunLimit | undefined }> = [];
-    const runner: NodeRunner = async (argv, limit) => {
-      seen.push({ argv, limit });
+    const seen: Array<{ argv: readonly string[] }> = [];
+    const runner: NodeRunner = async (argv) => {
+      seen.push({ argv });
 
       return answers.shift() ?? { code: 0, stdout: "", stderr: "" };
     };
@@ -82,7 +47,7 @@ describe("the calls on one node", () => {
     return { runner, seen };
   };
 
-  test("an upload is limited by the file's size, and a failed one is made once more", async () => {
+  test("a failed upload is made once more", async () => {
     const local = join(root, "train.jsonl");
     writeFileSync(local, "x".repeat(3_000_000));
     const { runner, seen } = recording([{ code: 1, stdout: "", stderr: "hub closed" }, { code: 0, stdout: "", stderr: "" }]);
@@ -90,14 +55,14 @@ describe("the calls on one node", () => {
     const carried = await nodeCalls(runner, CONSOLE, "alpha").upload(local, "/srv/trainer/a-project/train.jsonl");
 
     expect(carried.code).toBe(0);
-    expect(seen.map((one) => one.limit)).toEqual([{ ms: 63_000, bytes: 3_000_000 }, { ms: 63_000, bytes: 3_000_000 }]);
+    expect(seen).toHaveLength(2);
     expect(seen[0]!.argv).toEqual(["bun", CONSOLE, "upload", local, "/srv/trainer/a-project/train.jsonl", "-a", "alpha"]);
   });
 
   test("a transfer failed twice says it was the second time", async () => {
     const { runner, seen } = recording([{ code: 1, stdout: "", stderr: "a" }, { code: 1, stdout: "", stderr: "b" }]);
 
-    const brought = await nodeCalls(runner, CONSOLE, "alpha").download("/remote.tar", join(root, "here.tar"), 678_000_000);
+    const brought = await nodeCalls(runner, CONSOLE, "alpha").download("/remote.tar", join(root, "here.tar"));
 
     expect(seen).toHaveLength(2);
     expect(runFault(brought)).toBe("tried 2 times, the last exit code 1 — b");
@@ -111,11 +76,11 @@ describe("the calls on one node", () => {
     expect(seen).toHaveLength(1);
   });
 
-  test("a command is not made twice and carries the command limit", async () => {
+  test("a command is not made twice", async () => {
     const { runner, seen } = recording([{ code: 1, stdout: "", stderr: "" }]);
 
     await nodeCalls(runner, CONSOLE, "alpha").exec("echo HOME=$HOME");
 
-    expect(seen).toEqual([{ argv: ["bun", CONSOLE, "exec", "-a", "alpha", "echo HOME=$HOME"], limit: COMMAND_LIMIT }]);
+    expect(seen).toEqual([{ argv: ["bun", CONSOLE, "exec", "-a", "alpha", "echo HOME=$HOME"] }]);
   });
 });

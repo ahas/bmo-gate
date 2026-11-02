@@ -17,7 +17,7 @@ import {
   type GgufOptions,
   type GgufSettings,
 } from "../../training/tooling/src/gguf-llm";
-import { authorizedLine, keyMaterial, knownHostsLine, type TunnelEnds } from "../../training/tooling/src/tunnel-install";
+import { SETUP_STANDING, authorizedLine, keyMaterial, knownHostsLine, type TunnelEnds } from "../../training/tooling/src/tunnel-install";
 import { scratchDir } from "./scratch";
 
 import type { NodeRunner, RunResult } from "../../training/tooling/src/node-calls";
@@ -72,7 +72,7 @@ interface Seen {
   carried?: { text: string; mode: number };
 }
 
-function fakeNode(options: { setup?: string; placed?: RunResult } = {}): { runner: NodeRunner; seen: Seen[] } {
+function fakeNode(options: { setup?: string; looks?: string[]; placed?: RunResult } = {}): { runner: NodeRunner; seen: Seen[] } {
   const seen: Seen[] = [];
   const runner: NodeRunner = async (argv) => {
     const one: Seen = { argv: [...argv] };
@@ -96,7 +96,7 @@ function fakeNode(options: { setup?: string; placed?: RunResult } = {}): { runne
       return answer("launched\n");
     }
     if (command.includes("setup.log")) {
-      return answer(`[10:00] checking Echo-Model-7B-Q8_0.gguf\n${options.setup ?? "GGUF-LLM-SETUP-DONE ok"}\n`);
+      return answer(options.looks?.shift() ?? `[10:00] checking Echo-Model-7B-Q8_0.gguf\n${options.setup ?? "GGUF-LLM-SETUP-DONE ok"}\n`);
     }
     if (command.includes("ssh-keygen") || command.startsWith("cat ~/.config/echo-model/tunnel_ed25519.pub")) {
       return answer(`${TUNNEL_PUB}\n`);
@@ -149,8 +149,6 @@ function installing(runner: NodeRunner, at: Stage, role: string | null = null): 
     tunnel: TUNNEL,
     health: async () => true,
     wait: async () => {},
-    setupPolls: 3,
-    healthPolls: 2,
     say: (line) => at.said.push(line),
   };
 }
@@ -321,6 +319,29 @@ describe("the install on a stand-in node", () => {
     expect(outcome.ok).toBe(false);
     expect(outcome.step).toBe("setup");
     expect(outcome.fault).toContain("its sha256 step");
+    expect(seen.some((one) => one.argv[0] === CATALOGUE)).toBe(false);
+  });
+
+  test("waits on the setup for as long as its process stands", async () => {
+    const at = stage();
+    const standing = `${SETUP_STANDING}\n[10:00] fetching Echo-Model-7B-Q8_0.gguf\n`;
+    const { runner, seen } = fakeNode({ looks: [standing, standing] });
+
+    const outcome = await installGguf(instance(), installing(runner, at));
+
+    expect(outcome.ok).toBe(true);
+    expect(seen.filter((one) => commandOf(one).includes("setup.log") && !commandOf(one).includes("setsid"))).toHaveLength(3);
+  });
+
+  test("stops at a setup whose process ended without its last line", async () => {
+    const at = stage();
+    const { runner, seen } = fakeNode({ looks: ["[10:00] fetching Echo-Model-7B-Q8_0.gguf\n"] });
+
+    const outcome = await installGguf(instance(), installing(runner, at));
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.step).toBe("setup");
+    expect(outcome.fault).toContain("ended without its last line");
     expect(seen.some((one) => one.argv[0] === CATALOGUE)).toBe(false);
   });
 

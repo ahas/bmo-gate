@@ -31,14 +31,15 @@ written for one caller.
 | Route | Request | Answer |
 |---|---|---|
 | `GET /gates` | | a page of the gate order, each `gateName`, `part` (`pre`, `post` or `apart`), `step`, `condition` or null, `switchable` and `answerTokens`; the order holds no gate, so the page is empty |
-| `GET /options/{gateName}` | | `timeoutMs`, `switchable`, `enabled`, `effective` (`thinking`, `answerTokens`, `timeoutMs`) and `defaults` |
-| `POST /options/{gateName}` | any of `timeoutMs` and `enabled` | `gateName` and `options`, the gate's route as a run reads it (`provider`, `model`, `timeoutMs`, `setAt`) |
-| `POST /options/{gateName}/agents/{agentName}` | as `POST /options/{gateName}` | as `POST /options/{gateName}`, its wait the agent's |
+| `GET /options/{gateName}` | | `switchable`, `enabled`, `effective` (`thinking`, `answerTokens`) and `defaults` |
+| `POST /options/{gateName}` | `enabled` | `gateName` and `options`, the gate's route as a run reads it (`provider`, `model`, `setAt`) |
+| `POST /options/{gateName}/agents/{agentName}` | as `POST /options/{gateName}` | as `POST /options/{gateName}`, its switch the agent's |
 | `POST /options/copied` | `agentName` (the companion), `fromAgentName` (the chat agent) | 204 |
 
-- **A gate's options** are its wait and its switch where its profile lets it be switched off. What it thinks and
-  how much it may answer are its tier's on its road; a change naming either is refused `own-llm`. No gate stands
-  in the order, so no options row is read or written.
+- **A gate's options** are its switch where its profile lets it be switched off. What it thinks and how much it
+  may answer are its tier's on its road; a change naming either is refused `own-llm`. A gate has no wait of its
+  own: a run is waited for until it ends (「Runs」). No gate stands in the order, so no options row is read or
+  written.
 - **A change names whose options it writes.** `POST /options/{gateName}` writes the chat agent's row of the gate;
   `POST /options/{gateName}/agents/{agentName}` writes the named agent's, with the same fields and refusals, and
   no other agent's row is touched by either.
@@ -135,7 +136,7 @@ It answers `entries`, each `path`, `text` and `source` (`document`, `person`, `r
   the translation policy's bound, four (`lanes`), and a part waits its turn behind those asked before it,
   whichever call it came in.
   At most 64 originals stand at once across the calls, read or waiting; a call that would take the count past
-  that is 503 `translator-busy`, with `Retry-After` naming the seconds to wait, 5, and nothing of it is read.
+  that waits in line, nothing of it read, until enough of those standing are answered, however long that takes.
 - **Keeping a translation** keeps `text` as the reading of `original` in the language, in place of any kept
   before.
 
@@ -147,6 +148,9 @@ its road gave none) and `ms`.
 
 - **One run of one gate,** for a unit that reads the answer itself. The run goes on the gate's road with the
   gate's options and is recorded as a road like any gate run.
+- **A run is waited for until it ends:** its road answers, fails, or somebody stops it. No span of time ends a
+  run or the wait for its place in the gate's pool (`docs/boundary-api.md`, 「How a gate run reaches a model」),
+  so the call is answered when the run is.
 - **The instructions** are the gate's own where `system` is absent. A name that is not a gate is 404
   `no-gate`; a gate switched off answers null without asking any road.
 
@@ -210,6 +214,8 @@ folder with its own `tool.toml`, placed with the tool host and registered as the
   named and none in the record is refused.
 - **Their answers** are the gate's, as the result's structured content and its one text piece, and their refusals
   are told as the translator's are.
+- **A call waits for the gate's answer** however long it takes: the manifests name no timeout, and the tool host
+  keeps no clock on a call (its `docs/api.md`, 「The manifest」).
 
 - **Its input** is `language`, a language tag, and `texts`, one text or several, at most sixteen, the most one
   translation carries (「Translations」). It is handed on to the gate as the translation's `language` and

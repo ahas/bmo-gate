@@ -1,9 +1,8 @@
 //! The agency's model gateway (`docs/boundary-api.md`, 「The model gateway」): a gate run on a registered model
-//! is one chat completion with no tools and no session, the caller's wait named in the gateway's per-request
-//! wait headers, and the gateway's key read from its file for each request.
+//! is one chat completion with no tools and no session, waited for until the gateway answers, and the gateway's
+//! key read from its file for each request.
 
 use std::path::PathBuf;
-use std::time::Duration;
 
 use futures_util::future::BoxFuture;
 use reqwest::Client;
@@ -25,8 +24,6 @@ pub struct Ask {
   pub input: String,
   pub max_tokens: i64,
   pub thinking: bool,
-  /// How long the caller waits, which the gateway is told so it gives up where the caller does.
-  pub wait: Duration,
   /// The run's sampling, as the sampling header carries it, where the run names one.
   pub sampling: Option<String>,
 }
@@ -128,15 +125,11 @@ impl Gateway for HttpGateway {
           enable_thinking: ask.thinking,
         },
       };
-      let seconds = ask.wait.as_secs().max(1).to_string();
       let caller = crate::http::Caller::new(UNIT, self.peer.clone());
       let mut request = self
         .client
         .post(caller.url(&["v1", "chat", "completions"]))
         .bearer_auth(key)
-        .header("x-litellm-timeout", &seconds)
-        .header("x-litellm-stream-timeout", &seconds)
-        .timeout(ask.wait)
         .json(&body);
 
       if let Some(sampling) = &ask.sampling {

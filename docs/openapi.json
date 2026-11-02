@@ -174,19 +174,11 @@
           },
           "thinking": {
             "type": "boolean"
-          },
-          "timeoutMs": {
-            "format": "int64",
-            "type": [
-              "integer",
-              "null"
-            ]
           }
         },
         "required": [
           "thinking",
-          "answerTokens",
-          "timeoutMs"
+          "answerTokens"
         ],
         "type": "object"
       },
@@ -292,13 +284,6 @@
               "boolean",
               "null"
             ]
-          },
-          "timeoutMs": {
-            "format": "int64",
-            "type": [
-              "integer",
-              "null"
-            ]
           }
         },
         "type": "object"
@@ -317,17 +302,9 @@
           },
           "switchable": {
             "type": "boolean"
-          },
-          "timeoutMs": {
-            "format": "int64",
-            "type": [
-              "integer",
-              "null"
-            ]
           }
         },
         "required": [
-          "timeoutMs",
           "switchable",
           "enabled",
           "effective",
@@ -383,19 +360,11 @@
             "description": "Epoch milliseconds.",
             "format": "int64",
             "type": "integer"
-          },
-          "timeoutMs": {
-            "format": "int64",
-            "type": [
-              "integer",
-              "null"
-            ]
           }
         },
         "required": [
           "provider",
           "model",
-          "timeoutMs",
           "setAt"
         ],
         "type": "object"
@@ -1863,7 +1832,7 @@
             "$ref": "#/components/responses/Error"
           }
         },
-        "summary": "Change a gate's wait or switch.",
+        "summary": "Change a gate's switch.",
         "tags": [
           "Gates"
         ],
@@ -1873,7 +1842,6 @@
           "no-gate",
           "own-llm",
           "nothing-to-change",
-          "timeout-out-of-range",
           "switch-not-boolean",
           "always-on",
           "failed",
@@ -1937,7 +1905,6 @@
           "no-gate",
           "own-llm",
           "nothing-to-change",
-          "timeout-out-of-range",
           "switch-not-boolean",
           "always-on",
           "failed",
@@ -2276,8 +2243,7 @@
           "language-unknown",
           "stopped",
           "failed",
-          "upstream-failed",
-          "translator-busy"
+          "upstream-failed"
         ]
       }
     },

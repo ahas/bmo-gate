@@ -14,7 +14,6 @@ use tokio::time::Instant;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Outcome {
   Answered,
-  Timeout,
   TooLarge,
   Error,
   Unavailable,
@@ -25,7 +24,6 @@ impl Outcome {
   pub fn word(self) -> &'static str {
     match self {
       Self::Answered => "answered",
-      Self::Timeout => "timeout",
       Self::TooLarge => "too-large",
       Self::Error => "error",
       Self::Unavailable => "unavailable",

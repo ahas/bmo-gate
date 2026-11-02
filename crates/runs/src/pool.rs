@@ -1,14 +1,13 @@
-//! How many runs of one gate stand at once (`docs/gates.md`, 「How many runs stand at once」): a gate whose road
-//! is a provider's program stands as many thrown-away sessions at once as its pool's bound, and a gate whose road
-//! is the gateway takes its runs in turns, the next waiting until the previous one has returned. A run waits for
-//! its place no longer than its own wait.
+//! How many runs of one gate stand at once (`docs/boundary-api.md`, 「How a gate run reaches a model」): a gate
+//! whose road is a provider's program stands as many thrown-away sessions at once as its pool's bound, and a gate
+//! whose road is the gateway takes its runs in turns, the next waiting until the previous one has returned. A run
+//! waits in line for its place however long that takes, and is never turned away.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use gate_policy::profiles::PROFILES;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
-use tokio::time::Instant;
 
 use crate::route::{Route, Way};
 
@@ -40,11 +39,10 @@ impl Pools {
       .clone()
   }
 
-  /// A place of the gate's pool for a run on its road, waited for until `by`; none where every place stayed
-  /// taken.
-  pub async fn take(&self, stage: &str, route: &Route, by: Instant) -> Option<Place> {
+  /// A place of the gate's pool for a run on its road, waited for in line until one comes free.
+  pub async fn take(&self, stage: &str, route: &Route) -> Place {
     let places = self.of(stage, route.way);
 
-    tokio::time::timeout_at(by, places.acquire_owned()).await.ok()?.ok().map(Place)
+    Place(places.acquire_owned().await.expect("a pool's places are never closed"))
   }
 }

@@ -1,7 +1,5 @@
 //! The client: one call for every route the gate serves, through the contract's own types.
 
-use std::time::Duration;
-
 use futures_util::{Stream, StreamExt};
 use reqwest::header::{ACCEPT, AUTHORIZATION};
 use reqwest::{Method, RequestBuilder, Response};
@@ -11,9 +9,6 @@ use sse_stream::SseStream;
 use url::Url;
 
 use crate::types::*;
-
-/// How long a call waits for its answer beyond the wait it asked the gate for.
-const ANSWER_WITHIN: Duration = Duration::from_secs(30);
 
 /// What a call came to short of the route's answer.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
@@ -75,7 +70,6 @@ impl GateClient {
       base.set_path(&path);
     }
     let http = reqwest::Client::builder()
-      .connect_timeout(Duration::from_secs(10))
       .build()
       .map_err(|error| ClientFailure::Unreachable(error.to_string()))?;
 
@@ -101,7 +95,6 @@ impl GateClient {
       .http
       .request(method, self.url(segments))
       .header(AUTHORIZATION, format!("Bearer {}", self.token))
-      .timeout(ANSWER_WITHIN)
   }
 
   fn get(&self, segments: &[&str]) -> RequestBuilder {

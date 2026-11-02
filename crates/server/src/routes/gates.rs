@@ -44,13 +44,11 @@ pub async fn gates() -> Json<Page<Gate>> {
 
 fn options_of(view: options::View) -> GateOptions {
   GateOptions {
-    timeout_ms: view.timeout_ms,
     switchable: view.switchable,
     enabled: view.enabled,
     effective: EffectiveOptions {
       thinking: view.effective.thinking,
       answer_tokens: view.effective.answer_tokens,
-      timeout_ms: view.effective.timeout_ms,
     },
     defaults: DefaultOptions {
       thinking: view.defaults.thinking,
@@ -63,7 +61,6 @@ fn route_of(route: options::RouteView) -> GateRoute {
   GateRoute {
     provider: route.provider,
     model: route.model,
-    timeout_ms: route.timeout_ms,
     set_at: route.set_at,
   }
 }
@@ -111,7 +108,7 @@ async fn changed(
     .await
     .map_err(Refused::of_options)?;
 
-  let options = options::route_view_for(runs, &gate_name, agent).await.map_err(Refused::of_options)?;
+  let options = options::route_view(runs, &gate_name).await.map_err(Refused::of_options)?;
 
   Ok(Json(GateOptionsChanged {
     gate_name,

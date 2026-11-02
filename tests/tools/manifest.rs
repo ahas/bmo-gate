@@ -55,7 +55,10 @@ fn every_manifest_reads_as_the_tool_host_reads_it() {
 
     assert_eq!(tool["name"].as_str(), Some(name.as_str()), "{name}: the tool is named as its folder");
     assert_eq!(tool["protocol"].as_integer(), Some(1), "{name}: it speaks protocol 1");
-    assert!(tool["timeout"].as_integer().unwrap_or(0) > 0, "{name}: its timeout is more than 0");
+    assert!(
+      tool.get("timeout").is_none(),
+      "{name}: a call waits for the gate's answer, however long it takes"
+    );
 
     let run = strings(tool.get("run"));
     let executable = run.first().unwrap_or_else(|| panic!("{name}: its run command names something"));
@@ -83,6 +86,10 @@ fn every_manifest_reads_as_the_tool_host_reads_it() {
       assert!(
         !strings(entry.get("capabilities")).is_empty(),
         "{name}: each entry asks for a capability"
+      );
+      assert!(
+        entry.get("timeout").is_none() && entry.get("unbounded").is_none(),
+        "{name}: no entry names a span to answer within"
       );
 
       for key in ["input", "output"] {

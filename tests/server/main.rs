@@ -39,8 +39,7 @@ pub const TOKEN: &str = "the-gate-token";
 /// The room the tests' turns are in.
 pub const ROOM: i64 = 7;
 
-/// A migrated store, the stand-ins, a wait of thirty seconds for every gate, the service over them, and its
-/// address on the loopback.
+/// A migrated store, the stand-ins, the service over them, and its address on the loopback.
 pub struct Ground {
   pub scratch: Scratch,
   pub agency: Arc<FakeAgency>,

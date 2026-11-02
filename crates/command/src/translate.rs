@@ -3,15 +3,11 @@
 
 use std::io::Read;
 use std::path::Path;
-use std::time::Duration;
 
 use gate_server::settings::Settings;
 use serde::{Deserialize, Serialize};
 
 use crate::{Answered, Fault};
-
-/// The longest the translator is waited on.
-pub const WAIT: Duration = Duration::from_secs(180);
 
 #[derive(clap::Args, Debug)]
 pub struct TranslateArgs {
@@ -59,11 +55,7 @@ pub async fn translate(path: &Path, args: TranslateArgs) -> Answered {
     .map_err(|why| Fault::failed(format!("the service's token: {why}")))?
     .ok_or_else(|| Fault::failed(format!("{} holds no token", settings.token_file)))?;
   let url = format!("{}/translations", settings.address.trim_end_matches('/'));
-  let client = reqwest::Client::builder()
-    .timeout(WAIT)
-    .build()
-    .map_err(|why| Fault::failed(format!("no client: {why}")))?;
-  let answer = client
+  let answer = reqwest::Client::new()
     .post(&url)
     .bearer_auth(token)
     .json(&Ask {

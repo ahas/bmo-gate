@@ -10,13 +10,9 @@ mod gateway;
 mod http;
 mod receiver;
 
-use std::time::Duration;
-
 use gate_ports::Peer;
 
-/// A peer for a stand-in, presenting `token`, offering each call once.
+/// A peer for a stand-in, presenting `token`.
 pub fn peer(stub: &stub::Stub, token: &str) -> Peer {
-  Peer::new(&stub.address, Some(token.to_owned()))
-    .unwrap()
-    .with_patience(Duration::ZERO, Duration::ZERO)
+  Peer::new(&stub.address, Some(token.to_owned())).unwrap()
 }

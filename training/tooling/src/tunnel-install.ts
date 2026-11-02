@@ -113,9 +113,7 @@ export interface InstallOptions {
   tmpRoot?: string;
   health?: () => Promise<boolean>;
   wait?: (ms: number) => Promise<void>;
-  setupPolls?: number;
   setupEveryMs?: number;
-  healthPolls?: number;
   healthEveryMs?: number;
   say?: (line: string) => void;
 }
@@ -244,14 +242,22 @@ export function envModeCommand(service: Pick<TunnelledService, "configDir">, nam
 }
 
 /** The setup, started and let go of: the hub stops a command it streams after five minutes, and the
- * stop reaches the whole process group, so it is detached and read back out of its log. */
+ * stop reaches the whole process group, so it is detached and read back out of its log. The number of
+ * the process it runs as is kept beside the log, so a look at it can tell whether it still stands. */
 export function setupLaunchCommand(service: Pick<TunnelledService, "serviceDir">): string {
-  return `cd ~/${service.serviceDir} && chmod +x node-setup.sh && rm -f setup.log && `
-    + `setsid nohup bash node-setup.sh > setup.log 2>&1 < /dev/null & echo launched`;
+  return `cd ~/${service.serviceDir} && chmod +x node-setup.sh && rm -f setup.log setup.pid && `
+    + `setsid nohup bash -c 'echo $$ > setup.pid && exec bash node-setup.sh' > setup.log 2>&1 < /dev/null & echo launched`;
 }
 
+/** The line a look at the setup says while its process stands. */
+export const SETUP_STANDING = "setup-standing";
+
+/** A look at the setup: whether its process stands, asked before its log's tail is read, so a setup
+ * that has ended has its last line in the tail read after. */
 export function setupTailCommand(service: Pick<TunnelledService, "serviceDir">, lines = 40): string {
-  return `tail -n ${lines} ~/${service.serviceDir}/setup.log 2>/dev/null || true`;
+  const dir = `~/${service.serviceDir}`;
+  return `{ kill -0 "$(cat ${dir}/setup.pid 2>/dev/null)" 2>/dev/null && echo ${SETUP_STANDING}; `
+    + `tail -n ${lines} ${dir}/setup.log 2>/dev/null; } || true`;
 }
 
 export interface SetupEnd {
@@ -260,10 +266,15 @@ export interface SetupEnd {
   fault: string | null;
 }
 
+/** How the setup stands by a look at it: ended with its last line, still going, or ended with neither,
+ * a setup that did not finish and names no step. */
 export function parseSetupEnd(text: string, marker: string): SetupEnd {
-  const line = text.split("\n").map((one) => one.trim()).filter((one) => one.startsWith(marker)).at(-1);
+  const lines = text.split("\n").map((one) => one.trim());
+  const line = lines.filter((one) => one.startsWith(marker)).at(-1);
   if (line === undefined) {
-    return { done: false, ok: false, fault: null };
+    return lines.includes(SETUP_STANDING)
+      ? { done: false, ok: false, fault: null }
+      : { done: true, ok: false, fault: null };
   }
   const said = line.slice(marker.length).trim();
   if (said === "ok") {
@@ -295,7 +306,7 @@ export function unitsCommand(service: Pick<TunnelledService, "serviceDir" | "uni
 function answersHealth(url: string): () => Promise<boolean> {
   return async () => {
     try {
-      return (await fetch(url, { signal: AbortSignal.timeout(5_000) })).status === 200;
+      return (await fetch(url)).status === 200;
     } catch {
       return false;
     }
@@ -367,22 +378,25 @@ export async function installTunnelledService(service: TunnelledService, options
   say(`${node}: ${carrying.length} service files put across`);
   done.push("upload");
 
-  // 4. The setup, detached and waited on.
+  // 4. The setup, detached and waited on for as long as its process stands.
   say(`${node}: standing up the environment of ${service.label}`);
   const launched = await exec(setupLaunchCommand(service));
   if (launched.code !== 0) {
     return stop("setup", `the install could not be started — ${runFault(launched)}`);
   }
   let end: SetupEnd = { done: false, ok: false, fault: null };
-  for (let poll = 0; poll < (options.setupPolls ?? 160) && !end.done; poll += 1) {
+  while (!end.done) {
     await wait(options.setupEveryMs ?? 15_000);
-    end = parseSetupEnd((await exec(setupTailCommand(service))).stdout, service.setupDone);
-  }
-  if (!end.done) {
-    return stop("setup", `the install did not finish — see ~/${service.serviceDir}/setup.log`);
+    const looked = await exec(setupTailCommand(service));
+    if (looked.code !== 0) {
+      return stop("setup", `the install could not be looked at — ${runFault(looked)}`);
+    }
+    end = parseSetupEnd(looked.stdout, service.setupDone);
   }
   if (!end.ok) {
-    return stop("setup", `the install stopped at its ${end.fault} step — see ~/${service.serviceDir}/setup.log`);
+    return stop("setup", end.fault === null
+      ? `the install ended without its last line — see ~/${service.serviceDir}/setup.log`
+      : `the install stopped at its ${end.fault} step — see ~/${service.serviceDir}/setup.log`);
   }
   done.push("setup");
 
@@ -438,17 +452,13 @@ export async function installTunnelledService(service: TunnelledService, options
   }
   done.push("units");
 
-  // 10. The service answering on the operations machine, through the tunnel.
+  // 10. The service answering on the operations machine, through the tunnel, however long it takes to
+  // come up.
   const url = healthUrl(service);
-  say(`waiting for ${url}`);
+  say(`waiting for ${url}; journalctl --user -u ${service.engineUnit} on ${node} says why it is not up yet`);
   const health = options.health ?? answersHealth(url);
-  let up = await health();
-  for (let poll = 0; poll < (options.healthPolls ?? 120) && !up; poll += 1) {
+  while (!(await health())) {
     await wait(options.healthEveryMs ?? 5_000);
-    up = await health();
-  }
-  if (!up) {
-    return stop("health", `${url} does not answer — see journalctl --user -u ${service.engineUnit} on ${node}`);
   }
   done.push("health");
 

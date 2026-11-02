@@ -1,7 +1,5 @@
 //! What every port shares: the addresses it takes, the path a call goes to, the bearer, a refusal read as the
-//! unit gave it, and a unit that does not answer.
-
-use std::time::Duration;
+//! unit gave it, and a unit that refuses the connection.
 
 use axum::http::Method;
 use gate_codes::Code;
@@ -88,24 +86,16 @@ async fn a_body_that_reads_as_neither_shape_is_malformed() {
   assert!(matches!(failed, PortError::Malformed { status: 200, .. }), "{failed:?}");
 }
 
-#[tokio::test(start_paused = true)]
-async fn a_refused_connection_is_offered_again_until_the_patience_runs_out() {
+#[tokio::test]
+async fn a_refused_connection_ends_the_call_and_is_offered_no_more() {
   // A port nothing listens on: bound, its address read, and let go.
   let address = {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     format!("http://{}", listener.local_addr().unwrap())
   };
-  let peer = Peer::new(&address, None)
-    .unwrap()
-    .with_patience(Duration::from_secs(6), Duration::from_secs(2));
-  let started = tokio::time::Instant::now();
+  let peer = Peer::new(&address, None).unwrap();
 
   let failed = Caller::new("a unit", peer).get::<Value>("a read", &["x"], &[]).await.unwrap_err();
 
   assert!(matches!(failed, PortError::Unreachable { .. }), "{failed:?}");
-  assert_eq!(
-    started.elapsed(),
-    Duration::from_secs(6),
-    "three waits of two seconds each before it gave up"
-  );
 }

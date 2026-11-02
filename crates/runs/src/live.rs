@@ -14,7 +14,6 @@ pub struct GateRun {
   pub message_id: Option<i64>,
   /// When it was asked, in seconds.
   pub started_at: i64,
-  pub cap_seconds: i64,
 }
 
 static RUNS: LazyLock<Mutex<BTreeMap<u64, GateRun>>> = LazyLock::new(Mutex::default);

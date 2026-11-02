@@ -1,11 +1,10 @@
-import { statSync } from "node:fs";
 import { join } from "node:path";
 
-import { COMMAND_LIMIT, nodeCalls, transferLimit } from "./node-calls";
+import { nodeCalls } from "./node-calls";
 import { homeDir } from "./roots";
 import { settingWords } from "./settings";
 
-import type { NodeCalls, NodeRunner, RunLimit, RunResult } from "./node-calls";
+import type { NodeCalls, NodeRunner, RunResult } from "./node-calls";
 
 // How this project reaches a node by its registered name (the node unit's docs/nodes.md, 「Registering and
 // changing a node」).
@@ -81,7 +80,7 @@ export function reservedAgainst(service: string, node: string, connection: Pick<
 
 /** The node's connection as the node list has it now, whatever shell it logs into, or why it could not be had. */
 export async function readListedConnection(name: string, runner: NodeRunner, command?: readonly string[]): Promise<NodeConnection | string> {
-  const asked = await runner(nodeListCommand(name, command), COMMAND_LIMIT);
+  const asked = await runner(nodeListCommand(name, command));
   const connection = asked.code === 0 ? parseConnection(asked.stdout) : null;
 
   if (connection === null) {
@@ -113,12 +112,13 @@ function expanded(path: string): string {
 }
 
 /** What every batch login and copy to an ssh node is given: nobody is asked anything, the node's key
- * alone where it names one, and a host key taken the first time and held to after, as the node list's
- * own check does. */
+ * alone where it names one, a host key taken the first time and held to after, as the node list's own
+ * check does, and the connection kept alive, so a node that has gone ends the call (docs/training.md,
+ * 「Calls on a node」). */
 export function sshOptions(target: Extract<NodeConnection, { kind: "ssh" }>, portFlag: "-p" | "-P"): string[] {
   const key = target.keyPath === null ? [] : ["-i", expanded(target.keyPath), "-o", "IdentitiesOnly=yes"];
 
-  return ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "StrictHostKeyChecking=accept-new", portFlag, String(target.port), ...key];
+  return ["-o", "BatchMode=yes", "-o", "ServerAliveInterval=30", "-o", "StrictHostKeyChecking=accept-new", portFlag, String(target.port), ...key];
 }
 
 /** A command handed to bash inside the login, as a console node's agent runs one in bash, whatever shell the
@@ -139,17 +139,16 @@ export function scpDownloadArgs(target: Extract<NodeConnection, { kind: "ssh" }>
 /** The three calls on an ssh node: a batch login for a command, a copy each way for a file. A copy
  * that failed is made once more, as a console node's transfer is. */
 export function sshNodeCalls(runner: NodeRunner, target: Extract<NodeConnection, { kind: "ssh" }>): NodeCalls {
-  const twice = async (argv: readonly string[], limit: RunLimit): Promise<RunResult> => {
-    const first = await runner(argv, limit);
+  const twice = async (argv: readonly string[]): Promise<RunResult> => {
+    const first = await runner(argv);
 
-    return first.code === 0 ? first : { ...await runner(argv, limit), attempts: 2 };
+    return first.code === 0 ? first : { ...await runner(argv), attempts: 2 };
   };
 
   return {
-    exec: (command) => runner(sshExecArgs(target, command), COMMAND_LIMIT),
-    upload: (local, remote) =>
-      twice(scpUploadArgs(target, local, remote), transferLimit(statSync(local, { throwIfNoEntry: false })?.size ?? 0)),
-    download: (remote, local, bytes) => twice(scpDownloadArgs(target, remote, local), transferLimit(bytes)),
+    exec: (command) => runner(sshExecArgs(target, command)),
+    upload: (local, remote) => twice(scpUploadArgs(target, local, remote)),
+    download: (remote, local) => twice(scpDownloadArgs(target, remote, local)),
   };
 }
 

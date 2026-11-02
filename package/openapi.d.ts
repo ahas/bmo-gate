@@ -168,7 +168,7 @@ export interface paths {
         /** One gate's options as it stands for the chat agent. */
         get: operations["gate_options"];
         put?: never;
-        /** Change a gate's wait or switch. */
+        /** Change a gate's switch. */
         post: operations["gate_options_change"];
         delete?: never;
         options?: never;
@@ -390,8 +390,6 @@ export interface components {
             /** Format: int64 */
             answerTokens: number;
             thinking: boolean;
-            /** Format: int64 */
-            timeoutMs: number | null;
         };
         /** @description One piece a turn is handed. */
         Entry: {
@@ -427,8 +425,6 @@ export interface components {
             enabled?: boolean | null;
             /** @description Not a gate option: its tier's. A change naming it is refused `own-llm`. */
             thinking?: boolean | null;
-            /** Format: int64 */
-            timeoutMs?: number | null;
         };
         /** @description One gate's options as it stands for the chat agent. */
         GateOptions: {
@@ -436,8 +432,6 @@ export interface components {
             effective: components["schemas"]["EffectiveOptions"];
             enabled: boolean;
             switchable: boolean;
-            /** Format: int64 */
-            timeoutMs: number | null;
         };
         /** @description The options as a change left them. */
         GateOptionsChanged: {
@@ -458,8 +452,6 @@ export interface components {
              * @description Epoch milliseconds.
              */
             setAt: number;
-            /** Format: int64 */
-            timeoutMs: number | null;
         };
         /** @description Readiness and version. */
         Health: {

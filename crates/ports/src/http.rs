@@ -1,8 +1,6 @@
-//! How every port reaches its unit: the unit's base address and token, a path built out of segments, a
-//! connection refused offered again within the caller's patience, and an answer read as the call's shape or
-//! as the unit's refusal.
-
-use std::time::Duration;
+//! How every port reaches its unit (`docs/boundary-api.md`, 「Calls the gate makes」): the unit's base address and
+//! token, a path built out of segments, a call waited for until it is answered or its connection is refused or
+//! broken, and an answer read as the call's shape or as the unit's refusal.
 
 use futures_util::{Stream, StreamExt};
 use gate_codes::Code;
@@ -11,18 +9,11 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-/// How long a call keeps offering itself to a unit that refuses the connection, and how often, unless a
-/// peer is given its own: the brain's rule, which every caller of a unit of this deployment keeps.
-pub const PATIENCE: Duration = Duration::from_secs(120);
-pub const RETRY_EVERY: Duration = Duration::from_secs(2);
-
 /// One unit as a port reaches it.
 #[derive(Clone, Debug)]
 pub struct Peer {
   base: Url,
   token: Option<String>,
-  patience: Duration,
-  retry_every: Duration,
 }
 
 impl Peer {
@@ -38,19 +29,7 @@ impl Peer {
       });
     }
 
-    Ok(Self {
-      base,
-      token,
-      patience: PATIENCE,
-      retry_every: RETRY_EVERY,
-    })
-  }
-
-  /// The same unit with another patience for a refused connection; zero offers each call once.
-  pub fn with_patience(mut self, patience: Duration, retry_every: Duration) -> Self {
-    self.patience = patience;
-    self.retry_every = retry_every;
-    self
+    Ok(Self { base, token })
   }
 }
 
@@ -60,7 +39,7 @@ impl Peer {
 pub enum PortError {
   /// The address given is no plain `http:` address a path can be added to.
   NotAnAddress { address: String },
-  /// The call did not reach the unit within the patience, or no answer came back.
+  /// The call did not reach the unit, its connection refused or broken, or no answer came back.
   Unreachable {
     unit: &'static str,
     call: &'static str,
@@ -172,26 +151,9 @@ impl Caller {
     }
   }
 
-  /// A request sent, offered again while the connection is refused and the patience lasts.
-  async fn send(&self, call: &'static str, build: impl Fn() -> RequestBuilder) -> Answer<Response> {
-    // The runtime's clock, which the waits below run on too.
-    let started = tokio::time::Instant::now();
-
-    loop {
-      match build().send().await {
-        Ok(response) => return Ok(response),
-        Err(why) if why.is_connect() && started.elapsed() + self.peer.retry_every <= self.peer.patience => {
-          tokio::time::sleep(self.peer.retry_every).await;
-        }
-        Err(why) => {
-          return Err(PortError::Unreachable {
-            unit: self.unit,
-            call,
-            why: why.to_string(),
-          });
-        }
-      }
-    }
+  /// A request sent and waited for until the unit answers or the connection is refused or broken.
+  async fn send(&self, call: &'static str, request: RequestBuilder) -> Answer<Response> {
+    request.send().await.map_err(|why| self.unreachable(call, why))
   }
 
   /// The refusal a non-2xx answer carries, its sentence under `error` and its code under `code`.
@@ -242,7 +204,7 @@ impl Caller {
     segments: &[&str],
     query: &[(&str, &str)],
   ) -> Answer<T> {
-    let response = self.send(call, || self.request(Method::GET, segments).query(query)).await?;
+    let response = self.send(call, self.request(Method::GET, segments).query(query)).await?;
 
     self.read(call, response).await
   }
@@ -254,7 +216,7 @@ impl Caller {
     segments: &[&str],
     query: &[(&str, &str)],
   ) -> Answer<String> {
-    let response = self.send(call, || self.request(Method::GET, segments).query(query)).await?;
+    let response = self.send(call, self.request(Method::GET, segments).query(query)).await?;
 
     if !response.status().is_success() {
       return Err(self.refused(call, response).await);
@@ -271,7 +233,7 @@ impl Caller {
     segments: &[&str],
     body: &B,
   ) -> Answer<T> {
-    let response = self.send(call, || self.request(method.clone(), segments).json(body)).await?;
+    let response = self.send(call, self.request(method, segments).json(body)).await?;
 
     self.read(call, response).await
   }
@@ -311,7 +273,7 @@ impl Caller {
     segments: &[&str],
     body: &B,
   ) -> Answer<()> {
-    let response = self.send(call, || self.request(method.clone(), segments).json(body)).await?;
+    let response = self.send(call, self.request(method, segments).json(body)).await?;
 
     if response.status().is_success() {
       Ok(())
@@ -322,7 +284,7 @@ impl Caller {
 
   /// A call sent with `method` and no body, whose answer is only its success.
   pub async fn without(&self, call: &'static str, method: Method, segments: &[&str]) -> Answer<()> {
-    let response = self.send(call, || self.request(method.clone(), segments)).await?;
+    let response = self.send(call, self.request(method, segments)).await?;
 
     if response.status().is_success() {
       Ok(())
@@ -338,7 +300,7 @@ impl Caller {
     segments: &[&str],
     body: &B,
   ) -> Answer<(StatusCode, String)> {
-    let response = self.send(call, || self.request(Method::POST, segments).json(body)).await?;
+    let response = self.send(call, self.request(Method::POST, segments).json(body)).await?;
     let status = response.status();
     let text = response.text().await.map_err(|why| self.unreachable(call, why))?;
 
@@ -352,7 +314,7 @@ impl Caller {
     segments: &[&str],
     query: &[(&str, &str)],
   ) -> Answer<impl Stream<Item = Answer<(String, Value)>> + use<>> {
-    let response = self.send(call, || self.request(Method::GET, segments).query(query)).await?;
+    let response = self.send(call, self.request(Method::GET, segments).query(query)).await?;
 
     if !response.status().is_success() {
       return Err(self.refused(call, response).await);

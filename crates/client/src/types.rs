@@ -59,7 +59,6 @@ pub struct Gate {
 pub struct EffectiveOptions {
   pub thinking: bool,
   pub answer_tokens: i64,
-  pub timeout_ms: Option<i64>,
 }
 
 /// The values a blank setting stands for.
@@ -74,7 +73,6 @@ pub struct DefaultOptions {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GateOptions {
-  pub timeout_ms: Option<i64>,
   pub switchable: bool,
   pub enabled: bool,
   pub effective: EffectiveOptions,
@@ -85,8 +83,6 @@ pub struct GateOptions {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct GateOptionChange {
-  #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub timeout_ms: Option<i64>,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub enabled: Option<bool>,
   /// Not a gate option: its tier's. A change naming it is refused `own-llm`.
@@ -103,7 +99,6 @@ pub struct GateOptionChange {
 pub struct GateRoute {
   pub provider: String,
   pub model: String,
-  pub timeout_ms: Option<i64>,
   /// Epoch milliseconds.
   pub set_at: i64,
 }

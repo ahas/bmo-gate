@@ -26,8 +26,8 @@ use crate::agency::{FakeAgency, mapping, provider};
 use crate::fakes::{AnsweringGateway, FakeBrain, FakeReceiver, PausingGateway};
 use crate::scratch::Scratch;
 
-/// A migrated store, the stand-ins, a wait of thirty seconds for every gate, a folder of the test's own for the
-/// shipped pieces, and the reference road over them, each gate's model answering as `answer` makes it.
+/// A migrated store, the stand-ins, a folder of the test's own for the shipped pieces, and the reference road over
+/// them, each gate's model answering as `answer` makes it.
 pub struct Ground {
   pub scratch: Scratch,
   pub brain: Arc<FakeBrain>,

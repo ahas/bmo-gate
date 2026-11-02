@@ -17,18 +17,16 @@ pub enum Code {
   NoGate,
   NothingToChange,
   OwnLlm,
-  TimeoutOutOfRange,
   SwitchNotBoolean,
   AlwaysOn,
   DocumentUnknown,
   LanguageUnknown,
   TooManyOriginals,
-  TranslatorBusy,
 }
 
 impl Code {
   /// Every code, in the order `docs/codes.md` lists them.
-  pub const ALL: [Code; 20] = [
+  pub const ALL: [Code; 18] = [
     Code::BadRequest,
     Code::Unauthorized,
     Code::NoRoute,
@@ -42,13 +40,11 @@ impl Code {
     Code::NoGate,
     Code::NothingToChange,
     Code::OwnLlm,
-    Code::TimeoutOutOfRange,
     Code::SwitchNotBoolean,
     Code::AlwaysOn,
     Code::DocumentUnknown,
     Code::LanguageUnknown,
     Code::TooManyOriginals,
-    Code::TranslatorBusy,
   ];
 
   /// The code as the wire spells it: kebab-case.
@@ -67,13 +63,11 @@ impl Code {
       Code::NoGate => "no-gate",
       Code::NothingToChange => "nothing-to-change",
       Code::OwnLlm => "own-llm",
-      Code::TimeoutOutOfRange => "timeout-out-of-range",
       Code::SwitchNotBoolean => "switch-not-boolean",
       Code::AlwaysOn => "always-on",
       Code::DocumentUnknown => "document-unknown",
       Code::LanguageUnknown => "language-unknown",
       Code::TooManyOriginals => "too-many-originals",
-      Code::TranslatorBusy => "translator-busy",
     }
   }
 
@@ -86,14 +80,13 @@ impl Code {
       Code::Conflict | Code::Stopped => 409,
       Code::TooLarge => 413,
       Code::OwnLlm
-      | Code::TimeoutOutOfRange
       | Code::SwitchNotBoolean
       | Code::AlwaysOn
       | Code::DocumentUnknown
       | Code::LanguageUnknown => 422,
       Code::Failed => 500,
       Code::UpstreamFailed => 502,
-      Code::NotReady | Code::TranslatorBusy => 503,
+      Code::NotReady => 503,
     }
   }
 

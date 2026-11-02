@@ -81,7 +81,7 @@ async fn a_row_of_every_other_table_is_written_and_read_through_its_entity() {
   let option = gate_options::ActiveModel {
     key: Set("a-gate".into()),
     agent: Set("chat-agent".into()),
-    timeout_ms: Set(Some(30_000)),
+    enabled: Set(Some(1)),
     set_at: Set(1),
     ..Default::default()
   }

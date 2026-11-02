@@ -47,6 +47,11 @@ console screen: a console reads its routes as any caller does.
 
 ## Calls the gate makes
 
+Every call below waits for its answer. Its end is the answer, a refused or broken connection, or the other unit
+gone; no call carries a timeout, and a refused connection ends the call where it stands, the gate's answer
+saying which unit did not answer. The two event streams the gate holds open, the receiver's and the agency's,
+are opened again after they drop.
+
 ### bmo-brain
 
 In the common conventions: camelCase, epoch milliseconds, and an error of `{code, error}`. The reads are
@@ -123,7 +128,6 @@ In the agency's conventions (its `docs/api.md`): camelCase, the agency's control
 | a stand-in | `GET /agents/{agentName}` | `standInAvailable`, whether a stand-in answers while Claude Code's road is closed |
 | a session | `POST /sessions` | `agentName`, `scope` `conversation`, `options` `{provider, model, cwd}`: one thrown-away conversation for one gate run on a provider's program |
 | a turn | `POST /sessions/{sessionId}/turns` | `prompt`, and the `gate` part: `system`, the gate's whole system prompt; `thinking`, whether the run thinks; and `model`, `effort` and `answerTokens`, the mapping its tier resolved to |
-| a session ended | `DELETE /sessions/{sessionId}` | a run of the gate's somebody stopped, its turn cut short |
 | a session's loads | `GET /session-loads/{sessionId}` | `documents`, each `path` and `version`: what the session was handed in full, which the index counts read |
 | a session's loads kept | `PUT /session-loads/{sessionId}` | `documents`, every load the session now holds, the piece just read added at its version |
 | a translation | `POST /translation-runs` | `purpose` (`document`, `worker` or `record`), `language` (the target's name as the policy names it), `text`, one part, and `note` where the gate has a word on that part: answered with `text`, the part translated whole, and the `provider` and `model` it went out on; 413 `too-large` for a part past the model's window (「The translation line」) |
@@ -155,9 +159,9 @@ The gate registers no hook at any of the agency's hook points and answers none.
 
 A gate run on a registered model has no tools and no session: it is one request to the gateway's
 `/v1/chat/completions`, the registration's name as its model, the gate's instructions as the first message,
-the input, `max_tokens` and `enable_thinking` as the run says, and the caller's wait in the gateway's
-per-request wait headers (the agency's `docs/own-llm.md`, 「A request with no tools」, 「The gateway」). The
-key is read from its file for each request.
+the input, `max_tokens` and `enable_thinking` as the run says (the agency's `docs/own-llm.md`, 「A request with no
+tools」, 「The gateway」). It names no wait: the request is waited for until the gateway answers or its connection
+is refused or broken. The key is read from its file for each request.
 
 
 
@@ -189,6 +193,9 @@ and nothing behind it (the agency's `docs/own-llm.md`, 「A gate has one road」
   gateway, on the model the mapping names. A request the gateway refuses as past the model's window is cut
   by its caller where the caller can cut it, each part asked on its own, and is the gate having no answer
   otherwise.
+- **A run waits for its place and for its answer.** A run past its gate's pool waits in line for a place however
+  long that takes and goes out when one comes free; once out, it is waited for until its road answers, fails, or
+  somebody stops it. No span of time ends a run, and a gate has no wait of its own.
 - **What a run walked** is written into the gate's road records, and what it spent is the agency's `usage-spent`.
 
 ## What the gate owns
@@ -210,7 +217,7 @@ and nothing behind it (the agency's `docs/own-llm.md`, 「A gate has one road」
 
 | Values | Owner | How the gate reads them |
 |---|---|---|
-| the gate pool: how many runs of one gate stand at once | the gate | its own policy file |
+| the gate pool: how many runs of one gate stand at once, the rest waiting in line | the gate | its own policy file |
 | what a turn is handed: the sheet's head and ceiling, the due memories' count, the woken rows' and the turn's totals | the gate | its own policy file |
 | the memories entry's lines | the gate | its own policy file |
 | the gate order and the gates' profiles | the gate | its own policy file, served by `GET /gates` |

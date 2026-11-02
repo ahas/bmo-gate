@@ -1,6 +1,7 @@
 # The brain's index offered to an agent: the gate's own reference routes, called with the gate's address and token
 # the record carries, for the turn's agent, room and session (docs/api.md, 「The tools a tool host places」). The
-# repository's tools test holds this manifest to the executable answering it.
+# repository's tools test holds this manifest to the executable answering it. A call waits for the gate's answer
+# however long it takes, so the manifest names no timeout.
 
 [tool]
 name = "reference"
@@ -9,7 +10,6 @@ language = "rust"
 build = 'cargo build --release -p gate-reference-tool && cp "$BMO_CARGO_TARGET/release/gate-reference-tool" "$BMO_TOOL_OUT/"'
 check = 'cargo test --test tools'
 run = ["gate-reference-tool"]
-timeout = 30
 
 [[entry]]
 namespace = "gate"

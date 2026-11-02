@@ -53,6 +53,9 @@ describe("the calls a connection answers", () => {
 
     expect(argv[0]).toBe("ssh");
     expect(argv).toContain("BatchMode=yes");
+    // A node that has gone is told by the connection's keep-alive; nothing bounds the connect itself.
+    expect(argv).toContain("ServerAliveInterval=30");
+    expect(argv.some((word) => word.startsWith("ConnectTimeout"))).toBe(false);
     expect(argv.slice(argv.indexOf("-i"), argv.indexOf("-i") + 2)).toEqual(["-i", "/keys/id_node"]);
     expect(argv.slice(-2)).toEqual(["owner@203.0.113.82", "bash -c 'echo HOME=$HOME'"]);
     expect(scpUploadArgs(HOME_PC, "/tmp/env", "/srv/trainer/.config/bmo-llm/env").slice(-2))

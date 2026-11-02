@@ -14,7 +14,8 @@ WorkingDirectory=%h/.local/share/bmo-gate/deploy
 ExecStart=%h/.local/share/bmo-gate/deploy/bin/gate-server %h/.local/share/bmo-gate/deploy/settings.toml
 Restart=always
 RestartSec=2
-TimeoutStopSec=30
+# The service installs no handler for SIGTERM, so the signal ends it at once and the stop waits for that end.
+TimeoutStopSec=infinity
 
 [Install]
 WantedBy=default.target

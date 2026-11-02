@@ -31,7 +31,6 @@ the camelCase keys.
 |---|---|---|
 | `nothing-to-change` | 400 | a change names no field |
 | `own-llm` | 422 | a change names thinking or the answer size, which are the gate's tier's |
-| `timeout-out-of-range` | 422 | a wait outside one second to five minutes |
 | `switch-not-boolean` | 422 | a switch sent as anything but true or false |
 | `always-on` | 422 | a switch for a gate whose profile lets it not be switched off |
 
@@ -42,4 +41,3 @@ the camelCase keys.
 | `document-unknown` | 422 | a document name that is no root and path |
 | `language-unknown` | 422 | a language the translator does not take: for a translation neither the worker's nor the owner's, for a document's translation one the policy names no language for (`docs/api.md`, 「Translations」 and 「Documents」) |
 | `too-many-originals` | 400 | a translation names more originals than one call carries (`docs/api.md`, 「Translations」) |
-| `translator-busy` | 503 | a translation would take the originals standing at the translator past their bound; `Retry-After` names the seconds to wait (`docs/api.md`, 「Translations」) |

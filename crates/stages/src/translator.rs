@@ -35,9 +35,6 @@ pub const CALL_ORIGINALS: usize = 16;
 /// The most originals standing at once across the readings, read or waiting for the translator.
 pub const STANDING_ORIGINALS: usize = 64;
 
-/// The seconds a caller turned away for a full intake waits before asking again.
-pub const BUSY_WAIT_SECONDS: u64 = 5;
-
 /// Where the readings queue for the translator: the places of the parts out at once, shared by every reading
 /// standing and taken in the order asked, and the count of originals standing, read or waiting.
 pub struct Intake {
@@ -50,8 +47,6 @@ pub struct Intake {
 pub enum Turned {
   /// It carries more originals than one reading takes.
   TooMany,
-  /// The originals standing would pass their bound.
-  Full,
 }
 
 /// A reading's originals standing in the intake until it is dropped.
@@ -72,9 +67,10 @@ impl Intake {
     Self::new(TRANSLATION.lanes, STANDING_ORIGINALS)
   }
 
-  /// The originals of one reading taken in, or why not: never more than `CALL_ORIGINALS`, and never past the
-  /// bound of those standing.
-  pub fn admit(&self, originals: usize) -> Result<Admitted, Turned> {
+  /// The originals of one reading taken in, or why not: never more than `CALL_ORIGINALS`. A reading that would
+  /// take those standing past their bound waits in line until enough of them are given back, however long that
+  /// takes.
+  pub async fn admit(&self, originals: usize) -> Result<Admitted, Turned> {
     if originals > CALL_ORIGINALS {
       return Err(Turned::TooMany);
     }
@@ -82,10 +78,12 @@ impl Intake {
       return Ok(Admitted(None));
     }
 
-    Arc::clone(&self.standing)
-      .try_acquire_many_owned(originals as u32)
-      .map(|permit| Admitted(Some(permit)))
-      .map_err(|_| Turned::Full)
+    let permit = Arc::clone(&self.standing)
+      .acquire_many_owned(originals as u32)
+      .await
+      .expect("the intake's places are never closed");
+
+    Ok(Admitted(Some(permit)))
   }
 }
 

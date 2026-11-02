@@ -32,7 +32,7 @@ pub const TABLES: &[TableMap] = &[
   TableMap {
     source: "gate_options",
     target: "gate_options",
-    columns: &["key", "agent", "thinking", "answer_tokens", "timeout_ms", "set_at", "enabled"],
+    columns: &["key", "agent", "thinking", "answer_tokens", "set_at", "enabled"],
   },
   TableMap {
     source: "gate_roads",

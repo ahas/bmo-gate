@@ -1,6 +1,7 @@
 # The translator offered to an agent: the gate's own POST /translations, called with the gate's address and token
 # the record carries (docs/api.md, 「The tools a tool host places」). The repository's tools test holds this
-# manifest to the executable answering it.
+# manifest to the executable answering it. A call waits for the gate's answer however long it takes, so the
+# manifest names no timeout.
 
 [tool]
 name = "translate"
@@ -9,7 +10,6 @@ language = "rust"
 build = 'cargo build --release -p gate-translate-tool && cp "$BMO_CARGO_TARGET/release/gate-translate-tool" "$BMO_TOOL_OUT/"'
 check = 'cargo test --test tools'
 run = ["gate-translate-tool"]
-timeout = 60
 
 [[entry]]
 namespace = "gate"

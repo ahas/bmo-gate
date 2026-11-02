@@ -71,7 +71,6 @@ pub struct FakeAgency {
   pub label: Mutex<Option<String>>,
   pub started: Mutex<Vec<(String, Apart)>>,
   pub turns: Mutex<Vec<GateTurn>>,
-  pub stopped: Mutex<Vec<String>>,
   pub resolved: Mutex<Vec<(String, Option<String>, String)>>,
   pub loads: Mutex<HashMap<String, Vec<Load>>>,
   /// What the translation line answers, one text an ask, in order; none left is no answer.
@@ -247,13 +246,6 @@ impl Agency for FakeAgency {
         call: "a turn",
         why: "no end is set".to_owned(),
       })
-    })
-  }
-
-  fn stop<'a>(&'a self, run: &'a str, _reason: &'a str) -> BoxFuture<'a, Answer<()>> {
-    Box::pin(async move {
-      self.stopped.lock().unwrap().push(run.to_owned());
-      Ok(())
     })
   }
 

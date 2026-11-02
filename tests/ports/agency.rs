@@ -42,7 +42,7 @@ async fn the_reads_answer_the_agents_the_rulebooks_the_providers_and_the_work_ke
     Method::GET,
     "/work-keys/a-work-key",
     200,
-    json!({ "key": "a-work-key", "provider": "claude-code", "model": "a-model", "effort": "low", "answerTokens": 2048, "capMs": 0, "runMode": "run" }),
+    json!({ "key": "a-work-key", "provider": "claude-code", "model": "a-model", "effort": "low", "answerTokens": 2048, "runMode": "run" }),
   );
 
   let agents = agency.agents().await.unwrap();
@@ -177,18 +177,6 @@ async fn a_gate_run_is_a_conversation_and_one_turn_carrying_the_whole_system_pro
       }
     })
   );
-}
-
-#[tokio::test]
-async fn a_session_is_ended() {
-  let stub = Stub::start().await;
-  let agency = HttpAgency::new(peer(&stub, "t"));
-
-  stub.canned(Method::DELETE, "/sessions/s-3", 204, "application/json", String::new());
-
-  agency.stop("s-3", "the caller left").await.unwrap();
-
-  assert_eq!(stub.one("/sessions/s-3").method, Method::DELETE);
 }
 
 #[tokio::test]

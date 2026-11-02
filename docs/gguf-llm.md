@@ -120,7 +120,9 @@ Each run, for the entry's registration, in order:
    and `engine.env`, the file and its served name. The key never rides a command line.
 5. Carries the node setup, its settings `setup.env` and the two filled units into `~/<name>`.
 6. Runs the node setup detached and waits for its last line, `GGUF-LLM-SETUP-DONE ok` or
-   `GGUF-LLM-SETUP-DONE failed:<step>`. The setup checks that the node's llama.cpp server, the dial's interpreter
+   `GGUF-LLM-SETUP-DONE failed:<step>`, looking again every fifteen seconds for as long as the setup's process
+   stands; a setup whose process has ended with neither line stops the run at `setup`, and so does a look at it
+   the node does not answer. The setup checks that the node's llama.cpp server, the dial's interpreter
    with `websockets` and the dial stand; leaves a file whose size and recorded hash match alone; and otherwise
    fetches the file from its source where it is missing or short, resuming a partial fetch, holds it to its size,
    hashes it and records the hash beside it. A file whose hash does not match is set aside under a `.mismatch`
@@ -129,7 +131,8 @@ Each run, for the entry's registration, in order:
    names the instance's key file in the door's list and pins the operations machine's host key on the node
    (「The tunnel and the key」).
 8. Installs the two units, reloads the user manager, enables them and restarts them.
-9. Waits until the listen answers `/health` on the operations machine, then records the node in the entry with the
+9. Waits until the listen answers `/health` on the operations machine, asking again every five seconds however
+   long that takes, then records the node in the entry with the
    catalogue's `--placed <entry> <node>`.
 
 What already stands is left as it is, so a run is repeated as often as one likes; a repeat restarts the engine.

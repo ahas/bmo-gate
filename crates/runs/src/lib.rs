@@ -1,7 +1,6 @@
 //! A gate's run on its one road (`docs/gates.md`; `docs/boundary-api.md`, 「How a gate run reaches a model」): one
-//! prompt in, one text out, on the one provider the gate's road begins on, waited for as long as the gate's own
-//! row says and no longer, with nothing behind it. What did not answer is the gate having no answer; what
-//! somebody stopped is raised to the caller.
+//! prompt in, one text out, on the one provider the gate's road begins on, waited for until it ends, with nothing
+//! behind it. What did not answer is the gate having no answer; what somebody stopped is raised to the caller.
 
 pub mod gateway;
 pub mod live;
@@ -13,7 +12,6 @@ pub mod session;
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::Duration;
 
 use gate_ports::agency::Agency;
 use gate_ports::gateway::Gateway;
@@ -138,22 +136,13 @@ pub(crate) fn fault(why: impl std::fmt::Display) -> GateError {
   GateError::Fault(why.to_string())
 }
 
-/// What one run of a gate is, as each road carries it: the gate, the request, the road and the moment its wait
-/// runs out.
+/// What one run of a gate is, as each road carries it: the gate, the request and the road.
 pub struct Run<'a> {
   pub stage: &'a str,
   pub request: &'a GateRequest,
   pub route: &'a Route,
-  pub deadline: Instant,
   /// The name the run goes out under, which a stop names it by.
   pub name: String,
-}
-
-impl Run<'_> {
-  /// What is left of the run's wait.
-  pub fn left(&self) -> Duration {
-    self.deadline.saturating_duration_since(Instant::now())
-  }
 }
 
 impl Runs {
@@ -183,41 +172,17 @@ impl Runs {
       (None, None) => route::read(self, stage).await?,
     };
 
-    // A gate whose row holds no wait is not run.
-    let agent = request.agent.as_deref().unwrap_or(&self.chat_agent);
-    let Some(timeout_ms) = options::timeout_ms(&self.db, stage, agent).await.map_err(fault)? else {
-      eprintln!(
-        "{stage}: no gate options row holds a wait for {agent}; the gate is not run and has no answer"
-      );
-      return Ok(None);
-    };
-    let started = Instant::now();
-    let deadline = started + Duration::from_millis(timeout_ms.max(0) as u64);
     let live = LIVE.fetch_add(1, Ordering::Relaxed);
     let run = Run {
       stage,
       request,
       route: &route,
-      deadline,
       name: format!("gate:{stage}:{live}"),
     };
 
-    // A run waits for its place in the gate's pool within its wait, but for one standing beside the gate's
-    // other runs.
-    let place = if request.alongside {
-      None
-    } else {
-      match self.pools.take(stage, &route, deadline).await {
-        Some(place) => Some(place),
-        None => {
-          self
-            .road(&run, Outcome::Timeout, records::elapsed_ms(started), &records::Spent::none())
-            .await;
-          println!("{stage}: no place of its pool came free within its wait; this gate has no answer");
-          return Ok(None);
-        }
-      }
-    };
+    // A run waits in line for its place in the gate's pool however long that takes, but for one standing beside
+    // the gate's other runs.
+    let place = if request.alongside { None } else { Some(self.pools.take(stage, &route).await) };
     // The run stands in the live board from here until it returns, whichever way it does.
     let _drawn = live::hold(live::GateRun {
       id: live,
@@ -225,7 +190,6 @@ impl Runs {
       chat_id: request.chat_id,
       message_id: request.message_id,
       started_at: records::now(),
-      cap_seconds: timeout_ms.max(0) / 1000,
     });
     let answer = self.carry(&run).await;
 
@@ -273,7 +237,7 @@ impl Runs {
   }
 
   // A request too large for its road, cut into the parts its caller makes and each asked on its own, on the
-  // same road and within the same wait.
+  // same road.
   async fn cut(&self, run: &Run<'_>, split: &dyn Split) -> Result<Option<String>, GateError> {
     let stage = run.stage;
     let Some(parts) = split.halve() else {
@@ -293,7 +257,6 @@ impl Runs {
             stage,
             request: &request,
             route: run.route,
-            deadline: run.deadline,
             name: run.name.clone(),
           };
 

@@ -7,6 +7,7 @@
 
 use std::sync::{Arc, Mutex};
 
+use futures_util::FutureExt;
 use gate_policy::translation::{TRANSLATION, Translation};
 use gate_stages::translator::{
   Ask, Asked, CALL_ORIGINALS, Intake, Purpose, Ran, Read, Reader, STANDING_ORIGINALS, Turned, keep,
@@ -186,21 +187,26 @@ fn a_deployment_whose_owner_reads_another_language_has_the_record_reader_take_th
   assert_eq!(Reader::Worker.language(&policy), "en");
 }
 
-#[test]
-fn the_intake_takes_one_readings_originals_up_to_its_bounds_and_frees_them_when_dropped() {
+#[tokio::test]
+async fn the_intake_takes_one_readings_originals_and_a_reading_past_its_bound_waits_in_line() {
   let intake = Intake::new(4, STANDING_ORIGINALS);
 
-  assert_eq!(intake.admit(CALL_ORIGINALS + 1).err(), Some(Turned::TooMany));
+  assert_eq!(intake.admit(CALL_ORIGINALS + 1).await.err(), Some(Turned::TooMany));
 
-  let standing: Vec<_> = (0..STANDING_ORIGINALS / CALL_ORIGINALS)
-    .map(|_| intake.admit(CALL_ORIGINALS).ok().unwrap())
-    .collect();
+  let mut standing = Vec::new();
 
-  assert_eq!(intake.admit(1).err(), Some(Turned::Full));
-  assert!(intake.admit(0).is_ok());
+  for _ in 0..STANDING_ORIGINALS / CALL_ORIGINALS {
+    standing.push(intake.admit(CALL_ORIGINALS).await.ok().unwrap());
+  }
+
+  let mut waiting = Box::pin(intake.admit(1));
+
+  assert!((&mut waiting).now_or_never().is_none(), "a reading past the bound was taken in");
+  assert!(intake.admit(0).now_or_never().is_some_and(|admitted| admitted.is_ok()));
 
   drop(standing);
-  assert!(intake.admit(CALL_ORIGINALS).is_ok());
+  assert!(waiting.await.is_ok());
+  assert!(intake.admit(CALL_ORIGINALS).await.is_ok());
 }
 
 #[tokio::test]
