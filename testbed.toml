@@ -16,11 +16,15 @@ setup = ["cd training/tooling && bun install --frozen-lockfile", "cd package && 
 # The sweeps that read the tree before anything runs: letters that are not English in the code, the README's
 # folder table and the dependencies the manifests name. The ledger records the lines each code file holds of
 # the Korean the gate's test input, its patterns and its sample states are written in.
-quick = ["korean", "layout", "dependencies", "cargo-profile"]
+quick = ["korean", "layout", "dependencies", "cargo-profile", "shared-versions"]
 korean_ledger = "korean-ledger.json"
 # The base libraries every unit may build on. The gate reaches every other unit through the routes and commands
 # `docs/boundary-api.md` states.
 base_libraries = ["bmo-chat", "bmo-chat-client", "bmo-ui", "bmo-gate-client"]
+
+# The repository whose root holds the shared versions the manifests and the lock hold to.
+[check.shared_versions]
+repository = "bmo-chat"
 
 [[check.step]]
 id = "check"
