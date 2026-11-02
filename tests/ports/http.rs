@@ -7,8 +7,8 @@ use gate_ports::http::Caller;
 use gate_ports::{Peer, PortError};
 use serde_json::{Value, json};
 
-use crate::peer;
-use crate::stub::Stub;
+use super::peer;
+use crate::support::stub::Stub;
 
 #[test]
 fn an_address_that_is_no_plain_http_one_is_refused_when_the_peer_is_made() {

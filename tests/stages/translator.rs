@@ -14,7 +14,7 @@ use gate_stages::translator::{
   readings, recalled,
 };
 
-use crate::ground;
+use super::ground;
 
 fn hangul(syllables: u32) -> String {
   (0..syllables).map(|at| char::from_u32(0xac00 + at * 29).unwrap()).collect()

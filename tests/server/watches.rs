@@ -19,12 +19,12 @@ use gate_stages::{Reading, Stages};
 use reqwest::StatusCode;
 use serde_json::json;
 
-use crate::fakes::{AnsweringGateway, FakeBrain, FakeReceiver};
-use crate::stub::Stub;
-use crate::{ROOM, TOKEN, ground};
+use super::{ROOM, TOKEN, ground};
+use crate::reference::fakes::{AnsweringGateway, FakeBrain, FakeReceiver};
+use crate::support::stub::Stub;
 
 // The service's routes and watches over the agency `stub` stands in for over HTTP, and over `receiver`.
-fn app_on(ground: &crate::Ground, stub: &Stub, receiver: Arc<dyn Receiver>) -> Arc<App> {
+fn app_on(ground: &super::Ground, stub: &Stub, receiver: Arc<dyn Receiver>) -> Arc<App> {
   let peer = Peer::new(&stub.address, Some("the-agency-token".to_owned())).unwrap();
   let gateway = Arc::new(AnsweringGateway {
     answer: Box::new(|_| None),

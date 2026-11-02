@@ -9,7 +9,7 @@ use std::time::Duration;
 use gate_stages::document_translation::{Kept, Lost, Order, Outcome, Queue, translate_part};
 use gate_stages::translator::{Ask, Purpose, Ran};
 
-use crate::ground;
+use super::ground;
 
 // A stand-in translation line answering each ask with the next of `answers`, and no answer once they run out.
 fn line(answers: Vec<String>) -> Ask {

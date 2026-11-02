@@ -1,12 +1,7 @@
-//! A store of a test's own as a database of its own: the store migrated once per test binary into a template
+//! A store of a test's own as a database of its own: the store migrated once per test process into a template
 //! database, and each test handed a copy of it, which the server makes in a fraction of the time a migration
-//! takes. A copy is dropped when its test is done, and the template and copies a binary left behind are
-//! dropped by the next binary to make a template.
-//!
-//! Each group of tests that needs a store includes this file as a module of its own and uses what it needs
-//! of it, so what one group leaves unused is no fault.
-
-#![allow(dead_code)]
+//! takes. A copy is dropped when its test is done, and the template and copies a process left behind are
+//! dropped by the next process to make a template.
 
 use std::str::FromStr;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -56,8 +51,8 @@ async fn create(name: &str, template: &str) {
   admin.close().await.unwrap();
 }
 
-// The template this binary's copies are made from, migrated the first time a test asks. The databases a
-// binary that is gone left behind are dropped first.
+// The template this process's copies are made from, migrated the first time a test asks. The databases a
+// process that is gone left behind are dropped first.
 async fn template() -> String {
   MADE
     .get_or_init(|| async {
@@ -158,11 +153,6 @@ impl Scratch {
 
   pub fn db(&self) -> &DatabaseConnection {
     &self.db
-  }
-
-  /// The database's name on the test server.
-  pub fn name(&self) -> &str {
-    &self.database
   }
 
   /// The database's address, as a reader handed one opens it.

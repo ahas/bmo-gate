@@ -5,7 +5,7 @@ use gate_command::Fault;
 use gate_command::records::read;
 use serde_json::Value;
 
-use crate::scratch::Scratch;
+use crate::support::scratch::Scratch;
 
 #[tokio::test]
 async fn every_row_is_one_json_object_in_the_order_written() {

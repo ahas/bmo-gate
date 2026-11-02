@@ -6,8 +6,8 @@ use axum::http::Method;
 use gate_ports::brain::{Brain, Event, HttpBrain, Reply};
 use serde_json::{Value, json};
 
-use crate::peer;
-use crate::stub::Stub;
+use super::peer;
+use crate::support::stub::Stub;
 
 fn brains() -> Value {
   json!({ "items": [{ "id": 9, "accountKey": "1", "agentKey": "chat-agent", "name": "chat-agent", "createdAt": 1 }], "more": false })

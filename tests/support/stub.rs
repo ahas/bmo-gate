@@ -2,8 +2,6 @@
 //! every request it was sent — its method, path, query, bearer, headers and body — for the test to read back.
 //! A path it was handed nothing for answers 404 `route_absent`.
 
-#![allow(dead_code)]
-
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 

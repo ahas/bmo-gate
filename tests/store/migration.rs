@@ -4,7 +4,7 @@
 use gate_store::migration::{MIGRATIONS_TABLE, Migrator, OWN_TABLES, TABLES};
 use sea_orm_migration::MigratorTrait;
 
-use crate::scratch::Scratch;
+use crate::support::scratch::Scratch;
 
 const TABLES_NOW: &str = "SELECT table_name::text FROM information_schema.tables \
    WHERE table_schema = current_schema() AND table_type = 'BASE TABLE' ORDER BY table_name";

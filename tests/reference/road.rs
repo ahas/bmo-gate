@@ -6,8 +6,8 @@ use gate_ports::brain::{Event, Sheet};
 use gate_reference::road::{Turn, handed, held_sheet};
 use gate_reference::{Entry, SituationTurn, Source};
 
-use crate::fakes::memory;
-use crate::{Ground, ground};
+use super::{Ground, ground};
+use crate::reference::fakes::memory;
 
 fn turn() -> Turn {
   Turn {

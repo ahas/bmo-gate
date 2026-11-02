@@ -2,15 +2,6 @@
 //! agency, the brain and the receiver stood in, every route driven with the bodies its callers send, and the
 //! watches beside them as the agency sees them.
 
-#[path = "../runs/fakes.rs"]
-mod agency;
-#[path = "../reference/fakes.rs"]
-mod fakes;
-#[path = "../support/scratch.rs"]
-mod scratch;
-#[path = "../support/stub.rs"]
-mod stub;
-
 mod receiver;
 mod watches;
 mod wire;
@@ -29,9 +20,9 @@ use gate_stages::{Reading, Stages};
 use reqwest::{Method, StatusCode};
 use serde_json::Value;
 
-use crate::agency::{FakeAgency, mapping, provider};
-use crate::fakes::{AnsweringGateway, FakeBrain, FakeReceiver, fragment};
-use crate::scratch::Scratch;
+use crate::reference::fakes::{AnsweringGateway, FakeBrain, FakeReceiver, fragment};
+use crate::runs::fakes::{FakeAgency, mapping, provider};
+use crate::support::scratch::Scratch;
 
 /// The token every caller presents.
 pub const TOKEN: &str = "the-gate-token";
@@ -42,7 +33,6 @@ pub const ROOM: i64 = 7;
 /// A migrated store, the stand-ins, the service over them, and its address on the loopback.
 pub struct Ground {
   pub scratch: Scratch,
-  pub agency: Arc<FakeAgency>,
   pub brain: Arc<FakeBrain>,
   pub gateway: Arc<AnsweringGateway>,
   pub app: Arc<App>,
@@ -100,7 +90,6 @@ pub async fn ground(test: &str, answer: impl Fn(&Ask) -> Option<String> + Send +
 
   Ground {
     scratch,
-    agency,
     brain,
     gateway,
     app,

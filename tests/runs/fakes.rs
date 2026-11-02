@@ -1,8 +1,6 @@
 //! A stand-in agency and model gateway the runs are carried against: each answers as it is set to and keeps what
 //! it was asked, so a test reads back every call a run made.
 
-#![allow(dead_code)]
-
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -19,7 +17,7 @@ use gate_ports::gateway::{Ask, Completion, Gateway};
 use gate_ports::http::Answer;
 use gate_runs::Runs;
 use sea_orm::DatabaseConnection;
-use serde_json::{Map, Value, json};
+use serde_json::{Map, json};
 
 /// A provider the stand-in lists, on, carrying a gate's line.
 pub fn provider(name: &str, registered: bool) -> Provider {
@@ -41,21 +39,6 @@ pub fn mapping(provider: &str, model: &str, effort: Option<&str>, answer_tokens:
     model: Some(model.to_owned()),
     effort: effort.map(str::to_owned),
     answer_tokens,
-  }
-}
-
-/// A turn's end as the agency answers it.
-pub fn turn_end(outcome: &str, answer: Option<&str>, reply: Option<Value>) -> TurnEnd {
-  TurnEnd {
-    delivery: "taken".to_owned(),
-    run: Some("run-1".to_owned()),
-    outcome: outcome.to_owned(),
-    answer: answer.map(str::to_owned),
-    reason: (outcome != "answered").then(|| format!("it ended {outcome}")),
-    engine_error: None,
-    went_out: None,
-    reply,
-    failure: None,
   }
 }
 
@@ -88,19 +71,6 @@ impl FakeAgency {
       .lock()
       .unwrap()
       .extend(answers.iter().map(|answer| (*answer).to_owned()));
-  }
-
-  pub fn route(&self, key: &str, mode: &str) {
-    self.routes.lock().unwrap().push(Route {
-      key: key.to_owned(),
-      route_mode: mode.to_owned(),
-      account: None,
-      set_at: Some(42),
-      provider: None,
-      model: None,
-      effort: None,
-      answer_tokens: None,
-    });
   }
 }
 
@@ -261,12 +231,6 @@ pub struct FakeGateway {
   pub asked: Mutex<Vec<Ask>>,
 }
 
-impl FakeGateway {
-  pub fn answers(&self, answers: Vec<Answer<Completion>>) {
-    *self.answers.lock().unwrap() = answers;
-  }
-}
-
 impl Gateway for FakeGateway {
   fn complete<'a>(&'a self, ask: &'a Ask) -> BoxFuture<'a, Answer<Completion>> {
     Box::pin(async move {
@@ -285,18 +249,6 @@ impl Gateway for FakeGateway {
       answers.remove(0)
     })
   }
-}
-
-/// A completion answering `text`, with a usage.
-pub fn completion(text: &str) -> Answer<Completion> {
-  Ok(Completion {
-    text: Some(text.to_owned()),
-    usage: Some(json!({
-      "prompt_tokens": 120,
-      "completion_tokens": 7,
-      "prompt_tokens_details": { "cached_tokens": 100 }
-    })),
-  })
 }
 
 /// The runs over a database and the stand-ins, the chat agent named `the-chat-agent`.

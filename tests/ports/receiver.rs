@@ -6,8 +6,8 @@ use futures_util::StreamExt;
 use gate_ports::receiver::{Drafted, HttpReceiver, Receiver};
 use serde_json::json;
 
-use crate::peer;
-use crate::stub::Stub;
+use super::peer;
+use crate::support::stub::Stub;
 
 #[tokio::test]
 async fn the_draft_rows_are_read_off_the_event_stream_and_nothing_else_is() {

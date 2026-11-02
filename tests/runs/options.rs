@@ -5,7 +5,7 @@ use gate_codes::Code;
 use gate_runs::options::{self, GateRow, Refusal, copy, row};
 use serde_json::json;
 
-use crate::{ground, runs_of};
+use super::{ground, runs_of};
 
 fn refused(result: Result<(), Refusal>) -> Code {
   result.unwrap_err().code

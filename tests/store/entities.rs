@@ -7,7 +7,7 @@ use gate_store::entity::{
 };
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, EntityTrait, IdenStatic, Iterable};
 
-use crate::scratch::Scratch;
+use crate::support::scratch::Scratch;
 
 /// The columns an entity names, in the order its model declares them.
 fn entity_columns<E: EntityTrait>() -> (String, Vec<String>) {

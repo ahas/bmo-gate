@@ -6,8 +6,8 @@ use gate_ports::PortError;
 use gate_ports::gateway::{Ask, Gateway, HttpGateway};
 use serde_json::json;
 
-use crate::peer;
-use crate::stub::Stub;
+use super::peer;
+use crate::support::stub::Stub;
 
 fn ask() -> Ask {
   Ask {

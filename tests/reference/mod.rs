@@ -2,18 +2,13 @@
 //! database of the test's own, a gateway standing for any model, which the road never asks; the memories entry; the
 //! woken rows; and the brain's index.
 
-#[path = "../runs/fakes.rs"]
-mod agency;
-mod fakes;
-#[path = "../support/scratch.rs"]
-mod scratch;
+pub(crate) mod fakes;
 
 mod index;
 mod memories;
 mod road;
 mod situation;
 
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -22,18 +17,16 @@ use gate_reference::Reference;
 use gate_runs::Runs;
 use gate_stages::{Reading, Stages};
 
-use crate::agency::{FakeAgency, mapping, provider};
-use crate::fakes::{AnsweringGateway, FakeBrain, FakeReceiver, PausingGateway};
-use crate::scratch::Scratch;
+use crate::reference::fakes::{AnsweringGateway, FakeBrain, FakeReceiver, PausingGateway};
+use crate::runs::fakes::{FakeAgency, mapping, provider};
+use crate::support::scratch::Scratch;
 
 /// A migrated store, the stand-ins, a folder of the test's own for the shipped pieces, and the reference road over
 /// them, each gate's model answering as `answer` makes it.
 pub struct Ground {
-  pub scratch: Scratch,
+  _scratch: Scratch,
   pub brain: Arc<FakeBrain>,
-  pub receiver: Arc<FakeReceiver>,
   pub gateway: Arc<AnsweringGateway>,
-  pub shipped: PathBuf,
   pub reference: Reference,
 }
 
@@ -81,16 +74,14 @@ pub async fn paused_ground(
   let reference = Reference {
     stages,
     brain: brain.clone(),
-    receiver: receiver.clone(),
-    shipped: Some(shipped.clone()),
+    receiver,
+    shipped: Some(shipped),
   };
 
   Ground {
-    scratch,
+    _scratch: scratch,
     brain,
-    receiver,
     gateway,
-    shipped,
     reference,
   }
 }

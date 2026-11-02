@@ -4,8 +4,8 @@ use gate_ports::brain::Event;
 use gate_reference::situation::event_entries;
 use gate_reference::{SituationTurn, Source};
 
-use crate::fakes::memory;
-use crate::ground;
+use super::ground;
+use crate::reference::fakes::memory;
 
 fn turn() -> SituationTurn {
   SituationTurn {

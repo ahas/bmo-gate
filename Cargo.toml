@@ -64,6 +64,9 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish = false
+# One test target, the harness at tests/main.rs, with a module per file of checks and per crate's tests (bmo-chat's
+# docs/conventions.md, 「Rust builds」).
+autotests = false
 
 [dependencies]
 axum.workspace = true
@@ -122,56 +125,24 @@ toml.workspace = true
 # A scratch database's address, another database's name in the test server's own.
 url.workspace = true
 
-# The contract's test: the committed OpenAPI document is the one the types generate.
 [[test]]
-name = "api"
-path = "tests/api.rs"
+name = "main"
+path = "tests/main.rs"
 
-# The store's tests, one binary over a scratch database of each test's own.
-[[test]]
-name = "store"
-path = "tests/store/main.rs"
+# The build profiles bmo-chat's docs/conventions.md, 「Rust builds」, states, which the cargo-profile quick check
+# holds: debug information down to line numbers in a development build, none in a test binary, whose panics still
+# name their file and line, and no incremental state, since every checkout's crates build under names of their own
+# in the one shared build directory.
+[profile.dev]
+debug = "line-tables-only"
+split-debuginfo = "unpacked"
+incremental = false
 
-# The ports' tests, one binary over stand-in units on the loopback.
-[[test]]
-name = "ports"
-path = "tests/ports/main.rs"
+[profile.test]
+debug = "line-tables-only"
+strip = "debuginfo"
+incremental = false
 
-# The markup crate's tests, one binary, a module per module of the crate.
-[[test]]
-name = "markup"
-path = "tests/markup/main.rs"
-
-# The runs' tests, one binary over a scratch database and stand-in agency and gateway of each test's own.
-[[test]]
-name = "runs"
-path = "tests/runs/main.rs"
-
-# The stages' tests, one binary over a scratch database and a stand-in agency.
-[[test]]
-name = "stages"
-path = "tests/stages/main.rs"
-
-# The reference road's tests, one binary over a scratch database and stand-in brain, receiver, bmo-job, agency and
-# gateway.
-[[test]]
-name = "reference"
-path = "tests/reference/main.rs"
-
-# The service's contract tests, one binary driving every route with its callers' bodies over a scratch database and
-# stand-in units.
-[[test]]
-name = "server"
-path = "tests/server/main.rs"
-
-# The unit command's tests, one binary over the nouns, the evaluation set, the bench, the agreement and the cases,
-# on a scratch database and stand-in units.
-[[test]]
-name = "command"
-path = "tests/command/main.rs"
-
-# The tools' test: each tool's manifest read against its folder and the declaration, and the translator's tool's
-# calls answered against a stand-in gate.
-[[test]]
-name = "tools"
-path = "tests/tools/main.rs"
+[profile.release]
+debug = false
+strip = "debuginfo"

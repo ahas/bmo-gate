@@ -8,7 +8,7 @@ name = "reference"
 protocol = 1
 language = "rust"
 build = 'cargo build --release -p gate-reference-tool && cp "$BMO_CARGO_TARGET/release/gate-reference-tool" "$BMO_TOOL_OUT/"'
-check = 'cargo test --test tools'
+check = 'cargo test --test main tools::'
 run = ["gate-reference-tool"]
 
 [[entry]]

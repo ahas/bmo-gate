@@ -11,7 +11,7 @@ use gate_stages::Reading;
 use gate_stages::records::{Record, plain_words};
 use gate_stages::translator::{Ask, Purpose, Ran};
 
-use crate::{Ground, ground};
+use super::{Ground, ground};
 
 // What the stand-in line was asked: the part, what for, into which language and under which note.
 struct Asked {

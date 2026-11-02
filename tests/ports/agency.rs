@@ -6,8 +6,8 @@ use futures_util::StreamExt;
 use gate_ports::agency::{Agency, Apart, GateTurn, HttpAgency, Line};
 use serde_json::json;
 
-use crate::peer;
-use crate::stub::Stub;
+use super::peer;
+use crate::support::stub::Stub;
 
 #[tokio::test]
 async fn the_reads_answer_the_agents_the_rulebooks_the_providers_and_the_work_key() {

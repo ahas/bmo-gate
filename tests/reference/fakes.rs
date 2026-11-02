@@ -1,27 +1,16 @@
 //! Stand-ins for the brain, the receiver and bmo-job the reference road is carried against, and a gateway that
 //! answers each request by what it is asked: each keeps what it was asked, so a test reads back every call.
 
-#![allow(dead_code)]
-
 use std::collections::HashMap;
 use std::sync::Mutex;
 
 use futures_util::StreamExt;
 use futures_util::future::BoxFuture;
 use futures_util::stream::BoxStream;
-use gate_ports::PortError;
 use gate_ports::brain::{Brain, Condition, Document, Event, Fragment, MemoryRow, Reply, Sheet};
 use gate_ports::gateway::{Ask, Completion, Gateway};
 use gate_ports::http::Answer;
 use gate_ports::receiver::{Drafted, Receiver};
-
-fn unoffered<T>(unit: &'static str, call: &'static str) -> Answer<T> {
-  Err(PortError::Unreachable {
-    unit,
-    call,
-    why: "not offered by the stand-in".into(),
-  })
-}
 
 /// A fragment row of a kind, its slug and title, in the room or shared, owned by a person or nobody.
 pub fn fragment(kind: &str, slug: &str, title: &str, chat_id: Option<i64>, owner: Option<i64>) -> Fragment {

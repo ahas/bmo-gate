@@ -26,8 +26,12 @@ stands, and no other.
 - **One manifest at the root,** `Cargo.toml`. A Bun or Python project keeps its own manifest and lockfile in its
   own folder, one level down or more, and is a project of its own to the testbed.
 - **No folder is named after its parent.** A folder's name says what it holds.
-- **Tests live in `tests/`,** never beside the code they test. A Rust test is a Cargo test of the root package;
-  a Bun project's tests stand under `tests/` in a folder named for the project.
+- **Tests live in `tests/`,** never beside the code they test. The Rust tests are the root package's one test
+  target, the harness `tests/main.rs` named `main` (bmo-chat's `docs/conventions.md`, 「Rust builds」): each
+  check that spans the repository a module of a file at the top of `tests/`, each crate's tests a module of a
+  folder named after it, and what they share the `support` module. One module's tests run as
+  `bmo-testbed cargo test --test main <module>::`. A Bun project's tests stand under `tests/` in a folder named
+  for the project.
 - **No weights, datasets or run output in git.** They are runtime data under the data root the settings name;
   the repository holds only the declarations that say where they are read from.
 

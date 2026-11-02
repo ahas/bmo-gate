@@ -5,7 +5,7 @@ use axum::http::Method;
 use gate_reference_tool::{ADDRESS, AGENT, INDEX, PIECE, ROOM, SEARCH, SESSION, TOKEN, answer};
 use serde_json::{Value, json};
 
-use crate::stub::Stub;
+use crate::support::stub::Stub;
 
 fn call(entry: &str, arguments: Value, variables: Value) -> String {
   json!({

@@ -1,16 +1,13 @@
 //! The runs' tests: the gate options and the pool over a scratch database of each test's own.
 
-#[path = "../support/scratch.rs"]
-mod scratch;
-
-mod fakes;
+pub(crate) mod fakes;
 mod options;
 mod pool;
 
 use std::sync::Arc;
 
-use crate::fakes::{FakeAgency, FakeGateway};
-use crate::scratch::Scratch;
+use crate::runs::fakes::{FakeAgency, FakeGateway};
+use crate::support::scratch::Scratch;
 
 /// A migrated store and fresh stand-ins.
 pub async fn ground() -> (Scratch, Arc<FakeAgency>, Arc<FakeGateway>) {

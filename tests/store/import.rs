@@ -5,7 +5,7 @@ use std::path::Path;
 
 use sea_orm::{ConnectionTrait, DbBackend, Statement};
 
-use crate::scratch::Scratch;
+use crate::support::scratch::Scratch;
 
 /// The seven tables, each with the row its fixture writes, or none.
 fn export() -> [(&'static str, &'static str, &'static [&'static str]); 7] {

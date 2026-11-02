@@ -5,7 +5,7 @@ use futures_util::StreamExt;
 use reqwest::StatusCode;
 use serde_json::json;
 
-use crate::{ROOM, TOKEN, ground, refused};
+use super::{ROOM, TOKEN, ground, refused};
 
 #[tokio::test]
 async fn a_call_without_the_token_is_refused() {

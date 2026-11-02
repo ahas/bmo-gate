@@ -3,7 +3,7 @@
 use reqwest::StatusCode;
 use serde_json::json;
 
-use crate::{ground, refused};
+use super::{ground, refused};
 
 // A Korean greeting, as a worker's record holds it.
 const GREETING: &str = "\u{c548}\u{b155}\u{d558}\u{c138}\u{c694}";

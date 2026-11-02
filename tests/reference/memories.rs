@@ -4,7 +4,7 @@
 use gate_policy::reference::REFERENCE;
 use gate_reference::memories::{due_first, index_title, memories_entry, memory_line, memory_path};
 
-use crate::fakes::memory;
+use crate::reference::fakes::memory;
 
 #[test]
 fn a_rows_line_is_written_in_korean_time_with_its_parts() {

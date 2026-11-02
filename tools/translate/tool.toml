@@ -8,7 +8,7 @@ name = "translate"
 protocol = 1
 language = "rust"
 build = 'cargo build --release -p gate-translate-tool && cp "$BMO_CARGO_TARGET/release/gate-translate-tool" "$BMO_TOOL_OUT/"'
-check = 'cargo test --test tools'
+check = 'cargo test --test main tools::'
 run = ["gate-translate-tool"]
 
 [[entry]]
