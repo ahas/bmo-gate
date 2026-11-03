@@ -54,7 +54,7 @@ fn an_order_with_no_provider_on_stands_on_its_first_with_nothing_to_run_on() {
 #[test]
 fn a_role_whose_order_is_empty_gives_a_gate_no_road() {
   let refused =
-    road_provider("a-gate", &role("delegator", vec![], None), &[provider("claude-code", false)]);
+    road_provider("a-gate", &role("doppelganger", vec![], None), &[provider("claude-code", false)]);
 
   assert!(refused.unwrap_err().to_string().contains("no provider order of its own"));
 }
