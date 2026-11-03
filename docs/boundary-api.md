@@ -121,10 +121,8 @@ In the agency's conventions (its `docs/api.md`): camelCase, the agency's control
 
 | Call | Route | What the gate needs it for |
 |---|---|---|
-| the agents | `GET /agents` | the registrations a gate run names and the agents a turn is for |
 | the providers | `GET /providers` | whether each provider is on, and whether its models are registrations or served on the agency's gateway, which decides how a gate run reaches its model |
 | a gate's role | `GET /roles/{roleName}` | the role a gate's profile names (`docs/gates.md`, 「Where a gate's runs go out」): `provider`, its active provider or null, and `order`, each entry's `provider`, `model`, `effort`, `thinking` and `answerTokens`, which a gate run goes out on; 404 `not-found` is a role the agency does not hold |
-| a stand-in | `GET /agents/{agentName}` | `standInAvailable`, whether a stand-in answers while Claude Code's road is closed |
 | a session | `POST /sessions` | `agentName`, `scope` `conversation`, `options` `{provider, model, cwd}`: one thrown-away conversation for one gate run on a provider's program |
 | a turn | `POST /sessions/{sessionId}/turns` | `prompt`, and the `gate` part: `system`, the gate's whole system prompt; `thinking`, whether the run thinks; and `model`, `effort` and `answerTokens`, what its role's order names on the run's provider |
 | a session's loads | `GET /session-loads/{sessionId}` | `documents`, each `path` and `version`: what the session was handed in full, which the index counts read |

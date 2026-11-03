@@ -1,30 +1,17 @@
-//! The agency port (`docs/boundary-api.md`, 「bmo-agency」 and 「How a gate run reaches a model」): the agents and
-//! the shared rulebooks, the providers, a role's provider order, the stand-in, a thrown-away session and its one
-//! turn, and the roads a turn walked. Bodies are camelCase, but for a turn's work parts,
-//! which go by the snake-case names a job's runner sends them.
+//! The agency port (`docs/boundary-api.md`, 「bmo-agency」 and 「How a gate run reaches a model」): the shared
+//! rulebooks, the providers, a role's provider order, a thrown-away session and its one turn, and the roads a
+//! turn walked. Bodies are camelCase, but for a turn's work parts, which go by the snake-case names a job's runner
+//! sends them.
 
 use futures_util::future::BoxFuture;
 use futures_util::stream::BoxStream;
 use futures_util::{StreamExt, TryStreamExt};
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
+use serde_json::Value;
 
 use crate::brain::Load;
 use crate::http::{Answer, Caller, Peer, PortError};
-
-/// One agent as the agency lists it: what the gate reads of it, and the rest of its row as it stands.
-#[derive(Clone, Debug, PartialEq, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Agent {
-  pub name: String,
-  pub label: Option<String>,
-  pub awake: bool,
-  pub brain_folder: Option<String>,
-  pub recollector_registration: Option<String>,
-  #[serde(flatten)]
-  pub rest: Map<String, Value>,
-}
 
 /// A shared rulebook, by its name and its text.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -186,9 +173,6 @@ pub struct TranslationRun {
 
 /// Every call the gate makes on the agency.
 pub trait Agency: Send + Sync {
-  /// Every agent of the store, the resting among them.
-  fn agents(&self) -> BoxFuture<'_, Answer<Vec<Agent>>>;
-
   /// The shared rulebooks named, in the order asked.
   fn rulebooks<'a>(&'a self, names: &'a [&'a str]) -> BoxFuture<'a, Answer<Vec<Rulebook>>>;
 
@@ -197,9 +181,6 @@ pub trait Agency: Send + Sync {
 
   /// One role with its provider order, or none where the agency holds no role of the name.
   fn role<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Answer<Option<Role>>>;
-
-  /// Whether a stand-in answers the agent while the rest closes Claude Code's road.
-  fn stand_in<'a>(&'a self, agent: &'a str) -> BoxFuture<'a, Answer<bool>>;
 
   /// A thrown-away session started for the agent at the scope given.
   fn start_apart<'a>(&'a self, agent: &'a str, apart: &'a Apart) -> BoxFuture<'a, Answer<Session>>;
@@ -253,12 +234,6 @@ impl HttpAgency {
   }
 }
 #[derive(Deserialize)]
-struct Agents {
-  #[serde(default)]
-  items: Vec<Agent>,
-}
-
-#[derive(Deserialize)]
 struct Rulebooks {
   rulebooks: Vec<Rulebook>,
 }
@@ -294,13 +269,6 @@ struct AgencyTurn {
   outcome: Option<String>,
   #[serde(default)]
   answer: Option<String>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct StandIn {
-  #[serde(default)]
-  stand_in_available: bool,
 }
 
 #[derive(Serialize)]
@@ -342,14 +310,6 @@ struct GateSend<'a> {
 const NOTHING_HELD: &str = "not-found";
 
 impl Agency for HttpAgency {
-  fn agents(&self) -> BoxFuture<'_, Answer<Vec<Agent>>> {
-    Box::pin(async move {
-      let agents: Agents = self.caller.get("agents", &["agents"], &[]).await?;
-
-      Ok(agents.items)
-    })
-  }
-
   fn rulebooks<'a>(&'a self, names: &'a [&'a str]) -> BoxFuture<'a, Answer<Vec<Rulebook>>> {
     Box::pin(async move {
       let names = names.join(",");
@@ -376,16 +336,6 @@ impl Agency for HttpAgency {
       match self.caller.get::<Role>("role", &["roles", name], &[]).await {
         Ok(role) => Ok(Some(role)),
         Err(PortError::Refused { code, .. }) if code == NOTHING_HELD => Ok(None),
-        Err(why) => Err(why),
-      }
-    })
-  }
-
-  fn stand_in<'a>(&'a self, agent: &'a str) -> BoxFuture<'a, Answer<bool>> {
-    Box::pin(async move {
-      match self.caller.get::<StandIn>("stand-in", &["agents", agent], &[]).await {
-        Ok(stand) => Ok(stand.stand_in_available),
-        Err(PortError::Refused { code, .. }) if code == NOTHING_HELD => Ok(false),
         Err(why) => Err(why),
       }
     })

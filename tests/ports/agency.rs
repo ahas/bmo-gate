@@ -1,5 +1,5 @@
-//! The agency port: the agents, the rulebooks, the providers, a role's provider order, the stand-in, a
-//! thrown-away session and its one turn, a session ended, the roads walked and the hook registered.
+//! The agency port: the rulebooks, the providers, a role's provider order, a thrown-away session and its one
+//! turn, and the roads walked.
 
 use axum::http::Method;
 use futures_util::StreamExt;
@@ -10,22 +10,10 @@ use super::peer;
 use crate::support::stub::Stub;
 
 #[tokio::test]
-async fn the_reads_answer_the_agents_the_rulebooks_the_providers_and_a_role() {
+async fn the_reads_answer_the_rulebooks_the_providers_and_a_role() {
   let stub = Stub::start().await;
   let agency = HttpAgency::new(peer(&stub, "control-token"));
 
-  stub.answer(
-    Method::GET,
-    "/agents",
-    200,
-    json!({ "items": [{ "name": "chat-agent", "label": "The agent", "awake": true, "brainFolder": "", "recollectorRegistration": null, "role": "chat" }] }),
-  );
-  stub.answer(
-    Method::GET,
-    "/agents/chat-agent",
-    200,
-    json!({ "name": "chat-agent", "standInAvailable": false }),
-  );
   stub.answer(
     Method::GET,
     "/rulebooks",
@@ -52,14 +40,10 @@ async fn the_reads_answer_the_agents_the_rulebooks_the_providers_and_a_role() {
     }),
   );
 
-  let agents = agency.agents().await.unwrap();
   let rulebooks = agency.rulebooks(&["plain-writing", "recollection"]).await.unwrap();
   let providers = agency.providers().await.unwrap();
   let role = agency.role("a-gate-role").await.unwrap().unwrap();
-  let stand_in = agency.stand_in("chat-agent").await.unwrap();
 
-  assert_eq!(agents[0].brain_folder.as_deref(), Some(""));
-  assert_eq!(agents[0].rest["role"], json!("chat"));
   assert_eq!(rulebooks[0].text, "Write plainly.");
   assert_eq!(providers[0].lines, vec!["gate"]);
   assert_eq!(role.provider.as_deref(), Some("claude-code"));
@@ -67,9 +51,8 @@ async fn the_reads_answer_the_agents_the_rulebooks_the_providers_and_a_role() {
   assert_eq!(role.order[0].effort.as_deref(), Some("low"));
   assert_eq!(role.order[1].thinking.as_deref(), Some("on"));
   assert_eq!(role.order[1].answer_tokens, Some(2048));
-  assert!(!stand_in);
   assert_eq!(stub.one("/rulebooks").query.as_deref(), Some("names=plain-writing%2Crecollection"));
-  assert_eq!(stub.one("/agents").bearer().as_deref(), Some("control-token"));
+  assert_eq!(stub.one("/rulebooks").bearer().as_deref(), Some("control-token"));
 }
 
 #[tokio::test]

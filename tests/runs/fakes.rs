@@ -9,7 +9,7 @@ use futures_util::future::BoxFuture;
 use futures_util::stream::BoxStream;
 use gate_ports::PortError;
 use gate_ports::agency::{
-  Agency, Agent, Apart, Entry, GateTurn, Provider, RoadWalked, Role, Rulebook, Session, TranslationAsk,
+  Agency, Apart, Entry, GateTurn, Provider, RoadWalked, Role, Rulebook, Session, TranslationAsk,
   TranslationRun, TurnEnd,
 };
 use gate_ports::brain::Load;
@@ -17,7 +17,7 @@ use gate_ports::gateway::{Ask, Completion, Gateway};
 use gate_ports::http::Answer;
 use gate_runs::Runs;
 use sea_orm::DatabaseConnection;
-use serde_json::{Map, json};
+use serde_json::json;
 
 /// A provider the stand-in lists, on, carrying a gate's line.
 pub fn provider(name: &str, registered: bool) -> Provider {
@@ -59,7 +59,6 @@ pub struct FakeAgency {
   pub roles: Mutex<HashMap<String, Role>>,
   pub end: Mutex<Option<TurnEnd>>,
   pub turn_takes: Mutex<Duration>,
-  pub label: Mutex<Option<String>>,
   pub started: Mutex<Vec<(String, Apart)>>,
   pub turns: Mutex<Vec<GateTurn>>,
   pub loads: Mutex<HashMap<String, Vec<Load>>>,
@@ -90,19 +89,6 @@ fn unanswered<T>(call: &'static str) -> Answer<T> {
 }
 
 impl Agency for FakeAgency {
-  fn agents(&self) -> BoxFuture<'_, Answer<Vec<Agent>>> {
-    Box::pin(async move {
-      Ok(vec![Agent {
-        name: "the-chat-agent".to_owned(),
-        label: self.label.lock().unwrap().clone(),
-        awake: true,
-        brain_folder: None,
-        recollector_registration: None,
-        rest: Map::new(),
-      }])
-    })
-  }
-
   fn translation_run<'a>(&'a self, ask: &'a TranslationAsk) -> BoxFuture<'a, Answer<TranslationRun>> {
     Box::pin(async move {
       self.translations.lock().unwrap().push(ask.clone());
@@ -160,10 +146,6 @@ impl Agency for FakeAgency {
 
       Ok(())
     })
-  }
-
-  fn stand_in<'a>(&'a self, _agent: &'a str) -> BoxFuture<'a, Answer<bool>> {
-    Box::pin(async move { unanswered("a stand-in") })
   }
 
   fn start_apart<'a>(&'a self, agent: &'a str, apart: &'a Apart) -> BoxFuture<'a, Answer<Session>> {
