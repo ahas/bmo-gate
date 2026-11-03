@@ -9,8 +9,8 @@ use futures_util::future::BoxFuture;
 use futures_util::stream::BoxStream;
 use gate_ports::PortError;
 use gate_ports::agency::{
-  Agency, Apart, Entry, GateTurn, Provider, RoadWalked, Role, Rulebook, Session, TranslationAsk,
-  TranslationRun, TurnEnd,
+  Agency, Apart, Entry, GateTurn, Provider, RoadWalked, Role, Session, TranslationAsk, TranslationRun,
+  TurnEnd,
 };
 use gate_ports::brain::Load;
 use gate_ports::gateway::{Ask, Completion, Gateway};
@@ -111,20 +111,6 @@ impl Agency for FakeAgency {
         }),
         None => unanswered("translation run"),
       }
-    })
-  }
-
-  fn rulebooks<'a>(&'a self, names: &'a [&'a str]) -> BoxFuture<'a, Answer<Vec<Rulebook>>> {
-    Box::pin(async move {
-      Ok(
-        names
-          .iter()
-          .map(|name| Rulebook {
-            name: (*name).to_owned(),
-            text: format!("the {name} rulebook"),
-          })
-          .collect(),
-      )
     })
   }
 

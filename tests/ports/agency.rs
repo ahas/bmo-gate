@@ -1,5 +1,5 @@
-//! The agency port: the rulebooks, the providers, a role's provider order, a thrown-away session and its one
-//! turn, and the roads walked.
+//! The agency port: the providers, a role's provider order, a thrown-away session and its one turn, and the
+//! roads walked.
 
 use axum::http::Method;
 use futures_util::StreamExt;
@@ -10,16 +10,10 @@ use super::peer;
 use crate::support::stub::Stub;
 
 #[tokio::test]
-async fn the_reads_answer_the_rulebooks_the_providers_and_a_role() {
+async fn the_reads_answer_the_providers_and_a_role() {
   let stub = Stub::start().await;
   let agency = HttpAgency::new(peer(&stub, "control-token"));
 
-  stub.answer(
-    Method::GET,
-    "/rulebooks",
-    200,
-    json!({ "rulebooks": [{ "name": "plain-writing", "text": "Write plainly." }] }),
-  );
   stub.answer(
     Method::GET,
     "/providers",
@@ -40,19 +34,16 @@ async fn the_reads_answer_the_rulebooks_the_providers_and_a_role() {
     }),
   );
 
-  let rulebooks = agency.rulebooks(&["plain-writing", "recollection"]).await.unwrap();
   let providers = agency.providers().await.unwrap();
   let role = agency.role("a-gate-role").await.unwrap().unwrap();
 
-  assert_eq!(rulebooks[0].text, "Write plainly.");
   assert_eq!(providers[0].lines, vec!["gate"]);
   assert_eq!(role.provider.as_deref(), Some("claude-code"));
   assert_eq!(role.order[0].model, "a-model");
   assert_eq!(role.order[0].effort.as_deref(), Some("low"));
   assert_eq!(role.order[1].thinking.as_deref(), Some("on"));
   assert_eq!(role.order[1].answer_tokens, Some(2048));
-  assert_eq!(stub.one("/rulebooks").query.as_deref(), Some("names=plain-writing%2Crecollection"));
-  assert_eq!(stub.one("/rulebooks").bearer().as_deref(), Some("control-token"));
+  assert_eq!(stub.one("/providers").bearer().as_deref(), Some("control-token"));
 }
 
 #[tokio::test]

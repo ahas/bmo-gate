@@ -1,7 +1,6 @@
-//! The agency port (`docs/boundary-api.md`, 「bmo-agency」 and 「How a gate run reaches a model」): the shared
-//! rulebooks, the providers, a role's provider order, a thrown-away session and its one turn, and the roads a
-//! turn walked. Bodies are camelCase, but for a turn's work parts, which go by the snake-case names a job's runner
-//! sends them.
+//! The agency port (`docs/boundary-api.md`, 「bmo-agency」 and 「How a gate run reaches a model」): the providers,
+//! a role's provider order, a thrown-away session and its one turn, and the roads a turn walked. Bodies are
+//! camelCase, but for a turn's work parts, which go by the snake-case names a job's runner sends them.
 
 use futures_util::future::BoxFuture;
 use futures_util::stream::BoxStream;
@@ -12,13 +11,6 @@ use serde_json::Value;
 
 use crate::brain::Load;
 use crate::http::{Answer, Caller, Peer, PortError};
-
-/// A shared rulebook, by its name and its text.
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-pub struct Rulebook {
-  pub name: String,
-  pub text: String,
-}
 
 /// A provider in the walk's order, and what it declares.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -173,9 +165,6 @@ pub struct TranslationRun {
 
 /// Every call the gate makes on the agency.
 pub trait Agency: Send + Sync {
-  /// The shared rulebooks named, in the order asked.
-  fn rulebooks<'a>(&'a self, names: &'a [&'a str]) -> BoxFuture<'a, Answer<Vec<Rulebook>>>;
-
   /// The providers in the walk's order.
   fn providers(&self) -> BoxFuture<'_, Answer<Vec<Provider>>>;
 
@@ -233,11 +222,6 @@ impl HttpAgency {
     }
   }
 }
-#[derive(Deserialize)]
-struct Rulebooks {
-  rulebooks: Vec<Rulebook>,
-}
-
 #[derive(Deserialize)]
 struct Providers {
   #[serde(default)]
@@ -310,15 +294,6 @@ struct GateSend<'a> {
 const NOTHING_HELD: &str = "not-found";
 
 impl Agency for HttpAgency {
-  fn rulebooks<'a>(&'a self, names: &'a [&'a str]) -> BoxFuture<'a, Answer<Vec<Rulebook>>> {
-    Box::pin(async move {
-      let names = names.join(",");
-      let rulebooks: Rulebooks = self.caller.get("rulebooks", &["rulebooks"], &[("names", &names)]).await?;
-
-      Ok(rulebooks.rulebooks)
-    })
-  }
-
   fn translation_run<'a>(&'a self, ask: &'a TranslationAsk) -> BoxFuture<'a, Answer<TranslationRun>> {
     Box::pin(async move { self.caller.post("translation run", &["translation-runs"], ask).await })
   }
