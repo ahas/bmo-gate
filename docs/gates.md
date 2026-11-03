@@ -9,9 +9,31 @@
   empty with it. A gate's options, a stage run and a trial serve no gate either: a name that is no gate of the
   order is refused `no-gate`.
 - **A gate is a model-only run of the gate's:** one prompt in, one text out, no shell, no tool and no session of
-  its own. A run goes out on the one road its work key's route names (the agency's `docs/own-llm.md`, 「A gate has
-  one road」), and what reaches a model on each road is `docs/boundary-api.md`, 「How a gate run reaches a model」.
+  its own. A run goes out on the provider order of the role its profile names (「Where a gate's runs go out」
+  below), and what reaches a model on each road is `docs/boundary-api.md`, 「How a gate run reaches a model」.
   No gate of the order runs.
+
+## Where a gate's runs go out
+
+- **A gate's profile names a role of the agency's,** and its runs go out on that role's provider order (the
+  agency's `docs/agent-roles.md` and `docs/provider-order.md`). No gate is a role, and the agency seeds none for
+  a gate and chooses no provider for one (its `docs/own-llm.md`, 「Gates are not agency's runs」): the role a
+  profile names is one the owner keeps on the agency's control port for it. A gate whose role the agency does
+  not hold has no road, and a run of it is refused as a fault of the road.
+- **A run reads its role as it starts** (`GET /roles/{roleName}`, `docs/boundary-api.md`, 「bmo-agency」) and goes
+  out on the role's active provider, with the model, the effort, the thinking and the answer ceiling the order's
+  entry names there. Where the role names no active provider that is on, the run goes out on the first entry of the
+  order whose provider is on; where no provider of the order is on, it stands on the order's first provider with
+  nothing to run on there, and the gate has no answer.
+- **A role whose order is empty gives a gate no road.** Such a role follows the supervisor that asks it, and no
+  supervisor asks a gate run.
+- **A run its caller puts on one provider** goes out on the role's entry for that provider where the provider is
+  on, and has nothing to run on where the order holds no entry for it or it is off. **A run its caller puts on
+  one registration** goes to the first provider whose models are registrations, with that registration as its
+  model and the effort, the thinking and the answer ceiling the role's entry for that provider names.
+- **What a gate thinks and how much it may answer are its role's,** never an option of the gate's
+  (`docs/api.md`, 「Gates」).
+- **No gate stands in the order,** so no profile names a role and no run reads one.
 
 ## What a turn is served with
 

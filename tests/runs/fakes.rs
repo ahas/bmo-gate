@@ -9,7 +9,7 @@ use futures_util::future::BoxFuture;
 use futures_util::stream::BoxStream;
 use gate_ports::PortError;
 use gate_ports::agency::{
-  Agency, Agent, Apart, GateTurn, Mapping, Provider, RoadWalked, Route, Rulebook, Session, TranslationAsk,
+  Agency, Agent, Apart, Entry, GateTurn, Provider, RoadWalked, Role, Rulebook, Session, TranslationAsk,
   TranslationRun, TurnEnd,
 };
 use gate_ports::brain::Load;
@@ -31,30 +31,37 @@ pub fn provider(name: &str, registered: bool) -> Provider {
   }
 }
 
-/// A mapping on a provider.
-pub fn mapping(provider: &str, model: &str, effort: Option<&str>, answer_tokens: Option<i64>) -> Mapping {
-  Mapping {
-    provider: Some(provider.to_owned()),
-    tier: Some("Simple".to_owned()),
-    model: Some(model.to_owned()),
-    effort: effort.map(str::to_owned),
+/// An entry of a role's provider order: the provider and the model, effort, thinking and answer ceiling there.
+pub fn entry(provider: &str, model: &str, thinking: Option<&str>, answer_tokens: Option<i64>) -> Entry {
+  Entry {
+    provider: provider.to_owned(),
+    model: model.to_owned(),
+    effort: None,
+    thinking: thinking.map(str::to_owned),
     answer_tokens,
   }
 }
 
-/// The stand-in agency: its providers, its work keys' run modes, the mapping each provider resolves, how a turn
-/// ends, how long a turn takes, and every session, turn and stop it was asked.
+/// A role with its provider order and its active provider.
+pub fn role(name: &str, order: Vec<Entry>, active: Option<&str>) -> Role {
+  Role {
+    name: name.to_owned(),
+    order,
+    provider: active.map(str::to_owned),
+  }
+}
+
+/// The stand-in agency: its providers, its roles, how a turn ends, how long a turn takes, and every session,
+/// turn and stop it was asked.
 #[derive(Default)]
 pub struct FakeAgency {
   pub providers: Mutex<Vec<Provider>>,
-  pub routes: Mutex<Vec<Route>>,
-  pub mappings: Mutex<HashMap<String, Mapping>>,
+  pub roles: Mutex<HashMap<String, Role>>,
   pub end: Mutex<Option<TurnEnd>>,
   pub turn_takes: Mutex<Duration>,
   pub label: Mutex<Option<String>>,
   pub started: Mutex<Vec<(String, Apart)>>,
   pub turns: Mutex<Vec<GateTurn>>,
-  pub resolved: Mutex<Vec<(String, Option<String>, String)>>,
   pub loads: Mutex<HashMap<String, Vec<Load>>>,
   /// What the translation line answers, one text an ask, in order; none left is no answer.
   pub translated: Mutex<std::collections::VecDeque<String>>,
@@ -139,8 +146,8 @@ impl Agency for FakeAgency {
     Box::pin(async move { Ok(self.providers.lock().unwrap().clone()) })
   }
 
-  fn work_key<'a>(&'a self, key: &'a str) -> BoxFuture<'a, Answer<Option<Route>>> {
-    Box::pin(async move { Ok(self.routes.lock().unwrap().iter().find(|one| one.key == key).cloned()) })
+  fn role<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Answer<Option<Role>>> {
+    Box::pin(async move { Ok(self.roles.lock().unwrap().get(name).cloned()) })
   }
 
   fn session_loads<'a>(&'a self, session: &'a str) -> BoxFuture<'a, Answer<Vec<Load>>> {
@@ -152,36 +159,6 @@ impl Agency for FakeAgency {
       self.loads.lock().unwrap().insert(session.to_owned(), loads.to_vec());
 
       Ok(())
-    })
-  }
-
-  fn resolve<'a>(
-    &'a self,
-    work_key: &'a str,
-    provider: Option<&'a str>,
-    tier: &'a str,
-  ) -> BoxFuture<'a, Answer<Option<Mapping>>> {
-    Box::pin(async move {
-      self.resolved.lock().unwrap().push((
-        work_key.to_owned(),
-        provider.map(str::to_owned),
-        tier.to_owned(),
-      ));
-
-      let mappings = self.mappings.lock().unwrap();
-      let found = match provider {
-        Some(provider) => mappings.get(provider).cloned(),
-        None => {
-          let providers = self.providers.lock().unwrap();
-
-          providers
-            .iter()
-            .filter(|one| one.enabled)
-            .find_map(|one| mappings.get(&one.name).cloned())
-        }
-      };
-
-      Ok(found)
     })
   }
 

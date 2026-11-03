@@ -30,7 +30,7 @@ the camelCase keys.
 | Code | Status | When |
 |---|---|---|
 | `nothing-to-change` | 400 | a change names no field |
-| `own-llm` | 422 | a change names thinking or the answer size, which are the gate's tier's |
+| `own-llm` | 422 | a change names thinking or the answer size, which are the gate's role's |
 | `switch-not-boolean` | 422 | a switch sent as anything but true or false |
 | `always-on` | 422 | a switch for a gate whose profile lets it not be switched off |
 

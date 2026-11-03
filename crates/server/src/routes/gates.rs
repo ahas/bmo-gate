@@ -104,11 +104,13 @@ async fn changed(
   let body = serde_json::to_value(change)
     .map_err(|why| Refused::new(Code::BadRequest, format!("the change could not be read: {why}")))?;
 
-  options::change_for(runs, &gate_name, agent, &body, now())
+  let at = now();
+
+  options::change_for(runs, &gate_name, agent, &body, at)
     .await
     .map_err(Refused::of_options)?;
 
-  let options = options::route_view(runs, &gate_name).await.map_err(Refused::of_options)?;
+  let options = options::route_view(runs, &gate_name, at).await.map_err(Refused::of_options)?;
 
   Ok(Json(GateOptionsChanged {
     gate_name,

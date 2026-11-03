@@ -18,7 +18,7 @@ use gate_runs::Runs;
 use gate_stages::{Reading, Stages};
 
 use crate::reference::fakes::{AnsweringGateway, FakeBrain, FakeReceiver, PausingGateway};
-use crate::runs::fakes::{FakeAgency, mapping, provider};
+use crate::runs::fakes::{FakeAgency, provider};
 use crate::support::scratch::Scratch;
 
 /// A migrated store, the stand-ins, a folder of the test's own for the shipped pieces, and the reference road over
@@ -58,11 +58,6 @@ pub async fn paused_ground(
   );
 
   agency.providers.lock().unwrap().push(provider("registry", true));
-  agency
-    .mappings
-    .lock()
-    .unwrap()
-    .insert("registry".into(), mapping("registry", "a-registration", None, None));
 
   let shipped = std::env::temp_dir().join(format!("gate-reference-{}-{test}", std::process::id()));
 

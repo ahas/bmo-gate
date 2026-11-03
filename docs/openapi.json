@@ -265,7 +265,7 @@
         "description": "A change of a gate's options: a field left out stays.",
         "properties": {
           "answerTokens": {
-            "description": "Not a gate option: its tier's. A change naming it is refused `own-llm`.",
+            "description": "Not a gate option: its role's. A change naming it is refused `own-llm`.",
             "format": "int64",
             "type": [
               "integer",
@@ -279,7 +279,7 @@
             ]
           },
           "thinking": {
-            "description": "Not a gate option: its tier's. A change naming it is refused `own-llm`.",
+            "description": "Not a gate option: its role's. A change naming it is refused `own-llm`.",
             "type": [
               "boolean",
               "null"
@@ -348,7 +348,7 @@
         "type": "object"
       },
       "GateRoute": {
-        "description": "The gate's route as a run reads it.",
+        "description": "The gate's road as a run reads it: the provider and the model its role's order names.",
         "properties": {
           "model": {
             "type": "string"
@@ -357,7 +357,7 @@
             "type": "string"
           },
           "setAt": {
-            "description": "Epoch milliseconds.",
+            "description": "The moment the change was written, in epoch milliseconds.",
             "format": "int64",
             "type": "integer"
           }

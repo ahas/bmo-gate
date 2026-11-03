@@ -85,21 +85,21 @@ pub struct GateOptions {
 pub struct GateOptionChange {
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub enabled: Option<bool>,
-  /// Not a gate option: its tier's. A change naming it is refused `own-llm`.
+  /// Not a gate option: its role's. A change naming it is refused `own-llm`.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub thinking: Option<bool>,
-  /// Not a gate option: its tier's. A change naming it is refused `own-llm`.
+  /// Not a gate option: its role's. A change naming it is refused `own-llm`.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub answer_tokens: Option<i64>,
 }
 
-/// The gate's route as a run reads it.
+/// The gate's road as a run reads it: the provider and the model its role's order names.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GateRoute {
   pub provider: String,
   pub model: String,
-  /// Epoch milliseconds.
+  /// The moment the change was written, in epoch milliseconds.
   pub set_at: i64,
 }
 

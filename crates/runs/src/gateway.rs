@@ -1,7 +1,7 @@
 //! A gate asked on a registered model (`docs/boundary-api.md`, 「The model gateway」): one request with no tools
-//! to the registration its mapping names, through the agency's gateway, with the gate's thinking and answer room
-//! on that road and its sampling, waited for until the gateway answers. A request the gateway refuses as past the
-//! registration's window is too large; anything else unanswered is an error.
+//! to the registration its role's entry names, through the agency's gateway, with the gate's thinking and answer
+//! room on that road and its sampling, waited for until the gateway answers. A request the gateway refuses as past
+//! the registration's window is too large; anything else unanswered is an error.
 
 use gate_policy::profiles::PROFILES;
 use gate_ports::PortError;
@@ -32,9 +32,12 @@ pub async fn ask(runs: &Runs, run: &Run<'_>) -> Result<Ended, GateError> {
   let Some(mapping) = &run.route.mapping else {
     return Ok(unanswered(Outcome::Unavailable, "its provider serves it nothing now"));
   };
-  let Some(model) = mapping.model.clone().filter(|model| !model.is_empty()) else {
-    return Ok(unanswered(Outcome::Unavailable, "its tier maps to no registration"));
-  };
+  let model = mapping.model.clone();
+
+  if model.is_empty() {
+    return Ok(unanswered(Outcome::Unavailable, "its role's order names no registration"));
+  }
+
   let sampling = PROFILES
     .of(stage)
     .and_then(|profile| profile.sampling.as_ref())

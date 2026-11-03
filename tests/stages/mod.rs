@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use gate_stages::{Reading, Stages};
 
-use crate::runs::fakes::{FakeAgency, FakeGateway, mapping, provider};
+use crate::runs::fakes::{FakeAgency, FakeGateway, provider};
 use crate::support::scratch::Scratch;
 
 /// A migrated store, stand-ins for the agency and its gateway with one registered provider, and the stages on
@@ -30,11 +30,6 @@ pub async fn ground(test: &str, reading: Reading) -> Ground {
   let runs = crate::runs::fakes::runs(scratch.db(), &agency, &gateway);
 
   agency.providers.lock().unwrap().push(provider("registry", true));
-  agency
-    .mappings
-    .lock()
-    .unwrap()
-    .insert("registry".into(), mapping("registry", "a-registration", None, None));
 
   let stages = Arc::new(Stages::new(runs, reading));
 

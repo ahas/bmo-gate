@@ -122,12 +122,11 @@ In the agency's conventions (its `docs/api.md`): camelCase, the agency's control
 | Call | Route | What the gate needs it for |
 |---|---|---|
 | the agents | `GET /agents` | the registrations a gate run names and the agents a turn is for |
-| the providers | `GET /providers` | the provider order a gate's road begins on and whether each is on |
-| a gate's route | `GET /work-keys/{workKey}` | the run mode the gate's work key stands on (`docs/gates.md`, 「Where a gate's runs go out」) |
-| a mapping | `GET /work-keys/{workKey}?provider=&tier=` | the `provider`, `model`, `effort` and `answerTokens` a gate run goes out on |
+| the providers | `GET /providers` | whether each provider is on, and whether its models are registrations or served on the agency's gateway, which decides how a gate run reaches its model |
+| a gate's role | `GET /roles/{roleName}` | the role a gate's profile names (`docs/gates.md`, 「Where a gate's runs go out」): `provider`, its active provider or null, and `order`, each entry's `provider`, `model`, `effort`, `thinking` and `answerTokens`, which a gate run goes out on; 404 `not-found` is a role the agency does not hold |
 | a stand-in | `GET /agents/{agentName}` | `standInAvailable`, whether a stand-in answers while Claude Code's road is closed |
 | a session | `POST /sessions` | `agentName`, `scope` `conversation`, `options` `{provider, model, cwd}`: one thrown-away conversation for one gate run on a provider's program |
-| a turn | `POST /sessions/{sessionId}/turns` | `prompt`, and the `gate` part: `system`, the gate's whole system prompt; `thinking`, whether the run thinks; and `model`, `effort` and `answerTokens`, the mapping its tier resolved to |
+| a turn | `POST /sessions/{sessionId}/turns` | `prompt`, and the `gate` part: `system`, the gate's whole system prompt; `thinking`, whether the run thinks; and `model`, `effort` and `answerTokens`, what its role's order names on the run's provider |
 | a session's loads | `GET /session-loads/{sessionId}` | `documents`, each `path` and `version`: what the session was handed in full, which the index counts read |
 | a session's loads kept | `PUT /session-loads/{sessionId}` | `documents`, every load the session now holds, the piece just read added at its version |
 | a translation | `POST /translation-runs` | `purpose` (`document`, `worker` or `record`), `language` (the target's name as the policy names it), `text`, one part, and `note` where the gate has a word on that part: answered with `text`, the part translated whole, and the `provider` and `model` it went out on; 413 `too-large` for a part past the model's window (「The translation line」) |
@@ -138,10 +137,10 @@ The gate registers no hook at any of the agency's hook points and answers none.
 ### The translation line
 
 - **Every translation the gate makes is one ask of the agency's translation line,** `POST /translation-runs`, a
-  part at a time: the agency runs it as a run apart on its `translate` work key, under the instructions of the
-  purpose asked, which are the agency's (its `docs/launch-lines.md`, 「Translate runner」). The purpose is
-  `document` for a part of a document the viewer asked for, `worker` for a text read into the worker's language
-  and `record` for a worker's record read into the owner's language.
+  part at a time: the agency runs it as a run apart on its translator role's provider order, under the instructions
+  of the purpose asked, which are the agency's (its `docs/launch-lines.md`, 「Translate runner」). The purpose is
+  `document` for a part of a document the viewer asked for, `worker` for a text read into the worker's language and
+  `record` for a worker's record read into the owner's language.
 - **What stays the gate's:** the translations route, the kept translations, a document's queue, the cutting into
   parts, the structure each answer is held to and the asks again, how many parts stand out at once, and the
   halving of a part too large for the line's road: a part the line refuses 413 `too-large` is cut in two, at a
@@ -179,11 +178,12 @@ node by a batch login (`docs/gguf-llm.md`).
 Gate runs are the gate's own: the agency starts none and holds no gate's line. A translation is no gate run: the
 gate asks the agency's translation line, which the agency runs as a run apart (「The translation line」). No gate
 stands in the order, so no gate of a turn reaches a model. A run that a caller names goes on its one road, one ask
-and nothing behind it (the agency's `docs/own-llm.md`, 「A gate has one road」):
+and nothing behind it (`docs/gates.md`, 「Where a gate's runs go out」):
 
-- **The road** is the gate's work key's run mode where it names a provider that is on, else the first provider
-  on in the provider order; the mapping comes from `POST /routes/resolve` at the tier the gate's profile names.
-  A run its caller puts on another provider or on one registration goes there alone.
+- **The road** is the provider order of the role the gate's profile names: the role's active provider, else the
+  first provider of its order that is on, with the model, the effort, the thinking and the answer ceiling the
+  order's entry names there (`docs/gates.md`, 「Where a gate's runs go out」). A run its caller puts on another
+  provider or on one registration goes there alone.
 - **A provider whose program carries the run** — Claude Code, and any provider the agency does not mark
   `gateway` — is a thrown-away agency session each run: started apart on the provider and model, sent one
   turn with the gate's instructions as its whole system prompt, a fresh session, no tools, and thinking as
@@ -223,7 +223,7 @@ and nothing behind it (the agency's `docs/own-llm.md`, 「A gate has one road」
 | the gate order and the gates' profiles | the gate | its own policy file, served by `GET /gates` |
 | the prompt ceilings | the gate | its own policy file |
 | the translator's languages: the worker's, the owner's and each language's name | the gate | its own policy file |
-| a work key's tier, mapping and run mode | the agency | `POST /routes/resolve`, `GET /fallback` |
+| the provider order a gate's runs go out on, each entry's model, effort, thinking and answer ceiling | the agency | `GET /roles/{roleName}`, the role the gate's profile names |
 | the keepalive's ping bound | the agency | not read: a gate run keeps no session |
 | a resident turn's shape | the agency | not read: a gate run is no resident turn |
 | OpenRouter's settings | the agency | not read: a run reaches OpenRouter through the agency |
@@ -270,9 +270,9 @@ Statements here that a sibling's document does not yet match, each for that sibl
   layers in the order it lists them.
 - **The upstreams' published clients do not carry the calls the gate makes.** bmo-brain's client serves memory
   rows, notes, watches, reminders, fragments and libraries, and not the subject, sheet and tally routes the gate
-  reads; bmo-agency's client serves sessions and turns, and not the work-key route the gate resolves. The
-  gate's hand-written ports in `crates/ports` stand for these calls until their owners serve them, and the
-  gate takes the client of each one as soon as it does.
+  reads. The gate's hand-written ports in `crates/ports` stand for these calls until their owners serve them,
+  and the gate takes the client of each one as soon as it does; bmo-agency's client serves the role read, the
+  sessions and the turns the gate's agency port makes, for the gate to take up.
 - **The agency keeps a copy of the gate order:** its `policy/gates.toml` and the policy crate's module of it. Its
   gate switch route validates a gate's name against its own copy; the copy is for the agency to retire, reading
   the order through `GET /gates`.

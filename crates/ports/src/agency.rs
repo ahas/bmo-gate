@@ -1,6 +1,6 @@
 //! The agency port (`docs/boundary-api.md`, 「bmo-agency」 and 「How a gate run reaches a model」): the agents and
-//! the shared rulebooks, the providers, a work key's route and mapping, the stand-in, a thrown-away session and
-//! its one turn, and the roads a turn walked. Bodies are camelCase, but for a turn's work parts,
+//! the shared rulebooks, the providers, a role's provider order, the stand-in, a thrown-away session and its one
+//! turn, and the roads a turn walked. Bodies are camelCase, but for a turn's work parts,
 //! which go by the snake-case names a job's runner sends them.
 
 use futures_util::future::BoxFuture;
@@ -46,31 +46,33 @@ pub struct Provider {
   pub lines: Vec<String>,
 }
 
-/// A work key's route as the fallback settings hold it: the run mode it stands on.
+/// One entry of a role's provider order: the provider, and the model, the effort, the thinking and the answer
+/// ceiling the role runs on there, each of the last three none where the entry leaves it to the provider.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Route {
-  pub key: String,
-  pub route_mode: String,
-  pub account: Option<String>,
-  pub set_at: Option<i64>,
-  /// The provider the work key goes out on.
-  pub provider: Option<String>,
-  /// The model the work key's tier maps there.
-  pub model: Option<String>,
+pub struct Entry {
+  pub provider: String,
+  pub model: String,
+  #[serde(default)]
   pub effort: Option<String>,
+  /// `on`, `off`, or none for the provider's own.
+  #[serde(default)]
+  pub thinking: Option<String>,
+  #[serde(default)]
   pub answer_tokens: Option<i64>,
 }
 
-/// The mapping a work key goes out on at a tier.
+/// A role as the agency answers it, what a gate's run reads of it: its provider order and its active provider.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Mapping {
+pub struct Role {
+  pub name: String,
+  #[serde(default)]
+  pub order: Vec<Entry>,
+  /// The first provider of its order with quota that can answer now; none where no provider of it has quota or
+  /// its order is empty.
+  #[serde(default)]
   pub provider: Option<String>,
-  pub tier: Option<String>,
-  pub model: Option<String>,
-  pub effort: Option<String>,
-  pub answer_tokens: Option<i64>,
 }
 
 /// The scope a thrown-away session is started at: on a provider and a model, in a folder, for no item and
@@ -97,13 +99,11 @@ pub struct Line {
   #[serde(skip_serializing_if = "Option::is_none")]
   pub effort: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
-  pub tier: Option<String>,
-  #[serde(skip_serializing_if = "Option::is_none")]
   pub answer_tokens: Option<i64>,
 }
 
 /// One gate run's turn into its thrown-away session: the material as the prompt, the gate's instructions as
-/// the whole system prompt, whether the run thinks, a fresh session, and the run's name and work key.
+/// the whole system prompt, whether the run thinks, a fresh session, and the run's name and its gate's.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct GateTurn {
   pub session: String,
@@ -112,7 +112,7 @@ pub struct GateTurn {
   pub model: String,
   pub mapping: Line,
   pub name: String,
-  pub work_key: String,
+  pub gate: String,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub chat: Option<i64>,
   pub system: String,
@@ -125,7 +125,6 @@ pub struct WentOut {
   pub provider: Option<String>,
   pub model: Option<String>,
   pub effort: Option<String>,
-  pub tier: Option<String>,
 }
 
 /// A turn's end, as its send answers it: the parts the gate reads, and the reply and the failure as they came.
@@ -196,17 +195,8 @@ pub trait Agency: Send + Sync {
   /// The providers in the walk's order.
   fn providers(&self) -> BoxFuture<'_, Answer<Vec<Provider>>>;
 
-  /// One work key's route, or none where the agency holds no route for it.
-  fn work_key<'a>(&'a self, key: &'a str) -> BoxFuture<'a, Answer<Option<Route>>>;
-
-  /// The mapping a work key goes out on at a tier, on the provider named or the walk's first, or none where no
-  /// provider serves it.
-  fn resolve<'a>(
-    &'a self,
-    work_key: &'a str,
-    provider: Option<&'a str>,
-    tier: &'a str,
-  ) -> BoxFuture<'a, Answer<Option<Mapping>>>;
+  /// One role with its provider order, or none where the agency holds no role of the name.
+  fn role<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Answer<Option<Role>>>;
 
   /// Whether a stand-in answers the agent while the rest closes Claude Code's road.
   fn stand_in<'a>(&'a self, agent: &'a str) -> BoxFuture<'a, Answer<bool>>;
@@ -277,21 +267,6 @@ struct Rulebooks {
 struct Providers {
   #[serde(default)]
   items: Vec<Provider>,
-}
-
-#[allow(dead_code)]
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct WorkKey {
-  key: String,
-  provider: String,
-  model: String,
-  #[serde(default)]
-  effort: Option<String>,
-  #[serde(default)]
-  answer_tokens: Option<i64>,
-  #[serde(default)]
-  run_mode: String,
 }
 
 #[derive(Deserialize)]
@@ -396,40 +371,10 @@ impl Agency for HttpAgency {
     })
   }
 
-  fn work_key<'a>(&'a self, key: &'a str) -> BoxFuture<'a, Answer<Option<Route>>> {
+  fn role<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Answer<Option<Role>>> {
     Box::pin(async move {
-      match self.caller.get::<WorkKey>("work key", &["work-keys", key], &[]).await {
-        Ok(work) => Ok(Some(Route {
-          key: work.key,
-          route_mode: work.run_mode,
-          account: None,
-          set_at: None,
-          provider: Some(work.provider),
-          model: Some(work.model),
-          effort: work.effort,
-          answer_tokens: work.answer_tokens,
-        })),
-        Err(PortError::Refused { code, .. }) if code == NOTHING_HELD => Ok(None),
-        Err(why) => Err(why),
-      }
-    })
-  }
-
-  fn resolve<'a>(
-    &'a self,
-    work_key: &'a str,
-    provider: Option<&'a str>,
-    tier: &'a str,
-  ) -> BoxFuture<'a, Answer<Option<Mapping>>> {
-    Box::pin(async move {
-      let mut query: Vec<(&str, &str)> = vec![("tier", tier)];
-
-      if let Some(provider) = provider {
-        query.push(("provider", provider));
-      }
-
-      match self.caller.get::<Mapping>("mapping", &["work-keys", work_key], &query).await {
-        Ok(mapping) => Ok(Some(mapping)),
+      match self.caller.get::<Role>("role", &["roles", name], &[]).await {
+        Ok(role) => Ok(Some(role)),
         Err(PortError::Refused { code, .. }) if code == NOTHING_HELD => Ok(None),
         Err(why) => Err(why),
       }

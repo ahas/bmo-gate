@@ -32,12 +32,12 @@ written for one caller.
 |---|---|---|
 | `GET /gates` | | a page of the gate order, each `gateName`, `part` (`pre`, `post` or `apart`), `step`, `condition` or null, `switchable` and `answerTokens`; the order holds no gate, so the page is empty |
 | `GET /options/{gateName}` | | `switchable`, `enabled`, `effective` (`thinking`, `answerTokens`) and `defaults` |
-| `POST /options/{gateName}` | `enabled` | `gateName` and `options`, the gate's route as a run reads it (`provider`, `model`, `setAt`) |
+| `POST /options/{gateName}` | `enabled` | `gateName` and `options`, the gate's road as a run reads it (`provider` and `model`, `docs/gates.md`, 「Where a gate's runs go out」) and `setAt`, the moment the change was written |
 | `POST /options/{gateName}/agents/{agentName}` | as `POST /options/{gateName}` | as `POST /options/{gateName}`, its switch the agent's |
 | `POST /options/copied` | `agentName` (the companion), `fromAgentName` (the chat agent) | 204 |
 
 - **A gate's options** are its switch where its profile lets it be switched off. What it thinks and how much it
-  may answer are its tier's on its road; a change naming either is refused `own-llm`. A gate has no wait of its
+  may answer are its role's on its road; a change naming either is refused `own-llm`. A gate has no wait of its
   own: a run is waited for until it ends (「Runs」). No gate stands in the order, so no options row is read or
   written.
 - **A change names whose options it writes.** `POST /options/{gateName}` writes the chat agent's row of the gate;

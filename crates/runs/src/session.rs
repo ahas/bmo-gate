@@ -1,8 +1,8 @@
 //! A gate asked on a provider's program (`docs/gates.md`, 「A gate on a provider's program」): one thrown-away
-//! agency session started apart on the provider and the model the gate's tier maps to there, and one turn into
-//! it with the gate's instructions as its whole system prompt, a fresh session, no tools and thinking as the run
-//! asks, waited for until it ends. A turn somebody stopped is raised; any other end with no answer is the gate
-//! having none.
+//! agency session started apart on the provider and the model the gate's role's order names there, and one turn
+//! into it with the gate's instructions as its whole system prompt, a fresh session, no tools and thinking as the
+//! run asks, waited for until it ends. A turn somebody stopped is raised; any other end with no answer is the
+//! gate having none.
 
 use gate_ports::agency::{Apart, GateTurn, Line, TurnEnd};
 
@@ -104,11 +104,10 @@ pub async fn ask(runs: &Runs, run: &Run<'_>) -> Result<Ended, GateError> {
     mapping: Line {
       model: model.clone(),
       effort: mapping.effort.clone(),
-      tier: Some(route.tier.clone()),
       answer_tokens: mapping.answer_tokens,
     },
     name: run.name.clone(),
-    work_key: run.route.key.clone(),
+    gate: run.route.gate.clone(),
     chat: request.chat_id,
     system: request.system.clone(),
     thinking: request.thinking,

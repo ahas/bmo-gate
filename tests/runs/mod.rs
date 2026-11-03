@@ -1,8 +1,10 @@
-//! The runs' tests: the gate options and the pool over a scratch database of each test's own.
+//! The runs' tests: the gate options and the pool over a scratch database of each test's own, and the road a
+//! gate's role gives.
 
 pub(crate) mod fakes;
 mod options;
 mod pool;
+mod route;
 
 use std::sync::Arc;
 

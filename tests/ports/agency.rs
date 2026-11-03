@@ -1,4 +1,4 @@
-//! The agency port: the agents, the rulebooks, the providers, a work key's route and mapping, the stand-in, a
+//! The agency port: the agents, the rulebooks, the providers, a role's provider order, the stand-in, a
 //! thrown-away session and its one turn, a session ended, the roads walked and the hook registered.
 
 use axum::http::Method;
@@ -10,7 +10,7 @@ use super::peer;
 use crate::support::stub::Stub;
 
 #[tokio::test]
-async fn the_reads_answer_the_agents_the_rulebooks_the_providers_and_the_work_key() {
+async fn the_reads_answer_the_agents_the_rulebooks_the_providers_and_a_role() {
   let stub = Stub::start().await;
   let agency = HttpAgency::new(peer(&stub, "control-token"));
 
@@ -40,83 +40,52 @@ async fn the_reads_answer_the_agents_the_rulebooks_the_providers_and_the_work_ke
   );
   stub.answer(
     Method::GET,
-    "/work-keys/a-work-key",
+    "/roles/a-gate-role",
     200,
-    json!({ "key": "a-work-key", "provider": "claude-code", "model": "a-model", "effort": "low", "answerTokens": 2048, "runMode": "run" }),
+    json!({
+      "name": "a-gate-role", "code": "a-gate-role", "label": "A gate role", "line": "worker", "maxConcurrent": 2,
+      "order": [
+        { "provider": "claude-code", "model": "a-model", "effort": "low", "thinking": null },
+        { "provider": "registry", "model": "a-registration", "effort": null, "thinking": "on", "answerTokens": 2048 }
+      ],
+      "quotaShare": 0.01, "provider": "claude-code", "running": 0, "waiting": 0
+    }),
   );
 
   let agents = agency.agents().await.unwrap();
   let rulebooks = agency.rulebooks(&["plain-writing", "recollection"]).await.unwrap();
   let providers = agency.providers().await.unwrap();
-  let route = agency.work_key("a-work-key").await.unwrap().unwrap();
+  let role = agency.role("a-gate-role").await.unwrap().unwrap();
   let stand_in = agency.stand_in("chat-agent").await.unwrap();
 
   assert_eq!(agents[0].brain_folder.as_deref(), Some(""));
   assert_eq!(agents[0].rest["role"], json!("chat"));
   assert_eq!(rulebooks[0].text, "Write plainly.");
   assert_eq!(providers[0].lines, vec!["gate"]);
-  assert_eq!(route.provider.as_deref(), Some("claude-code"));
-  assert_eq!(route.model.as_deref(), Some("a-model"));
-  assert_eq!(route.answer_tokens, Some(2048));
+  assert_eq!(role.provider.as_deref(), Some("claude-code"));
+  assert_eq!(role.order[0].model, "a-model");
+  assert_eq!(role.order[0].effort.as_deref(), Some("low"));
+  assert_eq!(role.order[1].thinking.as_deref(), Some("on"));
+  assert_eq!(role.order[1].answer_tokens, Some(2048));
   assert!(!stand_in);
   assert_eq!(stub.one("/rulebooks").query.as_deref(), Some("names=plain-writing%2Crecollection"));
   assert_eq!(stub.one("/agents").bearer().as_deref(), Some("control-token"));
 }
 
 #[tokio::test]
-async fn a_mapping_is_resolved_at_a_tier_and_a_key_no_provider_serves_resolves_to_none() {
+async fn a_role_the_agency_does_not_hold_reads_as_none() {
   let stub = Stub::start().await;
   let agency = HttpAgency::new(peer(&stub, "t"));
 
   stub.answer(
     Method::GET,
-    "/work-keys/a-work-key",
-    200,
-    json!({ "key": "a-work-key", "provider": "claude-code", "model": "a-model", "effort": "low", "answerTokens": 2048 }),
-  );
-
-  let mapping = agency.resolve("a-work-key", None, "Light").await.unwrap().unwrap();
-
-  assert_eq!(mapping.provider.as_deref(), Some("claude-code"));
-  assert_eq!(mapping.model.as_deref(), Some("a-model"));
-  assert_eq!(mapping.answer_tokens, Some(2048));
-  assert_eq!(stub.one("/work-keys/a-work-key").query.as_deref(), Some("tier=Light"));
-
-  let named = Stub::start().await;
-  named.answer(
-    Method::GET,
-    "/work-keys/a-work-key",
-    200,
-    json!({ "key": "a-work-key", "provider": "codex", "model": "a-codex-model", "effort": "low", "answerTokens": null }),
-  );
-
-  assert_eq!(
-    HttpAgency::new(peer(&named, "t"))
-      .resolve("a-work-key", Some("codex"), "Light")
-      .await
-      .unwrap()
-      .unwrap()
-      .provider
-      .as_deref(),
-    Some("codex")
-  );
-  assert_eq!(named.one("/work-keys/a-work-key").query.as_deref(), Some("tier=Light&provider=codex"));
-
-  let none = Stub::start().await;
-  none.answer(
-    Method::GET,
-    "/work-keys/a-work-key",
+    "/roles/no-such-role",
     404,
-    json!({ "error": "no route serves a-work-key", "code": "not-found" }),
+    json!({ "error": "no role no-such-role", "code": "not-found" }),
   );
 
-  assert_eq!(
-    HttpAgency::new(peer(&none, "t"))
-      .resolve("a-work-key", Some("codex"), "Light")
-      .await
-      .unwrap(),
-    None
-  );
+  assert_eq!(agency.role("no-such-role").await.unwrap(), None);
+  assert_eq!(stub.one("/roles/no-such-role").bearer().as_deref(), Some("t"));
 }
 
 #[tokio::test]
@@ -151,11 +120,10 @@ async fn a_gate_run_is_a_conversation_and_one_turn_carrying_the_whole_system_pro
     mapping: Line {
       model: "a-model".into(),
       effort: Some("low".into()),
-      tier: Some("Light".into()),
       answer_tokens: None,
     },
-    name: "gate:a-work-key:1".into(),
-    work_key: "a-work-key".into(),
+    name: "gate:a-gate:1".into(),
+    gate: "a-gate".into(),
     chat: Some(7),
     system: "the gate's instructions".into(),
     thinking: false,

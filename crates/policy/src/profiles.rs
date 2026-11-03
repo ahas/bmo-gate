@@ -1,6 +1,6 @@
 //! Each gate's profile: what the gate itself declares about how it runs, read beside the gate order and served
-//! with it by `GET /gates`. The road a gate takes and the model its tier maps to are its work key's, which the
-//! agency keeps and resolves.
+//! with it by `GET /gates`. The road a gate takes is the provider order of the role its profile names, which the
+//! agency keeps (`docs/gates.md`, 「Where a gate's runs go out」).
 
 use std::collections::BTreeMap;
 
@@ -18,8 +18,8 @@ pub struct Profiles {
 #[serde(deny_unknown_fields)]
 pub struct Profile {
   pub key: String,
-  /// The gate's word for its work, which the agency maps to a provider's model and effort.
-  pub tier: String,
+  /// The agency's role whose provider order the gate's runs go out on.
+  pub role: String,
   /// The owner may switch it off, since its caller has a way of its own without it.
   #[serde(default)]
   pub switchable: bool,

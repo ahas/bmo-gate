@@ -1,12 +1,12 @@
 //! A gate's own options (`docs/api.md`, 「Gates」): its switch where its profile lets it be switched off, kept for
-//! each agent. What a gate runs on beside it — its thinking and answer room — is its tier's on its own road. The
+//! each agent. What a gate runs on beside it — its thinking and answer room — is its role's on its own road. The
 //! screen reads and writes the chat agent's rows; a companion's are copied from them.
 
 use gate_codes::Code;
 use gate_policy::fill_marks;
 use gate_policy::gates::GATE_ORDER;
 use gate_policy::profiles::{PROFILES, Profile};
-use gate_ports::agency::Mapping;
+use gate_ports::agency::Entry;
 use gate_store::entity::gate_options;
 use gate_words::options as words;
 use sea_orm::{
@@ -17,9 +17,9 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::route;
-use crate::{GateError, Runs, fault};
+use crate::{GateError, Runs};
 
-/// What a gate's answer is given where neither its tier nor its own work asks for more.
+/// What a gate's answer is given where neither its role nor its own work asks for more.
 pub const DEFAULT_ANSWER_TOKENS: i64 = 2048;
 
 /// Why a change was not taken: its code and the sentence naming why.
@@ -72,7 +72,7 @@ pub async fn row(db: &DatabaseConnection, key: &str, agent: &str) -> Result<Opti
   }))
 }
 
-/// What a gate asks for where its tier says nothing.
+/// What a gate asks for where its role says nothing.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Defaults {
@@ -87,14 +87,14 @@ pub fn defaults(profile: &Profile) -> Defaults {
   }
 }
 
-/// Whether a registered model's mapping thinks: its effort says so.
-pub fn thinks_on(mapping: &Mapping) -> bool {
-  mapping.effort.as_deref() == Some("thinking")
+/// Whether a run on a registered model thinks: its role's entry there switches thinking on.
+pub fn thinks_on(mapping: &Entry) -> bool {
+  mapping.thinking.as_deref() == Some("on")
 }
 
-/// The answer room a gate's request on a registered model is given: its tier's there, never below the gate's
-/// own floor, and the common default where neither names one.
-pub fn answer_room(stage: &str, mapping: Option<&Mapping>) -> i64 {
+/// The answer room a gate's request on a registered model is given: the answer ceiling its role's entry names
+/// there, never below the gate's own floor, and the common default where neither names one.
+pub fn answer_room(stage: &str, mapping: Option<&Entry>) -> i64 {
   let floor = PROFILES.of(stage).and_then(|profile| profile.answer_tokens);
 
   mapping
@@ -147,8 +147,8 @@ pub async fn view(runs: &Runs, key: &str) -> Result<View, Refusal> {
   })
 }
 
-/// A gate's route as a run reads it: the provider its road begins on, the model its tier maps there and when its
-/// route was last set.
+/// A gate's road as a run reads it after a change of its options: the provider it goes out on, the model its
+/// role's order names there, and the moment the change was written.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RouteView {
@@ -157,12 +157,10 @@ pub struct RouteView {
   pub set_at: i64,
 }
 
-pub async fn route_view(runs: &Runs, key: &str) -> Result<RouteView, Refusal> {
+pub async fn route_view(runs: &Runs, key: &str, set_at: i64) -> Result<RouteView, Refusal> {
   profile(key)?;
 
   let road = route::read(runs, key).await.map_err(Refusal::unit)?;
-  let route = runs.agency.work_key(key).await.map_err(|why| Refusal::unit(fault(why)))?;
-  let set_at = route.and_then(|one| one.set_at).unwrap_or(0);
 
   Ok(RouteView {
     provider: road.provider.clone(),

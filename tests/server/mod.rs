@@ -21,7 +21,7 @@ use reqwest::{Method, StatusCode};
 use serde_json::Value;
 
 use crate::reference::fakes::{AnsweringGateway, FakeBrain, FakeReceiver, fragment};
-use crate::runs::fakes::{FakeAgency, mapping, provider};
+use crate::runs::fakes::{FakeAgency, provider};
 use crate::support::scratch::Scratch;
 
 /// The token every caller presents.
@@ -57,11 +57,6 @@ pub async fn ground(test: &str, answer: impl Fn(&Ask) -> Option<String> + Send +
   );
 
   agency.providers.lock().unwrap().push(provider("registry", true));
-  agency
-    .mappings
-    .lock()
-    .unwrap()
-    .insert("registry".into(), mapping("registry", "a-registration", None, None));
 
   let data_root = std::env::temp_dir().join(format!("gate-server-{}-{test}", std::process::id()));
 

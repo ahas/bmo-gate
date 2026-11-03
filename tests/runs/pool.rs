@@ -8,10 +8,10 @@ use gate_runs::route::{Route, Way};
 
 fn route(way: Way) -> Route {
   Route {
-    key: "a-gate".into(),
+    gate: "a-gate".into(),
     provider: "a-provider".into(),
     way,
-    tier: "Simple".into(),
+    role: "a-role".into(),
     mapping: None,
   }
 }

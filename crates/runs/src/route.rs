@@ -1,17 +1,11 @@
-//! A gate's one road as its run reads it (`docs/boundary-api.md`, 「How a gate run reaches a model」): the
-//! provider it begins on, as the work key's run mode names it or the agency's walk finds it; the mapping the
-//! gate's tier resolves to there; and whether the provider's program carries the run or the gateway does.
+//! A gate's one road as its run reads it (`docs/gates.md`, 「Where a gate's runs go out」): the provider order of
+//! the role its profile names, the provider the run goes out on there and the entry the order names for it, and
+//! whether the provider's program carries the run or the gateway does.
 
 use gate_policy::profiles::PROFILES;
-use gate_ports::agency::{Mapping, Provider};
+use gate_ports::agency::{Entry, Provider, Role};
 
 use crate::{GateError, Runs, fault};
-
-/// The run mode of a work key that walks the providers in the owner's order.
-pub const AUTO: &str = "auto";
-
-/// The line a gate's run goes out on, which a provider's program carries or not.
-pub const LINE: &str = "gate";
 
 /// How a run reaches its model: as a thrown-away session of the provider's program, or as one request through
 /// the gateway for a provider whose models are registrations.
@@ -24,29 +18,29 @@ pub enum Way {
 /// A gate's road as one run reads it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Route {
-  /// The agency's work key the run goes out under: the gate's own.
-  pub key: String,
-  /// The provider the road begins on.
+  /// The gate the run is of.
+  pub gate: String,
+  /// The provider the road goes out on.
   pub provider: String,
   pub way: Way,
-  /// The gate's tier, which the mapping was resolved at.
-  pub tier: String,
-  /// The mapping the tier resolves to on the provider; none where the provider serves the gate nothing now.
-  pub mapping: Option<Mapping>,
+  /// The role whose provider order the road was read from.
+  pub role: String,
+  /// The entry the role's order names on the provider; none where the provider serves the gate nothing now.
+  pub mapping: Option<Entry>,
 }
 
 impl Route {
-  /// The model the road goes out on, as its mapping names it; empty where it names none.
+  /// The model the road goes out on, as its entry names it; empty where it names none.
   pub fn model(&self) -> &str {
-    self.mapping.as_ref().and_then(|mapping| mapping.model.as_deref()).unwrap_or_default()
+    self.mapping.as_ref().map(|mapping| mapping.model.as_str()).unwrap_or_default()
   }
 }
 
-/// The tier a gate's profile names, which every mapping of it is resolved at.
-pub fn tier_of(stage: &str) -> Result<String, GateError> {
+/// The role a gate's profile names, whose provider order every run of it goes out on.
+pub fn role_of(stage: &str) -> Result<String, GateError> {
   PROFILES
     .of(stage)
-    .map(|profile| profile.tier.clone())
+    .map(|profile| profile.role.clone())
     .ok_or_else(|| fault(format!("{stage} is no gate of the gate order")))
 }
 
@@ -61,43 +55,48 @@ fn enabled(providers: &[Provider], name: &str) -> bool {
   providers.iter().any(|one| one.name == name && one.enabled)
 }
 
-/// The run mode the work key stands on, as the agency's fallback settings hold it; the walk where they hold
-/// none.
-pub async fn run_mode(runs: &Runs, stage: &str) -> Result<String, GateError> {
-  let route = runs.agency.work_key(stage).await.map_err(fault)?;
+/// The role the gate's profile names, as the agency holds it now.
+async fn read_role(runs: &Runs, stage: &str) -> Result<Role, GateError> {
+  let name = role_of(stage)?;
 
-  Ok(route.map_or_else(|| AUTO.to_owned(), |route| route.route_mode))
+  runs
+    .agency
+    .role(&name)
+    .await
+    .map_err(fault)?
+    .ok_or_else(|| fault(format!("{stage}: the agency holds no role {name}")))
 }
 
-/// The provider a gate's road begins on, with the mapping its tier resolves to there: the one its run mode names
-/// where that is on, else the first the agency's walk finds serving it, else the first that carries a gate's
-/// line, with nothing it maps to.
-pub async fn road_provider(
-  runs: &Runs,
+/// The entry a role's order names on a provider that is on; none where the order holds none for it or it is off.
+fn entry_on(role: &Role, providers: &[Provider], provider: &str) -> Option<Entry> {
+  enabled(providers, provider)
+    .then(|| role.order.iter().find(|entry| entry.provider == provider).cloned())
+    .flatten()
+}
+
+/// The provider a gate's road goes out on, with the entry its role's order names there: the role's active
+/// provider, else the first of its order that is on, else the order's first with nothing to run on. A role
+/// whose order is empty follows a supervisor, and no supervisor asks a gate run, so it gives no road.
+pub fn road_provider(
   stage: &str,
-  mode: &str,
+  role: &Role,
   providers: &[Provider],
-  tier: &str,
-) -> Result<(String, Option<Mapping>), GateError> {
-  if mode != AUTO && enabled(providers, mode) {
-    let mapping = runs.agency.resolve(stage, Some(mode), tier).await.map_err(fault)?;
-
-    return Ok((mode.to_owned(), mapping));
-  }
-
-  if let Some(mapping) = runs.agency.resolve(stage, None, tier).await.map_err(fault)?
-    && let Some(provider) = mapping.provider.clone()
+) -> Result<(String, Option<Entry>), GateError> {
+  if let Some(active) = &role.provider
+    && let Some(entry) = entry_on(role, providers, active)
   {
-    return Ok((provider, Some(mapping)));
+    return Ok((active.clone(), Some(entry)));
   }
 
-  providers
-    .iter()
-    .filter(|one| one.enabled)
-    .find(|one| one.lines.iter().any(|line| line == LINE))
-    .or_else(|| providers.iter().find(|one| one.enabled))
-    .map(|one| (one.name.clone(), None))
-    .ok_or_else(|| fault("no provider is on"))
+  if let Some(entry) = role.order.iter().find(|entry| enabled(providers, &entry.provider)) {
+    return Ok((entry.provider.clone(), Some(entry.clone())));
+  }
+
+  role
+    .order
+    .first()
+    .map(|entry| (entry.provider.clone(), None))
+    .ok_or_else(|| fault(format!("{stage}: the role {} has no provider order of its own", role.name)))
 }
 
 /// The gate's road.
@@ -105,67 +104,50 @@ pub async fn read(runs: &Runs, stage: &str) -> Result<Route, GateError> {
   read_on(runs, stage, None).await
 }
 
-/// The gate's road as it reads on a provider its caller names in place of the one it begins on — a gate
-/// evaluation scoring it, for one. A provider named that is off serves the run nothing.
+/// The gate's road as it reads on a provider its caller names in place of the one it goes out on — a gate
+/// evaluation scoring it, for one. A provider named that is off, or that the role's order holds no entry for,
+/// serves the run nothing.
 pub async fn read_on(runs: &Runs, stage: &str, on: Option<&str>) -> Result<Route, GateError> {
-  let tier = tier_of(stage)?;
-  // A gate's runs go out under its own work key, the gate's name (docs/gates.md, 「Where a gate's runs go out」).
-  let key = stage.to_owned();
+  let role = read_role(runs, stage).await?;
   let providers = runs.agency.providers().await.map_err(fault)?;
   let (provider, mapping) = match on {
-    Some(on) => {
-      let mapping = if enabled(&providers, on) {
-        runs.agency.resolve(&key, Some(on), &tier).await.map_err(fault)?
-      } else {
-        None
-      };
-
-      (on.to_owned(), mapping)
-    }
-    None => {
-      let mode = run_mode(runs, &key).await?;
-      let (provider, mapping) = road_provider(runs, &key, &mode, &providers, &tier).await?;
-
-      (provider, mapping)
-    }
+    Some(on) => (on.to_owned(), entry_on(&role, &providers, on)),
+    None => road_provider(stage, &role, &providers)?,
   };
 
   Ok(Route {
-    key,
+    gate: stage.to_owned(),
     way: way_of(&providers, &provider),
     provider,
-    tier,
+    role: role.name,
     mapping,
   })
 }
 
 /// The gate's road as it reads on one registration its caller names in place of its own — the model an agent's
 /// recollectors go out on: the first provider whose models are registrations, that registration as its model
-/// with the gate's own tier's room there, and nothing behind it.
+/// with the effort, the thinking and the answer ceiling the role's entry for that provider names, and nothing
+/// behind it.
 pub async fn read_registered(runs: &Runs, stage: &str, registration: &str) -> Result<Route, GateError> {
-  let tier = tier_of(stage)?;
+  let role = read_role(runs, stage).await?;
   let providers = runs.agency.providers().await.map_err(fault)?;
   let Some(provider) = providers.iter().find(|one| one.registered) else {
     return Err(fault(format!("{stage}: no provider serves registrations to run {registration} on")));
   };
-  let resolved = if provider.enabled {
-    runs.agency.resolve(stage, Some(&provider.name), &tier).await.map_err(fault)?
-  } else {
-    None
-  };
-  let mapping = Mapping {
-    provider: Some(provider.name.clone()),
-    tier: Some(tier.clone()),
-    model: Some(registration.to_owned()),
-    effort: resolved.as_ref().and_then(|one| one.effort.clone()),
-    answer_tokens: resolved.as_ref().and_then(|one| one.answer_tokens),
+  let named = role.order.iter().find(|entry| entry.provider == provider.name);
+  let mapping = Entry {
+    provider: provider.name.clone(),
+    model: registration.to_owned(),
+    effort: named.and_then(|entry| entry.effort.clone()),
+    thinking: named.and_then(|entry| entry.thinking.clone()),
+    answer_tokens: named.and_then(|entry| entry.answer_tokens),
   };
 
   Ok(Route {
-    key: stage.to_owned(),
+    gate: stage.to_owned(),
     provider: provider.name.clone(),
     way: Way::Gateway,
-    tier,
+    role: role.name,
     mapping: provider.enabled.then_some(mapping),
   })
 }

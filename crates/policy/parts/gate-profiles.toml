@@ -1,7 +1,8 @@
 # Each gate's profile (docs/gates.md): one for every gate of the gate order and for nothing else. A profile's
 # values are defaults only: an owner's explicit choice is a row of the gate options table and survives a later
-# change here. A profile names its tier, the gate's word for its work, which the agency maps to a provider's
-# model and effort for each run. It may also name:
+# change here. A profile names its role, the agency's role whose provider order its runs go out on, with the model,
+# the effort, the thinking and the answer ceiling each entry names (docs/gates.md, 「Where a gate's runs go out」).
+# It may also name:
 # - switchable: the owner may switch it off, since its caller has a way of its own without it;
 # - holds_no_session: its runs are asked about a session rather than held as one;
 # - answer_tokens: the room its answer is given, where its answer is not the shape the common default was
