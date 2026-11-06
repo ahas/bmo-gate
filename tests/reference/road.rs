@@ -88,7 +88,11 @@ async fn a_turn_carries_its_due_memories_the_speakers_sheet_head_and_the_woken_r
   let memories = memories_of(&entries).unwrap();
 
   assert_eq!(carried(memories), (1..=due).rev().map(|at| 40 + at).collect::<Vec<_>>());
-  assert!(memories.text.contains(&format!("of the {} open items", due + 5)));
+  assert!(
+    memories
+      .text
+      .contains(&format!("{} open items, due now or bearing on this turn", due + 5))
+  );
   assert!(
     memories
       .text

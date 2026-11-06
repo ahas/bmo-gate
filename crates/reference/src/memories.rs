@@ -92,8 +92,9 @@ pub fn index_title(memory: &MemoryRow) -> String {
   format!("{}\u{2026}", js::trim_end(&js::text(&characters[..js::within(&characters, limit - 1)])))
 }
 
-/// The memories entry: the opening, with `open` the rows the room holds, what the session does with them, the
-/// carried rows' lines in the order given, and the line on the rows not carried; none where no row is carried.
+/// The memories entry: the head naming the rows that follow, with `open` the rows the room holds, the carried rows'
+/// lines in the order given, and the line on the rows not carried; none where no row is carried. The entry carries
+/// data alone; how a turn reads it stands in the room's block.
 pub fn memories_entry(chat_id: i64, open: usize, carried: &[&MemoryRow]) -> Option<Entry> {
   if carried.is_empty() {
     return None;
@@ -103,15 +104,7 @@ pub fn memories_entry(chat_id: i64, open: usize, carried: &[&MemoryRow]) -> Opti
   let chat = chat_id.to_string();
   let count = open.to_string();
   let items = if open == 1 { &lines.item_one } else { &lines.item_many };
-  let mut text = vec![
-    fill_marks(&lines.opening, &[("count", &count), ("items", items)]),
-    lines.quiet.clone(),
-    fill_marks(&lines.check_off, &[("chat", &chat)]),
-  ];
-
-  if carried.iter().any(|row| row.kind == "state") {
-    text.push(lines.state.clone());
-  }
+  let mut text = vec![fill_marks(&lines.opening, &[("count", &count), ("items", items)])];
 
   text.push(String::new());
   text.extend(carried.iter().map(|memory| memory_line(memory)));

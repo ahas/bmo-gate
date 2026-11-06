@@ -1,15 +1,13 @@
 # What an agent holds in a room as a turn reads it (docs/reference-selection.md): the lines the memories entry is
 # written in. How many due rows it carries stands in reference.toml.
 
-# The memories entry: its opening (`{count}` rows, `{items}` the word for them), what a session does with it
-# (`{chat}` the room), the line a state adds, each row's line and its parts, and the line on the rows not carried.
+# The memories entry: the head naming the rows that follow (`{count}` rows, `{items}` the word for them), each
+# row's line and its parts, and the line on the rows not carried. How the entry is read and how an item is kept or
+# a state moved stand in the room's block, not here.
 [entry]
-opening = "Your memories for this room: of the {count} open {items} you are holding here — promises you made, things you said you would check, follow-ups handed to you, and the state of anything under way here — these are the ones due now or bearing on this turn."
+opening = "Your memories for this room — {count} open {items}, due now or bearing on this turn:"
 item_one = "item"
 item_many = "items"
-quiet = "This is your own quiet memory. Do not recite it, and do not bring an item up unless someone asks about it; act on it when its time comes."
-check_off = "Once an item is kept, or dropped by the person it was for, check it off: memory_done with chat {chat}, memory <id> and text '<how it ended>'."
-state = "A state goes on from where it stands: as it moves, rewrite it with memory_update, memory <id> and action '<where it stands now>'; once it ends, is called off or has plainly stopped, release it with memory_done."
 line = "- #{id} {type} · written {written} KST{moved}{for}{from}: {action}"
 moved = " · moved {at} KST"
 for_user = " · for user {user}"

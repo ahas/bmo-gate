@@ -28,10 +28,11 @@ pieces themselves live in the brain, and the system documents among them are the
   the room's subject as its room (the brain's `docs/design.md`, 「A person is a subject」). It is held to 14,000
   characters by its lines from the top. The brain keeps no sheet as a row, and no memory of type `sheet` is read.
   The rest of a speaker's facts reach the agent through its own reading of the index.
-- **The memories go as one entry,** under `memories/<room>`: an opening that says how many open rows the room
-  holds, what the agent does with them, one line a row — its number, kind, when it was written and moved, whom it
-  is for, the item it was left open by and its words — and a closing line saying how many more stand and how the
-  agent lists them.
+- **The memories go as one entry,** under `memories/<room>`: a head naming it and how many open rows the room
+  holds, one line a row — its number, kind, when it was written and moved, whom it is for, the item it was left
+  open by and its words — and a closing line saying how many more stand and how the agent lists them. The entry
+  carries data alone: how it is read, how an item is checked off and how a state is moved stand in the room block
+  the session already carries (the receiver's `docs/bmo-window.md`, 「What every turn carries」).
 - **What a turn carries together is held to 30,000 characters,** the memories entry and the woken rows; the rows
   the events wake are held to 12,000 between them, and a row that does not fit is passed over and logged with its
   name and size. Over the total the largest piece goes first, the path breaking a tie. A sheet is held to its own

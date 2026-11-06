@@ -64,13 +64,33 @@ fn the_entry_carries_the_rows_given_and_says_how_many_more_stand() {
   let entry = memories_entry(7, 5, &[&rows[0], &rows[1]]).unwrap();
 
   assert_eq!(entry.path, memory_path(7));
-  assert!(entry.text.contains("of the 5 open items"));
+  assert!(
+    entry
+      .text
+      .contains("Your memories for this room — 5 open items, due now or bearing on this turn:")
+  );
   assert!(entry.text.contains("- #1 promise") && entry.text.contains("- #2 state"));
-  assert!(entry.text.contains("memory_update"));
   assert!(
     entry
       .text
       .ends_with("- … 3 more open here, not carried this turn: brain_list with chat 7")
   );
   assert!(memories_entry(7, 5, &[]).is_none());
+}
+
+#[test]
+fn the_entry_carries_no_instruction_sentence() {
+  let rows = [memory(1, "state", "a", "the build runs")];
+  let entry = memories_entry(7, 1, &[&rows[0]]).unwrap();
+
+  for instruction in [
+    "quiet memory",
+    "Do not recite",
+    "memory_done",
+    "memory_update",
+    "check it off",
+    "A state goes on",
+  ] {
+    assert!(!entry.text.contains(instruction), "{instruction} stands in the entry: {}", entry.text);
+  }
 }

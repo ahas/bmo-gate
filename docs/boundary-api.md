@@ -217,7 +217,7 @@ and nothing behind it (`docs/gates.md`, 「Where a gate's runs go out」):
 |---|---|---|
 | the gate pool: how many runs of one gate stand at once, the rest waiting in line | the gate | its own policy file |
 | what a turn is handed: the sheet's head and ceiling, the due memories' count, the woken rows' and the turn's totals | the gate | its own policy file |
-| the memories entry's lines | the gate | its own policy file |
+| the memories entry's data lines | the gate | its own policy file |
 | the gate order and the gates' profiles | the gate | its own policy file, served by `GET /gates` |
 | the prompt ceilings | the gate | its own policy file |
 | the translator's languages: the worker's, the owner's and each language's name | the gate | its own policy file |
