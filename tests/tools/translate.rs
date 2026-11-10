@@ -142,7 +142,7 @@ async fn a_record_naming_no_gate_is_answered_its_reason() {
 
 #[tokio::test]
 async fn a_gate_that_cannot_be_reached_is_answered_its_reason() {
-  let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+  let listener = std::net::TcpListener::bind("[::1]:0").unwrap();
   let address = format!("http://{}", listener.local_addr().unwrap());
   drop(listener);
 
