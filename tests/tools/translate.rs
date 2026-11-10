@@ -131,7 +131,7 @@ async fn a_record_naming_no_gate_is_answered_its_reason() {
   assert!(text(&no_address).contains(ADDRESS));
 
   let no_token = answer(
-    &call(json!({ "language": "en", "texts": ["one"] }), json!({ ADDRESS: "http://127.0.0.1:9" })),
+    &call(json!({ "language": "en", "texts": ["one"] }), json!({ ADDRESS: "http://[::1]:9" })),
     nothing,
   )
   .await
