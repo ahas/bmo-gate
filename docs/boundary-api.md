@@ -194,6 +194,10 @@ and nothing behind it (`docs/gates.md`, 「Where a gate's runs go out」):
 - **A run waits for its place and for its answer.** A run past its gate's pool waits in line for a place however
   long that takes and goes out when one comes free; once out, it is waited for until its road answers, fails, or
   somebody stops it. No span of time ends a run, and a gate has no wait of its own.
+- **Runs for different companies share no prompt prefix on any road.** A run whose caller names its `tenant`
+  carries, as the first line of its material, a mark made from that name alone; an engine or a provider reuses a
+  cached prefix only where the material agrees from its first token, so no company's material is answered faster
+  for having been read for another. A run that names none — the platform's own rooms — carries no mark.
 - **What a run walked** is written into the gate's road records, and what it spent is the agency's `usage-spent`.
 
 ## What the gate owns

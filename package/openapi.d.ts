@@ -419,11 +419,11 @@ export interface components {
         GateOptionChange: {
             /**
              * Format: int64
-             * @description Not a gate option: its tier's. A change naming it is refused `own-llm`.
+             * @description Not a gate option: its role's. A change naming it is refused `own-llm`.
              */
             answerTokens?: number | null;
             enabled?: boolean | null;
-            /** @description Not a gate option: its tier's. A change naming it is refused `own-llm`. */
+            /** @description Not a gate option: its role's. A change naming it is refused `own-llm`. */
             thinking?: boolean | null;
         };
         /** @description One gate's options as it stands for the chat agent. */
@@ -443,13 +443,13 @@ export interface components {
             items: components["schemas"]["Gate"][];
             more: boolean;
         };
-        /** @description The gate's route as a run reads it. */
+        /** @description The gate's road as a run reads it: the provider and the model its role's order names. */
         GateRoute: {
             model: string;
             provider: string;
             /**
              * Format: int64
-             * @description Epoch milliseconds.
+             * @description The moment the change was written, in epoch milliseconds.
              */
             setAt: number;
         };
@@ -680,6 +680,8 @@ export interface components {
             /** Format: int64 */
             roomId?: number | null;
             system?: string | null;
+            /** @description The company the run is for, as the caller names it; runs for different companies share no prompt prefix. */
+            tenant?: string | null;
             thinking?: boolean | null;
         };
         /** @description The parts queued. */

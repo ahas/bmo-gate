@@ -143,7 +143,8 @@ It answers `entries`, each `path`, `text` and `source` (`document`, `person`, `r
 ## Runs
 
 `POST /stages/{gateName}/runs` takes `prompt`, `system?`, `roomId?`, `messageId?`, `agentName?`, `thinking?`
-(true where absent) and `alongside?` (false where absent). It answers `answer` (the gate's text, or null where
+(true where absent), `alongside?` (false where absent) and `tenant?`, the company the run is for, as the caller
+names it. It answers `answer` (the gate's text, or null where
 its road gave none) and `ms`.
 
 - **One run of one gate,** for a unit that reads the answer itself. The run goes on the gate's road with the

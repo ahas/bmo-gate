@@ -479,6 +479,9 @@ pub struct StageRunAsk {
   pub thinking: Option<bool>,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub alongside: Option<bool>,
+  /// The company the run is for, as the caller names it; runs for different companies share no prompt prefix.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub tenant: Option<String>,
 }
 
 /// What a run of a gate answered.

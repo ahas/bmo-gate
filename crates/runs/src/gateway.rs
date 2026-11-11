@@ -46,7 +46,7 @@ pub async fn ask(runs: &Runs, run: &Run<'_>) -> Result<Ended, GateError> {
   let ask = Ask {
     model: model.clone(),
     system: run.request.system.clone(),
-    input: run.request.prompt.clone(),
+    input: run.request.material(),
     max_tokens: options::answer_room(stage, Some(mapping)),
     thinking: options::thinks_on(mapping),
     sampling,

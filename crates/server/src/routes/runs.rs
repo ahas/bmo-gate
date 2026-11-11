@@ -43,6 +43,7 @@ pub async fn run(
   request.agent = Some(agent);
   request.thinking = asked.thinking.unwrap_or(true);
   request.alongside = asked.alongside.unwrap_or(false);
+  request.tenant = asked.tenant.filter(|tenant| !tenant.trim().is_empty());
 
   let answer = runs.run(&gate_name, &request).await.map_err(Refused::of_run)?;
 

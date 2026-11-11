@@ -39,6 +39,16 @@ pub struct Runs {
 // The number each run of this service is told apart by.
 static LIVE: AtomicU64 = AtomicU64::new(1);
 
+/// The mark a company's material is led by: a short digest of its name, which says nothing of the name itself.
+pub fn tenant_mark(tenant: &str) -> String {
+  use sha2::{Digest, Sha256};
+
+  let digest = Sha256::digest(tenant.as_bytes());
+  let short: String = digest.iter().take(6).map(|byte| format!("{byte:02x}")).collect();
+
+  format!("[tenant {short}]")
+}
+
 /// One gate's request: its instructions, the one call's material, what it judges, whose turn it runs in and
 /// which round, whether it thinks, whether it stands beside the gate's other runs, and how its caller cuts it
 /// where it is too large for its road.
@@ -60,6 +70,9 @@ pub struct GateRequest {
   /// The provider the run goes out on in place of the one the gate's road begins on, with nothing behind it:
   /// the road a caller scores the run on.
   pub provider: Option<String>,
+  /// The company the run is for, whose mark leads its material (`docs/boundary-api.md`, 「How a gate run
+  /// reaches a model」).
+  pub tenant: Option<String>,
 }
 
 impl GateRequest {
@@ -78,6 +91,7 @@ impl GateRequest {
       split: None,
       registration: None,
       provider: None,
+      tenant: None,
     }
   }
 
@@ -96,6 +110,16 @@ impl GateRequest {
       split: None,
       registration: self.registration.clone(),
       provider: self.provider.clone(),
+      tenant: self.tenant.clone(),
+    }
+  }
+
+  /// The material the run sends: the prompt, led by its company's mark where it names one, so runs for different
+  /// companies share no prompt prefix.
+  pub fn material(&self) -> String {
+    match &self.tenant {
+      Some(tenant) => format!("{}\n{}", tenant_mark(tenant), self.prompt),
+      None => self.prompt.clone(),
     }
   }
 }

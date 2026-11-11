@@ -1140,6 +1140,13 @@
               "null"
             ]
           },
+          "tenant": {
+            "description": "The company the run is for, as the caller names it; runs for different companies share no prompt prefix.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "thinking": {
             "type": [
               "boolean",

@@ -98,7 +98,7 @@ pub async fn ask(runs: &Runs, run: &Run<'_>) -> Result<Ended, GateError> {
   };
   let turn = GateTurn {
     session: session.id,
-    prompt: request.prompt.clone(),
+    prompt: request.material(),
     provider: route.provider.clone(),
     model: model.clone(),
     mapping: Line {

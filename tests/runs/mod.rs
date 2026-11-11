@@ -5,6 +5,7 @@ pub(crate) mod fakes;
 mod options;
 mod pool;
 mod route;
+mod tenant;
 
 use std::sync::Arc;
 
