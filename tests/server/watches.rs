@@ -1,7 +1,8 @@
 //! The watches the service keeps beside its routes, as the agency sees them: its road events are read, and no hook
 //! is registered at any of its points, `session-summariser` among them, nor answered by a route of the gate's; and
 //! as the receiver sees them: the draft rows its event stream tells are written as the `draft` stage, once each,
-//! under the round's message where the round has one.
+//! under the round's message where the round has one; and the agency's roads are written with their numbers, the
+//! stream read on from the newest written each time it is opened.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -13,6 +14,7 @@ use gate_ports::receiver::{Drafted, HttpReceiver, Receiver};
 use gate_reference::Reference;
 use gate_runs::Runs;
 use gate_server::App;
+use gate_server::stop::Stop;
 use gate_stages::document_translation::Queue;
 use gate_stages::translator::Intake;
 use gate_stages::{Reading, Stages};
@@ -51,6 +53,7 @@ fn app_on(ground: &super::Ground, stub: &Stub, receiver: Arc<dyn Receiver>) -> A
     translations: Intake::of_policy(),
     token: TOKEN.to_owned(),
     data_root: PathBuf::from(&ground.app.data_root),
+    stop: Stop::default(),
   })
 }
 
@@ -59,7 +62,7 @@ async fn the_watches_read_the_agencys_road_events_and_register_no_hook() {
   let ground = ground("no-hook", |_| None).await;
   let stub = Stub::start().await;
 
-  gate_server::watches::start(app_on(&ground, &stub, Arc::new(FakeReceiver::default())));
+  gate_server::watches::start(app_on(&ground, &stub, Arc::new(FakeReceiver::default())), REOPEN);
 
   let mut waited = Duration::ZERO;
 
@@ -74,6 +77,112 @@ async fn the_watches_read_the_agencys_road_events_and_register_no_hook() {
 
   assert!(seen.iter().any(|seen| seen.path == "/events"), "{seen:?}");
   assert!(!seen.iter().any(|seen| seen.path.starts_with("/hooks")), "{seen:?}");
+}
+
+// How long a dropped stream waits before it is opened again, in the tests.
+const REOPEN: Duration = Duration::from_millis(20);
+
+// Waits until `holds` answers true, ten seconds at most, and says whether it did.
+async fn until<F: std::future::Future<Output = bool>>(mut holds: impl FnMut() -> F) -> bool {
+  let mut waited = Duration::ZERO;
+
+  while waited < Duration::from_secs(10) {
+    if holds().await {
+      return true;
+    }
+
+    tokio::time::sleep(Duration::from_millis(20)).await;
+    waited += Duration::from_millis(20);
+  }
+
+  false
+}
+
+// The agency's frame telling one road of the tests' room under its event's number.
+fn road_frame(event: i64, run: &str) -> String {
+  let road = json!({
+    "stage": "chat", "chatId": ROOM, "run": run, "provider": "a-provider", "model": "a-model", "outcome": "answered",
+    "ms": 900, "inputTokens": 3, "outputTokens": 4, "cacheReadTokens": null, "cacheWriteTokens": null,
+    "contextRatio": null
+  });
+  let data = json!({ "id": event, "kind": "road-walked", "at": 1, "data": road });
+
+  format!("id: {event}\nevent: road-walked\ndata: {data}\n\n")
+}
+
+#[tokio::test]
+async fn the_agencys_roads_are_written_once_each_and_read_on_from_the_newest_written() {
+  let ground = ground("roads-read-on", |_| None).await;
+  let agency = Stub::start().await;
+
+  ground
+    .scratch
+    .run(
+      r#"INSERT INTO gate_roads (stage, provider, model, outcome, ms, created_at, run, event)
+         VALUES ('chat', 'a-provider', 'a-model', 'answered', 1, 1, 'turn:5', 5)"#,
+      vec![],
+    )
+    .await
+    .unwrap();
+  // The stream ends after its frames, as one the agency's stop cuts does, and is opened again.
+  agency.canned(
+    reqwest::Method::GET,
+    "/events",
+    200,
+    "text/event-stream",
+    [road_frame(5, "turn:5"), road_frame(6, "turn:6"), road_frame(7, "turn:7")].concat(),
+  );
+
+  gate_server::watches::start(app_on(&ground, &agency, Arc::new(FakeReceiver::default())), REOPEN);
+
+  let opened = || agency.seen().into_iter().filter(|seen| seen.path == "/events").collect::<Vec<_>>();
+
+  assert!(until(|| async { opened().len() >= 2 }).await, "{:?}", agency.seen());
+
+  let opened = opened();
+  let runs = ground
+    .scratch
+    .texts(
+      r#"SELECT run || ':' || event FROM gate_roads WHERE event IS NOT NULL ORDER BY event"#,
+      vec![],
+    )
+    .await;
+
+  assert_eq!(opened[0].header("last-event-id").as_deref(), Some("5"));
+  assert_eq!(opened[1].header("last-event-id").as_deref(), Some("7"));
+  assert_eq!(runs, ["turn:5:5", "turn:6:6", "turn:7:7"]);
+}
+
+#[tokio::test]
+async fn roads_after_a_number_the_agency_never_gave_are_written_whatever_their_number() {
+  let ground = ground("roads-numbering-behind", |_| None).await;
+  let agency = Stub::start().await;
+
+  ground
+    .scratch
+    .run(
+      r#"INSERT INTO gate_roads (stage, provider, model, outcome, ms, created_at, run, event)
+         VALUES ('chat', 'a-provider', 'a-model', 'answered', 1, 1, 'turn:900', 900)"#,
+      vec![],
+    )
+    .await
+    .unwrap();
+
+  let missed = json!({ "kind": "events.missed", "at": 1, "data": { "after": 900, "keptFrom": 10 } });
+
+  agency.canned(
+    reqwest::Method::GET,
+    "/events",
+    200,
+    "text/event-stream",
+    format!("event: events.missed\ndata: {missed}\n\n{}", road_frame(12, "turn:12")),
+  );
+
+  gate_server::watches::start(app_on(&ground, &agency, Arc::new(FakeReceiver::default())), REOPEN);
+
+  let written = || ground.scratch.count(r#"SELECT count(*) FROM gate_roads WHERE event = 12"#, vec![]);
+
+  assert!(until(|| async { written().await == 1 }).await, "{:?}", agency.seen());
 }
 
 #[tokio::test]
@@ -151,7 +260,7 @@ async fn the_receivers_draft_rows_are_written_as_the_draft_stage_under_the_round
   let app = app_on(&ground, &agency, Arc::new(HttpReceiver::new(peer)));
   let mut heard = app.stages.events.subscribe();
 
-  gate_server::watches::start(app);
+  gate_server::watches::start(app, REOPEN);
 
   let count = || ground.scratch.count(r#"SELECT count(*) FROM judgements WHERE stage = 'draft'"#, vec![]);
   let mut waited = Duration::ZERO;
@@ -191,7 +300,15 @@ async fn the_receivers_draft_rows_are_written_as_the_draft_stage_under_the_round
     .count();
 
   assert_eq!(told, 5);
-  assert_eq!(receiver.one("/events").bearer().as_deref(), Some("the-receiver-token"));
+  assert!(
+    receiver
+      .seen()
+      .iter()
+      .filter(|seen| seen.path == "/events")
+      .all(|seen| seen.bearer().as_deref() == Some("the-receiver-token")),
+    "{:?}",
+    receiver.seen()
+  );
 }
 
 #[tokio::test]

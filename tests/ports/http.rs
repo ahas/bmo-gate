@@ -98,4 +98,21 @@ async fn a_refused_connection_ends_the_call_and_is_offered_no_more() {
   let failed = Caller::new("a unit", peer).get::<Value>("a read", &["x"], &[]).await.unwrap_err();
 
   assert!(matches!(failed, PortError::Unreachable { .. }), "{failed:?}");
+  assert!(failed.unanswered());
+}
+
+#[tokio::test]
+async fn a_503_is_no_answer_and_any_other_refusal_is_one() {
+  let stub = Stub::start().await;
+  let caller = Caller::new("a unit", peer(&stub, "t"));
+
+  for (path, status, unanswered) in
+    [("/starting", 503, true), ("/stopped", 409, false), ("/broken", 500, false)]
+  {
+    stub.answer(Method::POST, path, status, json!({ "code": "a-code", "error": "a sentence" }));
+
+    let failed = caller.post::<_, Value>("a call", &[&path[1..]], &json!({})).await.unwrap_err();
+
+    assert_eq!(failed.unanswered(), unanswered, "{status}");
+  }
 }

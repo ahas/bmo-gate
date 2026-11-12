@@ -1,6 +1,9 @@
 //! How every port reaches its unit (`docs/boundary-api.md`, 「Calls the gate makes」): the unit's base address and
 //! token, a path built out of segments, a call waited for until it is answered or its connection is refused or
-//! broken, and an answer read as the call's shape or as the unit's refusal.
+//! broken, a call asked again for as long as the unit gives it no answer, and an answer read as the call's shape or
+//! as the unit's refusal.
+
+use std::time::Duration;
 
 use futures_util::{Stream, StreamExt};
 use gate_codes::Code;
@@ -78,6 +81,38 @@ impl PortError {
       _ => None,
     }
   }
+
+  /// Whether the unit gave the call no answer: its connection refused, reset or closed before the answer came,
+  /// or a 503 saying it cannot take the call now. Such a failure says nothing of the call, only of the moment.
+  pub fn unanswered(&self) -> bool {
+    matches!(self, PortError::Unreachable { .. } | PortError::Refused { status: 503, .. })
+  }
+}
+
+/// How long a call the unit gave no answer waits before it is asked again: `first` after the first time, each
+/// pause after it twice the one before, up to `most`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Patience {
+  pub first: Duration,
+  pub most: Duration,
+}
+
+impl Default for Patience {
+  /// One second, doubling to thirty (`docs/boundary-api.md`, 「The translation line」).
+  fn default() -> Self {
+    Self {
+      first: Duration::from_secs(1),
+      most: Duration::from_secs(30),
+    }
+  }
+}
+
+/// One frame of a server-sent event stream: its id where it carries one, its name, and its data read as JSON.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Frame {
+  pub id: Option<String>,
+  pub name: String,
+  pub data: Value,
 }
 
 impl std::fmt::Display for PortError {
@@ -248,6 +283,29 @@ impl Caller {
     self.send_json(call, Method::POST, segments, body).await
   }
 
+  /// A body posted and answered as `T`, asked again after each pause `patience` gives for as long as the unit
+  /// gives it no answer (`PortError::unanswered`); any other end is the call's.
+  pub async fn post_until_answered<B: Serialize + ?Sized, T: DeserializeOwned>(
+    &self,
+    call: &'static str,
+    segments: &[&str],
+    body: &B,
+    patience: Patience,
+  ) -> Answer<T> {
+    let mut pause = patience.first;
+
+    loop {
+      match self.post(call, segments, body).await {
+        Err(why) if why.unanswered() => {
+          eprintln!("{why}; asked again in {}ms", pause.as_millis());
+          tokio::time::sleep(pause).await;
+          pause = (pause * 2).min(patience.most);
+        }
+        answer => return answer,
+      }
+    }
+  }
+
   /// A body posted and answered as `T`, or none where the unit holds nothing there: a 404 with `code`.
   pub async fn post_or_nothing<B: Serialize + ?Sized, T: DeserializeOwned>(
     &self,
@@ -307,45 +365,52 @@ impl Caller {
     Ok((status, text))
   }
 
-  /// A stream of server-sent events, each its name and its data read as JSON.
+  /// A stream of server-sent events, each frame its id, its name and its data read as JSON, opened after the
+  /// event `after` names where one is named, as `Last-Event-ID` carries it.
   pub async fn events(
     &self,
     call: &'static str,
     segments: &[&str],
     query: &[(&str, &str)],
-  ) -> Answer<impl Stream<Item = Answer<(String, Value)>> + use<>> {
-    let response = self.send(call, self.request(Method::GET, segments).query(query)).await?;
+    after: Option<&str>,
+  ) -> Answer<impl Stream<Item = Answer<Frame>> + use<>> {
+    let request = self.request(Method::GET, segments).query(query);
+    let request = match after {
+      Some(after) => request.header("Last-Event-ID", after),
+      None => request,
+    };
+    let response = self.send(call, request).await?;
 
     if !response.status().is_success() {
       return Err(self.refused(call, response).await);
     }
 
     let unit = self.unit;
-    let stream =
-      sse_stream::SseStream::from_bytes_stream(response.bytes_stream()).filter_map(
-        move |event| async move {
-          match event {
-            Ok(event) => {
-              let data = event.data?;
-              let name = event.event.unwrap_or_else(|| "message".to_owned());
+    let stream = sse_stream::SseStream::from_bytes_stream(response.bytes_stream()).filter_map(
+      move |event| async move {
+        match event {
+          Ok(event) => {
+            let data = event.data?;
+            let name = event.event.unwrap_or_else(|| "message".to_owned());
+            let id = event.id;
 
-              Some(serde_json::from_str(&data).map(|data| (name, data)).map_err(|why| {
-                PortError::Malformed {
-                  unit,
-                  call,
-                  status: 200,
-                  why: why.to_string(),
-                }
-              }))
-            }
-            Err(why) => Some(Err(PortError::Unreachable {
-              unit,
-              call,
-              why: why.to_string(),
-            })),
+            Some(serde_json::from_str(&data).map(|data| Frame { id, name, data }).map_err(|why| {
+              PortError::Malformed {
+                unit,
+                call,
+                status: 200,
+                why: why.to_string(),
+              }
+            }))
           }
-        },
-      );
+          Err(why) => Some(Err(PortError::Unreachable {
+            unit,
+            call,
+            why: why.to_string(),
+          })),
+        }
+      },
+    );
 
     Ok(stream)
   }

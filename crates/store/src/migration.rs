@@ -9,6 +9,7 @@ mod m20261026_000001_judgement_lines;
 mod m20261026_000002_sanitised_texts;
 mod m20261029_000001_retired_tables;
 mod m20261102_000001_option_wait;
+mod m20261112_000001_road_event;
 
 use sea_orm_migration::prelude::*;
 
@@ -42,6 +43,7 @@ impl MigratorTrait for Migrator {
       Box::new(m20261026_000002_sanitised_texts::Migration),
       Box::new(m20261029_000001_retired_tables::Migration),
       Box::new(m20261102_000001_option_wait::Migration),
+      Box::new(m20261112_000001_road_event::Migration),
     ]
   }
 

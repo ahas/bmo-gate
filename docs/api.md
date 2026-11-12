@@ -193,7 +193,9 @@ characters; a longer one is 413 `too-large`.
 `GET /events` is the gate's one stream, as server-sent events. An event's `event` field is its kind and its
 `id` field its number; its data is `{"id", "kind", "at", "data"}`, the inner `data` being the member the
 event tells of. The kinds are `judgement.created` and `document-translation.changed`. A
-reader that falls behind loses what it missed and reads the collections again.
+reader that falls behind loses what it missed and reads the collections again. When the service stops, every
+open stream is sent `event: stopping` with no id and its data `{}`, and then ends (`docs/boundary-api.md`,
+「Stopping」); a reader opens it again once the service answers.
 
 ## The tools a tool host places
 

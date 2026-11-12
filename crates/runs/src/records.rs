@@ -6,7 +6,10 @@ use std::time::SystemTime;
 
 use gate_markup::js;
 use gate_store::entity::{gate_roads, judgements};
-use sea_orm::{ActiveModelTrait, ActiveValue::Set, DatabaseConnection, NotSet};
+use sea_orm::sea_query::Expr;
+use sea_orm::{
+  ActiveModelTrait, ActiveValue::Set, DatabaseConnection, DbErr, EntityTrait, NotSet, QuerySelect,
+};
 use serde_json::Value;
 use tokio::time::Instant;
 
@@ -112,10 +115,19 @@ pub struct Road<'a> {
   pub run: Option<&'a str>,
   /// How full the session's context window stood once the run ended, where a session reported it.
   pub context_ratio: Option<f64>,
+  /// The number of the agency's event the road came in, none for a road the gate's own run walked.
+  pub event: Option<i64>,
 }
 
-/// The road written.
+/// The road written; a road the database would not take is said and lost.
 pub async fn road(db: &DatabaseConnection, road: &Road<'_>) {
+  if let Err(why) = write_road(db, road).await {
+    eprintln!("{}: its road could not be recorded: {why}", road.stage);
+  }
+}
+
+/// The road written, or why the database would not take it.
+pub async fn write_road(db: &DatabaseConnection, road: &Road<'_>) -> Result<(), DbErr> {
   let row = gate_roads::ActiveModel {
     id: NotSet,
     stage: Set(road.stage.to_owned()),
@@ -134,11 +146,22 @@ pub async fn road(db: &DatabaseConnection, road: &Road<'_>) {
     run: Set(road.run.map(str::to_owned)),
     rowid: NotSet,
     context_ratio: Set(road.context_ratio),
+    event: Set(road.event),
   };
 
-  if let Err(why) = row.insert(db).await {
-    eprintln!("{}: its road could not be recorded: {why}", road.stage);
-  }
+  row.insert(db).await.map(|_| ())
+}
+
+/// The newest number of the agency's events a road was written with, none where no road came in one.
+pub async fn newest_event(db: &DatabaseConnection) -> Result<Option<i64>, DbErr> {
+  let newest: Option<Option<i64>> = gate_roads::Entity::find()
+    .select_only()
+    .column_as(Expr::col(gate_roads::Column::Event).max(), "newest")
+    .into_tuple()
+    .one(db)
+    .await?;
+
+  Ok(newest.flatten())
 }
 
 /// An answer as a verdict line: its first line, cut with a mark past `most` characters, counted in UTF-16 units

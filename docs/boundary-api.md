@@ -45,11 +45,28 @@ console screen: a console reads its routes as any caller does.
   order the rows were written. A name that is not one of the gate's own tables ends with 2. It reads and writes
   nothing else, and like `health` it is no noun, so `nouns` does not declare it.
 
+## Stopping
+
+The service stops on SIGTERM or an interrupt, and the unit's stop waits for it to end.
+
+- **It takes no new connection** from the moment the signal comes, and a connection held idle between calls is
+  closed.
+- **Every open event stream is told,** with an `event: stopping` frame carrying no id (`docs/api.md`, 「Events」),
+  and then ends, so a reader opens it again against the service that comes next rather than waiting on one that
+  is gone.
+- **The calls in hand are let finish within thirty seconds** of the signal. The service ends once the last of
+  them has answered, or when the thirty seconds have passed with a call still open, which then ends unanswered
+  with its connection; a caller asks it again of the service that comes next.
+- **What the watches hold is not lost:** a road the agency's stream told is written with its number, so the
+  stream is read on from the newest number written (「The roads walked」), and the receiver's draft rows are
+  replayed from its ring.
+
 ## Calls the gate makes
 
 Every call below waits for its answer. Its end is the answer, a refused or broken connection, or the other unit
 gone; no call carries a timeout, and a refused connection ends the call where it stands, the gate's answer
-saying which unit did not answer. The two event streams the gate holds open, the receiver's and the agency's,
+saying which unit did not answer, but for a translation run, which is asked again until the agency answers
+(「The translation line」). The two event streams the gate holds open, the receiver's and the agency's,
 are opened again after they drop.
 
 ### bmo-brain
@@ -128,7 +145,7 @@ In the agency's conventions (its `docs/api.md`): camelCase, the agency's control
 | a session's loads | `GET /session-loads/{sessionId}` | `documents`, each `path` and `version`: what the session was handed in full, which the index counts read |
 | a session's loads kept | `PUT /session-loads/{sessionId}` | `documents`, every load the session now holds, the piece just read added at its version |
 | a translation | `POST /translation-runs` | `purpose` (`document`, `worker` or `record`), `language` (the target's name as the policy names it), `text`, one part, and `note` where the gate has a word on that part: answered with `text`, the part translated whole, and the `provider` and `model` it went out on; 413 `too-large` for a part past the model's window (「The translation line」) |
-| the events | `GET /events?kinds=road-walked` | the road each conversational turn walked, which the gate writes into its road records |
+| the events | `GET /events?kinds=road-walked`, with `Last-Event-ID` | the road each conversational turn walked, which the gate writes into its road records, read on from the last one written (「The roads walked」) |
 
 The gate registers no hook at any of the agency's hook points and answers none.
 
@@ -144,6 +161,11 @@ The gate registers no hook at any of the agency's hook points and answers none.
   halving of a part too large for the line's road: a part the line refuses 413 `too-large` is cut in two, at a
   paragraph else a line, each half asked on its own and the two joined in order, a half with no answer leaving
   the part unanswered. Any other refusal leaves the part unanswered.
+- **A translation run the agency did not answer is asked again, never ended:** a connection refused, reset or
+  closed before the answer came, and a 503 the agency answers while it cannot take the run, are each followed
+  by the same ask once a pause has passed, one second after the first and doubling to at most thirty, until the
+  agency answers it or refuses it otherwise. An agency restarting under a run therefore costs the run its time
+  and never its answer.
 - **The gate's word on a part goes as its `note`,** which the line carries into the run untranslated: where an
   answer lost its part's structure, or a record's rendering ran its lists together, left English, changed a
   fenced block or used a banned term, the ask again names what was wrong with the last answer; and a record's
@@ -151,6 +173,28 @@ The gate registers no hook at any of the agency's hook points and answers none.
   have. A part the gate has no word on goes with no note.
 - **What is the agency's:** the road each translation walked and what it spent, kept in the agency's ledger; the
   gate keeps of a document's translation only its rows and, where a part failed, why.
+
+### The roads walked
+
+The agency publishes the road each conversational turn walked as a `road-walked` event on its event stream (the
+agency's `docs/api.md`, 「Events」, and its `docs/run-records.md`, 「The roads a turn walked」). Each frame
+carries the event's number as its SSE id, and its data is the event, `{id, kind, at, data}`, its inner `data`
+the road: `stage`, `chatId`, `run`, `provider`, `model`, `outcome`, `ms`, the four token counts and
+`contextRatio`.
+
+- **Each road is written into the gate's road records with its number,** the road record's `event`; a road
+  record the gate writes for its own runs carries none.
+- **The stream is read on from the newest number written.** It is opened with that number as `Last-Event-ID`,
+  so the agency sends every road it published after it and then the live ones; a road whose number is not past
+  the newest written is not written again. With no number written yet, it is opened with none and reads from
+  then on. The newest number is read from the road records each time the service starts and followed in memory
+  while it runs, so neither the agency's restart nor the gate's own loses a road the agency still keeps.
+- **It is opened again five seconds after it drops,** whatever dropped it: the agency stopping, the connection
+  broken, a refusal.
+- **A road the agency no longer keeps** is told as `events.missed`; the gate says on its error stream which
+  numbers were missed and reads on from what follows. Where the number the gate named is one the agency never
+  gave, its numbering standing behind the gate's, every road sent after the notice is written whatever its
+  number.
 
 ### The model gateway
 

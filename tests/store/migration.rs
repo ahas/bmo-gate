@@ -48,6 +48,7 @@ async fn every_index_the_readers_lean_on_stands() {
 
   for index in [
     "gate_roads_chat",
+    "gate_roads_event",
     "gate_roads_round",
     "gate_roads_stage",
     "judgements_chat",

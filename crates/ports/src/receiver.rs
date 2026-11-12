@@ -52,19 +52,21 @@ impl HttpReceiver {
 impl Receiver for HttpReceiver {
   fn drafts(&self) -> BoxFuture<'_, Answer<BoxStream<'static, Answer<Drafted>>>> {
     Box::pin(async move {
-      let events = self.caller.events("draft rows", &["events"], &[]).await?;
+      let events = self.caller.events("draft rows", &["events"], &[], None).await?;
       // A `draft` frame of kind `start` tells a question as it starts and carries none of a row's answer
       // fields, so it is let go by its kind before a row is read.
       let drafts = events
-        .try_filter(|(_, data)| {
-          futures_util::future::ready(data["type"] == "draft" && data["kind"] != "start")
+        .try_filter(|frame| {
+          futures_util::future::ready(frame.data["type"] == "draft" && frame.data["kind"] != "start")
         })
-        .and_then(|(_, data)| {
-          futures_util::future::ready(serde_json::from_value(data).map_err(|why| PortError::Malformed {
-            unit: "bmo-receiver",
-            call: "draft rows",
-            status: 200,
-            why: why.to_string(),
+        .and_then(|frame| {
+          futures_util::future::ready(serde_json::from_value(frame.data).map_err(|why| {
+            PortError::Malformed {
+              unit: "bmo-receiver",
+              call: "draft rows",
+              status: 200,
+              why: why.to_string(),
+            }
           }))
         });
 

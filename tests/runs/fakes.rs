@@ -9,7 +9,7 @@ use futures_util::future::BoxFuture;
 use futures_util::stream::BoxStream;
 use gate_ports::PortError;
 use gate_ports::agency::{
-  Agency, Apart, Entry, GateTurn, Provider, RoadWalked, Role, Session, TranslationAsk, TranslationRun,
+  Agency, Apart, Entry, GateTurn, Provider, RoadEvent, Role, Session, TranslationAsk, TranslationRun,
   TurnEnd,
 };
 use gate_ports::brain::Load;
@@ -164,7 +164,10 @@ impl Agency for FakeAgency {
     })
   }
 
-  fn roads_walked(&self) -> BoxFuture<'_, Answer<BoxStream<'static, Answer<RoadWalked>>>> {
+  fn roads_walked(
+    &self,
+    _after: Option<i64>,
+  ) -> BoxFuture<'_, Answer<BoxStream<'static, Answer<RoadEvent>>>> {
     Box::pin(async move { unanswered("road-walked") })
   }
 }

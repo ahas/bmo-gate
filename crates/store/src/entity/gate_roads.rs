@@ -29,6 +29,8 @@ pub struct Model {
   pub run: Option<String>,
   pub rowid: i64,
   pub context_ratio: Option<f64>,
+  /// The number of the agency's event the road came in, none for a road the gate's own run walked.
+  pub event: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

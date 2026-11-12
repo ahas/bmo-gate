@@ -311,6 +311,7 @@ impl Runs {
         round: run.request.round.as_deref(),
         run: Some(&run.name),
         context_ratio: None,
+        event: None,
       },
     )
     .await;

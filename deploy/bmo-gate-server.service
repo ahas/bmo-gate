@@ -14,7 +14,8 @@ WorkingDirectory=%h/.local/share/bmo-gate/deploy
 ExecStart=%h/.local/share/bmo-gate/deploy/bin/gate-server %h/.local/share/bmo-gate/deploy/settings.toml
 Restart=always
 RestartSec=2
-# The service installs no handler for SIGTERM, so the signal ends it at once and the stop waits for that end.
+# On SIGTERM the service takes no new call, ends its event streams and lets the calls in hand finish within its
+# own deadline (docs/boundary-api.md, 「Stopping」), so the stop waits for that end and never escalates to a kill.
 TimeoutStopSec=infinity
 
 [Install]

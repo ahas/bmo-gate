@@ -1,11 +1,12 @@
 //! The gate's service (`docs/boundary-api.md`): every route the boundary states, behind the gate's bearer token,
 //! and the watches the service keeps going beside them — the agency's road events written into the road records,
-//! and the receiver's draft rows written as the `draft` stage.
+//! and the receiver's draft rows written as the `draft` stage — until it is stopped and drained.
 
 pub mod answer;
 pub mod drafts;
 pub mod routes;
 pub mod settings;
+pub mod stop;
 pub mod watches;
 
 use std::path::PathBuf;
@@ -32,9 +33,10 @@ use sea_orm_migration::MigratorTrait;
 
 use crate::answer::Refused;
 use crate::settings::{Settings, Unread};
+use crate::stop::Stop;
 
 /// Everything a route stands on: the gates and the reference road, the document translations' queue, the
-/// translations' intake, the token every caller presents and the data root.
+/// translations' intake, the token every caller presents, the data root, and whether the service is stopping.
 pub struct App {
   pub stages: Arc<Stages>,
   pub reference: Arc<Reference>,
@@ -42,6 +44,7 @@ pub struct App {
   pub translations: Intake,
   pub token: String,
   pub data_root: PathBuf,
+  pub stop: Stop,
 }
 
 async fn bearer(State(app): State<Arc<App>>, request: Request, next: Next) -> Response {
@@ -143,18 +146,24 @@ pub async fn stand(settings: &Settings) -> Result<Arc<App>, Unread> {
     translations: Intake::of_policy(),
     token,
     data_root: settings.data_root.clone(),
+    stop: Stop::default(),
   }))
 }
 
-/// The service answering at its listen address until it is stopped, its watches going beside it.
+/// The service answering at its listen address, its watches going beside it, until SIGTERM or an interrupt stops
+/// it and its calls in hand are drained (`docs/boundary-api.md`, 「Stopping」).
 pub async fn serve(settings: Settings) -> Result<(), Unread> {
   let app = stand(&settings).await?;
   let listener = tokio::net::TcpListener::bind(&settings.listen)
     .await
     .map_err(|why| Unread(format!("{}: {why}", settings.listen)))?;
+  let stop = app.stop.clone();
 
-  watches::start(app.clone());
+  tokio::spawn(stop.clone().on_signal());
+  watches::start(app.clone(), watches::REOPEN);
   println!("gate-server: answering at {}", settings.listen);
 
-  axum::serve(listener, router(app)).await.map_err(|why| Unread(why.to_string()))
+  stop::drain(listener, router(app), stop, stop::DRAIN)
+    .await
+    .map_err(|why| Unread(why.to_string()))
 }

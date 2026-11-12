@@ -1,16 +1,17 @@
 //! The agency port (`docs/boundary-api.md`, 「bmo-agency」 and 「How a gate run reaches a model」): the providers,
-//! a role's provider order, a thrown-away session and its one turn, and the roads a turn walked. Bodies are
-//! camelCase, but for a turn's work parts, which go by the snake-case names a job's runner sends them.
+//! a role's provider order, a thrown-away session and its one turn, a translation run asked until the agency
+//! answers it, and the roads a turn walked, read on from the last one read. Bodies are camelCase, but for a turn's
+//! work parts, which go by the snake-case names a job's runner sends them.
 
+use futures_util::StreamExt;
 use futures_util::future::BoxFuture;
 use futures_util::stream::BoxStream;
-use futures_util::{StreamExt, TryStreamExt};
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::brain::Load;
-use crate::http::{Answer, Caller, Peer, PortError};
+use crate::http::{Answer, Caller, Frame, Patience, Peer, PortError};
 
 /// A provider in the walk's order, and what it declares.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -139,6 +140,62 @@ pub struct RoadWalked {
   pub context_ratio: Option<f64>,
 }
 
+/// What the agency's event stream tells of the roads walked (`docs/boundary-api.md`, 「The roads walked」).
+#[derive(Clone, Debug, PartialEq)]
+pub enum RoadEvent {
+  /// A road, with the number the agency gave its event.
+  Walked { event: i64, road: Box<RoadWalked> },
+  /// The events after `after` are no longer kept, the oldest kept being `kept_from` where any is.
+  Missed { after: i64, kept_from: Option<i64> },
+}
+
+/// The data of an `events.missed` frame.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Missed {
+  after: i64,
+  #[serde(default)]
+  kept_from: Option<i64>,
+}
+
+impl RoadEvent {
+  /// The road event a frame of the agency's stream tells, none for a frame of another kind. A frame's data is the
+  /// agency's event, the member it tells of under its own `data`.
+  fn of(frame: Frame) -> Option<Answer<Self>> {
+    let malformed = |why: String| PortError::Malformed {
+      unit: "bmo-agency",
+      call: "roads walked",
+      status: 200,
+      why,
+    };
+    let member = frame.data.get("data").cloned().unwrap_or(Value::Null);
+    let read = match frame.name.as_str() {
+      "road-walked" => frame
+        .id
+        .as_deref()
+        .and_then(|id| id.parse::<i64>().ok())
+        .ok_or_else(|| malformed(format!("a road-walked frame carries no number: {:?}", frame.id)))
+        .and_then(|event| {
+          serde_json::from_value(member)
+            .map(|road| RoadEvent::Walked {
+              event,
+              road: Box::new(road),
+            })
+            .map_err(|why| malformed(why.to_string()))
+        }),
+      "events.missed" => serde_json::from_value::<Missed>(member)
+        .map(|missed| RoadEvent::Missed {
+          after: missed.after,
+          kept_from: missed.kept_from,
+        })
+        .map_err(|why| malformed(why.to_string())),
+      _ => return None,
+    };
+
+    Some(read)
+  }
+}
+
 /// One part asked of the agency's translation line: what it is for, the target language's name and the text.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -177,8 +234,12 @@ pub trait Agency: Send + Sync {
   /// A gate run's one turn, carried to its end.
   fn turn<'a>(&'a self, turn: &'a GateTurn) -> BoxFuture<'a, Answer<TurnEnd>>;
 
-  /// The roads conversational turns walk, from the moment the stream opens.
-  fn roads_walked(&self) -> BoxFuture<'_, Answer<BoxStream<'static, Answer<RoadWalked>>>>;
+  /// The roads conversational turns walk: every one the agency keeps after the event `after` numbers, then the
+  /// live ones; from the moment the stream opens where `after` is none.
+  fn roads_walked(
+    &self,
+    after: Option<i64>,
+  ) -> BoxFuture<'_, Answer<BoxStream<'static, Answer<RoadEvent>>>>;
 
   /// What a session was handed in full, each document by its path and version; none where it holds none.
   fn session_loads<'a>(&'a self, _session: &'a str) -> BoxFuture<'a, Answer<Vec<Load>>> {
@@ -190,7 +251,8 @@ pub trait Agency: Send + Sync {
     Box::pin(async { Ok(()) })
   }
 
-  /// One part translated by the agency's translation line; an agency that serves none refuses it.
+  /// One part translated by the agency's translation line, asked until the agency answers it; an agency that
+  /// serves none refuses it.
   fn translation_run<'a>(&'a self, _ask: &'a TranslationAsk) -> BoxFuture<'a, Answer<TranslationRun>> {
     Box::pin(async {
       Err(PortError::Unreachable {
@@ -213,13 +275,20 @@ struct Loads {
 #[derive(Clone, Debug)]
 pub struct HttpAgency {
   caller: Caller,
+  patience: Patience,
 }
 
 impl HttpAgency {
   pub fn new(peer: Peer) -> Self {
     Self {
       caller: Caller::new("bmo-agency", peer),
+      patience: Patience::default(),
     }
+  }
+
+  /// The same agency, a call it gives no answer asked again after the pauses `patience` gives.
+  pub fn with_patience(self, patience: Patience) -> Self {
+    Self { patience, ..self }
   }
 }
 #[derive(Deserialize)]
@@ -295,7 +364,12 @@ const NOTHING_HELD: &str = "not-found";
 
 impl Agency for HttpAgency {
   fn translation_run<'a>(&'a self, ask: &'a TranslationAsk) -> BoxFuture<'a, Answer<TranslationRun>> {
-    Box::pin(async move { self.caller.post("translation run", &["translation-runs"], ask).await })
+    Box::pin(async move {
+      self
+        .caller
+        .post_until_answered("translation run", &["translation-runs"], ask, self.patience)
+        .await
+    })
   }
 
   fn providers(&self) -> BoxFuture<'_, Answer<Vec<Provider>>> {
@@ -399,19 +473,19 @@ impl Agency for HttpAgency {
     })
   }
 
-  fn roads_walked(&self) -> BoxFuture<'_, Answer<BoxStream<'static, Answer<RoadWalked>>>> {
+  fn roads_walked(
+    &self,
+    after: Option<i64>,
+  ) -> BoxFuture<'_, Answer<BoxStream<'static, Answer<RoadEvent>>>> {
     Box::pin(async move {
-      let events = self.caller.events("roads walked", &["events"], &[("kinds", "road-walked")]).await?;
-      let roads = events
-        .try_filter(|(name, _)| futures_util::future::ready(name == "road-walked"))
-        .and_then(|(_, data)| {
-          futures_util::future::ready(serde_json::from_value(data).map_err(|why| PortError::Malformed {
-            unit: "bmo-agency",
-            call: "roads walked",
-            status: 200,
-            why: why.to_string(),
-          }))
-        });
+      let after = after.map(|after| after.to_string());
+      let events = self
+        .caller
+        .events("roads walked", &["events"], &[("kinds", "road-walked")], after.as_deref())
+        .await?;
+      let roads = events.filter_map(|frame| {
+        futures_util::future::ready(frame.map_or_else(|why| Some(Err(why)), RoadEvent::of))
+      });
 
       Ok(roads.boxed())
     })
