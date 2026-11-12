@@ -3,6 +3,7 @@
 //! watches beside them as the agency sees them, and the service stopped and drained.
 
 mod receiver;
+mod restart;
 mod stop;
 mod watches;
 mod wire;

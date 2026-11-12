@@ -9,6 +9,8 @@ use gate_ports::agency::{Agency, Apart, GateTurn, HttpAgency, Line, RoadEvent, T
 use gate_ports::http::Patience;
 use gate_ports::{Peer, PortError};
 use serde_json::json;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
 
 use super::peer;
 use crate::support::stub::Stub;
@@ -215,13 +217,14 @@ fn ask() -> TranslationAsk {
 }
 
 #[tokio::test]
-async fn a_translation_run_is_asked_again_through_closed_connections_and_503_until_the_agency_answers() {
+async fn a_translation_run_is_asked_again_through_closed_and_reset_connections_and_503_until_the_agency_answers()
+ {
   let answered =
     json!({ "text": "the translation", "provider": "a-provider", "model": "a-model" }).to_string();
   let turns = Turns::start(vec![
     Step::Close,
     Step::Answer(503, json!({ "code": "starting", "error": "the agency is starting" }).to_string()),
-    Step::Close,
+    Step::Reset,
     Step::Answer(200, answered),
   ])
   .await;
@@ -230,6 +233,22 @@ async fn a_translation_run_is_asked_again_through_closed_connections_and_503_unt
 
   assert_eq!(run.text, "the translation");
   assert_eq!(turns.taken(), 4);
+}
+
+#[tokio::test]
+async fn the_reset_step_resets_the_connection() {
+  let turns = Turns::start(vec![Step::Reset]).await;
+  let mut stream = TcpStream::connect(turns.address.trim_start_matches("http://")).await.unwrap();
+
+  stream
+    .write_all(b"POST /translation-runs HTTP/1.1\r\nhost: x\r\ncontent-length: 2\r\n\r\n{}")
+    .await
+    .unwrap();
+
+  let mut read = [0_u8; 64];
+  let ended = stream.read(&mut read).await;
+
+  assert_eq!(ended.map_err(|why| why.kind()), Err(std::io::ErrorKind::ConnectionReset));
 }
 
 #[tokio::test]

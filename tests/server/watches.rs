@@ -23,11 +23,12 @@ use serde_json::json;
 
 use super::{ROOM, TOKEN, ground};
 use crate::reference::fakes::{AnsweringGateway, FakeBrain, FakeReceiver};
+use crate::support::agency::StandInAgency;
 use crate::support::stub::Stub;
 
-// The service's routes and watches over the agency `stub` stands in for over HTTP, and over `receiver`.
-fn app_on(ground: &super::Ground, stub: &Stub, receiver: Arc<dyn Receiver>) -> Arc<App> {
-  let peer = Peer::new(&stub.address, Some("the-agency-token".to_owned())).unwrap();
+// The service's routes and watches over the agency standing in at `agency` over HTTP, and over `receiver`.
+fn app_on(ground: &super::Ground, agency: &str, receiver: Arc<dyn Receiver>) -> Arc<App> {
+  let peer = Peer::new(agency, Some("the-agency-token".to_owned())).unwrap();
   let gateway = Arc::new(AnsweringGateway {
     answer: Box::new(|_| None),
     asked: Default::default(),
@@ -62,7 +63,7 @@ async fn the_watches_read_the_agencys_road_events_and_register_no_hook() {
   let ground = ground("no-hook", |_| None).await;
   let stub = Stub::start().await;
 
-  gate_server::watches::start(app_on(&ground, &stub, Arc::new(FakeReceiver::default())), REOPEN);
+  gate_server::watches::start(app_on(&ground, &stub.address, Arc::new(FakeReceiver::default())), REOPEN);
 
   let mut waited = Duration::ZERO;
 
@@ -133,7 +134,7 @@ async fn the_agencys_roads_are_written_once_each_and_read_on_from_the_newest_wri
     [road_frame(5, "turn:5"), road_frame(6, "turn:6"), road_frame(7, "turn:7")].concat(),
   );
 
-  gate_server::watches::start(app_on(&ground, &agency, Arc::new(FakeReceiver::default())), REOPEN);
+  gate_server::watches::start(app_on(&ground, &agency.address, Arc::new(FakeReceiver::default())), REOPEN);
 
   let opened = || agency.seen().into_iter().filter(|seen| seen.path == "/events").collect::<Vec<_>>();
 
@@ -178,11 +179,50 @@ async fn roads_after_a_number_the_agency_never_gave_are_written_whatever_their_n
     format!("event: events.missed\ndata: {missed}\n\n{}", road_frame(12, "turn:12")),
   );
 
-  gate_server::watches::start(app_on(&ground, &agency, Arc::new(FakeReceiver::default())), REOPEN);
+  gate_server::watches::start(app_on(&ground, &agency.address, Arc::new(FakeReceiver::default())), REOPEN);
 
   let written = || ground.scratch.count(r#"SELECT count(*) FROM gate_roads WHERE event = 12"#, vec![]);
 
   assert!(until(|| async { written().await == 1 }).await, "{:?}", agency.seen());
+}
+
+#[tokio::test]
+async fn the_roads_walked_while_the_agency_restarts_are_written_once_the_stream_is_opened_again() {
+  let ground = ground("roads-agency-restart", |_| None).await;
+  let agency = StandInAgency::start().await;
+  let written = || async {
+    ground
+      .scratch
+      .texts(
+        r#"SELECT run || ':' || event FROM gate_roads WHERE event IS NOT NULL ORDER BY event"#,
+        vec![],
+      )
+      .await
+  };
+
+  gate_server::watches::start(
+    app_on(&ground, &agency.address(), Arc::new(FakeReceiver::default())),
+    REOPEN,
+  );
+
+  assert!(until(|| async { agency.opened().len() == 1 }).await);
+  agency.publish_road(1, ROOM, "turn:1");
+  agency.publish_road(2, ROOM, "turn:2");
+  assert!(until(|| async { written().await.len() == 2 }).await, "{:?}", written().await);
+
+  // The agency stops in the middle of the stream: the connection is cut, and the roads of the turns that end
+  // while it is down are kept by it and published to nobody.
+  agency.stop().await;
+  agency.publish_road(3, ROOM, "turn:3");
+  agency.publish_road(4, ROOM, "turn:4");
+  agency.start_again().await;
+
+  assert!(until(|| async { agency.opened().len() == 2 }).await, "{:?}", agency.opened());
+  agency.publish_road(5, ROOM, "turn:5");
+  assert!(until(|| async { written().await.len() == 5 }).await, "{:?}", written().await);
+
+  assert_eq!(agency.opened(), [None, Some("2".to_owned())]);
+  assert_eq!(written().await, ["turn:1:1", "turn:2:2", "turn:3:3", "turn:4:4", "turn:5:5"]);
 }
 
 #[tokio::test]
@@ -257,7 +297,7 @@ async fn the_receivers_draft_rows_are_written_as_the_draft_stage_under_the_round
 
   assert_eq!(status, StatusCode::CREATED, "{sent}");
 
-  let app = app_on(&ground, &agency, Arc::new(HttpReceiver::new(peer)));
+  let app = app_on(&ground, &agency.address, Arc::new(HttpReceiver::new(peer)));
   let mut heard = app.stages.events.subscribe();
 
   gate_server::watches::start(app, REOPEN);
@@ -315,7 +355,7 @@ async fn the_receivers_draft_rows_are_written_as_the_draft_stage_under_the_round
 async fn a_draft_row_is_written_once_whatever_its_kind_and_a_round_with_no_message_stands_under_none() {
   let ground = ground("draft-once", |_| None).await;
   let agency = Stub::start().await;
-  let app = app_on(&ground, &agency, Arc::new(FakeReceiver::default()));
+  let app = app_on(&ground, &agency.address, Arc::new(FakeReceiver::default()));
   let skipped = drafted(1, "intent", "question", "skip", None);
 
   gate_server::watches::write_drafted(&app, &skipped).await;

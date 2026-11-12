@@ -7,6 +7,7 @@
   "tests/markup/js.rs": 1,
   "tests/markup/web_address.rs": 1,
   "tests/markup/wording.rs": 11,
+  "tests/server/restart.rs": 1,
   "tests/server/work.rs": 1,
   "tests/stages/markdown.rs": 4,
   "tests/stages/records.rs": 1,

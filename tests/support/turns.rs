@@ -1,6 +1,7 @@
 //! A stand-in unit on the loopback whose connections go by a script: each connection it takes is the next step,
 //! the last step standing for every connection after it. A step closes the connection once the request has come,
-//! with no answer, or answers it and closes, so every call the caller makes is a connection of its own.
+//! with no answer, resets it with the request half read, or answers it and closes, so every call the caller makes
+//! is a connection of its own.
 
 use std::convert::Infallible;
 use std::sync::Arc;
@@ -21,6 +22,9 @@ use tokio::task::JoinHandle;
 pub enum Step {
   /// The request read and the connection closed with no answer.
   Close,
+  /// One byte of the request read and the connection dropped with the rest unread, which the kernel answers
+  /// with a reset.
+  Reset,
   /// The request answered with a status and a JSON body.
   Answer(u16, String),
 }
@@ -52,6 +56,10 @@ impl Turns {
             Step::Close => {
               let mut read = [0_u8; 4096];
               let _ = stream.read(&mut read).await;
+            }
+            Step::Reset => {
+              let mut read = [0_u8; 1];
+              let _ = stream.read_exact(&mut read).await;
             }
             Step::Answer(status, body) => {
               let answer = service_fn(move |_| {
