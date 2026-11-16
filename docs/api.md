@@ -81,6 +81,7 @@ written for one caller.
 | `lines` | the room's recent messages in the room shape, each a string |
 | `speakerIds` | the people whose words the turn answers |
 | `situation?` | `agentName`, `roomKind` (`owner` or `group`), `events` (each `kind` and `itemId?`), `nowAt` |
+| `agent?` | the supervisor a turn with no situation is read for, a job's first prompt or its double's; where a situation stands too it names the same agent |
 | `holds?` | names the turn is held to |
 | `round?` | the round the turn belongs to |
 | `peopleSpoke` | whether anyone spoke |
@@ -93,7 +94,11 @@ It answers `entries`, each `path`, `text` and `source` (`document`, `person`, `r
 - **A turn's reference** is what attaches with no pick (`docs/reference-selection.md`, 「What a turn is
   given」): the head of each speaker's sheet, at most three due memories and the rows the turn's events wake. It
   asks no model. The envelope is read for the room, the speakers, the agent and the events; its other fields
-  change nothing a turn is given.
+  change nothing a turn is given. The turn is read from the brain of the agent it names, the situation's
+  `agentName` else `agent`, found by the account owning it (`docs/reference-selection.md`, 「Whose reference it
+  is」); an agent keeping no brain is handed no entry. An envelope naming no agent, one whose `agent` and
+  situation name two, and a `roomKind` other than `owner` or `group` are 400 `bad-request`, and nothing is read
+  from the chat agent's brain in their place.
 
 | Route | Query | Answer |
 |---|---|---|

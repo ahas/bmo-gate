@@ -21,6 +21,7 @@ async fn a_turn_is_handed_only_what_no_gate_picks_and_no_model_is_asked() {
         "messageId": 9,
         "lines": ["Owner (id 5): how do deploys go?"],
         "speakerIds": [5],
+        "agent": "the-chat-agent",
         "round": "round-1",
         "peopleSpoke": true,
         "records": true,

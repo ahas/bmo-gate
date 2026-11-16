@@ -14,10 +14,13 @@ Every account has supervisors of its own, each with a brain of its own, and a su
 another supervisor's memories, rooms or people, of its own account or another.
 
 - **A reference is one supervisor's, read from its own brain alone.** The supervisor is the agent the caller
-  names: the situation's agent on a turn, `agent` on the index, a piece and a search. Nothing is read for an agent
-  nobody names: the index, a piece and a search asked with no `agent` are refused, and never answered from the
-  chat agent's brain. A turn whose envelope carries no situation is the deployment's own, a job's or a thrown-away
-  session's instruction, and is read for the chat agent.
+  names: the situation's agent on a chat turn, the envelope's `agent` on a turn with no situation, and `agent` on
+  the index, a piece and a search. A turn with no situation is a supervisor's instruction outside any room, a
+  job's first prompt or its double's, and names the supervisor it is read for in `agent`; an envelope carrying both
+  names one agent in each, and one naming two is refused.
+- **Nothing is read for an agent nobody names.** A turn whose envelope names no agent, by its situation or its
+  `agent`, and an index, a piece or a search asked with no `agent` are refused, and never answered from the chat
+  agent's brain.
 - **The supervisor's account decides the brain.** The gate asks the agency who owns the supervisor (its
   `ownerAccount`, `docs/boundary-api.md`, 「bmo-agency」), and reads the one brain filed under that account and the
   supervisor's name (the brain's `docs/design.md`, 「Whose a brain is」): the account's key is the owning user's id.
@@ -46,9 +49,9 @@ another supervisor's memories, rooms or people, of its own account or another.
   event」).
 - **Nothing else.** No room rule, no knowledge, no lore, no other person's sheet and no undue memory attaches to a
   turn: each stands in the index, for the agent to read where the turn needs it.
-- **Every turn is one designated agent's,** the agent its situation names, and everything is read from that
-  agent's own brain (「Whose reference it is」). An agent keeping no brain is given no sheet and no memory, never
-  the chat agent's.
+- **Every turn is one designated agent's,** the agent its situation names, else its `agent`, and everything is
+  read from that agent's own brain (「Whose reference it is」). An agent keeping no brain is given no sheet and no
+  memory, never the chat agent's.
 - **The sheet's head is its first eight lines,** the policy's count, the most important facts: the person's facts
   about no room and their facts about this room, one line a fact, as the brain renders the person's subject with
   the room's subject as its room (the brain's `docs/design.md`, 「A person is a subject」). It is held to 14,000

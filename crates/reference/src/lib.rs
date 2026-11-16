@@ -88,11 +88,6 @@ pub struct Reference {
 }
 
 impl Reference {
-  /// The chat agent, whose turn a reference is composed for where nothing names another.
-  pub fn chat_agent(&self) -> &str {
-    &self.stages.runs.chat_agent
-  }
-
   /// Whose brain the agent's reference is read from (`docs/reference-selection.md`, 「Whose reference it is」): the
   /// brain the account owning it files it under, else, for an agent no account owns, the one brain of its name.
   pub async fn brain_key(&self, agent: &str) -> Result<BrainKey, PortError> {

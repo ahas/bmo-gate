@@ -14,6 +14,7 @@ fn turn() -> Turn {
     chat_id: 7,
     message_id: Some(9),
     speaker_ids: vec![5, 5],
+    agent: "the-chat-agent".into(),
     situation: None,
   }
 }

@@ -282,6 +282,10 @@ pub struct ReferenceAsk {
   pub speaker_ids: Vec<i64>,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub situation: Option<Situation>,
+  /// The supervisor a turn with no situation is read for, a job's first prompt or its double's; where a
+  /// situation stands too, the same agent it names.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub agent: Option<String>,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub holds: Option<Vec<String>>,
   #[serde(default, skip_serializing_if = "Option::is_none")]

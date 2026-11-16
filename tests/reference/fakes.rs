@@ -76,12 +76,14 @@ pub fn memory(id: i64, kind: &str, slug: &str, action: &str) -> MemoryRow {
 
 /// The stand-in brain: what it answers each read with, every brain it was asked to read, and what it was handed
 /// back. Where `own` holds brains, only they are kept, and each answers the fragments it holds; where it holds none,
-/// every agent keeps one brain answering `fragments`.
+/// every agent keeps one brain answering `fragments`. A brain `standing_of` holds answers its own standing rows in
+/// place of `standing`.
 #[derive(Default)]
 pub struct FakeBrain {
   pub own: Mutex<HashMap<BrainKey, Vec<Fragment>>>,
   pub read: Mutex<Vec<BrainKey>>,
   pub standing: Mutex<Vec<MemoryRow>>,
+  pub standing_of: Mutex<HashMap<BrainKey, Vec<MemoryRow>>>,
   pub conditions: Mutex<Vec<Condition>>,
   pub woken: Mutex<Vec<MemoryRow>>,
   pub fragments: Mutex<Vec<Fragment>>,
@@ -111,9 +113,13 @@ impl Brain for FakeBrain {
 
   fn standing<'a>(&'a self, key: &'a BrainKey, _chat: i64) -> BoxFuture<'a, Answer<Vec<MemoryRow>>> {
     Box::pin(async move {
-      let kept = self.reads(key);
+      if !self.reads(key) {
+        return Ok(vec![]);
+      }
 
-      Ok(if kept { self.standing.lock().unwrap().clone() } else { vec![] })
+      let own = self.standing_of.lock().unwrap();
+
+      Ok(own.get(key).cloned().unwrap_or_else(|| self.standing.lock().unwrap().clone()))
     })
   }
 

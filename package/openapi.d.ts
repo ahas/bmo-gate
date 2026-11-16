@@ -600,6 +600,11 @@ export interface components {
         };
         /** @description A turn's envelope, as the gate's reference road reads it. */
         ReferenceAsk: {
+            /**
+             * @description The supervisor a turn with no situation is read for, a job's first prompt or its double's; where a
+             *     situation stands too, the same agent it names.
+             */
+            agent?: string | null;
             answered?: string | null;
             holds?: string[] | null;
             lines: string[];

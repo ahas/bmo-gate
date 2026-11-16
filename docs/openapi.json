@@ -839,6 +839,13 @@
       "ReferenceAsk": {
         "description": "A turn's envelope, as the gate's reference road reads it.",
         "properties": {
+          "agent": {
+            "description": "The supervisor a turn with no situation is read for, a job's first prompt or its double's; where a\nsituation stands too, the same agent it names.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "answered": {
             "type": [
               "string",

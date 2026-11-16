@@ -18,23 +18,16 @@ pub const ROOM_RULE: &str = "room-rule";
 pub const KNOWLEDGE: &str = "library-knowledge";
 pub const PERSON_BOOK: &str = "person-book";
 
-/// What a turn is handed to compose its reference by: the room, the message it is about, who spoke, and the
-/// situation road where the turn has one.
+/// What a turn is handed to compose its reference by: the room, the message it is about, who spoke, the agent whose
+/// turn it is, and the situation road where the turn has one.
 pub struct Turn {
   pub chat_id: i64,
   pub message_id: Option<i64>,
   pub speaker_ids: Vec<i64>,
+  /// The supervisor whose brain alone the turn is read from (`docs/reference-selection.md`, 「Whose reference it
+  /// is」).
+  pub agent: String,
   pub situation: Option<SituationTurn>,
-}
-
-impl Turn {
-  /// The agent whose turn it is: the situation road's, the chat agent's where the turn carries none.
-  pub fn agent<'a>(&'a self, reference: &'a Reference) -> &'a str {
-    self
-      .situation
-      .as_ref()
-      .map_or(reference.chat_agent(), |situation| situation.agent.as_str())
-  }
 }
 
 /// A person's sheet held to the reference's ceiling for one: its lines from the top, the most important first, as
@@ -140,7 +133,7 @@ fn within_turn_budget(chat_id: i64, taken: Vec<Entry>) -> Vec<Entry> {
 /// and the rows the turn's events wake, the memories and the woken rows held to the turn's total, all from the turn's
 /// agent's own brain; nothing where whose brain it is cannot be told.
 pub async fn handed(reference: &Reference, turn: &Turn) -> Vec<Entry> {
-  let key = match reference.brain_key(turn.agent(reference)).await {
+  let key = match reference.brain_key(&turn.agent).await {
     Ok(key) => key,
     Err(why) => {
       eprintln!(

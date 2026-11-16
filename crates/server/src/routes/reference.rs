@@ -18,11 +18,32 @@ use gate_reference::road::{Turn, handed};
 use crate::App;
 use crate::answer::{Answered, Body, Query, Refused};
 
-/// The turn the envelope stands for.
-pub fn turn_of(envelope: ReferenceAsk) -> Turn {
+// The agent an envelope names, by its situation or its `agent`, refused where it names nobody or the two name
+// different agents (`docs/reference-selection.md`, 「Whose reference it is」).
+fn named_agent(envelope: &ReferenceAsk) -> Result<String, Refused> {
+  let named = |agent: &str| Some(agent.trim().to_owned()).filter(|agent| !agent.is_empty());
+  let by_situation = envelope.situation.as_ref().and_then(|situation| named(&situation.agent_name));
+  let by_field = envelope.agent.as_deref().and_then(named);
+
+  match (by_situation, by_field) {
+    (Some(situation), Some(field)) if situation != field => Err(Refused::new(
+      Code::BadRequest,
+      "the envelope's agent and its situation's agentName name two agents",
+    )),
+    (Some(agent), _) | (None, Some(agent)) => Ok(agent),
+    (None, None) => Err(Refused::new(
+      Code::BadRequest,
+      "a turn is read for the agent its situation or its agent names, and none is named",
+    )),
+  }
+}
+
+/// The turn the envelope stands for, refused where it names no agent or two.
+pub fn turn_of(envelope: ReferenceAsk) -> Result<Turn, Refused> {
+  let agent = named_agent(&envelope)?;
   let situation = envelope.situation.map(|situation| SituationTurn {
     chat_id: envelope.room_id,
-    agent: situation.agent_name,
+    agent: agent.clone(),
     events: situation
       .events
       .into_iter()
@@ -33,12 +54,13 @@ pub fn turn_of(envelope: ReferenceAsk) -> Turn {
       .collect(),
   });
 
-  Turn {
+  Ok(Turn {
     chat_id: envelope.room_id,
     message_id: envelope.message_id,
     speaker_ids: envelope.speaker_ids,
+    agent,
     situation,
-  }
+  })
 }
 
 pub async fn reference(
@@ -51,7 +73,7 @@ pub async fn reference(
     return Err(Refused::new(Code::BadRequest, "the situation's roomKind is neither owner nor group"));
   }
 
-  let entries = handed(&app.reference, &turn_of(envelope)).await;
+  let entries = handed(&app.reference, &turn_of(envelope)?).await;
 
   Ok(Json(ReferenceAnswer {
     entries: entries

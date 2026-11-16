@@ -1,6 +1,7 @@
 //! Whose reference it is (`docs/reference-selection.md`, 「Whose reference it is」): each supervisor of an account
-//! reads its own brain alone, the deployment's own supervisor reads as it does with no account, an agent keeping no
-//! brain has no index, and an index asked for nobody is refused.
+//! reads its own brain alone, on a chat turn, on a turn with no room and on its index, the deployment's own supervisor
+//! reads as it does with no account, an agent keeping no brain has none, and a turn or an index asked for nobody is
+//! refused.
 
 use gate_ports::agency::Supervisor;
 use gate_ports::brain::BrainKey;
@@ -8,7 +9,7 @@ use reqwest::StatusCode;
 use serde_json::{Value, json};
 
 use super::{Ground, ROOM, ground};
-use crate::reference::fakes::fragment;
+use crate::reference::fakes::{fragment, memory};
 
 // Two supervisors of two accounts and the deployment's own, each brain holding one note of its own.
 fn furnished(ground: &Ground) {
@@ -35,6 +36,33 @@ fn furnished(ground: &Ground) {
       vec![fragment("library-knowledge", "deploy-notes", "the deployment's notes", None, None)],
     ),
   ]);
+}
+
+// Each of the three brains holding one due promise of its own.
+fn promised(ground: &Ground) {
+  ground.brain.standing_of.lock().unwrap().extend(
+    [("u7", Some(7), 1), ("u8", Some(8), 2), ("the-chat-agent", None, 3)].map(|(name, account, id)| {
+      let mut due = memory(id, "promise", "", &format!("{name} keeps its promise."));
+
+      due.event_met_at = Some(100);
+      (
+        account.map_or_else(|| BrainKey::unowned(name), |account| BrainKey::owned(name, account)),
+        vec![due],
+      )
+    }),
+  );
+}
+
+// A turn with no room and no situation, a supervisor's job or its double, read for whom `agent` names.
+fn roomless(agent: Value) -> Value {
+  json!({
+    "roomId": 0,
+    "lines": ["Do the work the brief describes."],
+    "speakerIds": [],
+    "agent": agent,
+    "peopleSpoke": false,
+    "records": false,
+  })
 }
 
 // Every slug an index answers, across its groups.
@@ -145,4 +173,62 @@ async fn a_turn_is_handed_only_what_its_own_supervisors_brain_holds() {
   let read = ground.brain.read.lock().unwrap().clone();
 
   assert!(!read.is_empty() && read.iter().all(|key| *key == BrainKey::owned("u8", 8)), "{read:?}");
+}
+
+#[tokio::test]
+async fn a_turn_with_no_room_is_read_from_the_named_supervisors_own_brain_alone() {
+  let ground = ground("whose-roomless", |_| None).await;
+
+  furnished(&ground);
+  promised(&ground);
+
+  for (agent, key) in [
+    ("u7", BrainKey::owned("u7", 7)),
+    ("u8", BrainKey::owned("u8", 8)),
+    ("the-chat-agent", BrainKey::unowned("the-chat-agent")),
+  ] {
+    ground.brain.read.lock().unwrap().clear();
+
+    let (status, body) = ground.post("/reference/selected", roomless(json!(agent))).await;
+
+    assert_eq!(status, StatusCode::OK, "{body}");
+
+    let texts: Vec<&str> = body["entries"]
+      .as_array()
+      .unwrap()
+      .iter()
+      .map(|entry| entry["text"].as_str().unwrap())
+      .collect();
+
+    assert_eq!(texts.len(), 1, "{body}");
+    assert!(texts[0].contains(&format!("{agent} keeps its promise.")), "{body}");
+
+    let read = ground.brain.read.lock().unwrap().clone();
+
+    assert!(!read.is_empty() && read.iter().all(|read| *read == key), "{agent}: {read:?}");
+  }
+
+  let (status, body) = ground.post("/reference/selected", roomless(json!("a-stranger"))).await;
+
+  assert_eq!(status, StatusCode::OK, "{body}");
+  assert_eq!(body["entries"], json!([]), "an agent keeping no brain is handed nothing");
+}
+
+#[tokio::test]
+async fn a_turn_naming_nobody_or_two_agents_is_refused_and_never_read_for_the_chat_agent() {
+  let ground = ground("whose-nobody", |_| None).await;
+
+  furnished(&ground);
+
+  let mut two = roomless(json!("u7"));
+
+  two["roomId"] = json!(ROOM);
+  two["situation"] = json!({ "agentName": "u8", "roomKind": "group", "events": [], "nowAt": 1 });
+
+  for envelope in [roomless(Value::Null), roomless(json!(" ")), two] {
+    let (status, body) = ground.post("/reference/selected", envelope.clone()).await;
+
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{envelope}: {body}");
+  }
+  assert!(ground.brain.read.lock().unwrap().is_empty(), "no brain is read for an envelope refused");
 }
