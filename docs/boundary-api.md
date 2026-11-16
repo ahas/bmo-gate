@@ -98,7 +98,7 @@ no room at all.
 | knowledge read | `GET /brains/{brainId}/memories` | `type=knowledge`, `status=active`, paged | `items`, filtered by the slug asked |
 | lore read | `GET /brains/{brainId}/memories` | `type=lore`, `status=active`, paged | `items`, filtered by the slug asked; a piece's body is the row's text |
 | a subject found | `GET /brains/{brainId}/subjects` | `type` (`person` or `room`), `key` (the user's or the room's id), `limit=1` | `items`: the subject, or none where the brain holds none |
-| a person's sheet | `GET /brains/{brainId}/subjects/{subjectId}/sheet` | `roomId`, the room's subject, where the brain holds one; `limit`, the head's line count, for a speaker's head (`docs/reference-selection.md`, 「What a turn is given」), and none for a whole sheet | `text/plain`: one line a fact, `- [#<id> since <date>] <text>`, the most important first; empty where the brain knows no fact of the person there |
+| a person's sheet | `GET /brains/{brainId}/subjects/{subjectId}/sheet` | `roomId`, the room's subject, where the brain holds one; `limit`, the head's count of fact lines, for a speaker's head (`docs/reference-selection.md`, 「What a turn is given」), and none for a whole sheet | `text/plain`: one line a name first, `- [#<id> name] <text>`, those about the room ahead of those about no room, every name whatever the `limit`; then one line a fact, `- [#<id> since <date>] <text>`, the most important first; empty where the brain knows no name and no fact of the person there |
 
 The system's reference documents are held nowhere in the brain, so the brain answers no rows of them, and the
 shipped folder holds their bodies alone. The lore is the agent's brain's: memories of type `lore`, each
@@ -109,9 +109,9 @@ layer's name, and its body its text. The rows stand in their layers' positions a
 own.
 A person is read through their sheet, never through a row: the brain holds no memory of type `sheet`, and
 the gate reads none. A speaker's head and a person's piece read from the index are both that person's sheet as
-the brain renders it with the turn's room as its room — their facts about no room and their facts about that
-room (the brain's `docs/design.md`, 「A person is a subject」) — held to the reference's ceiling for a sheet
-(`docs/reference-selection.md`, 「What a turn is given」). An entry of the `people` group is one person subject
+the brain renders it with the turn's room as its room — their names, then their facts about no room and their
+facts about that room (the brain's `docs/design.md`, 「A person is a subject」) — held to the reference's ceiling
+for a sheet (`docs/reference-selection.md`, 「What a turn is given」). An entry of the `people` group is one person subject
 the brain's live facts are about: its slug `person-<user id>`, what it holds the subject's name, else the user
 id. The brain picks nothing, and the gate writes nothing back to it.
 

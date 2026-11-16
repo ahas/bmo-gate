@@ -40,9 +40,9 @@ another supervisor's memories, rooms or people, of its own account or another.
 ## What a turn is given
 
 - **The head of the standing sheet of everyone who spoke this turn,** what the brain knows of that person in
-  this room as the brain renders it from their facts, the most important first, held to the sheet's ceiling, under
-  the path `rooms/<room>/people/<user id>/sheet.md`, the turn's agent's own; a person the brain knows no fact of
-  in the room has none.
+  this room as the brain renders it from their names and facts, every name first and then the most important
+  facts, held to the sheet's ceiling, under the path `rooms/<room>/people/<user id>/sheet.md`, the turn's agent's
+  own; a person the brain knows no name and no fact of in the room has none.
 - **The room's due memories,** the errands whose event has come, the latest come first and at most three, as one
   entry under `memories/<room>`; a turn on which nothing is due carries no memories entry.
 - **The rows the turn's events wake,** by the event alone (the brain's `docs/memories.md`, 「A row with an
@@ -52,11 +52,14 @@ another supervisor's memories, rooms or people, of its own account or another.
 - **Every turn is one designated agent's,** the agent its situation names, else its `agent`, and everything is
   read from that agent's own brain (「Whose reference it is」). An agent keeping no brain is given no sheet and no
   memory, never the chat agent's.
-- **The sheet's head is its first eight lines,** the policy's count, the most important facts: the person's facts
-  about no room and their facts about this room, one line a fact, as the brain renders the person's subject with
-  the room's subject as its room (the brain's `docs/design.md`, 「A person is a subject」). It is held to 14,000
-  characters by its lines from the top. The brain keeps no sheet as a row, and no memory of type `sheet` is read.
-  The rest of a speaker's facts reach the agent through its own reading of the index.
+- **The sheet's head is every name line first, then the eight most important fact lines,** the policy's count,
+  as the brain renders the person's subject with the room's subject as its room (the brain's `docs/design.md`,
+  「A person is a subject」). The name lines are what the person is called, one line a live name, those about this
+  room ahead of those about no room; the policy's count cuts the fact lines alone, so a head never leaves out a
+  name. The fact lines are the person's facts about no room and their facts about this room, one line a fact, the
+  most important first. The head is held to 14,000 characters by its lines from the top. The brain keeps no sheet
+  as a row, and no memory of type `sheet` is read. The rest of a speaker's facts reach the agent through its own
+  reading of the index.
 - **The memories go as one entry,** under `memories/<room>`: a head naming it and how many open rows the room
   holds, one line a row — its number, kind, when it was written and moved, whom it is for, the item it was left
   open by and its words — and a closing line saying how many more stand and how the agent lists them. The entry
