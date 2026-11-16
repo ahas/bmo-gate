@@ -32,6 +32,19 @@ stands, and no other.
   folder named after it, and what they share the `support` module. One module's tests run as
   `bmo-testbed cargo test --test main <module>::`. A Bun project's tests stand under `tests/` in a folder named
   for the project.
+- **A test that needs a store makes a database of its own** on the server `BMO_TEST_POSTGRES` names, else the
+  local socket's `bmo_test`. The first such test of a harness process migrates a template with the store's
+  migrator, named `bmo_gate_test_tmpl_` followed by the process id, and each test gets a copy of it, or a blank
+  database, named `bmo_gate_test_copy_` followed by the process id and a count.
+  - A copy is dropped when its test ends, and the test fails if the drop does: the drop first ends the suite
+    role's own sessions on the database and then drops it without forcing, since forcing needs the right to end
+    other roles' processes, an autovacuum worker's among them, which the suite's role need not hold, while the
+    plain drop stops an autovacuum worker itself.
+  - Before a harness process makes its first database it drops every template and copy whose process no longer
+    runs on this machine and that no session is on, so a process that ended or was killed, and the template it
+    kept to its end, leave nothing behind past the next run. A database the sweep cannot drop is named on the
+    error stream. The sweep reads these two names and the two a checkout behind this rule still makes them
+    under, `gate_rs_tmpl_` and `gate_rs_copy_`, and no other.
 - **No weights, datasets or run output in git.** They are runtime data under the data root the settings name;
   the repository holds only the declarations that say where they are read from.
 
