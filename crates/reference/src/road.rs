@@ -1,6 +1,6 @@
 //! The road a turn's reference is composed on (`docs/reference-selection.md`, 「What a turn is given」): the head of
-//! the sheet of everyone who spoke, as the brain renders it from their facts, the room's due memories and the rows
-//! the turn's events wake, held to the turn's total. No model is asked.
+//! the sheet of everyone who spoke, as the brain renders it from their names and facts, the room's due memories and
+//! the rows the turn's events wake, held to the turn's total. No model is asked.
 
 use std::collections::HashSet;
 
@@ -30,8 +30,8 @@ pub struct Turn {
   pub situation: Option<SituationTurn>,
 }
 
-/// A person's sheet held to the reference's ceiling for one: its lines from the top, the most important first, as
-/// many as fit; empty where not even the first does.
+/// A person's sheet held to the reference's ceiling for one: its lines from the top, every name line and then the
+/// most important facts, as many as fit; empty where not even the first does.
 pub fn held_sheet(text: &str) -> String {
   let ceiling = REFERENCE.sheet_chars;
   let mut kept: Vec<&str> = vec![];
@@ -51,8 +51,8 @@ pub fn held_sheet(text: &str) -> String {
   kept.join("\n")
 }
 
-/// The head of the standing sheet of everyone who spoke this turn: the first lines of each one's sheet in the room
-/// as the agent's own brain, `key`, renders it from their facts, as many as the policy names, held to its ceiling.
+/// The head of the standing sheet of everyone who spoke this turn: each one's sheet in the room as the agent's own
+/// brain, `key`, renders it, every name line and then as many fact lines as the policy names, held to its ceiling.
 /// An agent keeping no brain is given none.
 pub async fn standing_entries(
   reference: &Reference,

@@ -10,7 +10,7 @@ pub struct Reference {
   pub turn_budget_chars: usize,
   /// What a person's sheet may hold where it attaches, in characters.
   pub sheet_chars: usize,
-  /// How many lines of a speaker's sheet attach as its head.
+  /// How many fact lines of a speaker's sheet attach as its head, every name line carried ahead of them.
   pub sheet_lines: usize,
   /// How many of a room's due memories attach.
   pub due: usize,

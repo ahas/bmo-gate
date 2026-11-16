@@ -5,11 +5,11 @@
 turn_budget_chars = 30000
 
 # What a person's sheet may hold where it attaches, in characters: the lines of the brain's rendering from the top,
-# the most important first, as many as fit.
+# every name line and then the most important facts, as many as fit.
 sheet_chars = 14000
 
-# How many lines of a speaker's sheet attach on every turn as its head: the most important facts, as the brain's
-# sheet orders them.
+# How many fact lines of a speaker's sheet attach on every turn as its head: the most important facts, as the
+# brain's sheet orders them, with every name line carried ahead of them.
 sheet_lines = 8
 
 # How many of a room's due memories, the errands whose event has come, attach on a turn, the latest first.
