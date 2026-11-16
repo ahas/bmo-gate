@@ -1,6 +1,6 @@
 //! The rows a turn's events wake: each attaches by the event alone, its action under its own name.
 
-use gate_ports::brain::Event;
+use gate_ports::brain::{BrainKey, Event};
 use gate_reference::situation::event_entries;
 use gate_reference::{SituationTurn, Source};
 
@@ -27,7 +27,7 @@ async fn a_row_an_event_wakes_attaches_by_the_event_alone() {
     memory(2, "errand", "report-back", "report the job"),
   ]);
 
-  let entries = event_entries(&ground.reference, &turn()).await;
+  let entries = event_entries(&ground.reference, &turn(), &BrainKey::unowned("the-chat-agent")).await;
 
   assert_eq!(
     entries.iter().map(|entry| (entry.path.as_str(), entry.source)).collect::<Vec<_>>(),

@@ -47,7 +47,9 @@ async fn the_index_counts_what_the_session_read_a_piece_records_its_read_and_a_s
 
   ground.furnish();
 
-  let (status, index) = ground.get(&format!("/reference/index?room={ROOM}&session=session-a")).await;
+  let (status, index) = ground
+    .get(&format!("/reference/index?room={ROOM}&agent=the-chat-agent&session=session-a"))
+    .await;
 
   assert_eq!(status, StatusCode::OK, "{index}");
 
@@ -67,29 +69,41 @@ async fn the_index_counts_what_the_session_read_a_piece_records_its_read_and_a_s
   assert_eq!(knowledge["entries"][0]["holds"], "how a deploy goes");
 
   let (status, piece) = ground
-    .get(&format!("/reference/pieces/deploy-notes?room={ROOM}&group=knowledge&session=session-a"))
+    .get(&format!(
+      "/reference/pieces/deploy-notes?room={ROOM}&agent=the-chat-agent&group=knowledge&session=session-a"
+    ))
     .await;
 
   assert_eq!(status, StatusCode::OK, "{piece}");
   assert_eq!(piece["text"], "Deploys go through the testbed.");
 
-  let (_, index) = ground.get(&format!("/reference/index?room={ROOM}&session=session-a")).await;
+  let (_, index) = ground
+    .get(&format!("/reference/index?room={ROOM}&agent=the-chat-agent&session=session-a"))
+    .await;
 
   assert_eq!(index["groups"][2]["unread"], 1, "the piece read is counted read");
 
-  let (status, found) = ground.get(&format!("/reference/search?q=deploy&room={ROOM}")).await;
+  let (status, found) = ground
+    .get(&format!("/reference/search?q=deploy&room={ROOM}&agent=the-chat-agent"))
+    .await;
 
   assert_eq!(status, StatusCode::OK, "{found}");
   assert_eq!(found["entries"][0]["slug"], "deploy-notes");
   assert_eq!(found["entries"][0]["group"], "knowledge");
 
   for (asked, code) in [
-    (format!("/reference/pieces/no-such?room={ROOM}&group=knowledge"), StatusCode::NOT_FOUND),
     (
-      format!("/reference/pieces/deploy-notes?room={ROOM}&group=no-group"),
+      format!("/reference/pieces/no-such?room={ROOM}&agent=the-chat-agent&group=knowledge"),
+      StatusCode::NOT_FOUND,
+    ),
+    (
+      format!("/reference/pieces/deploy-notes?room={ROOM}&agent=the-chat-agent&group=no-group"),
       StatusCode::BAD_REQUEST,
     ),
-    (format!("/reference/search?q=deploy&room={ROOM}&limit=25"), StatusCode::BAD_REQUEST),
+    (
+      format!("/reference/search?q=deploy&room={ROOM}&agent=the-chat-agent&limit=25"),
+      StatusCode::BAD_REQUEST,
+    ),
   ] {
     assert_eq!(ground.get(&asked).await.0, code, "{asked}");
   }

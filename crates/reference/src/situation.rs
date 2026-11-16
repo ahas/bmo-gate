@@ -4,6 +4,7 @@
 
 use gate_markup::js;
 use gate_policy::reference::REFERENCE;
+use gate_ports::brain::BrainKey;
 
 use crate::memories;
 use crate::{Entry, Reference, SituationTurn, Source};
@@ -13,10 +14,11 @@ pub fn rule_path(slug: &str) -> String {
   format!("situation-rule/{slug}")
 }
 
-/// The rows the turn's events wake, each attaching its action under its own name within the policy's allowance;
-/// no model is asked. A room whose rows cannot be read this turn loses them and nothing else.
-pub async fn event_entries(reference: &Reference, turn: &SituationTurn) -> Vec<Entry> {
-  let woken = match memories::woken(reference, turn.chat_id, &turn.agent, &turn.events).await {
+/// The rows the turn's events wake in the turn's agent's brain, `key`, each attaching its action under its own name
+/// within the policy's allowance; no model is asked. A room whose rows cannot be read this turn loses them and
+/// nothing else.
+pub async fn event_entries(reference: &Reference, turn: &SituationTurn, key: &BrainKey) -> Vec<Entry> {
+  let woken = match memories::woken(reference, turn.chat_id, key, &turn.events).await {
     Ok(woken) => woken,
     Err(why) => {
       eprintln!("reference: chat {} events could not be read: {why}", turn.chat_id);

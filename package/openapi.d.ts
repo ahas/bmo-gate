@@ -200,7 +200,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The brain's index for an agent in a room: five groups, each its unread count against the session's loads, its hint and its entries. */
+        /** The brain's index for an agent in a room, read from that agent's own brain alone: five groups, each its unread count against the session's loads, its hint and its entries; no group where the agent keeps no brain. */
         get: operations["reference_index"];
         put?: never;
         post?: never;
@@ -1075,7 +1075,7 @@ export interface operations {
     reference_index: {
         parameters: {
             query: {
-                agent?: string;
+                agent: string;
                 room: number;
                 session?: string;
             };
@@ -1100,7 +1100,7 @@ export interface operations {
     reference_piece: {
         parameters: {
             query: {
-                agent?: string;
+                agent: string;
                 group: string;
                 room: number;
                 session?: string;
@@ -1128,7 +1128,7 @@ export interface operations {
     reference_search: {
         parameters: {
             query: {
-                agent?: string;
+                agent: string;
                 limit?: number;
                 q: string;
                 room: number;

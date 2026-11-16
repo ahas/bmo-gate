@@ -1,14 +1,15 @@
 //! The brain's index as an agent reads it itself (`docs/reference-selection.md`, 「The index an agent reads」):
-//! five groups of entries, each entry what it holds and when it is read, the session's loads counted out of the
-//! unread, a piece read whole by its slug and recorded among the session's loads, and a search over every
-//! entry's words. No model is asked.
+//! five groups of entries from the agent's own brain alone (「Whose reference it is」), each entry what it holds and
+//! when it is read, the session's loads counted out of the unread, a piece read whole by its slug and recorded among
+//! the session's loads, and a search over every entry's words. An agent keeping no brain has no index. No model is
+//! asked.
 
 use std::collections::HashSet;
 use std::sync::LazyLock;
 
 use gate_markup::js::bun_hash;
 use gate_ports::PortError;
-use gate_ports::brain::{Condition, Load, MemoryRow, Reply};
+use gate_ports::brain::{BrainKey, Condition, Load, MemoryRow, Reply};
 use regex::Regex;
 
 use crate::fragments::{self, Fragment};
@@ -145,15 +146,15 @@ fn memory_entry(chat_id: i64, row: &MemoryRow) -> IndexEntry {
   }
 }
 
-/// One group's entries for the agent in the room, in the order the brain gives them.
+/// One group's entries in the room from the agent's own brain, `key`, in the order the brain gives them.
 pub async fn entries(
   reference: &Reference,
-  agent: &str,
+  key: &BrainKey,
   chat_id: i64,
   group: &str,
 ) -> Result<Vec<IndexEntry>, Unanswered> {
   let rows = |kind: &'static str| async move {
-    fragments::rows(reference, agent, chat_id, kind).await.map_err(Unanswered::Unit)
+    fragments::rows(reference, key, chat_id, kind).await.map_err(Unanswered::Unit)
   };
 
   Ok(match group {
@@ -169,7 +170,7 @@ pub async fn entries(
     }
     "room-rules" => {
       let rules = rows(ROOM_RULE).await?;
-      let conditions = memories::candidates(reference, chat_id, agent).await.map_err(Unanswered::Unit)?;
+      let conditions = memories::candidates(reference, chat_id, key).await.map_err(Unanswered::Unit)?;
 
       rules
         .iter()
@@ -179,7 +180,7 @@ pub async fn entries(
     }
     "knowledge" => rows(KNOWLEDGE).await?.iter().map(|row| fragment_entry(row, Body::Knowledge)).collect(),
     "people" => rows(PERSON_BOOK).await?.iter().map(person_entry).collect(),
-    "room-memories" => memories::standing(reference, chat_id, agent)
+    "room-memories" => memories::standing(reference, chat_id, key)
       .await
       .iter()
       .map(|row| memory_entry(chat_id, row))
@@ -198,20 +199,24 @@ async fn held(reference: &Reference, session: Option<&str>) -> Result<HashSet<St
   Ok(loads.into_iter().map(|load| load.path).collect())
 }
 
-/// The index for the agent in the room: every group in order, each with its unread count against the session's
-/// loads and its hint.
+/// The index in the room from the agent's own brain, `key`: every group in order, each with its unread count against
+/// the session's loads and its hint; no group at all where the agent keeps no brain.
 pub async fn index(
   reference: &Reference,
-  agent: &str,
+  key: &BrainKey,
   chat_id: i64,
   session: Option<&str>,
   now: i64,
 ) -> Result<Vec<Group>, Unanswered> {
+  if !reference.brain.kept(key).await.map_err(Unanswered::Unit)? {
+    return Ok(vec![]);
+  }
+
   let held = held(reference, session).await?;
   let mut groups = vec![];
 
   for group in GROUPS {
-    let entries = entries(reference, agent, chat_id, group).await?;
+    let entries = entries(reference, key, chat_id, group).await?;
     let unread = entries.iter().filter(|entry| !held.contains(&entry.path)).count();
     let changed = entries
       .iter()
@@ -237,13 +242,13 @@ pub async fn index(
 /// One piece read whole by its slug within its group, recorded among the session's loads where one is named.
 pub async fn piece(
   reference: &Reference,
-  agent: &str,
+  key: &BrainKey,
   chat_id: i64,
   group: &str,
   slug: &str,
   session: Option<&str>,
 ) -> Result<Piece, Unanswered> {
-  let entry = entries(reference, agent, chat_id, group)
+  let entry = entries(reference, key, chat_id, group)
     .await?
     .into_iter()
     .find(|entry| entry.slug == slug)
@@ -261,7 +266,7 @@ pub async fn piece(
       (entry.path.clone(), text)
     }
     Body::Knowledge => {
-      match reference.brain.knowledge(agent, chat_id, &slugs).await.map_err(Unanswered::Unit)? {
+      match reference.brain.knowledge(key, chat_id, &slugs).await.map_err(Unanswered::Unit)? {
         Reply::Answered(documents) => documents
           .into_iter()
           .next()
@@ -272,7 +277,7 @@ pub async fn piece(
     }
     Body::Lore => reference
       .brain
-      .lore(agent, &slugs)
+      .lore(key, &slugs)
       .await
       .map_err(Unanswered::Unit)?
       .into_iter()
@@ -281,7 +286,7 @@ pub async fn piece(
       .ok_or(Unanswered::NoPiece)?,
     Body::Person(owner) => reference
       .brain
-      .sheets(agent, chat_id, &[*owner], None)
+      .sheets(key, chat_id, &[*owner], None)
       .await
       .map_err(Unanswered::Unit)?
       .into_iter()
@@ -325,7 +330,7 @@ fn words_of(text: &str) -> Vec<String> {
 /// `limit`.
 pub async fn search(
   reference: &Reference,
-  agent: &str,
+  key: &BrainKey,
   chat_id: i64,
   query: &str,
   limit: usize,
@@ -335,7 +340,7 @@ pub async fn search(
   let mut order = 0;
 
   for group in GROUPS {
-    for entry in entries(reference, agent, chat_id, group).await? {
+    for entry in entries(reference, key, chat_id, group).await? {
       let said: HashSet<String> = words_of(&format!(
         "{} {} {}",
         entry.slug,

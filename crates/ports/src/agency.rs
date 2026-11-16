@@ -220,6 +220,15 @@ pub struct TranslationRun {
   pub model: String,
 }
 
+/// A supervisor as the gate reads it: the account that owns it, by the owning user's id, none for the deployment's
+/// own (the agency's `docs/api.md`, 「supervisors」).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Supervisor {
+  #[serde(default)]
+  pub owner_account: Option<i64>,
+}
+
 /// Every call the gate makes on the agency.
 pub trait Agency: Send + Sync {
   /// The providers in the walk's order.
@@ -227,6 +236,9 @@ pub trait Agency: Send + Sync {
 
   /// One role with its provider order, or none where the agency holds no role of the name.
   fn role<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Answer<Option<Role>>>;
+
+  /// One supervisor, or none where the agency holds no supervisor of the name.
+  fn supervisor<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Answer<Option<Supervisor>>>;
 
   /// A thrown-away session started for the agent at the scope given.
   fn start_apart<'a>(&'a self, agent: &'a str, apart: &'a Apart) -> BoxFuture<'a, Answer<Session>>;
@@ -384,6 +396,16 @@ impl Agency for HttpAgency {
     Box::pin(async move {
       match self.caller.get::<Role>("role", &["roles", name], &[]).await {
         Ok(role) => Ok(Some(role)),
+        Err(PortError::Refused { code, .. }) if code == NOTHING_HELD => Ok(None),
+        Err(why) => Err(why),
+      }
+    })
+  }
+
+  fn supervisor<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Answer<Option<Supervisor>>> {
+    Box::pin(async move {
+      match self.caller.get::<Supervisor>("supervisor", &["supervisors", name], &[]).await {
+        Ok(supervisor) => Ok(Some(supervisor)),
         Err(PortError::Refused { code, .. }) if code == NOTHING_HELD => Ok(None),
         Err(why) => Err(why),
       }

@@ -6,7 +6,7 @@ use std::collections::HashSet;
 
 use gate_markup::js;
 use gate_policy::reference::REFERENCE;
-use gate_ports::brain::MemoryRow;
+use gate_ports::brain::{BrainKey, MemoryRow};
 
 use crate::{Entry, Reference, SituationTurn, Source, memories, situation};
 
@@ -59,13 +59,13 @@ pub fn held_sheet(text: &str) -> String {
 }
 
 /// The head of the standing sheet of everyone who spoke this turn: the first lines of each one's sheet in the room
-/// as the brain renders it from their facts, as many as the policy names, held to its ceiling. An agent keeping no
-/// long-term memory is given none.
+/// as the agent's own brain, `key`, renders it from their facts, as many as the policy names, held to its ceiling.
+/// An agent keeping no brain is given none.
 pub async fn standing_entries(
   reference: &Reference,
   chat_id: i64,
   speakers: &[i64],
-  agent: &str,
+  key: &BrainKey,
 ) -> Vec<Entry> {
   let mut seen = HashSet::new();
   let senders: Vec<i64> = speakers.iter().copied().filter(|id| seen.insert(*id)).collect();
@@ -74,7 +74,7 @@ pub async fn standing_entries(
     return vec![];
   }
 
-  match reference.brain.sheets(agent, chat_id, &senders, Some(REFERENCE.sheet_lines)).await {
+  match reference.brain.sheets(key, chat_id, &senders, Some(REFERENCE.sheet_lines)).await {
     Ok(sheets) => sheets
       .into_iter()
       .map(|sheet| Entry {
@@ -137,19 +137,29 @@ fn within_turn_budget(chat_id: i64, taken: Vec<Entry>) -> Vec<Entry> {
 }
 
 /// What a turn is handed (`docs/api.md`, 「Reference」): the head of each speaker's sheet, the room's due memories
-/// and the rows the turn's events wake, the memories and the woken rows held to the turn's total.
+/// and the rows the turn's events wake, the memories and the woken rows held to the turn's total, all from the turn's
+/// agent's own brain; nothing where whose brain it is cannot be told.
 pub async fn handed(reference: &Reference, turn: &Turn) -> Vec<Entry> {
-  let agent = turn.agent(reference);
+  let key = match reference.brain_key(turn.agent(reference)).await {
+    Ok(key) => key,
+    Err(why) => {
+      eprintln!(
+        "reference: chat {} hands nothing, whose brain it is could not be told: {why}",
+        turn.chat_id
+      );
+      return vec![];
+    }
+  };
   let woken = async {
     match &turn.situation {
-      Some(situation) => situation::event_entries(reference, situation).await,
+      Some(situation) => situation::event_entries(reference, situation, &key).await,
       None => vec![],
     }
   };
   let (woken, standing, sheets) = tokio::join!(
     woken,
-    memories::standing(reference, turn.chat_id, agent),
-    standing_entries(reference, turn.chat_id, &turn.speaker_ids, agent)
+    memories::standing(reference, turn.chat_id, &key),
+    standing_entries(reference, turn.chat_id, &turn.speaker_ids, &key)
   );
   let (due, _) = memories::due_first(&standing);
   let carried: Vec<&MemoryRow> = due.iter().collect();

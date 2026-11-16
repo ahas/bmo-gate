@@ -18,6 +18,8 @@ pub struct BrainMember {
   #[serde(default)]
   pub id: i64,
   #[serde(default)]
+  pub account_key: String,
+  #[serde(default)]
   pub agent_key: String,
 }
 

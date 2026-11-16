@@ -1,7 +1,8 @@
 //! The brain's index as the tool host places it (`docs/api.md`, 「The tools a tool host places」): a call of
 //! `gate/reference_index`, `gate/reference_piece` or `gate/reference_search` read from what the tool host hands it,
 //! put to the gate's reference routes with the address and token the record carries, for the turn's agent, room and
-//! session the record names, and answered as a tool result.
+//! session the record names, and answered as a tool result. A call whose record names no agent is refused, so an
+//! answer is only ever the calling agent's own brain's.
 
 use std::collections::BTreeMap;
 
@@ -125,7 +126,11 @@ pub async fn answer(asked: &str, environment: impl Fn(&str) -> Option<String>) -
       return Ok(refusal(format!("ERROR: the record names no gate token in {TOKEN} or {TOKEN_FILE}.")));
     }
   };
-  let agent = variable(AGENT);
+  let Some(agent) = variable(AGENT) else {
+    return Ok(refusal(format!(
+      "The record names no agent in {AGENT}, and the brain's index is read only for the agent whose turn it is."
+    )));
+  };
   let session = variable(SESSION);
   let room_of =
     |named: Option<i64>| named.or_else(|| variable(ROOM).and_then(|room| room.trim().parse().ok()));

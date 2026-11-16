@@ -3,11 +3,16 @@
 //! hit posted by memory id.
 
 use axum::http::Method;
-use gate_ports::brain::{Brain, Event, HttpBrain, Reply};
+use gate_ports::brain::{Brain, BrainKey, Event, HttpBrain, Reply};
 use serde_json::{Value, json};
 
 use super::peer;
 use crate::support::stub::Stub;
+
+// The brain the reads are of: the chat agent's, of no account.
+fn chat_agent() -> BrainKey {
+  BrainKey::unowned("chat-agent")
+}
 
 fn brains() -> Value {
   json!({ "items": [{ "id": 9, "accountKey": "1", "agentKey": "chat-agent", "name": "chat-agent", "createdAt": 1 }], "more": false })
@@ -144,13 +149,13 @@ async fn the_memory_reads_find_the_agents_brain_and_map_its_standing_types() {
   // Every standing type is asked for; the stub answers the same page for each.
   served(&stub, "promise", vec![moved_state(), written_situation(), elsewhere()]);
 
-  let standing = brain.standing("chat-agent", 7).await.unwrap();
-  let conditions = brain.conditions("chat-agent", 7).await.unwrap();
+  let standing = brain.standing(&chat_agent(), 7).await.unwrap();
+  let conditions = brain.conditions(&chat_agent(), 7).await.unwrap();
   let events = [Event {
     kind: "job-ended".into(),
     item: Some(12),
   }];
-  let woken = brain.woken("chat-agent", 7, &events).await.unwrap();
+  let woken = brain.woken(&chat_agent(), 7, &events).await.unwrap();
 
   // The moved row waits on an event, so it is woken rather than standing; the room 8 promise is not read here.
   assert!(standing.iter().all(|row| row.chat_id == Some(7)), "{standing:?}");
@@ -191,7 +196,7 @@ async fn a_row_the_agent_wrote_stands_by_its_text_and_an_errand_stands_once_its_
   stub.answer(Method::GET, "/brains", 200, brains());
   served(&stub, "promise", vec![written_promise(), errand(8, false), errand(9, true)]);
 
-  let standing = brain.standing("chat-agent", 7).await.unwrap();
+  let standing = brain.standing(&chat_agent(), 7).await.unwrap();
   let ids: Vec<i64> = standing.iter().map(|row| row.id).collect();
 
   // Every standing type is asked for and the stub answers the same page for each, so each row stands once a type.
@@ -214,7 +219,7 @@ async fn the_fragment_reads_ask_the_brain_by_type() {
   stub.answer(Method::GET, "/brains", 200, brains());
   served(&stub, "rule", vec![rule()]);
 
-  let offered = brain.offered("chat-agent", 7, &["room-rule".to_owned()]).await.unwrap();
+  let offered = brain.offered(&chat_agent(), 7, &["room-rule".to_owned()]).await.unwrap();
 
   assert_eq!(offered[0].slug, "quiet");
   assert_eq!(offered[0].items, vec![12]);
@@ -237,14 +242,14 @@ async fn the_document_read_filters_the_knowledge_by_its_slug() {
   stub.answer(Method::GET, "/brains", 200, brains());
   served(&stub, "knowledge", vec![knowledge_piece()]);
 
-  let read = brain.knowledge("chat-agent", 7, &["tomatoes".to_owned()]).await.unwrap();
+  let read = brain.knowledge(&chat_agent(), 7, &["tomatoes".to_owned()]).await.unwrap();
   let Reply::Answered(documents) = read else { panic!("answered") };
   assert_eq!(documents.len(), 1);
   assert_eq!(documents[0].path, "knowledge/tomatoes.md");
   assert_eq!(documents[0].text, "Tomatoes like sun.");
   assert_eq!(documents[0].version, "40");
 
-  let none = brain.knowledge("chat-agent", 7, &["none".to_owned()]).await.unwrap();
+  let none = brain.knowledge(&chat_agent(), 7, &["none".to_owned()]).await.unwrap();
   let Reply::Answered(documents) = none else { panic!("answered") };
   assert!(documents.is_empty());
 }
@@ -289,7 +294,7 @@ async fn the_lore_stands_in_its_layers_order_and_a_piece_is_read_by_its_slug() {
     ],
   );
 
-  let offered = brain.offered("chat-agent", 7, &["lore".to_owned()]).await.unwrap();
+  let offered = brain.offered(&chat_agent(), 7, &["lore".to_owned()]).await.unwrap();
   let placed: Vec<(&str, Option<&str>, &str)> = offered
     .iter()
     .map(|row| (row.slug.as_str(), row.section.as_deref(), row.title.as_str()))
@@ -312,7 +317,7 @@ async fn the_lore_stands_in_its_layers_order_and_a_piece_is_read_by_its_slug() {
   assert!(query.contains("type=lore") && query.contains("status=active"), "{query}");
 
   let read = brain
-    .lore("chat-agent", &["founding".to_owned(), "elsewhere".to_owned()])
+    .lore(&chat_agent(), &["founding".to_owned(), "elsewhere".to_owned()])
     .await
     .unwrap();
   assert_eq!(read.len(), 1);
@@ -352,7 +357,7 @@ async fn a_persons_sheet_is_the_brains_rendering_of_their_facts_in_the_room() {
   );
   stub.canned(Method::GET, "/brains/9/subjects/5/sheet", 200, "text/plain", String::new());
 
-  let sheets = brain.sheets("chat-agent", 7, &[31, 32, 33], None).await.unwrap();
+  let sheets = brain.sheets(&chat_agent(), 7, &[31, 32, 33], None).await.unwrap();
 
   assert_eq!(sheets.len(), 1);
   assert_eq!((sheets[0].person, sheets[0].path.as_str()), (31, "rooms/7/people/31/sheet.md"));
@@ -363,7 +368,7 @@ async fn a_persons_sheet_is_the_brains_rendering_of_their_facts_in_the_room() {
   assert_eq!(stub.one("/brains/9/subjects/4/sheet").query.as_deref(), Some("roomId=3"));
 
   // A head is asked for by its line count.
-  brain.sheets("chat-agent", 7, &[31], Some(8)).await.unwrap();
+  brain.sheets(&chat_agent(), 7, &[31], Some(8)).await.unwrap();
 
   let heads: Vec<Option<String>> = stub
     .seen()
@@ -408,7 +413,7 @@ async fn the_person_book_offers_one_candidate_for_each_person_the_facts_are_abou
     ]),
   );
 
-  let offered = brain.offered("chat-agent", 7, &["person-book".to_owned()]).await.unwrap();
+  let offered = brain.offered(&chat_agent(), 7, &["person-book".to_owned()]).await.unwrap();
   let read: Vec<(&str, &str, Option<i64>, &str, &str)> = offered
     .iter()
     .map(|row| (row.kind.as_str(), row.slug.as_str(), row.owner, row.title.as_str(), row.path.as_str()))
@@ -426,4 +431,59 @@ async fn the_person_book_offers_one_candidate_for_each_person_the_facts_are_abou
 
   assert!(tallies.contains("type=fact") && tallies.contains("by=subject"), "{tallies}");
   assert!(stub.seen().iter().all(|seen| seen.path != "/brains/9/memories"));
+}
+
+#[tokio::test]
+async fn each_supervisor_is_read_from_its_own_accounts_brain_and_a_name_on_two_accounts_from_none() {
+  let stub = Stub::start().await;
+  let brain = HttpBrain::new(peer(&stub, "t"));
+  let listed = |id: i64, account: &str, agent: &str| json!({ "id": id, "accountKey": account, "agentKey": agent, "name": agent, "createdAt": 1 });
+
+  stub.answer(
+    Method::GET,
+    "/brains",
+    200,
+    page(vec![
+      listed(22, "7", "u7"),
+      listed(23, "8", "u8"),
+      listed(30, "7", "helper"),
+      listed(31, "8", "helper"),
+    ]),
+  );
+  stub.answer(Method::GET, "/brains/22/memories", 200, page(vec![rule()]));
+  stub.answer(Method::GET, "/brains/23/memories", 200, page(vec![rule()]));
+
+  let rules = ["room-rule".to_owned()];
+  let first = brain.offered(&BrainKey::owned("u7", 7), 7, &rules).await.unwrap();
+
+  assert_eq!(first.len(), 1);
+
+  let asked: Vec<String> = stub.seen().into_iter().map(|seen| seen.path).collect();
+
+  assert!(
+    asked.contains(&"/brains/22/memories".to_owned()) && !asked.contains(&"/brains/23/memories".to_owned())
+  );
+  assert!(stub.one("/brains").query.unwrap_or_default().contains("accountKey=7"));
+
+  let second = brain.offered(&BrainKey::owned("u8", 8), 7, &rules).await.unwrap();
+
+  assert_eq!(second.len(), 1);
+  assert!(stub.seen().iter().any(|seen| seen.path == "/brains/23/memories"));
+
+  for (key, why) in [
+    (BrainKey::owned("u7", 8), "a supervisor's name under another account"),
+    (BrainKey::unowned("helper"), "a name of no account on two accounts' brains"),
+    (BrainKey::unowned("nobody"), "a name the brain keeps no brain of"),
+  ] {
+    let before = stub.seen().len();
+
+    assert!(!brain.kept(&key).await.unwrap(), "{why}");
+    assert!(brain.offered(&key, 7, &rules).await.unwrap().is_empty(), "{why}");
+    assert!(brain.standing(&key, 7).await.unwrap().is_empty(), "{why}");
+    assert!(brain.sheets(&key, 7, &[31], None).await.unwrap().is_empty(), "{why}");
+    assert!(
+      stub.seen()[before..].iter().all(|seen| seen.path == "/brains"),
+      "{why}: no brain's members are read"
+    );
+  }
 }

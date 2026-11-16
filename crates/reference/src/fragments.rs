@@ -1,10 +1,10 @@
-//! The fragment rows the brain's index lists (the brain's `docs/fragments.md`; `docs/reference-selection.md`, 「The
-//! index an agent reads」): the rows a turn's agent may read in a room, its own and those marked for every agent.
+//! The fragment rows the brain's index lists (`docs/reference-selection.md`, 「The index an agent reads」): the rows a
+//! turn's agent's own brain holds for a room.
 
 use std::sync::atomic::{AtomicI64, Ordering};
 
 use gate_ports::PortError;
-use gate_ports::brain;
+use gate_ports::brain::{self, BrainKey};
 
 use crate::Reference;
 
@@ -61,16 +61,16 @@ impl Fragment {
   }
 }
 
-/// The active rows of one kind the turn's agent may be offered in the room — its own and those marked for every
-/// agent — in the order the brain gives them.
+/// The active rows of one kind the turn's agent's own brain, `key`, offers in the room, in the order the brain gives
+/// them.
 pub async fn rows(
   reference: &Reference,
-  agent: &str,
+  key: &BrainKey,
   chat_id: i64,
   kind: &str,
 ) -> Result<Vec<Fragment>, PortError> {
   let kinds = [kind.to_owned()];
-  let rows = reference.brain.offered(agent, chat_id, &kinds).await?;
+  let rows = reference.brain.offered(key, chat_id, &kinds).await?;
 
   Ok(rows.into_iter().filter(|row| row.kind == kind).map(Fragment::of).collect())
 }

@@ -10,7 +10,7 @@ use bmo_gate_client::{
   ReferencePieceQuery, ReferenceSearch, ReferenceSearchQuery, SearchEntry, SituationEvent,
 };
 use gate_codes::Code;
-use gate_ports::brain::Event;
+use gate_ports::brain::{BrainKey, Event};
 use gate_reference::SituationTurn;
 use gate_reference::index::{self as gate_index, IndexEntry, Unanswered};
 use gate_reference::road::{Turn, handed};
@@ -84,11 +84,17 @@ fn entry_of(entry: IndexEntry) -> bmo_gate_client::IndexEntry {
   }
 }
 
-fn agent_of<'a>(app: &'a App, agent: &'a Option<String>) -> &'a str {
-  agent
-    .as_deref()
-    .filter(|agent| !agent.trim().is_empty())
-    .unwrap_or(app.reference.chat_agent())
+// Whose brain an index, a piece or a search is read from: the named agent's own, never the chat agent's in its
+// place (`docs/reference-selection.md`, 「Whose reference it is」).
+async fn brain_key(app: &App, agent: &str) -> Result<BrainKey, Refused> {
+  if agent.trim().is_empty() {
+    return Err(Refused::new(
+      Code::BadRequest,
+      "the index is read for the agent named in agent, and none is named",
+    ));
+  }
+
+  app.reference.brain_key(agent).await.map_err(|why| unanswered(Unanswered::Unit(why)))
 }
 
 /// `GET /reference/index`: the brain's index for an agent in a room.
@@ -96,9 +102,9 @@ pub async fn index(
   State(app): State<Arc<App>>,
   Query(asked): Query<ReferenceIndexQuery>,
 ) -> Answered<Json<ReferenceIndex>> {
-  let agent = agent_of(&app, &asked.agent);
+  let key = brain_key(&app, &asked.agent).await?;
   let session = asked.session.as_deref().filter(|session| !session.trim().is_empty());
-  let groups = gate_index::index(&app.reference, agent, asked.room, session, gate_runs::records::now())
+  let groups = gate_index::index(&app.reference, &key, asked.room, session, gate_runs::records::now())
     .await
     .map_err(unanswered)?;
 
@@ -121,9 +127,9 @@ pub async fn piece(
   Path(slug): Path<String>,
   Query(asked): Query<ReferencePieceQuery>,
 ) -> Answered<Json<ReferencePiece>> {
-  let agent = agent_of(&app, &asked.agent);
+  let key = brain_key(&app, &asked.agent).await?;
   let session = asked.session.as_deref().filter(|session| !session.trim().is_empty());
-  let piece = gate_index::piece(&app.reference, agent, asked.room, &asked.group, &slug, session)
+  let piece = gate_index::piece(&app.reference, &key, asked.room, &asked.group, &slug, session)
     .await
     .map_err(unanswered)?;
 
@@ -154,8 +160,8 @@ pub async fn search(
       ));
     }
   };
-  let agent = agent_of(&app, &asked.agent);
-  let found = gate_index::search(&app.reference, agent, asked.room, &asked.q, limit)
+  let key = brain_key(&app, &asked.agent).await?;
+  let found = gate_index::search(&app.reference, &key, asked.room, &asked.q, limit)
     .await
     .map_err(unanswered)?;
 

@@ -215,7 +215,7 @@ pub fn document() -> Value {
     "/reference/index",
     "reference_index",
     "Reference",
-    "The brain's index for an agent in a room: five groups, each its unread count against the session's loads, its hint and its entries.",
+    "The brain's index for an agent in a room, read from that agent's own brain alone: five groups, each its unread count against the session's loads, its hint and its entries; no group where the agent keeps no brain.",
     vec![],
     Some(query_of::<ReferenceIndexQuery>),
     None,

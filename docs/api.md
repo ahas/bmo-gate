@@ -97,14 +97,16 @@ It answers `entries`, each `path`, `text` and `source` (`document`, `person`, `r
 
 | Route | Query | Answer |
 |---|---|---|
-| `GET /reference/index` | `session?`, `room`, `agent?` | `groups`, each `group`, `unread`, `hint` (or null) and `entries`, each `slug`, `holds`, `readWhen` (or null) and `path`, the path a piece read of it is recorded under among the session's loads |
-| `GET /reference/pieces/{slug}` | `room`, `group`, `session?`, `agent?` | `slug`, `group`, `path`, `text` |
-| `GET /reference/search` | `q`, `room`, `limit?` (8 where absent, at most 24), `agent?` | `entries`, each `slug`, `group`, `holds`, `readWhen` (or null) |
+| `GET /reference/index` | `session?`, `room`, `agent` | `groups`, each `group`, `unread`, `hint` (or null) and `entries`, each `slug`, `holds`, `readWhen` (or null) and `path`, the path a piece read of it is recorded under among the session's loads |
+| `GET /reference/pieces/{slug}` | `room`, `group`, `session?`, `agent` | `slug`, `group`, `path`, `text` |
+| `GET /reference/search` | `q`, `room`, `limit?` (8 where absent, at most 24), `agent` | `entries`, each `slug`, `group`, `holds`, `readWhen` (or null) |
 
 - **The index, a piece and a search** are the brain's reference as the agent reads it itself, with no model
   (`docs/reference-selection.md`, 「The index an agent reads」). `group` is `system-documents`, `room-rules`,
-  `knowledge`, `people` or `room-memories`; any other is 400 `bad-request`, as is a `limit` outside 1 to 24 or an
-  empty `q`. An index asked with no `session` counts every entry unread. A slug its group does not hold is 404
+  `knowledge`, `people` or `room-memories`; any other is 400 `bad-request`, as is a `limit` outside 1 to 24, an
+  empty `q` or a blank `agent`. Each is read from the named agent's own brain alone, found by the account owning
+  it (`docs/reference-selection.md`, 「Whose reference it is」); an agent keeping no brain is answered no group, no
+  piece and no entry. An index asked with no `session` counts every entry unread. A slug its group does not hold is 404
   `not-found`. A piece read with `session` is recorded among the
   session's loads; a call on the agency that fails is 502 `upstream-failed`.
 
@@ -213,8 +215,9 @@ folder with its own `tool.toml`, placed with the tool host and registered as the
 
 - **The reference tools read the turn from the call's record** (the agency's `docs/tools.md`): the agent from
   `BMO_TURN_AGENT`, the room from `BMO_TURN_CHAT` where the call names none, and the session from
-  `BMO_TURN_SESSION` where the record carries it; each is passed to the gate where it stands. A call with no room
-  named and none in the record is refused.
+  `BMO_TURN_SESSION` where the record carries it; each is passed to the gate where it stands. A call whose record
+  names no agent is refused, so an answer is only ever the calling agent's own, and so is a call with no room
+  named and none in the record.
 - **Their answers** are the gate's, as the result's structured content and its one text piece, and their refusals
   are told as the translator's are.
 - **A call waits for the gate's answer** however long it takes: the manifests name no timeout, and the tool host

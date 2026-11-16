@@ -156,18 +156,50 @@ pub struct Load {
   pub version: String,
 }
 
-/// Every call the gate makes on the brain.
+/// Whose brain a read is of: the agent's key and the key of the account its brain is filed under, none for an agent
+/// of no account (the brain's `docs/design.md`, 「Whose a brain is」; `docs/reference-selection.md`, 「Whose reference
+/// it is」).
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct BrainKey {
+  pub account: Option<String>,
+  pub agent: String,
+}
+
+impl BrainKey {
+  /// The brain of an agent no account owns: the one brain filed under its key in any account.
+  pub fn unowned(agent: impl Into<String>) -> Self {
+    Self {
+      account: None,
+      agent: agent.into(),
+    }
+  }
+
+  /// The brain of an agent an account owns, filed under the owning user's id.
+  pub fn owned(agent: impl Into<String>, user: i64) -> Self {
+    Self {
+      account: Some(user.to_string()),
+      agent: agent.into(),
+    }
+  }
+}
+
+/// Every call the gate makes on the brain, each of one agent's brain alone; an agent keeping no brain is answered
+/// nothing.
 pub trait Brain: Send + Sync {
+  /// Whether the agent keeps a brain: none where the brain lists no brain of the key, and none where an agent of no
+  /// account has its key on brains of more than one account.
+  fn kept<'a>(&'a self, key: &'a BrainKey) -> BoxFuture<'a, Answer<bool>>;
+
   /// The room's open rows that wait on nothing, and the errands whose event has come.
-  fn standing<'a>(&'a self, agent: &'a str, chat: i64) -> BoxFuture<'a, Answer<Vec<MemoryRow>>>;
+  fn standing<'a>(&'a self, key: &'a BrainKey, chat: i64) -> BoxFuture<'a, Answer<Vec<MemoryRow>>>;
 
   /// The rows with a condition that reach the room.
-  fn conditions<'a>(&'a self, agent: &'a str, chat: i64) -> BoxFuture<'a, Answer<Vec<Condition>>>;
+  fn conditions<'a>(&'a self, key: &'a BrainKey, chat: i64) -> BoxFuture<'a, Answer<Vec<Condition>>>;
 
   /// The rows the turn's events wake.
   fn woken<'a>(
     &'a self,
-    agent: &'a str,
+    key: &'a BrainKey,
     chat: i64,
     events: &'a [Event],
   ) -> BoxFuture<'a, Answer<Vec<MemoryRow>>>;
@@ -175,7 +207,7 @@ pub trait Brain: Send + Sync {
   /// The active fragment rows of the kinds named the turn's agent may be offered in the room.
   fn offered<'a>(
     &'a self,
-    agent: &'a str,
+    key: &'a BrainKey,
     chat: i64,
     kinds: &'a [String],
   ) -> BoxFuture<'a, Answer<Vec<Fragment>>>;
@@ -183,20 +215,20 @@ pub trait Brain: Send + Sync {
   /// The knowledge chunks asked for, in the order asked, or the brain's refusal of a slug outside the room.
   fn knowledge<'a>(
     &'a self,
-    agent: &'a str,
+    key: &'a BrainKey,
     chat: i64,
     slugs: &'a [String],
   ) -> BoxFuture<'a, Answer<Reply<Vec<Document>>>>;
 
   /// The lore pieces asked for, by their slugs.
-  fn lore<'a>(&'a self, agent: &'a str, slugs: &'a [String]) -> BoxFuture<'a, Answer<Vec<Document>>>;
+  fn lore<'a>(&'a self, key: &'a BrainKey, slugs: &'a [String]) -> BoxFuture<'a, Answer<Vec<Document>>>;
 
   /// Each of these people's sheets in the room, in the order asked: what the brain renders from their facts
   /// about no room and their facts about the room, its first `lines` lines alone where a count is given. A person
   /// the brain knows no fact of there has none.
   fn sheets<'a>(
     &'a self,
-    agent: &'a str,
+    key: &'a BrainKey,
     chat: i64,
     people: &'a [i64],
     lines: Option<usize>,
@@ -206,12 +238,12 @@ pub trait Brain: Send + Sync {
 // A subject as a brain finds it: the brain, the subject's type and its key.
 type SubjectKey = (i64, String, String);
 
-/// The brain over HTTP: the agent's brain found once by the agent's key, its memories read by type and
-/// mapped to the reference road's rows (the brain's `docs/boundary-api.md`, 「Brains」).
+/// The brain over HTTP: the agent's brain found by its account and its key and remembered once found, its
+/// memories read by type and mapped to the reference road's rows (the brain's `docs/boundary-api.md`, 「Brains」).
 #[derive(Clone, Debug)]
 pub struct HttpBrain {
   caller: Caller,
-  brains: std::sync::Arc<std::sync::Mutex<BTreeMap<String, i64>>>,
+  brains: std::sync::Arc<std::sync::Mutex<BTreeMap<BrainKey, i64>>>,
   subjects: std::sync::Arc<std::sync::Mutex<BTreeMap<SubjectKey, i64>>>,
 }
 
@@ -237,27 +269,38 @@ impl HttpBrain {
     self.caller.get(call, &segments, query).await
   }
 
-  // The agent's brain, by the agent's key, remembered once found.
-  async fn brain(&self, agent: &str) -> Answer<i64> {
-    if let Some(id) = self.brains.lock().ok().and_then(|held| held.get(agent).copied()) {
-      return Ok(id);
+  // The agent's brain, remembered once found: the brain of its account and its key, or, for an agent of no
+  // account, the one brain of its key; none where the brain lists none, or more than one for an agent of no
+  // account.
+  async fn brain(&self, key: &BrainKey) -> Answer<Option<i64>> {
+    if let Some(id) = self.brains.lock().ok().and_then(|held| held.get(key).copied()) {
+      return Ok(Some(id));
     }
 
-    let page: Page<BrainMember> =
-      self.get("the agent's brain", "brains", &[("agentKey", agent), ("limit", "2")]).await?;
-    let found = page.items.into_iter().find(|brain| brain.agent_key == agent).map(|brain| brain.id);
-    let id = found.ok_or_else(|| crate::http::PortError::Malformed {
-      unit: "bmo-brain",
-      call: "the agent's brain",
-      status: 200,
-      why: format!("the brain lists no brain of the agent {agent:?}"),
-    })?;
+    let mut query: Vec<(&str, &str)> = vec![("agentKey", key.agent.as_str()), ("limit", "2")];
+
+    if let Some(account) = key.account.as_deref() {
+      query.push(("accountKey", account));
+    }
+
+    let page: Page<BrainMember> = self.get("the agent's brain", "brains", &query).await?;
+    let found: Vec<i64> = page
+      .items
+      .iter()
+      .filter(|brain| brain.agent_key == key.agent)
+      .filter(|brain| key.account.as_ref().is_none_or(|account| &brain.account_key == account))
+      .map(|brain| brain.id)
+      .collect();
+    let alone = found.len() == 1 && (key.account.is_some() || !page.more);
+    let Some(id) = found.first().copied().filter(|_| alone) else {
+      return Ok(None);
+    };
 
     if let Ok(mut held) = self.brains.lock() {
-      held.insert(agent.to_owned(), id);
+      held.insert(key.clone(), id);
     }
 
-    Ok(id)
+    Ok(Some(id))
   }
 
   // The active memories of one type in a brain, read in pages of the size the route takes, each after the
@@ -326,8 +369,10 @@ impl HttpBrain {
 
   // The memories the standing rows and the conditions are read from: every active row of the standing
   // types read in the room.
-  async fn held(&self, agent: &str, chat: i64) -> Answer<Vec<Memory>> {
-    let brain = self.brain(agent).await?;
+  async fn held(&self, key: &BrainKey, chat: i64) -> Answer<Vec<Memory>> {
+    let Some(brain) = self.brain(key).await? else {
+      return Ok(Vec::new());
+    };
     let mut all = Vec::new();
 
     for kind in STANDING_TYPES {
@@ -365,8 +410,10 @@ impl HttpBrain {
   }
 
   // The people the brain's live facts are about, each as the person-book search's candidate in the room.
-  async fn people_rows(&self, agent: &str, chat: i64) -> Answer<Vec<Fragment>> {
-    let brain = self.brain(agent).await?;
+  async fn people_rows(&self, key: &BrainKey, chat: i64) -> Answer<Vec<Fragment>> {
+    let Some(brain) = self.brain(key).await? else {
+      return Ok(Vec::new());
+    };
     let tallies: Vec<Tally> = self
       .get(
         "people offered",
@@ -399,59 +446,65 @@ impl HttpBrain {
     Ok(
       people
         .iter()
-        .map(|(person, name)| person_row(agent, chat, *person, name.as_deref()))
+        .map(|(person, name)| person_row(&key.agent, chat, *person, name.as_deref()))
         .collect(),
     )
   }
 
   // The active rows of a reference kind read in the room, as the gate's fragment rows.
-  async fn rows_of(&self, agent: &str, chat: i64, kind: &str) -> Answer<Vec<Fragment>> {
+  async fn rows_of(&self, key: &BrainKey, chat: i64, kind: &str) -> Answer<Vec<Fragment>> {
     let Some((brain_type, old_kind)) = brain_type(kind) else {
       return Ok(Vec::new());
     };
 
     if brain_type == FACT_TYPE {
-      return self.people_rows(agent, chat).await;
+      return self.people_rows(key, chat).await;
     }
 
-    let brain = self.brain(agent).await?;
+    let Some(brain) = self.brain(key).await? else {
+      return Ok(Vec::new());
+    };
     let rows = self.active(brain, brain_type).await?;
 
     if brain_type == LORE_TYPE {
       let layers = self.layers(brain).await?;
       let read: Vec<Memory> = rows.into_iter().filter(|memory| in_room(memory, chat)).collect();
 
-      return Ok(lore_rows(agent, &read, &layers));
+      return Ok(lore_rows(&key.agent, &read, &layers));
     }
 
     Ok(
       rows
         .iter()
         .filter(|memory| in_room(memory, chat))
-        .map(|memory| fragment_row(agent, old_kind, memory))
+        .map(|memory| fragment_row(&key.agent, old_kind, memory))
         .collect(),
     )
   }
 }
 
 impl Brain for HttpBrain {
-  fn standing<'a>(&'a self, agent: &'a str, chat: i64) -> BoxFuture<'a, Answer<Vec<MemoryRow>>> {
+  fn kept<'a>(&'a self, key: &'a BrainKey) -> BoxFuture<'a, Answer<bool>> {
+    Box::pin(async move { Ok(self.brain(key).await?.is_some()) })
+  }
+
+  fn standing<'a>(&'a self, key: &'a BrainKey, chat: i64) -> BoxFuture<'a, Answer<Vec<MemoryRow>>> {
     Box::pin(async move {
-      let rows = self.held(agent, chat).await?;
+      let rows = self.held(key, chat).await?;
 
       Ok(
         rows
           .iter()
           .filter(|memory| standing(memory))
-          .map(|memory| memory_row(agent, memory))
+          .map(|memory| memory_row(&key.agent, memory))
           .collect(),
       )
     })
   }
 
-  fn conditions<'a>(&'a self, agent: &'a str, chat: i64) -> BoxFuture<'a, Answer<Vec<Condition>>> {
+  fn conditions<'a>(&'a self, key: &'a BrainKey, chat: i64) -> BoxFuture<'a, Answer<Vec<Condition>>> {
     Box::pin(async move {
-      let rows = self.held(agent, chat).await?;
+      let rows = self.held(key, chat).await?;
 
       Ok(conditions(&rows))
     })
@@ -459,18 +512,18 @@ impl Brain for HttpBrain {
 
   fn woken<'a>(
     &'a self,
-    agent: &'a str,
+    key: &'a BrainKey,
     chat: i64,
     events: &'a [Event],
   ) -> BoxFuture<'a, Answer<Vec<MemoryRow>>> {
     Box::pin(async move {
-      let rows = self.held(agent, chat).await?;
+      let rows = self.held(key, chat).await?;
 
       Ok(
         rows
           .iter()
           .filter(|memory| woken_by(memory, events))
-          .map(|memory| memory_row(agent, memory))
+          .map(|memory| memory_row(&key.agent, memory))
           .collect(),
       )
     })
@@ -478,7 +531,7 @@ impl Brain for HttpBrain {
 
   fn offered<'a>(
     &'a self,
-    agent: &'a str,
+    key: &'a BrainKey,
     chat: i64,
     kinds: &'a [String],
   ) -> BoxFuture<'a, Answer<Vec<Fragment>>> {
@@ -494,7 +547,7 @@ impl Brain for HttpBrain {
         }
 
         read.push(brain_type);
-        all.extend(self.rows_of(agent, chat, kind).await?);
+        all.extend(self.rows_of(key, chat, kind).await?);
       }
 
       Ok(all)
@@ -503,12 +556,14 @@ impl Brain for HttpBrain {
 
   fn knowledge<'a>(
     &'a self,
-    agent: &'a str,
+    key: &'a BrainKey,
     chat: i64,
     slugs: &'a [String],
   ) -> BoxFuture<'a, Answer<Reply<Vec<Document>>>> {
     Box::pin(async move {
-      let brain = self.brain(agent).await?;
+      let Some(brain) = self.brain(key).await? else {
+        return Ok(Reply::Answered(Vec::new()));
+      };
       let rows = self.active(brain, "knowledge").await?;
       let documents = rows
         .iter()
@@ -525,9 +580,11 @@ impl Brain for HttpBrain {
     })
   }
 
-  fn lore<'a>(&'a self, agent: &'a str, slugs: &'a [String]) -> BoxFuture<'a, Answer<Vec<Document>>> {
+  fn lore<'a>(&'a self, key: &'a BrainKey, slugs: &'a [String]) -> BoxFuture<'a, Answer<Vec<Document>>> {
     Box::pin(async move {
-      let brain = self.brain(agent).await?;
+      let Some(brain) = self.brain(key).await? else {
+        return Ok(Vec::new());
+      };
       let rows = self.active(brain, LORE_TYPE).await?;
 
       Ok(
@@ -547,7 +604,7 @@ impl Brain for HttpBrain {
 
   fn sheets<'a>(
     &'a self,
-    agent: &'a str,
+    key: &'a BrainKey,
     chat: i64,
     people: &'a [i64],
     lines: Option<usize>,
@@ -557,7 +614,9 @@ impl Brain for HttpBrain {
         return Ok(Vec::new());
       }
 
-      let brain = self.brain(agent).await?;
+      let Some(brain) = self.brain(key).await? else {
+        return Ok(Vec::new());
+      };
       let room = self.subject(brain, "room", &chat.to_string()).await?.map(|room| room.to_string());
       let limit = lines.map(|lines| lines.to_string());
       let query: Vec<(&str, &str)> = [("roomId", room.as_deref()), ("limit", limit.as_deref())]

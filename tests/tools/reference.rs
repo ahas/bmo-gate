@@ -1,5 +1,6 @@
 //! The brain's index tool answering calls against a stand-in gate: the index for the turn's room and session, a
-//! piece by its slug and group, a search with its limit, and a call that names no room where the record names none.
+//! piece by its slug and group, a search with its limit, each for the agent the record names, and a call whose record
+//! names no agent, or no room where the call names none, refused.
 
 use axum::http::Method;
 use gate_reference_tool::{ADDRESS, AGENT, INDEX, PIECE, ROOM, SEARCH, SESSION, TOKEN, answer};
@@ -75,13 +76,25 @@ async fn the_index_a_piece_and_a_search_go_to_the_gate_for_the_turns_room_and_se
 }
 
 #[tokio::test]
-async fn a_call_naming_no_room_where_the_record_names_none_is_refused() {
+async fn a_call_whose_record_names_no_agent_or_no_room_is_refused() {
   let gate = Stub::start().await;
-  let result = answer(&call(INDEX, json!({}), json!({ ADDRESS: gate.address, TOKEN: "a-token" })), nothing)
-    .await
-    .unwrap();
 
-  assert_eq!(result["isError"], true);
+  for variables in [
+    json!({ ADDRESS: gate.address, TOKEN: "a-token", AGENT: "agent-a" }),
+    json!({ ADDRESS: gate.address, TOKEN: "a-token", ROOM: "-500" }),
+    json!({ ADDRESS: gate.address, TOKEN: "a-token", AGENT: " ", ROOM: "-500" }),
+  ] {
+    for (entry, arguments) in [
+      (INDEX, json!({})),
+      (PIECE, json!({ "slug": "release", "group": "knowledge" })),
+      (SEARCH, json!({ "query": "release" })),
+    ] {
+      let result = answer(&call(entry, arguments, variables.clone()), nothing).await.unwrap();
+
+      assert_eq!(result["isError"], true, "{entry} {variables}");
+    }
+  }
+
   assert!(gate.seen().is_empty(), "nothing went to the gate");
   assert!(answer(&call("gate/other", json!({}), json!({})), nothing).await.is_err());
 }

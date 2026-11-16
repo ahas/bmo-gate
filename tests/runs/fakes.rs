@@ -9,8 +9,8 @@ use futures_util::future::BoxFuture;
 use futures_util::stream::BoxStream;
 use gate_ports::PortError;
 use gate_ports::agency::{
-  Agency, Apart, Entry, GateTurn, Provider, RoadEvent, Role, Session, TranslationAsk, TranslationRun,
-  TurnEnd,
+  Agency, Apart, Entry, GateTurn, Provider, RoadEvent, Role, Session, Supervisor, TranslationAsk,
+  TranslationRun, TurnEnd,
 };
 use gate_ports::brain::Load;
 use gate_ports::gateway::{Ask, Completion, Gateway};
@@ -57,6 +57,8 @@ pub fn role(name: &str, order: Vec<Entry>, active: Option<&str>) -> Role {
 pub struct FakeAgency {
   pub providers: Mutex<Vec<Provider>>,
   pub roles: Mutex<HashMap<String, Role>>,
+  /// The supervisors it holds, by name.
+  pub supervisors: Mutex<HashMap<String, Supervisor>>,
   pub end: Mutex<Option<TurnEnd>>,
   pub turn_takes: Mutex<Duration>,
   pub started: Mutex<Vec<(String, Apart)>>,
@@ -120,6 +122,10 @@ impl Agency for FakeAgency {
 
   fn role<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Answer<Option<Role>>> {
     Box::pin(async move { Ok(self.roles.lock().unwrap().get(name).cloned()) })
+  }
+
+  fn supervisor<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Answer<Option<Supervisor>>> {
+    Box::pin(async move { Ok(self.supervisors.lock().unwrap().get(name).cloned()) })
   }
 
   fn session_loads<'a>(&'a self, session: &'a str) -> BoxFuture<'a, Answer<Vec<Load>>> {

@@ -8,6 +8,32 @@ pieces themselves live in the brain, and the system documents among them are the
 - **The agent chooses what it reads** from the brain's index, which a turn names as each group's count of unread
   entries, through the index, piece and search routes and the tools that call them (「The index an agent reads」).
 
+## Whose reference it is
+
+Every account has supervisors of its own, each with a brain of its own, and a supervisor's reference never shows
+another supervisor's memories, rooms or people, of its own account or another.
+
+- **A reference is one supervisor's, read from its own brain alone.** The supervisor is the agent the caller
+  names: the situation's agent on a turn, `agent` on the index, a piece and a search. Nothing is read for an agent
+  nobody names: the index, a piece and a search asked with no `agent` are refused, and never answered from the
+  chat agent's brain. A turn whose envelope carries no situation is the deployment's own, a job's or a thrown-away
+  session's instruction, and is read for the chat agent.
+- **The supervisor's account decides the brain.** The gate asks the agency who owns the supervisor (its
+  `ownerAccount`, `docs/boundary-api.md`, 「bmo-agency」), and reads the one brain filed under that account and the
+  supervisor's name (the brain's `docs/design.md`, 「Whose a brain is」): the account's key is the owning user's id.
+- **A supervisor of no account,** the deployment's own, and an agent the agency holds no supervisor of, are read
+  from the one brain filed under their name in any account. A name that stands on brains of more than one
+  account reads none of them: the gate never picks one.
+- **No brain, no memory index.** An agent the brain keeps no brain for is handed nothing from a brain on a turn,
+  and its index answers no group at all; a piece of it is not found and a search finds nothing.
+- **The room narrows, never widens.** A room picks among the supervisor's own rows, those about that room or about
+  no room, and the people its own brain knows facts of; no room named brings in a row of any other brain. So a
+  supervisor reads its own rooms' memories and people alone.
+- **The system documents meant for every supervisor** are the shipped reference documents `docs/reference-index.md`
+  lists, and no other. A note about the deployment's machines, its credentials or the owner's own work is never one
+  of them: it is a memory of the owner's brain, and reaches the owner's supervisor alone. The `system-documents`
+  group's lore is the supervisor's own brain's.
+
 ## What a turn is given
 
 - **The head of the standing sheet of everyone who spoke this turn,** what the brain knows of that person in
@@ -20,9 +46,9 @@ pieces themselves live in the brain, and the system documents among them are the
   event」).
 - **Nothing else.** No room rule, no knowledge, no lore, no other person's sheet and no undue memory attaches to a
   turn: each stands in the index, for the agent to read where the turn needs it.
-- **Every turn is one designated agent's,** and everything is read for that agent: its own memories, and of the
-  brain's rows only those it owns and those marked for every agent (the agency's `docs/agent-ownership.md`). An
-  agent keeping no long-term memory is given no sheet, never the chat agent's.
+- **Every turn is one designated agent's,** the agent its situation names, and everything is read from that
+  agent's own brain (「Whose reference it is」). An agent keeping no brain is given no sheet and no memory, never
+  the chat agent's.
 - **The sheet's head is its first eight lines,** the policy's count, the most important facts: the person's facts
   about no room and their facts about this room, one line a fact, as the brain renders the person's subject with
   the room's subject as its room (the brain's `docs/design.md`, 「A person is a subject」). It is held to 14,000
@@ -45,14 +71,15 @@ pieces themselves live in the brain, and the system documents among them are the
 
 | Route | Query | Answer |
 |---|---|---|
-| `GET /reference/index` | `session?`, `room`, `agent?` | `groups`, each `group`, `unread`, `hint` and `entries` (each `slug`, `holds`, `readWhen`, `path`) |
-| `GET /reference/pieces/{slug}` | `room`, `group`, `session?`, `agent?` | `slug`, `group`, `path`, `text` |
-| `GET /reference/search` | `q`, `room`, `limit?`, `agent?` | `entries`, each `slug`, `group`, `holds`, `readWhen` |
+| `GET /reference/index` | `session?`, `room`, `agent` | `groups`, each `group`, `unread`, `hint` and `entries` (each `slug`, `holds`, `readWhen`, `path`) |
+| `GET /reference/pieces/{slug}` | `room`, `group`, `session?`, `agent` | `slug`, `group`, `path`, `text` |
+| `GET /reference/search` | `q`, `room`, `limit?`, `agent` | `entries`, each `slug`, `group`, `holds`, `readWhen` |
 
-- **Five groups, in this order:** `system-documents` (the shipped reference documents and, in a room that reads
-  it, the lore of the agent's brain), `room-rules` (the room's rules and its situation rules), `knowledge`, `people`
-  (everyone the brain knows facts of in the room) and `room-memories` (the room's standing memories). The agent is
-  the one named, else the chat agent.
+- **Five groups, in this order:** `system-documents` (the lore of the agent's brain, in a room that reads it; the
+  brain holds no row of a shipped reference document, so no index lists one), `room-rules` (the room's rules and
+  its situation rules), `knowledge`, `people` (everyone the brain knows facts of in the room) and `room-memories`
+  (the room's standing memories). Every group is the named agent's own brain's (「Whose reference it is」); an
+  agent keeping no brain is answered no group at all.
 - **An entry** is the row's `slug`, what it `holds`, when to read it, `readWhen`, and its `path`, the path a piece
   read of it is recorded under among the session's loads, which is how a caller names what a session read. A knowledge piece's or a
   rule's title is split where it says when it is needed — at "; needed", "; consulted" and their kin up to the

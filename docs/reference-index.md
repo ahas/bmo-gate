@@ -1,8 +1,13 @@
 # System reference index
 
-- This is the index of the system's own reference documents, which the brain's index lists in its `system-documents` group for an agent to read in every chat (`docs/reference-selection.md`, 「The index an agent reads」).
-- A slug here names the system document of the same name the deployment ships; a slug not listed here never resolves.
-- Each entry below stands as a fragment row, which is what the index lists and what a piece resolves against (the brain's `docs/fragments.md`).
+- This is the index of the system's own reference documents, the shipped documents meant for every supervisor
+  of every account (`docs/reference-selection.md`, 「Whose reference it is」). A slug here names the system document
+  of the same name the deployment ships; a slug not listed here never resolves.
+- A document stands here only where every supervisor may read it: what the system is and how its rooms speak. A
+  note about the deployment's machines, its credentials or the owner's own work never stands here; it is a memory
+  of the owner's brain.
+- The brain holds no row of these documents, so the brain's index lists none of them (`docs/boundary-api.md`,
+  「bmo-brain」).
 - An entry says what kind of document it is and the questions or situations a turn needs it for, never a list of the words it mentions: the words every turn carries would attach it to every turn (the brain's `docs/fragments.md`, 「The shape a title must have」).
 
 ## The system

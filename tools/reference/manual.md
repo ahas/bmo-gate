@@ -35,5 +35,5 @@ first, at most `limit` (8 where absent, 24 at most). It asks no model: name the 
 
 ## The room and the session
 
-Each call reads the turn's room and session; name `room` only to read another room. A result marked as an error is
-a refusal: its text says why.
+Each call reads your own brain, for the turn's room and session; name `room` only to read another room. Naming a
+room never reaches another agent's brain. A result marked as an error is a refusal: its text says why.

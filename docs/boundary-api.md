@@ -76,7 +76,9 @@ In the common conventions: camelCase, epoch milliseconds, and an error of `{code
 (the brain's `docs/boundary-api.md`, 「Brains」); the brain's published client does not carry the reference
 road's view of the rows.
 
-The gate finds the turn's agent's brain once, by the agent's key, and reads that brain's memories by type:
+The gate finds the turn's agent's brain by the account that owns the agent and the agent's key
+(`docs/reference-selection.md`, 「Whose reference it is」), remembers it once found, and reads that brain's
+memories by type:
 one memory is one row of a type about subjects, and the gate maps it to what the reference road reads. A
 row the data move brought keeps its old fields in `labels`, which the mapping reads where they stand; a row
 the agent wrote itself is read from its subjects: its room is its `room` subject, its person its first
@@ -85,7 +87,7 @@ no room at all.
 
 | Call | Route | Body or query | Answer |
 |---|---|---|---|
-| the agent's brain | `GET /brains` | `agentKey`, `limit=2` | `items`: the one brain of that agent key, whose id every call below stands under |
+| the agent's brain | `GET /brains` | `agentKey`, `accountKey` where the agent's supervisor has an account (the owning user's id), `limit=2` | `items`: the brain of that account and agent key, whose id every call below stands under; with no account asked, the one brain of that agent key, and none where the key stands in two accounts or more; where none is answered, every read below answers nothing |
 | standing rows | `GET /brains/{brainId}/memories` | `type` (each of `promise`, `check`, `followup`, `situation`, `state`), `status=active`, `limit` at the route's ceiling, `after` for each page after the first | `items`: the rows that wait on nothing, by their old `conditions` label or, for a `situation` the agent wrote, its own text, and the errands whose event has come, by their `event_met_at` label; a row's words are its old condition's action, else its text |
 | conditional rows | the standing rows | | their old `conditions` label, or a `situation`'s text as its condition |
 | rows the events wake | the standing rows | | the gate filters them by the events their `event` or `conditions` labels name |
@@ -142,6 +144,7 @@ In the agency's conventions (its `docs/api.md`): camelCase, the agency's control
 | a gate's role | `GET /roles/{roleName}` | the role a gate's profile names (`docs/gates.md`, 「Where a gate's runs go out」): `provider`, its active provider or null, and `order`, each entry's `provider`, `model`, `effort`, `thinking` and `answerTokens`, which a gate run goes out on; 404 `not-found` is a role the agency does not hold |
 | a session | `POST /sessions` | `agentName`, `scope` `conversation`, `options` `{provider, model, cwd}`: one thrown-away conversation for one gate run on a provider's program |
 | a turn | `POST /sessions/{sessionId}/turns` | `prompt`, and the `gate` part: `system`, the gate's whole system prompt; `thinking`, whether the run thinks; and `model`, `effort` and `answerTokens`, what its role's order names on the run's provider |
+| a supervisor's owner | `GET /supervisors/{supervisorName}` | `ownerAccount`, the id of the user whose account owns the supervisor, null for the deployment's own; a name the agency holds no supervisor of (404 `not-found`) is read as no account. The account decides whose brain a reference is read from (`docs/reference-selection.md`, 「Whose reference it is」) |
 | a session's loads | `GET /session-loads/{sessionId}` | `documents`, each `path` and `version`: what the session was handed in full, which the index counts read |
 | a session's loads kept | `PUT /session-loads/{sessionId}` | `documents`, every load the session now holds, the piece just read added at its version |
 | a translation | `POST /translation-runs` | `purpose` (`document`, `worker` or `record`), `language` (the target's name as the policy names it), `text`, one part, and `note` where the gate has a word on that part: answered with `text`, the part translated whole, and the `provider` and `model` it went out on; 413 `too-large` for a part past the model's window (「The translation line」) |

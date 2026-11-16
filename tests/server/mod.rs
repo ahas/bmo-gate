@@ -6,6 +6,7 @@ mod receiver;
 mod restart;
 mod stop;
 mod watches;
+mod whose;
 mod wire;
 mod work;
 
@@ -37,6 +38,7 @@ pub const ROOM: i64 = 7;
 pub struct Ground {
   pub scratch: Scratch,
   pub brain: Arc<FakeBrain>,
+  pub agency: Arc<FakeAgency>,
   pub gateway: Arc<AnsweringGateway>,
   pub app: Arc<App>,
   pub address: String,
@@ -90,6 +92,7 @@ pub async fn ground(test: &str, answer: impl Fn(&Ask) -> Option<String> + Send +
   Ground {
     scratch,
     brain,
+    agency,
     gateway,
     app,
     address,

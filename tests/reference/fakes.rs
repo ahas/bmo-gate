@@ -7,7 +7,7 @@ use std::sync::Mutex;
 use futures_util::StreamExt;
 use futures_util::future::BoxFuture;
 use futures_util::stream::BoxStream;
-use gate_ports::brain::{Brain, Condition, Document, Event, Fragment, MemoryRow, Reply, Sheet};
+use gate_ports::brain::{Brain, BrainKey, Condition, Document, Event, Fragment, MemoryRow, Reply, Sheet};
 use gate_ports::gateway::{Ask, Completion, Gateway};
 use gate_ports::http::Answer;
 use gate_ports::receiver::{Drafted, Receiver};
@@ -74,9 +74,13 @@ pub fn memory(id: i64, kind: &str, slug: &str, action: &str) -> MemoryRow {
   }
 }
 
-/// The stand-in brain: what it answers each read with, and what it was handed back.
+/// The stand-in brain: what it answers each read with, every brain it was asked to read, and what it was handed
+/// back. Where `own` holds brains, only they are kept, and each answers the fragments it holds; where it holds none,
+/// every agent keeps one brain answering `fragments`.
 #[derive(Default)]
 pub struct FakeBrain {
+  pub own: Mutex<HashMap<BrainKey, Vec<Fragment>>>,
+  pub read: Mutex<Vec<BrainKey>>,
   pub standing: Mutex<Vec<MemoryRow>>,
   pub conditions: Mutex<Vec<Condition>>,
   pub woken: Mutex<Vec<MemoryRow>>,
@@ -89,22 +93,49 @@ pub struct FakeBrain {
   pub lore_asked: Mutex<Vec<Vec<String>>>,
 }
 
+impl FakeBrain {
+  // Whether the brain of the key is kept, the read recorded.
+  fn reads(&self, key: &BrainKey) -> bool {
+    self.read.lock().unwrap().push(key.clone());
+
+    let own = self.own.lock().unwrap();
+
+    own.is_empty() || own.contains_key(key)
+  }
+}
+
 impl Brain for FakeBrain {
-  fn standing<'a>(&'a self, _agent: &'a str, _chat: i64) -> BoxFuture<'a, Answer<Vec<MemoryRow>>> {
-    Box::pin(async move { Ok(self.standing.lock().unwrap().clone()) })
+  fn kept<'a>(&'a self, key: &'a BrainKey) -> BoxFuture<'a, Answer<bool>> {
+    Box::pin(async move { Ok(self.reads(key)) })
   }
 
-  fn conditions<'a>(&'a self, _agent: &'a str, _chat: i64) -> BoxFuture<'a, Answer<Vec<Condition>>> {
-    Box::pin(async move { Ok(self.conditions.lock().unwrap().clone()) })
+  fn standing<'a>(&'a self, key: &'a BrainKey, _chat: i64) -> BoxFuture<'a, Answer<Vec<MemoryRow>>> {
+    Box::pin(async move {
+      let kept = self.reads(key);
+
+      Ok(if kept { self.standing.lock().unwrap().clone() } else { vec![] })
+    })
+  }
+
+  fn conditions<'a>(&'a self, key: &'a BrainKey, _chat: i64) -> BoxFuture<'a, Answer<Vec<Condition>>> {
+    Box::pin(async move {
+      let kept = self.reads(key);
+
+      Ok(if kept { self.conditions.lock().unwrap().clone() } else { vec![] })
+    })
   }
 
   fn woken<'a>(
     &'a self,
-    _agent: &'a str,
+    key: &'a BrainKey,
     _chat: i64,
     events: &'a [Event],
   ) -> BoxFuture<'a, Answer<Vec<MemoryRow>>> {
     Box::pin(async move {
+      if !self.reads(key) {
+        return Ok(vec![]);
+      }
+
       self.events.lock().unwrap().extend(events.iter().cloned());
       Ok(self.woken.lock().unwrap().clone())
     })
@@ -112,31 +143,34 @@ impl Brain for FakeBrain {
 
   fn offered<'a>(
     &'a self,
-    _agent: &'a str,
+    key: &'a BrainKey,
     _chat: i64,
     kinds: &'a [String],
   ) -> BoxFuture<'a, Answer<Vec<Fragment>>> {
     Box::pin(async move {
-      Ok(
-        self
-          .fragments
-          .lock()
-          .unwrap()
-          .iter()
-          .filter(|row| kinds.contains(&row.kind))
-          .cloned()
-          .collect(),
-      )
+      if !self.reads(key) {
+        return Ok(vec![]);
+      }
+
+      let own = self.own.lock().unwrap();
+      let shared = self.fragments.lock().unwrap();
+      let rows = own.get(key).unwrap_or(&shared);
+
+      Ok(rows.iter().filter(|row| kinds.contains(&row.kind)).cloned().collect())
     })
   }
 
   fn knowledge<'a>(
     &'a self,
-    _agent: &'a str,
+    key: &'a BrainKey,
     _chat: i64,
     slugs: &'a [String],
   ) -> BoxFuture<'a, Answer<Reply<Vec<Document>>>> {
     Box::pin(async move {
+      if !self.reads(key) {
+        return Ok(Reply::Answered(vec![]));
+      }
+
       self.knowledge_asked.lock().unwrap().push(slugs.to_vec());
 
       let documents = self.documents.lock().unwrap();
@@ -157,8 +191,12 @@ impl Brain for FakeBrain {
     })
   }
 
-  fn lore<'a>(&'a self, _agent: &'a str, slugs: &'a [String]) -> BoxFuture<'a, Answer<Vec<Document>>> {
+  fn lore<'a>(&'a self, key: &'a BrainKey, slugs: &'a [String]) -> BoxFuture<'a, Answer<Vec<Document>>> {
     Box::pin(async move {
+      if !self.reads(key) {
+        return Ok(vec![]);
+      }
+
       self.lore_asked.lock().unwrap().push(slugs.to_vec());
 
       let lore = self.lore.lock().unwrap();
@@ -181,12 +219,16 @@ impl Brain for FakeBrain {
 
   fn sheets<'a>(
     &'a self,
-    _agent: &'a str,
+    key: &'a BrainKey,
     _chat: i64,
     people: &'a [i64],
     lines: Option<usize>,
   ) -> BoxFuture<'a, Answer<Vec<Sheet>>> {
     Box::pin(async move {
+      if !self.reads(key) {
+        return Ok(vec![]);
+      }
+
       let sheets = self.sheets.lock().unwrap();
       let head = |sheet: &Sheet| Sheet {
         text: match lines {

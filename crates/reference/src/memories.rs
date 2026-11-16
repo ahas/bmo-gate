@@ -10,7 +10,7 @@ use gate_policy::fill_marks;
 use gate_policy::memories::MEMORIES;
 use gate_policy::reference::REFERENCE;
 use gate_ports::PortError;
-use gate_ports::brain::{Condition, Event, MemoryRow};
+use gate_ports::brain::{BrainKey, Condition, Event, MemoryRow};
 
 use crate::{Entry, Reference, Source};
 
@@ -125,8 +125,8 @@ pub fn memories_entry(chat_id: i64, open: usize, carried: &[&MemoryRow]) -> Opti
 
 /// The room's standing rows as the brain answers them: the rows that wait on nothing and the errands whose event
 /// has come; none where they cannot be read.
-pub async fn standing(reference: &Reference, chat_id: i64, agent: &str) -> Vec<MemoryRow> {
-  match reference.brain.standing(agent, chat_id).await {
+pub async fn standing(reference: &Reference, chat_id: i64, key: &BrainKey) -> Vec<MemoryRow> {
+  match reference.brain.standing(key, chat_id).await {
     Ok(rows) => rows,
     Err(why) => {
       eprintln!("reference: chat {chat_id} memories could not be read: {why}");
@@ -139,21 +139,21 @@ pub async fn standing(reference: &Reference, chat_id: i64, agent: &str) -> Vec<M
 pub async fn candidates(
   reference: &Reference,
   chat_id: i64,
-  agent: &str,
+  key: &BrainKey,
 ) -> Result<Vec<Condition>, PortError> {
-  reference.brain.conditions(agent, chat_id).await
+  reference.brain.conditions(key, chat_id).await
 }
 
 /// The rows a turn's events wake that attach here by the event alone.
 pub async fn woken(
   reference: &Reference,
   chat_id: i64,
-  agent: &str,
+  key: &BrainKey,
   events: &[Event],
 ) -> Result<Vec<MemoryRow>, PortError> {
   if events.is_empty() {
     return Ok(vec![]);
   }
 
-  reference.brain.woken(agent, chat_id, events).await
+  reference.brain.woken(key, chat_id, events).await
 }

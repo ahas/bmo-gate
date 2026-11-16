@@ -309,8 +309,8 @@ pub struct ReferenceAnswer {
   pub entries: Vec<Entry>,
 }
 
-/// The brain's index asked for: the room, the session whose loads count an entry read, and the agent, the chat
-/// agent's where none is named.
+/// The brain's index asked for: the room, the session whose loads count an entry read, and the agent whose own
+/// brain it is read from.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[schemars(inline)]
@@ -318,8 +318,7 @@ pub struct ReferenceIndexQuery {
   pub room: i64,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub session: Option<String>,
-  #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub agent: Option<String>,
+  pub agent: String,
 }
 
 /// One entry of the index: its slug, what it holds and when it is read, null where its title says not.
@@ -353,7 +352,7 @@ pub struct ReferenceIndex {
 }
 
 /// A piece asked for by its slug: the room, its group, the session it is recorded among the loads of, and the
-/// agent.
+/// agent whose own brain it is read from.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[schemars(inline)]
@@ -362,8 +361,7 @@ pub struct ReferencePieceQuery {
   pub group: String,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub session: Option<String>,
-  #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub agent: Option<String>,
+  pub agent: String,
 }
 
 /// One piece read whole.
@@ -377,7 +375,7 @@ pub struct ReferencePiece {
 }
 
 /// A search of the index: its words, the room, at most how many entries (8 where absent, at most 24), and the
-/// agent.
+/// agent whose own brain it is read from.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[schemars(inline)]
@@ -386,8 +384,7 @@ pub struct ReferenceSearchQuery {
   pub room: i64,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub limit: Option<u32>,
-  #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub agent: Option<String>,
+  pub agent: String,
 }
 
 /// One entry a search found, with its group.
