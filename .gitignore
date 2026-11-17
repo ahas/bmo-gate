@@ -7,7 +7,6 @@ __pycache__/
 /training/tooling/tooling.toml
 # The typecheck's build record, wherever a project of its writes one.
 *.tsbuildinfo
-.graph/*
-!.graph/settings.toml
 # A tool folder a deployment places, made beside its manifest in the release.
 .placed/
+.graph/

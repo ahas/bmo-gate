@@ -20,7 +20,6 @@ Every other unit is reached through standard APIs alone, and of other repositori
 
 | Folder | What it holds |
 |---|---|
-| `.graph/` | The code dependency graph: one node per feature, with the files it is made of and what it reads, read and written by `bmo graph`. Its area files are generated in the checkout and untracked, so a fresh checkout builds them again, while `settings.toml` is the repository's configuration and stays tracked |
 | `crates/` | The Rust crates the root package is built from: the contract and its client, the store, the codes, the ports to the other units, the policy, the words, the markup, the runs, the reference road, the service's routes and the unit command |
 | `deploy/` | The service unit the testbed's deployment keeps on the operations machine |
 | `docs/` | The documents, which come before the code: start with `docs/layout.md`, and read `docs/api.md` for the public API and `docs/openapi.json` for its machine form |

@@ -7,7 +7,6 @@ the judgements and road records the gate keeps.
 
 | Folder | What it holds |
 |---|---|
-| `.graph/` | The code dependency graph: one node per feature, with the files it is made of and what it reads, written by the graph service and read by `bmo graph` |
 | `src/` | The root package: the version, the service binary and the unit command, built on the crates |
 | `crates/` | The Rust crates the root package is built from: the contract and its client, the store, the codes, the clients of the other units, the policy, the words, the markup, the runs, the reference road, the service's routes and watches, and the unit command |
 | `runtime/` | The GGUF engine's unit templates and node setup (`docs/gguf-llm.md`) |
