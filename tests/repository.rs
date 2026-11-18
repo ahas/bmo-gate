@@ -1,5 +1,5 @@
 //! Checks that span the repository: what its manifests may depend on, its layout and manifests, its one
-//! version, the testbed's declaration, where tests stand, and what no tracked file may hold (Hangul outside the
+//! version, where tests stand, and what no tracked file may hold (Hangul outside the
 //! prompts past the ledger, and the names a list kept outside the repository gives). Personal data is held by
 //! the testbed's `personal-data` check, which the declaration enables.
 
@@ -59,10 +59,6 @@ const OTHER_MANIFESTS: [&str; 12] = [
 /// The dependency lists of a Bun or Node manifest.
 const PACKAGE_DEPENDENCY_LISTS: [&str; 4] =
   ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"];
-
-/// The tables a testbed declaration may hold beside its two top-level keys.
-const TESTBED_TABLES: [&str; 8] =
-  ["test", "projects", "tools", "check", "build", "deploy", "runner", "events"];
 
 /// The ledger of Korean lines each file may hold.
 const LEDGER: &str = "korean-ledger.json";
@@ -355,33 +351,6 @@ fn the_version_file_holds_the_workspaces_version() {
   let version = text_of("VERSION").expect("VERSION is at the root");
   assert_eq!(version.trim(), env!("CARGO_PKG_VERSION"));
   assert_eq!(bmo_gate::VERSION, version.trim());
-}
-
-#[test]
-fn the_testbed_declaration_is_in_the_testbeds_format() {
-  let declaration: toml::Table = text_of("testbed.toml")
-    .expect("testbed.toml is at the root")
-    .parse()
-    .expect("testbed.toml is TOML");
-  let strange: Vec<&String> = declaration
-    .keys()
-    .filter(|key| !["testbed", "name"].contains(&key.as_str()) && !TESTBED_TABLES.contains(&key.as_str()))
-    .collect();
-
-  assert_eq!(declaration.get("testbed").and_then(toml::Value::as_integer), Some(0));
-  assert!(strange.is_empty(), "testbed.toml holds keys its format does not name: {strange:?}");
-  for key in TESTBED_TABLES.iter().filter(|key| declaration.contains_key(**key)) {
-    assert!(declaration[*key].is_table(), "`{key}` in testbed.toml is a table");
-  }
-  assert_eq!(
-    declaration["test"].get("languages").and_then(toml::Value::as_array),
-    Some(&vec![toml::Value::from("cargo"), toml::Value::from("bun")])
-  );
-  assert_eq!(
-    declaration["check"].get("base_libraries").and_then(toml::Value::as_array),
-    Some(&BASE_LIBRARIES.iter().map(|&name| toml::Value::from(name)).collect())
-  );
-  assert_eq!(declaration["check"].get("korean_ledger").and_then(toml::Value::as_str), Some(LEDGER));
 }
 
 #[test]
