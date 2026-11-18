@@ -108,7 +108,7 @@ gate-words.workspace = true
 http-body-util.workspace = true
 hyper.workspace = true
 hyper-util.workspace = true
-# The README's folder table is read as markdown.
+# The codes document is read as markdown.
 pulldown-cmark.workspace = true
 # The callers the service's contract tests speak as.
 reqwest.workspace = true

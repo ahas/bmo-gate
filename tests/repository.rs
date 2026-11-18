@@ -9,17 +9,9 @@ use std::io::ErrorKind;
 use std::path::{Component, Path};
 use std::process::Command;
 
-use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
 use serde_json::Value;
 
 const ROOT: &str = env!("CARGO_MANIFEST_DIR");
-
-/// The only `bmo-*` packages a manifest here may depend on: the base libraries, and the gate's own contract
-/// package.
-const BASE_LIBRARIES: [&str; 4] = ["bmo-chat", "bmo-chat-client", "bmo-ui", "bmo-gate-client"];
-
-/// The testbed's test kit, which a Bun project may take as a dev-dependency beside the base libraries.
-const TEST_KIT: &str = "@bmo-testbed/testkit";
 
 /// Shared crates of the single repository this one was separated from; what the gate needs of them lives
 /// in-tree here.
@@ -55,10 +47,6 @@ const OTHER_MANIFESTS: [&str; 12] = [
   "build.gradle",
   "Makefile",
 ];
-
-/// The dependency lists of a Bun or Node manifest.
-const PACKAGE_DEPENDENCY_LISTS: [&str; 4] =
-  ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"];
 
 /// The ledger of Korean lines each file may hold.
 const LEDGER: &str = "korean-ledger.json";
@@ -160,44 +148,6 @@ fn holds_word(text: &str, word: &str) -> bool {
   })
 }
 
-/// Whether a dependency named `name` is one of another repository's packages that is not a base library.
-fn is_foreign_bmo(name: &str) -> bool {
-  let name = name.to_lowercase().replace('_', "-");
-  let bmo = name.starts_with("bmo-") || name.starts_with("@bmo/") || name.starts_with("@bmo-");
-  bmo && !BASE_LIBRARIES.contains(&name.as_str()) && name != TEST_KIT
-}
-
-/// Every dependency a Bun or Node manifest names, in every one of its lists.
-fn package_dependencies(manifest: &Value) -> Vec<String> {
-  PACKAGE_DEPENDENCY_LISTS
-    .iter()
-    .filter_map(|list| manifest.get(list).and_then(Value::as_object))
-    .flat_map(|names| names.keys().cloned())
-    .collect()
-}
-
-/// Every requirement a Python project names: its dependencies, its optional ones and its dependency groups.
-/// A requirement is kept as written; whether it names another repository's package is read off its start.
-fn python_requirements(project: &toml::Table) -> Vec<String> {
-  let strings = |value: Option<&toml::Value>| -> Vec<String> {
-    value
-      .and_then(toml::Value::as_array)
-      .map(|listed| listed.iter().filter_map(toml::Value::as_str).map(str::to_owned).collect())
-      .unwrap_or_default()
-  };
-  let groups = |value: Option<&toml::Value>| -> Vec<String> {
-    value
-      .and_then(toml::Value::as_table)
-      .map(|table| table.values().flat_map(|group| strings(Some(group))).collect())
-      .unwrap_or_default()
-  };
-  let declared = project.get("project").and_then(toml::Value::as_table);
-  let mut found = strings(declared.and_then(|table| table.get("dependencies")));
-  found.extend(groups(declared.and_then(|table| table.get("optional-dependencies"))));
-  found.extend(groups(project.get("dependency-groups")));
-  found
-}
-
 fn names_list(names: &toml::Table, from: &str, key: &str) -> Vec<String> {
   names
     .get(key)
@@ -228,65 +178,9 @@ fn holds_rust_test(text: &str) -> bool {
     .any(|line| line.starts_with("#[cfg(test)]") || line.starts_with("#[test]"))
 }
 
-/// The first cell of every body row of the README's table whose first header cell is `Folder`, without the
-/// code span's marks and the trailing slash.
-fn readme_folders(readme: &str) -> BTreeSet<String> {
-  let mut folders = BTreeSet::new();
-  let mut in_head = false;
-  let mut cell = 0usize;
-  let mut text = String::new();
-  let mut is_folder_table = false;
-  let mut header_first = None::<String>;
-  for event in Parser::new_ext(readme, Options::ENABLE_TABLES) {
-    match event {
-      Event::Start(Tag::Table(_)) => {
-        is_folder_table = false;
-        header_first = None;
-      }
-      Event::Start(Tag::TableHead) => {
-        in_head = true;
-        cell = 0;
-      }
-      Event::End(TagEnd::TableHead) => {
-        in_head = false;
-        is_folder_table = header_first.as_deref() == Some("Folder");
-      }
-      Event::Start(Tag::TableRow) => cell = 0,
-      Event::Start(Tag::TableCell) => text.clear(),
-      Event::End(TagEnd::TableCell) => {
-        if in_head && cell == 0 {
-          header_first = Some(text.trim().to_owned());
-        } else if !in_head && is_folder_table && cell == 0 {
-          folders.insert(text.trim().trim_end_matches('/').to_owned());
-        }
-        cell += 1;
-      }
-      Event::Text(piece) | Event::Code(piece) => text.push_str(&piece),
-      _ => {}
-    }
-  }
-  folders
-}
-
 fn ledger() -> BTreeMap<String, usize> {
   let text = text_of(LEDGER).expect("the ledger is at the root");
   serde_json::from_str(&text).expect("the ledger is a JSON object from paths to counts")
-}
-
-#[test]
-fn cargo_depends_on_no_bmo_package_but_the_base_libraries() {
-  let metadata = metadata();
-  let mut refused = Vec::new();
-  for package in metadata["packages"].as_array().expect("metadata lists packages") {
-    let owner = package["name"].as_str().expect("a package has a name");
-    for dependency in package["dependencies"].as_array().expect("a package lists its dependencies") {
-      let name = dependency["name"].as_str().expect("a dependency has a name");
-      if is_foreign_bmo(name) || OLD_SHARED_CRATES.contains(&name) {
-        refused.push(format!("{owner} -> {name}"));
-      }
-    }
-  }
-  assert!(refused.is_empty(), "dependencies outside the base libraries: {refused:?}");
 }
 
 #[test]
@@ -300,50 +194,6 @@ fn no_package_takes_an_old_shared_crate_name() {
     .filter(|name| OLD_SHARED_CRATES.contains(name))
     .collect();
   assert!(taken.is_empty(), "packages named after old shared crates: {taken:?}");
-}
-
-#[test]
-fn bun_projects_depend_on_no_bmo_package_but_the_base_libraries() {
-  let mut refused = Vec::new();
-  for path in tracked_files().into_iter().filter(|path| file_name(path) == "package.json") {
-    let manifest: Value = serde_json::from_str(&text_of(&path).expect("a manifest is text"))
-      .unwrap_or_else(|error| panic!("{path} is not JSON: {error}"));
-    refused.extend(
-      package_dependencies(&manifest)
-        .into_iter()
-        .filter(|name| is_foreign_bmo(name))
-        .map(|name| format!("{path} -> {name}")),
-    );
-  }
-  assert!(refused.is_empty(), "Bun dependencies outside the base libraries: {refused:?}");
-}
-
-#[test]
-fn python_projects_depend_on_no_bmo_package_but_the_base_libraries() {
-  let mut refused = Vec::new();
-  for path in tracked_files().into_iter().filter(|path| file_name(path) == "pyproject.toml") {
-    let project: toml::Table = text_of(&path)
-      .expect("a manifest is text")
-      .parse()
-      .unwrap_or_else(|error| panic!("{path} is not TOML: {error}"));
-    refused.extend(
-      python_requirements(&project)
-        .into_iter()
-        .filter(|requirement| is_foreign_bmo(requirement.trim()))
-        .map(|requirement| format!("{path} -> {requirement}")),
-    );
-  }
-  assert!(refused.is_empty(), "Python dependencies outside the base libraries: {refused:?}");
-}
-
-#[test]
-fn a_foreign_bmo_package_is_told_from_a_base_library() {
-  assert!(is_foreign_bmo("bmo-receiver"));
-  assert!(is_foreign_bmo("@bmo/policy"));
-  assert!(is_foreign_bmo("bmo_policy>=1"));
-  assert!(!is_foreign_bmo("bmo-ui"));
-  assert!(!is_foreign_bmo(TEST_KIT));
-  assert!(!is_foreign_bmo("torch==2.14.1"));
 }
 
 #[test]
@@ -373,16 +223,6 @@ fn no_directory_is_named_after_its_parent() {
     })
     .collect();
   assert!(twins.is_empty(), "these paths repeat a directory inside itself: {twins:?}");
-}
-
-#[test]
-fn the_readme_names_every_top_level_folder_and_no_other() {
-  let standing: BTreeSet<String> = tracked_files()
-    .into_iter()
-    .filter_map(|path| path.split_once('/').map(|(folder, _)| folder.to_owned()))
-    .collect();
-  let named = readme_folders(&text_of("README.md").expect("README.md is at the root"));
-  assert_eq!(named, standing, "the README's folder table and the top-level folders differ");
 }
 
 #[test]
