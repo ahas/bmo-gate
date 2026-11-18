@@ -1,7 +1,7 @@
 //! Checks that span the repository: what its manifests may depend on, its layout and manifests, its one
 //! version, the testbed's declaration, where tests stand, and what no tracked file may hold (Hangul outside the
 //! prompts past the ledger, and the names a list kept outside the repository gives). Personal data is held by
-//! its own check (`tests/personal_data.rs`).
+//! the testbed's `personal-data` check, which the declaration enables.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;

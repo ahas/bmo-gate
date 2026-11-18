@@ -279,7 +279,6 @@ dependencies = [
  "hyper",
  "hyper-util",
  "pulldown-cmark",
- "regex",
  "reqwest",
  "sea-orm",
  "sea-orm-migration",

@@ -37,7 +37,8 @@ instead, and the check that holds it.
 
 - `cargo check --workspace --all-targets` — the static check.
 - `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D warnings` — the review.
-- `cargo test` — every test, the repository checks among them, the personal-data check included.
+- `cargo test` — every test, the repository checks among them. The personal-data check is the testbed's quick
+  check, enabled in the declaration.
 
 ## Version
 

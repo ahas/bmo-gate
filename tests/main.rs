@@ -8,7 +8,6 @@ mod api;
 mod codes;
 mod command;
 mod markup;
-mod personal_data;
 mod policy;
 mod ports;
 mod reference;
