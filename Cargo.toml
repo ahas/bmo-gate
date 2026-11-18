@@ -116,6 +116,8 @@ sea-orm.workspace = true
 sea-orm-migration.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+# The digest a kept translation is read back by.
+sha2.workspace = true
 sqlx.workspace = true
 tempfile.workspace = true
 tokio.workspace = true

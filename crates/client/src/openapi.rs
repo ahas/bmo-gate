@@ -281,11 +281,11 @@ pub fn document() -> Value {
     "/translations/kept",
     "translations_kept",
     "Translations",
-    "The translations kept for the originals named, in one language, without asking the translator.",
+    "The translations kept for the originals the digests name, in one language, without asking the translator.",
     vec![],
     Some(query_of::<KeptQuery>),
     None,
-    &[(200, "the translations kept", Some(made::<Page<KeptTranslation>>))],
+    &[(200, "the translations kept", Some(made::<Page<KeptReading>>))],
     &["unauthorized", "bad-request", "language-unknown", "failed"],
   );
   route(

@@ -629,6 +629,42 @@
         ],
         "type": "object"
       },
+      "KeptReading": {
+        "description": "One translation kept, read back by the digest of its original.",
+        "properties": {
+          "digest": {
+            "description": "The SHA-256 of the original exactly as written, in lowercase hex.",
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "digest",
+          "text"
+        ],
+        "type": "object"
+      },
+      "KeptReadingPage": {
+        "description": "One page of a list, and whether anything stands past its last member.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/KeptReading"
+            },
+            "type": "array"
+          },
+          "more": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "more"
+        ],
+        "type": "object"
+      },
       "KeptTranslation": {
         "description": "One translation kept under its original and its language.",
         "properties": {
@@ -642,25 +678,6 @@
         "required": [
           "original",
           "text"
-        ],
-        "type": "object"
-      },
-      "KeptTranslationPage": {
-        "description": "One page of a list, and whether anything stands past its last member.",
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/KeptTranslation"
-            },
-            "type": "array"
-          },
-          "more": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "items",
-          "more"
         ],
         "type": "object"
       },
@@ -2266,17 +2283,17 @@
         "operationId": "translations_kept",
         "parameters": [
           {
+            "description": "The digests of the originals, each the SHA-256 of an original exactly as written in lowercase hex, a comma\nbetween them.",
             "in": "query",
-            "name": "language",
+            "name": "digests",
             "required": true,
             "schema": {
               "type": "string"
             }
           },
           {
-            "description": "The originals, a comma between them.",
             "in": "query",
-            "name": "originals",
+            "name": "language",
             "required": true,
             "schema": {
               "type": "string"
@@ -2288,7 +2305,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/KeptTranslationPage"
+                  "$ref": "#/components/schemas/KeptReadingPage"
                 }
               }
             },
@@ -2298,7 +2315,7 @@
             "$ref": "#/components/responses/Error"
           }
         },
-        "summary": "The translations kept for the originals named, in one language, without asking the translator.",
+        "summary": "The translations kept for the originals the digests name, in one language, without asking the translator.",
         "tags": [
           "Translations"
         ],

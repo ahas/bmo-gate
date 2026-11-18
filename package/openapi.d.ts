@@ -302,7 +302,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The translations kept for the originals named, in one language, without asking the translator. */
+        /** The translations kept for the originals the digests name, in one language, without asking the translator. */
         get: operations["translations_kept"];
         /** Keep a reading of one original in one language, in place of any kept before. */
         put: operations["translation_keep"];
@@ -539,15 +539,21 @@ export interface components {
             /** Format: int64 */
             word: number;
         };
+        /** @description One translation kept, read back by the digest of its original. */
+        KeptReading: {
+            /** @description The SHA-256 of the original exactly as written, in lowercase hex. */
+            digest: string;
+            text: string;
+        };
+        /** @description One page of a list, and whether anything stands past its last member. */
+        KeptReadingPage: {
+            items: components["schemas"]["KeptReading"][];
+            more: boolean;
+        };
         /** @description One translation kept under its original and its language. */
         KeptTranslation: {
             original: string;
             text: string;
-        };
-        /** @description One page of a list, and whether anything stands past its last member. */
-        KeptTranslationPage: {
-            items: components["schemas"]["KeptTranslation"][];
-            more: boolean;
         };
         /** @description A judgement to write into a room's log. */
         NewJudgement: {
@@ -1236,9 +1242,12 @@ export interface operations {
     translations_kept: {
         parameters: {
             query: {
+                /**
+                 * @description The digests of the originals, each the SHA-256 of an original exactly as written in lowercase hex, a comma
+                 *     between them.
+                 */
+                digests: string;
                 language: string;
-                /** @description The originals, a comma between them. */
-                originals: string;
             };
             header?: never;
             path?: never;
@@ -1252,7 +1261,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["KeptTranslationPage"];
+                    "application/json": components["schemas"]["KeptReadingPage"];
                 };
             };
             default: components["responses"]["Error"];

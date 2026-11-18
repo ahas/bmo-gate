@@ -6,7 +6,7 @@ use std::sync::Arc;
 use axum::Json;
 use axum::extract::State;
 use bmo_gate_client::{
-  KeepTranslation, KeptQuery, KeptTranslation, Page, Reading, Readings, TranslationAsk,
+  KeepTranslation, KeptQuery, KeptReading, KeptTranslation, Page, Reading, Readings, TranslationAsk,
 };
 use gate_codes::Code;
 use gate_stages::translator::{self, CALL_ORIGINALS, Reader, Turned};
@@ -52,15 +52,26 @@ pub async fn translate(
 pub async fn kept(
   State(app): State<Arc<App>>,
   Query(asked): Query<KeptQuery>,
-) -> Answered<Json<Page<KeptTranslation>>> {
+) -> Answered<Json<Page<KeptReading>>> {
   reader(&asked.language)?;
+
+  let digests: Vec<&str> = asked.digests.split(',').filter(|digest| !digest.is_empty()).collect();
+
+  if let Some(wrong) = digests.iter().find(|digest| !translator::is_digest(digest)) {
+    return Err(Refused::new(
+      Code::BadRequest,
+      format!(
+        "{wrong} is no digest: a digest is the SHA-256 of an original in 64 lowercase hex characters"
+      ),
+    ));
+  }
 
   let mut items = vec![];
 
-  for original in asked.originals.split(',').filter(|original| !original.is_empty()) {
-    if let Some(text) = translator::recalled(&app.stages, &asked.language, original).await {
-      items.push(KeptTranslation {
-        original: original.to_owned(),
+  for digest in digests {
+    if let Some(text) = translator::recalled_digest(&app.stages, &asked.language, digest).await {
+      items.push(KeptReading {
+        digest: digest.to_owned(),
         text,
       });
     }

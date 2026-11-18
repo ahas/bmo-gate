@@ -441,14 +441,24 @@ pub struct KeptTranslation {
   pub text: String,
 }
 
+/// One translation kept, read back by the digest of its original.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct KeptReading {
+  /// The SHA-256 of the original exactly as written, in lowercase hex.
+  pub digest: String,
+  pub text: String,
+}
+
 /// Which kept translations to read.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[schemars(inline)]
 pub struct KeptQuery {
   pub language: String,
-  /// The originals, a comma between them.
-  pub originals: String,
+  /// The digests of the originals, each the SHA-256 of an original exactly as written in lowercase hex, a comma
+  /// between them.
+  pub digests: String,
 }
 
 /// A translation to keep.

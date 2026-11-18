@@ -209,8 +209,11 @@ fn shelf(language: &str) -> String {
 /// The reading kept for an original in the translation table, under the digest of the original exactly as written,
 /// in the documents `prefix` names and the language `target`, where one is kept. Never asks the translator.
 pub async fn recalled_under(stages: &Stages, prefix: &str, target: &str, original: &str) -> Option<String> {
-  let key = key(original);
+  recalled_by_key(stages, prefix, target, key(original)).await
+}
 
+// The reading kept under an original's digest, as `recalled_under` reads it.
+async fn recalled_by_key(stages: &Stages, prefix: &str, target: &str, key: String) -> Option<String> {
   one(
     &stages.runs.db,
     r#"SELECT "text" FROM "document_translations" WHERE "document" = $1 AND "version" = $2 AND "target" = $3 ORDER BY "part" LIMIT 1"#,
@@ -262,6 +265,17 @@ pub async fn keep_under(
 /// The kept reading of an original in a language, where one is kept. Never asks the translator.
 pub async fn recalled(stages: &Stages, language: &str, original: &str) -> Option<String> {
   recalled_under(stages, &shelf(language), language, original).await
+}
+
+/// The kept reading in a language of the original whose digest is `digest`, the SHA-256 of the original exactly
+/// as written in lowercase hex, where one is kept. Never asks the translator.
+pub async fn recalled_digest(stages: &Stages, language: &str, digest: &str) -> Option<String> {
+  recalled_by_key(stages, &shelf(language), language, digest.to_owned()).await
+}
+
+/// Whether a text is a digest as `recalled_digest` reads one: 64 lowercase hex characters.
+pub fn is_digest(text: &str) -> bool {
+  text.len() == 64 && text.bytes().all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
 }
 
 /// A reading kept as the one an original reads as in a language: a worker's own English kept as the reading of the

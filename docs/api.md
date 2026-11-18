@@ -120,7 +120,7 @@ It answers `entries`, each `path`, `text` and `source` (`document`, `person`, `r
 | Route | Request | Answer |
 |---|---|---|
 | `POST /translations` | `language`, `originals` | `readings`, each `text` and `whole` |
-| `GET /translations/kept` | `language`, `originals` (a comma-separated list) | a page of `original` and `text` |
+| `GET /translations/kept` | `language`, `digests` (a comma-separated list) | a page of `digest` and `text` |
 | `PUT /translations/kept` | `language`, `original`, `text` | 200, the translation kept |
 
 - **A language** is a language tag. A translation is kept under its original and its language, so the same
@@ -129,8 +129,10 @@ It answers `entries`, each `path`, `text` and `source` (`document`, `person`, `r
   owner reads another language changes the policy and no code: the language a worker reads, which the worker
   instructions put a text into, and the owner's language, which the record instructions put a text into and a
   record's checks hold it to. Any other language is 422 `language-unknown`.
-- **Reading kept translations** never asks the translator; the page holds one entry for each original with a
-  translation kept in the language.
+- **Reading kept translations** never asks the translator. Each original is named by its digest, the SHA-256 of
+  the original exactly as written in lowercase hex, so an original of any length and holding any character is
+  read the same way; the page holds one entry for each digest with a translation kept in the language, in the
+  order asked. A digest that is not 64 lowercase hex characters is 400 `bad-request`.
 - **Translating** answers one reading for each original, in the order given: an original with no part in
   another language stands as it is; any other has its parts in another language translated, each part
   standing beside the rest as it did, and is kept; a part the translator could not render stays in its

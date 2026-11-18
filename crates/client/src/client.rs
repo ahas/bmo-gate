@@ -198,8 +198,8 @@ impl GateClient {
     answer(self.post(&["translations"]).json(ask)).await
   }
 
-  /// The translations kept for some originals.
-  pub async fn kept_translations(&self, query: &KeptQuery) -> Result<Page<KeptTranslation>, ClientFailure> {
+  /// The translations kept for some originals, named by their digests.
+  pub async fn kept_translations(&self, query: &KeptQuery) -> Result<Page<KeptReading>, ClientFailure> {
     answer(self.get(&["translations", "kept"]).query(query)).await
   }
 
