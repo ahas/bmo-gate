@@ -10,9 +10,9 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 
 use crate::brain_rows::{
-  BrainMember, FACT_TYPE, LORE_TYPE, Layer, Memory, Page, STANDING_TYPES, Subject, Tally, brain_type,
-  conditions, fragment_row, in_room, label, lore_rows, lore_slug, memory_row, path_of, person_row,
-  sheet_path, slug_of, standing, woken_by,
+  BrainMember, FACT_TYPE, LORE_TYPE, Layer, Memory, Page, STANDING_TYPES, Subject, Tally, TopicItem,
+  brain_type, conditions, fragment_row, in_room, label, lore_rows, lore_slug, memory_row, org_memory,
+  path_of, person_row, sheet_path, slug_of, standing, woken_by,
 };
 use crate::http::{Answer, Caller, Peer};
 
@@ -156,6 +156,29 @@ pub struct Load {
   pub version: String,
 }
 
+/// One live memory of an org brain: its number, its words, its importance, whether it is locked, its recall
+/// condition, the topics it stands for and when it last changed (the brain's `docs/design.md`, 「Org brains」).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OrgMemory {
+  pub id: i64,
+  pub text: String,
+  pub importance: i64,
+  pub locked: bool,
+  pub recall_condition: Option<String>,
+  pub topics: Vec<String>,
+  pub changed_at: i64,
+}
+
+/// One topic as it stands for a member of an organisation: the org brain whose word on it holds, whether that word is
+/// locked, and its memories, the most important first.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OrgTopic {
+  pub topic: String,
+  pub brain: i64,
+  pub locked: bool,
+  pub memories: Vec<OrgMemory>,
+}
+
 /// Whose brain a read is of: the agent's key and the key of the account its brain is filed under, none for an agent
 /// of no account (the brain's `docs/design.md`, 「Whose a brain is」; `docs/reference-selection.md`, 「Whose reference
 /// it is」).
@@ -180,6 +203,11 @@ impl BrainKey {
       account: Some(user.to_string()),
       agent: agent.into(),
     }
+  }
+
+  /// The user whose account the brain is filed under, none for an agent of no account.
+  pub fn owner(&self) -> Option<i64> {
+    self.account.as_deref().and_then(|account| account.parse().ok())
   }
 }
 
@@ -233,6 +261,16 @@ pub trait Brain: Send + Sync {
     people: &'a [i64],
     lines: Option<usize>,
   ) -> BoxFuture<'a, Answer<Vec<Sheet>>>;
+
+  /// The org brain of a unit of a company, by their numbers; none where the brain keeps none.
+  fn org_brain(&self, company: i64, unit: i64) -> BoxFuture<'_, Answer<Option<i64>>>;
+
+  /// What stands for a member of the units whose org brains are named, the farthest first: for each topic, the
+  /// memories of the one brain whose word on it holds, read for the company's own people.
+  fn org_topics<'a>(&'a self, brains: &'a [i64]) -> BoxFuture<'a, Answer<Vec<OrgTopic>>>;
+
+  /// Every live memory of an org brain that is neither a proposal nor an episode, in the brain's order.
+  fn org_memories(&self, brain: i64) -> BoxFuture<'_, Answer<Vec<OrgMemory>>>;
 }
 
 // A subject as a brain finds it: the brain, the subject's type and its key.
@@ -244,6 +282,7 @@ type SubjectKey = (i64, String, String);
 pub struct HttpBrain {
   caller: Caller,
   brains: std::sync::Arc<std::sync::Mutex<BTreeMap<BrainKey, i64>>>,
+  org_brains: std::sync::Arc<std::sync::Mutex<BTreeMap<(i64, i64), i64>>>,
   subjects: std::sync::Arc<std::sync::Mutex<BTreeMap<SubjectKey, i64>>>,
 }
 
@@ -252,6 +291,7 @@ impl HttpBrain {
     Self {
       caller: Caller::new("bmo-brain", peer),
       brains: std::sync::Arc::new(std::sync::Mutex::new(BTreeMap::new())),
+      org_brains: std::sync::Arc::new(std::sync::Mutex::new(BTreeMap::new())),
       subjects: std::sync::Arc::new(std::sync::Mutex::new(BTreeMap::new())),
     }
   }
@@ -277,7 +317,8 @@ impl HttpBrain {
       return Ok(Some(id));
     }
 
-    let mut query: Vec<(&str, &str)> = vec![("agentKey", key.agent.as_str()), ("limit", "2")];
+    let mut query: Vec<(&str, &str)> =
+      vec![("kind", "agent"), ("agentKey", key.agent.as_str()), ("limit", "2")];
 
     if let Some(account) = key.account.as_deref() {
       query.push(("accountKey", account));
@@ -303,9 +344,14 @@ impl HttpBrain {
     Ok(Some(id))
   }
 
-  // The active memories of one type in a brain, read in pages of the size the route takes, each after the
-  // last id read, so a type holding more than one page is read whole.
+  // The active memories of one type in a brain, read whole.
   async fn active(&self, brain: i64, kind: &str) -> Answer<Vec<Memory>> {
+    self.memories(brain, &[("type", kind)]).await
+  }
+
+  // The active memories of a brain the filters name, read in pages of the size the route takes, each after the
+  // last id read, so a read holding more than one page is read whole.
+  async fn memories(&self, brain: i64, filters: &[(&str, &str)]) -> Answer<Vec<Memory>> {
     let mut all: Vec<Memory> = Vec::new();
     let path = format!("brains/{brain}/memories");
     let limit = PAGE_ROWS.to_string();
@@ -313,7 +359,9 @@ impl HttpBrain {
 
     loop {
       let after_text = after.map(|id| id.to_string());
-      let mut query: Vec<(&str, &str)> = vec![("type", kind), ("status", "active"), ("limit", &limit)];
+      let mut query: Vec<(&str, &str)> = filters.to_vec();
+
+      query.extend([("status", "active"), ("limit", limit.as_str())]);
 
       if let Some(after) = after_text.as_deref() {
         query.push(("after", after));
@@ -645,6 +693,69 @@ impl Brain for HttpBrain {
       }
 
       Ok(sheets)
+    })
+  }
+
+  fn org_brain(&self, company: i64, unit: i64) -> BoxFuture<'_, Answer<Option<i64>>> {
+    Box::pin(async move {
+      if let Some(id) = self.org_brains.lock().ok().and_then(|held| held.get(&(company, unit)).copied()) {
+        return Ok(Some(id));
+      }
+
+      let (account, agent) = (company.to_string(), unit.to_string());
+      let page: Page<BrainMember> = self
+        .get(
+          "a unit's org brain",
+          "brains",
+          &[("kind", "org"), ("accountKey", &account), ("agentKey", &agent), ("limit", "1")],
+        )
+        .await?;
+      let Some(id) = page
+        .items
+        .iter()
+        .find(|brain| brain.account_key == account && brain.agent_key == agent)
+        .map(|brain| brain.id)
+      else {
+        return Ok(None);
+      };
+
+      if let Ok(mut held) = self.org_brains.lock() {
+        held.insert((company, unit), id);
+      }
+
+      Ok(Some(id))
+    })
+  }
+
+  fn org_topics<'a>(&'a self, brains: &'a [i64]) -> BoxFuture<'a, Answer<Vec<OrgTopic>>> {
+    Box::pin(async move {
+      if brains.is_empty() {
+        return Ok(Vec::new());
+      }
+
+      let named = brains.iter().map(i64::to_string).collect::<Vec<_>>().join(",");
+      let items: Vec<TopicItem> =
+        self.get("what stands for a person", "org-topics", &[("brainIds", &named)]).await?;
+
+      Ok(
+        items
+          .into_iter()
+          .map(|item| OrgTopic {
+            topic: item.topic,
+            brain: item.brain_id,
+            locked: item.locked,
+            memories: item.memories.iter().map(org_memory).collect(),
+          })
+          .collect(),
+      )
+    })
+  }
+
+  fn org_memories(&self, brain: i64) -> BoxFuture<'_, Answer<Vec<OrgMemory>>> {
+    Box::pin(async move {
+      let rows = self.memories(brain, &[("excludeTypes", "rumor,episode")]).await?;
+
+      Ok(rows.iter().map(org_memory).collect())
     })
   }
 }

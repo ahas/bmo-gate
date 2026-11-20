@@ -4,7 +4,7 @@
     "slug": { "type": "string", "minLength": 1, "description": "The entry's slug, as the index names it." },
     "group": {
       "type": "string",
-      "enum": ["system-documents", "room-rules", "knowledge", "people", "room-memories"],
+      "enum": ["system-documents", "room-rules", "knowledge", "people", "room-memories", "organisation"],
       "description": "The group the entry stands in."
     },
     "room": { "type": "integer", "description": "The room; the turn's room where absent." }

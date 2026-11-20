@@ -6,6 +6,7 @@ pub(crate) mod fakes;
 
 mod index;
 mod memories;
+mod organisation;
 mod road;
 mod situation;
 
@@ -17,7 +18,7 @@ use gate_reference::Reference;
 use gate_runs::Runs;
 use gate_stages::{Reading, Stages};
 
-use crate::reference::fakes::{AnsweringGateway, FakeBrain, FakeReceiver, PausingGateway};
+use crate::reference::fakes::{AnsweringGateway, FakeAccounts, FakeBrain, FakeReceiver, PausingGateway};
 use crate::runs::fakes::{FakeAgency, provider};
 use crate::support::scratch::Scratch;
 
@@ -26,6 +27,8 @@ use crate::support::scratch::Scratch;
 pub struct Ground {
   _scratch: Scratch,
   pub brain: Arc<FakeBrain>,
+  pub accounts: Arc<FakeAccounts>,
+  pub agency: Arc<FakeAgency>,
   pub gateway: Arc<AnsweringGateway>,
   pub reference: Reference,
 }
@@ -66,9 +69,11 @@ pub async fn paused_ground(
   let stages = Arc::new(Stages::new(runs, Reading::default()));
   let brain = Arc::new(FakeBrain::default());
   let receiver = Arc::new(FakeReceiver::default());
+  let accounts = Arc::new(FakeAccounts::default());
   let reference = Reference {
     stages,
     brain: brain.clone(),
+    accounts: accounts.clone(),
     receiver,
     shipped: Some(shipped),
   };
@@ -76,6 +81,8 @@ pub async fn paused_ground(
   Ground {
     _scratch: scratch,
     brain,
+    accounts,
+    agency,
     gateway,
     reference,
   }

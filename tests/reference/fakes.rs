@@ -1,4 +1,4 @@
-//! Stand-ins for the brain, the receiver and bmo-job the reference road is carried against, and a gateway that
+//! Stand-ins for the brain, the account service, the receiver and bmo-job the reference road is carried against, and a gateway that
 //! answers each request by what it is asked: each keeps what it was asked, so a test reads back every call.
 
 use std::collections::HashMap;
@@ -7,7 +7,10 @@ use std::sync::Mutex;
 use futures_util::StreamExt;
 use futures_util::future::BoxFuture;
 use futures_util::stream::BoxStream;
-use gate_ports::brain::{Brain, BrainKey, Condition, Document, Event, Fragment, MemoryRow, Reply, Sheet};
+use gate_ports::accounts::{Accounts, Placement};
+use gate_ports::brain::{
+  Brain, BrainKey, Condition, Document, Event, Fragment, MemoryRow, OrgMemory, OrgTopic, Reply, Sheet,
+};
 use gate_ports::gateway::{Ask, Completion, Gateway};
 use gate_ports::http::Answer;
 use gate_ports::receiver::{Drafted, Receiver};
@@ -93,6 +96,14 @@ pub struct FakeBrain {
   pub events: Mutex<Vec<Event>>,
   pub knowledge_asked: Mutex<Vec<Vec<String>>>,
   pub lore_asked: Mutex<Vec<Vec<String>>>,
+  /// The org brains it keeps, by the company's and the unit's numbers.
+  pub org_brains: Mutex<HashMap<(i64, i64), i64>>,
+  /// What stands, each topic answered where its brain is among those named.
+  pub org_topics: Mutex<Vec<OrgTopic>>,
+  /// The org brains named on each read of what stands.
+  pub org_topics_asked: Mutex<Vec<Vec<i64>>>,
+  /// Each org brain's live memories.
+  pub org_memories: Mutex<HashMap<i64, Vec<OrgMemory>>>,
 }
 
 impl FakeBrain {
@@ -251,6 +262,45 @@ impl Brain for FakeBrain {
           .collect(),
       )
     })
+  }
+
+  fn org_brain(&self, company: i64, unit: i64) -> BoxFuture<'_, Answer<Option<i64>>> {
+    Box::pin(async move { Ok(self.org_brains.lock().unwrap().get(&(company, unit)).copied()) })
+  }
+
+  fn org_topics<'a>(&'a self, brains: &'a [i64]) -> BoxFuture<'a, Answer<Vec<OrgTopic>>> {
+    Box::pin(async move { Ok(self.standing_for(brains)) })
+  }
+
+  fn org_memories(&self, brain: i64) -> BoxFuture<'_, Answer<Vec<OrgMemory>>> {
+    Box::pin(async move { Ok(self.org_memories.lock().unwrap().get(&brain).cloned().unwrap_or_default()) })
+  }
+}
+
+impl FakeBrain {
+  /// The brain answering `standing` for the brains named.
+  fn standing_for(&self, brains: &[i64]) -> Vec<OrgTopic> {
+    self.org_topics_asked.lock().unwrap().push(brains.to_vec());
+    self
+      .org_topics
+      .lock()
+      .unwrap()
+      .iter()
+      .filter(|topic| brains.contains(&topic.brain))
+      .cloned()
+      .collect()
+  }
+}
+
+/// The stand-in account service: where each person stands, every person it holds none of standing in no unit.
+#[derive(Default)]
+pub struct FakeAccounts {
+  pub placements: Mutex<HashMap<i64, Placement>>,
+}
+
+impl Accounts for FakeAccounts {
+  fn placement(&self, user: i64) -> BoxFuture<'_, Answer<Option<Placement>>> {
+    Box::pin(async move { Ok(self.placements.lock().unwrap().get(&user).cloned()) })
   }
 }
 

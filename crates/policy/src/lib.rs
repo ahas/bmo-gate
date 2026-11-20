@@ -7,6 +7,7 @@ use serde::de::DeserializeOwned;
 pub mod gate_pool;
 pub mod gates;
 pub mod memories;
+pub mod organisation;
 pub mod profiles;
 pub mod reference;
 pub mod translation;

@@ -336,8 +336,8 @@ pub struct IndexEntry {
   pub path: String,
 }
 
-/// One group of the index: `system-documents`, `room-rules`, `knowledge`, `people` or `room-memories`, how many of
-/// its entries the session has not read, one sentence of what changed in the last three days or null, and its
+/// One group of the index: `system-documents`, `room-rules`, `knowledge`, `people`, `room-memories` or
+/// `organisation`, how many of its entries the session has not read, one sentence of what changed in the last three days or null, and its
 /// entries.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

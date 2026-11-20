@@ -52,6 +52,9 @@ pub struct Settings {
   pub agency: Unit,
   pub brain: Unit,
   pub receiver: Unit,
+  /// The account service, bmo-web's server; none reads no org brain.
+  #[serde(default)]
+  pub accounts: Option<Unit>,
   pub gateway: Gateway,
   pub shipped: Option<Shipped>,
   #[serde(default)]

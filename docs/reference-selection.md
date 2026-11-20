@@ -13,7 +13,9 @@ pieces themselves live in the brain, and the system documents among them are the
 Every account has supervisors of its own, each with a brain of its own, and a supervisor's reference never shows
 another supervisor's memories, rooms or people, of its own account or another.
 
-- **A reference is one supervisor's, read from its own brain alone.** The supervisor is the agent the caller
+- **A reference is one supervisor's, read from its own brain** and, beside it, from the org brains of the units the
+  person it serves belongs to (「What an organisation hands its members」); no other brain is read. The supervisor is
+  the agent the caller
   names: the situation's agent on a chat turn, the envelope's `agent` on a turn with no situation, and `agent` on
   the index, a piece and a search. A turn with no situation is a supervisor's instruction outside any room, a
   job's first prompt or its double's, and names the supervisor it is read for in `agent`; an envelope carrying both
@@ -28,14 +30,65 @@ another supervisor's memories, rooms or people, of its own account or another.
   from the one brain filed under their name in any account. A name that stands on brains of more than one
   account reads none of them: the gate never picks one.
 - **No brain, no memory index.** An agent the brain keeps no brain for is handed nothing from a brain on a turn,
-  and its index answers no group at all; a piece of it is not found and a search finds nothing.
+  org brains among them, and its index answers no group at all; a piece of it is not found and a search finds
+  nothing.
 - **The room narrows, never widens.** A room picks among the supervisor's own rows, those about that room or about
-  no room, and the people its own brain knows facts of; no room named brings in a row of any other brain. So a
-  supervisor reads its own rooms' memories and people alone.
+  no room, and the people its own brain knows facts of; no room named brings in a row of another agent's brain. So a
+  supervisor reads its own rooms' memories and people alone. The org brains are read by the person the supervisor
+  serves, never by the room, and hold no memory about a person.
 - **The system documents meant for every supervisor** are the shipped reference documents `docs/reference-index.md`
   lists, and no other. A note about the deployment's machines, its credentials or the owner's own work is never one
   of them: it is a memory of the owner's brain, and reaches the owner's supervisor alone. The `system-documents`
   group's lore is the supervisor's own brain's.
+
+## What an organisation hands its members
+
+An org brain holds what holds for everyone in one unit of an organisation, a company or a unit under it (the brain's
+`docs/design.md`, 「Org brains」). A supervisor's reference reads the org brains of the units the person it serves
+stands in, so what a company, a division or a team says of itself reaches every member's agent.
+
+```mermaid
+flowchart TD
+  S["the supervisor"] --> O["its owner account"]
+  O --> P["the person's units: posts, then the company down to the home unit"]
+  P --> B["each unit's org brain"]
+  B --> T["what stands for the person, by topic"]
+  T --> H["the org sheet on a turn"]
+  B --> I["the organisation group of the index"]
+```
+
+- **Whose organisation it is.** The person is the supervisor's owner, its `ownerAccount` (「Whose reference it
+  is」). A supervisor of no account, an owner the account service places in no unit, and a deployment whose
+  settings name no account service read no org brain: the turn carries no org sheet and the `organisation` group
+  stands empty.
+- **The person's units, the farthest first.** The account service answers the person's home unit with the path
+  from the company down to it, and the posts they hold in other units of the company, each with its own path
+  (`docs/boundary-api.md`, 「The account service」). The units are named in the order the brain reads them by: first
+  the units of the posts' paths that stand on no other path named, the posts in the order answered and each path
+  from the top down, then the company and each unit under it down to the home unit. So the home path wins a topic
+  over a post, and a nearer unit over a farther one.
+- **A unit's org brain** is the brain of the kind `org` filed under the company's number as its account and the
+  unit's number as its agent, each written as its digits. A unit the brain keeps no org brain for is passed over.
+- **What stands for the person** is the brain's answer for those org brains in that order (the brain's
+  `GET /org-topics`): for each topic, the memories of the one unit whose word on it holds, the farthest holding a
+  locked one, else the nearest holding one. A proposal and an episode never stand, and an org memory with no topic
+  stands for nobody: it is read through the index alone.
+- **Read for the company's own people.** Every org brain is read for an audience inside the company, internal-only
+  memories among them (`docs/boundary-api.md`, 「Contract gaps」).
+- **The org sheet** is one entry, under the path `organisation/sheet.md`, of the source `memory`: a head line saying
+  what it is, then one line a standing memory, its number, its unit's name, its topic, a mark where it is locked,
+  and its words. The lines go in the brain's order, the farthest unit first and the home unit last, each topic's
+  memories by importance.
+- **The org sheet is held to 2,000 characters.** The head line always stands. Where the lines do not all fit, they
+  are kept one at a time while they fit, a locked one first, then the nearer unit's, then the more important, the
+  brain's order breaking a tie; the lines kept stand in the brain's order. Nothing standing, or no line fitting,
+  carries no org sheet. Like a person's sheet it is held to its own ceiling and is not counted in the turn's total.
+- **The `organisation` group** of the index is every other live org memory of the person's units: the brain's
+  active rows of their org brains that are neither a proposal nor an episode, the unit's order and then the brain's,
+  less those the org sheet carried and those of a topic another unit's word holds. An entry's slug is `org-<memory
+  id>`, what it holds the unit's name and the first line of its words, when to read it the memory's recall
+  condition, and its path `organisation/<unit>/<memory id>`. A piece is the memory's words under the name of the unit
+  it is from, so the agent tells which unit said what where two disagree.
 
 ## What a turn is given
 
@@ -47,11 +100,13 @@ another supervisor's memories, rooms or people, of its own account or another.
   entry under `memories/<room>`; a turn on which nothing is due carries no memories entry.
 - **The rows the turn's events wake,** by the event alone (the brain's `docs/memories.md`, 「A row with an
   event」).
+- **The org sheet,** what the organisation of the person the supervisor serves holds for them on every topic
+  (「What an organisation hands its members」); a supervisor of no organisation has none.
 - **Nothing else.** No room rule, no knowledge, no lore, no other person's sheet and no undue memory attaches to a
   turn: each stands in the index, for the agent to read where the turn needs it.
 - **Every turn is one designated agent's,** the agent its situation names, else its `agent`, and everything is
-  read from that agent's own brain (「Whose reference it is」). An agent keeping no brain is given no sheet and no
-  memory, never the chat agent's.
+  read from that agent's own brain and the org brains of the person it serves (「Whose reference it is」). An agent
+  keeping no brain is given no sheet and no memory, never the chat agent's.
 - **The sheet's head is every name line first, then the eight most important fact lines,** the policy's count,
   as the brain renders the person's subject with the room's subject as its room (the brain's `docs/design.md`,
   「A person is a subject」). The name lines are what the person is called, one line a live name, those about this
@@ -81,23 +136,26 @@ another supervisor's memories, rooms or people, of its own account or another.
 | `GET /reference/pieces/{slug}` | `room`, `group`, `session?`, `agent` | `slug`, `group`, `path`, `text` |
 | `GET /reference/search` | `q`, `room`, `limit?`, `agent` | `entries`, each `slug`, `group`, `holds`, `readWhen` |
 
-- **Five groups, in this order:** `system-documents` (the lore of the agent's brain, in a room that reads it; the
+- **Six groups, in this order:** `system-documents` (the lore of the agent's brain, in a room that reads it; the
   brain holds no row of a shipped reference document, so no index lists one), `room-rules` (the room's rules and
-  its situation rules), `knowledge`, `people` (everyone the brain knows facts of in the room) and `room-memories`
-  (the room's standing memories). Every group is the named agent's own brain's (「Whose reference it is」); an
-  agent keeping no brain is answered no group at all.
+  its situation rules), `knowledge`, `people` (everyone the brain knows facts of in the room), `room-memories`
+  (the room's standing memories) and `organisation` (the org memories of the person the agent serves beyond its org
+  sheet, 「What an organisation hands its members」). Every other group is the named agent's own brain's (「Whose
+  reference it is」); an agent keeping no brain is answered no group at all.
 - **An entry** is the row's `slug`, what it `holds`, when to read it, `readWhen`, and its `path`, the path a piece
   read of it is recorded under among the session's loads, which is how a caller names what a session read. A knowledge piece's or a
   rule's title is split where it says when it is needed — at "; needed", "; consulted" and their kin up to the
   "when" that follows — what stands before being `holds` and the rest `readWhen`; a title that says no such thing
   is all `holds`, with `readWhen` null. A situation rule holds its action and is read when its condition holds; a
   memory holds its words and is read when its condition holds; a person holds their name, and is read when they
-  speak or are spoken of.
+  speak or are spoken of; an org memory holds its unit's name and its words, and is read when its recall condition
+  holds.
 - **`unread`** counts a group's entries whose path the session's loads do not hold (the agency's
   `GET /session-loads/{sessionId}`); with no session named, every entry is unread. **`hint`** is one sentence saying how many of the group's entries changed in
   the last three days, and null where none did.
 - **A piece** is read by its slug within its group: its path and its whole text, a person as their sheet held to
-  its ceiling, a memory and a situation rule as the row carries them. Where `session` is given, the piece is
+  its ceiling, a memory and a situation rule as the row carries them, an org memory as its words under its unit's
+  name. Where `session` is given, the piece is
   recorded among the session's loads at its version (the agency's `PUT /session-loads/{sessionId}`), so the next
   index counts it read. A slug the group does not hold is 404 `not-found`.
 - **A search** matches the words of `q` against every group's entries, their slugs, what they hold and when they
@@ -112,7 +170,7 @@ another supervisor's memories, rooms or people, of its own account or another.
 
 - **Every document the reference attaches goes to a chat session in full once per version**, and as a
   one-line mark on every later turn of that session that attaches the same version: the memories entry, the
-  standing sheets and the woken rows.
+  standing sheets, the org sheet and the woken rows.
 - **Why:** a chat session is a continuing conversation, so a document loaded once stays in that session's
   context and is read on later turns too. Sending the same text again buys nothing but its size.
 - **What a version is:** the attached text itself. One changed character is a new version, and a new version

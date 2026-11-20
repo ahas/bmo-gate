@@ -1,0 +1,15 @@
+# What an organisation hands its members (docs/reference-selection.md, 「What an organisation hands its members」): the
+# lines of the org sheet a turn carries and the words of the index's organisation group.
+
+# The org sheet: its head line, and one line a standing memory (`{id}` its number, `{unit}` its unit's name,
+# `{topic}` its topic, `{locked}` the locked mark where it is locked, `{text}` its words).
+[sheet]
+head = "What the organisation of the person you serve holds for them, by topic, the company first and their own unit last:"
+line = "- [#{id} {unit} · {topic}{locked}] {text}"
+locked = " · locked"
+
+# An entry of the organisation group: what it holds (`{unit}` its unit's name, `{text}` the first line of its
+# words), and its piece, its whole words under its unit's name.
+[index]
+holds = "{unit}: {text}"
+piece = "From {unit}:\n\n{text}"

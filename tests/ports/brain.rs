@@ -179,6 +179,7 @@ async fn the_memory_reads_find_the_agents_brain_and_map_its_standing_types() {
 
   let brains_asked = stub.one("/brains");
   assert!(brains_asked.query.as_deref().is_some_and(|q| q.contains("agentKey=chat-agent")));
+  assert!(brains_asked.query.as_deref().is_some_and(|q| q.contains("kind=agent")));
   assert_eq!(brains_asked.bearer().as_deref(), Some("brain-token"));
   let asked: Vec<_> = stub.seen().into_iter().filter(|seen| seen.path == "/brains/9/memories").collect();
   assert!(
@@ -486,4 +487,73 @@ async fn each_supervisor_is_read_from_its_own_accounts_brain_and_a_name_on_two_a
       "{why}: no brain's members are read"
     );
   }
+}
+
+#[tokio::test]
+async fn an_org_brain_is_found_by_its_company_and_unit_and_read_by_topic_and_whole() {
+  let stub = Stub::start().await;
+  let brain = HttpBrain::new(peer(&stub, "t"));
+  let topic = json!({ "id": 2, "type": "topic", "key": "working-hours" });
+
+  stub.answer(
+    Method::GET,
+    "/brains",
+    200,
+    page(vec![
+      json!({ "id": 40, "kind": "org", "accountKey": "1", "agentKey": "3", "name": "3", "createdAt": 1 }),
+    ]),
+  );
+  stub.answer(
+    Method::GET,
+    "/org-topics",
+    200,
+    json!([{ "topic": "working-hours", "brainId": 40, "locked": true, "memories": [{
+      "id": 5, "type": "fact", "text": "07:00 to 16:00", "subjects": [topic], "importance": 6, "locked": true,
+      "validFrom": 100, "createdAt": 90, "status": "active"
+    }] }]),
+  );
+  stub.answer(
+    Method::GET,
+    "/brains/40/memories",
+    200,
+    page(vec![json!({
+      "id": 6, "type": "fact", "text": "Reports go out on Friday.", "subjects": [], "importance": 4,
+      "recallCondition": "a weekly report comes up", "validFrom": 200, "createdAt": 200, "status": "active"
+    })]),
+  );
+
+  assert_eq!(brain.org_brain(1, 3).await.unwrap(), Some(40));
+  assert_eq!(brain.org_brain(1, 3).await.unwrap(), Some(40));
+  assert_eq!(brain.org_brain(1, 9).await.unwrap(), None);
+
+  let found: Vec<String> = stub
+    .seen()
+    .into_iter()
+    .filter(|seen| seen.path == "/brains")
+    .filter_map(|seen| seen.query)
+    .collect();
+
+  assert_eq!(found.len(), 2, "a brain found is remembered: {found:?}");
+  assert!(
+    found[0].contains("kind=org") && found[0].contains("accountKey=1") && found[0].contains("agentKey=3")
+  );
+
+  let standing = brain.org_topics(&[10, 40]).await.unwrap();
+
+  assert_eq!(stub.one("/org-topics").query.as_deref(), Some("brainIds=10%2C40"));
+  assert_eq!(standing.len(), 1);
+  assert_eq!((standing[0].brain, standing[0].locked), (40, true));
+  assert_eq!(standing[0].memories[0].topics, ["working-hours"]);
+  assert!(standing[0].memories[0].locked);
+
+  let memories = brain.org_memories(40).await.unwrap();
+  let asked = stub.one("/brains/40/memories").query.unwrap_or_default();
+
+  assert!(
+    asked.contains("excludeTypes=rumor%2Cepisode") && asked.contains("status=active"),
+    "{asked}"
+  );
+  assert!(!asked.contains("type="), "no type is named, so the read records no use: {asked}");
+  assert_eq!(memories[0].recall_condition.as_deref(), Some("a weekly report comes up"));
+  assert!(memories[0].topics.is_empty());
 }

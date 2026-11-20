@@ -27,6 +27,7 @@ each release links to the data root's `env/gate.toml`. It names:
 | `run_agent` | the registration name a gate run's own session stands under, so its program keeps a place apart from the agent whose turn it judges; absent, the caller's agent stands, or the stage's name where the caller names none |
 | `session_folder` | the folder a gate run's thrown-away session is started in |
 | `[agency]`, `[brain]`, `[receiver]` | each unit's `address`, and the `token_file` under `env/` holding the token it is called with |
+| `[accounts]` | the account service, bmo-web's server, in the same shape; absent, no org brain is read (`docs/reference-selection.md`, 「What an organisation hands its members」) |
 | `[gateway]` | the agency's model gateway: its `address`, and the `key_file` under `env/` |
 | `[shipped]` | `folder`, under which the shipped pieces' bodies are read — the system's reference documents, as the deployment places them — a row's path read relative to it |
 | `[reading]` | what the translator's checks read a text by: `set_aside`, the words the English test reads past — the names of people and agents and the marks a note's strands open with — and `wording`, the file the owner's banned words are read from, where the deployment keeps one |
@@ -76,7 +77,7 @@ In the common conventions: camelCase, epoch milliseconds, and an error of `{code
 (the brain's `docs/boundary-api.md`, 「Brains」); the brain's published client does not carry the reference
 road's view of the rows.
 
-The gate finds the turn's agent's brain by the account that owns the agent and the agent's key
+The gate finds the turn's agent's brain by the account that owns the agent and the agent's key, of the kind `agent`
 (`docs/reference-selection.md`, 「Whose reference it is」), remembers it once found, and reads that brain's
 memories by type:
 one memory is one row of a type about subjects, and the gate maps it to what the reference road reads. A
@@ -87,7 +88,7 @@ no room at all.
 
 | Call | Route | Body or query | Answer |
 |---|---|---|---|
-| the agent's brain | `GET /brains` | `agentKey`, `accountKey` where the agent's supervisor has an account (the owning user's id), `limit=2` | `items`: the brain of that account and agent key, whose id every call below stands under; with no account asked, the one brain of that agent key, and none where the key stands in two accounts or more; where none is answered, every read below answers nothing |
+| the agent's brain | `GET /brains` | `kind=agent`, `agentKey`, `accountKey` where the agent's supervisor has an account (the owning user's id), `limit=2` | `items`: the brain of that account and agent key, whose id every call below stands under; with no account asked, the one brain of that agent key, and none where the key stands in two accounts or more; where none is answered, every read below answers nothing |
 | standing rows | `GET /brains/{brainId}/memories` | `type` (each of `promise`, `check`, `followup`, `situation`, `state`), `status=active`, `limit` at the route's ceiling, `after` for each page after the first | `items`: the rows that wait on nothing, by their old `conditions` label or, for a `situation` the agent wrote, its own text, and the errands whose event has come, by their `event_met_at` label; a row's words are its old condition's action, else its text |
 | conditional rows | the standing rows | | their old `conditions` label, or a `situation`'s text as its condition |
 | rows the events wake | the standing rows | | the gate filters them by the events their `event` or `conditions` labels name |
@@ -98,6 +99,9 @@ no room at all.
 | knowledge read | `GET /brains/{brainId}/memories` | `type=knowledge`, `status=active`, paged | `items`, filtered by the slug asked |
 | lore read | `GET /brains/{brainId}/memories` | `type=lore`, `status=active`, paged | `items`, filtered by the slug asked; a piece's body is the row's text |
 | a subject found | `GET /brains/{brainId}/subjects` | `type` (`person` or `room`), `key` (the user's or the room's id), `limit=1` | `items`: the subject, or none where the brain holds none |
+| a unit's org brain | `GET /brains` | `kind=org`, `accountKey` the company's number, `agentKey` the unit's, `limit=1` | `items`: the unit's org brain, remembered once found, or none, where the unit is passed over |
+| what stands for a person | `GET /org-topics` | `brainIds`, the org brains of the person's units, the farthest first | one item a topic: `topic`, `brainId`, the brain whose word on it holds, `locked`, and its `memories`, each `id`, `text`, `importance` and `locked`; read for the company's own people, so no `audience` is named |
+| a unit's org memories | `GET /brains/{brainId}/memories` | `status=active`, `excludeTypes=rumor,episode`, paged | `items`: every live org memory of the unit that is neither a proposal nor an episode, each `id`, `text`, `recallCondition`, `subjects` (a topic is a subject of type `topic`, its key the topic) and `validFrom`; no type is named, so the read records no use |
 | a person's sheet | `GET /brains/{brainId}/subjects/{subjectId}/sheet` | `roomId`, the room's subject, where the brain holds one; `limit`, the head's count of fact lines, for a speaker's head (`docs/reference-selection.md`, 「What a turn is given」), and none for a whole sheet | `text/plain`: one line a name first, `- [#<id> name] <text>`, those about the room ahead of those about no room, every name whatever the `limit`; then one line a fact, `- [#<id> since <date>] <text>`, the most important first; empty where the brain knows no name and no fact of the person there |
 
 The system's reference documents are held nowhere in the brain, so the brain answers no rows of them, and the
@@ -114,6 +118,19 @@ facts about that room (the brain's `docs/design.md`, 「A person is a subject」
 for a sheet (`docs/reference-selection.md`, 「What a turn is given」). An entry of the `people` group is one person subject
 the brain's live facts are about: its slug `person-<user id>`, what it holds the subject's name, else the user
 id. The brain picks nothing, and the gate writes nothing back to it.
+
+### The account service
+
+bmo-web's server (its `docs/boundary.md`, 「Organisation units」), in its wire conventions: camelCase, its server's
+token, a user named by the digits of their id.
+
+| Call | Route | Body or query | Answer |
+|---|---|---|---|
+| a person's unit | `GET /users/{user}/unit` | | `company` and `path`, the unit references from the company down to the person's home unit, each `id` and `name`; 404 is a person the service places in no unit, who reads no org brain |
+| a person's posts | `GET /users/{user}/posts` | `Owner-Key`, the person's own id | `posts`, each `unit` and its `path` from the company down to it |
+
+The gate asks both for the owner of the supervisor whose reference it reads, on every turn and every read of the
+index, and keeps neither answer, so a person moved between units reads their new units at once.
 
 ### bmo-receiver
 
@@ -267,8 +284,9 @@ and nothing behind it (`docs/gates.md`, 「Where a gate's runs go out」):
 | Values | Owner | How the gate reads them |
 |---|---|---|
 | the gate pool: how many runs of one gate stand at once, the rest waiting in line | the gate | its own policy file |
-| what a turn is handed: the sheet's head and ceiling, the due memories' count, the woken rows' and the turn's totals | the gate | its own policy file |
+| what a turn is handed: the sheet's head and ceiling, the org sheet's ceiling, the due memories' count, the woken rows' and the turn's totals | the gate | its own policy file |
 | the memories entry's data lines | the gate | its own policy file |
+| the org sheet's lines and the organisation group's words | the gate | its own policy file |
 | the gate order and the gates' profiles | the gate | its own policy file, served by `GET /gates` |
 | the prompt ceilings | the gate | its own policy file |
 | the translator's languages: the worker's, the owner's and each language's name | the gate | its own policy file |
@@ -327,6 +345,11 @@ Statements here that a sibling's document does not yet match, each for that sibl
   the order through `GET /gates`.
 - **The brain's knowledge read** answers the knowledge chunks a room may read; the gate reads a room rule's piece
   through it as well, for the brain to take the room's room-rule chunks there.
+- **The receiver's turn names five groups of the index,** and not `organisation`, so a turn's index line counts no
+  unread org memory; the agent reaches the group through the index tools, for the receiver to name it.
+- **Nothing tells the gate whether someone outside the company sits in a room,** so every org brain is read for the
+  company's own people and an internal-only memory reaches such a room too; for the receiver to say it on the
+  envelope and the index's calls, which the gate then reads with the brain's `audience` `external`.
 - **The receiver sends no `lore`** with a turn's reference, so every room's index lists the lore.
 - **The document viewer counts a part kept as failed and says no more:** the parts page answers each such part's
   `failure` (`docs/api.md`, 「Documents」), for the web unit to show beside the count.

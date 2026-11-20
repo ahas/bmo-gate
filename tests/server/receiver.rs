@@ -61,7 +61,10 @@ async fn the_index_counts_what_the_session_read_a_piece_records_its_read_and_a_s
     .map(|group| group["group"].as_str().unwrap())
     .collect();
 
-  assert_eq!(groups, ["system-documents", "room-rules", "knowledge", "people", "room-memories"]);
+  assert_eq!(
+    groups,
+    ["system-documents", "room-rules", "knowledge", "people", "room-memories", "organisation"]
+  );
 
   let knowledge = &index["groups"][2];
 

@@ -421,7 +421,7 @@
         "type": "object"
       },
       "IndexGroup": {
-        "description": "One group of the index: `system-documents`, `room-rules`, `knowledge`, `people` or `room-memories`, how many of\nits entries the session has not read, one sentence of what changed in the last three days or null, and its\nentries.",
+        "description": "One group of the index: `system-documents`, `room-rules`, `knowledge`, `people`, `room-memories` or\n`organisation`, how many of its entries the session has not read, one sentence of what changed in the last three days or null, and its\nentries.",
         "properties": {
           "entries": {
             "items": {
@@ -1988,7 +1988,7 @@
             "$ref": "#/components/responses/Error"
           }
         },
-        "summary": "The brain's index for an agent in a room, read from that agent's own brain alone: five groups, each its unread count against the session's loads, its hint and its entries; no group where the agent keeps no brain.",
+        "summary": "The brain's index for an agent in a room, read from that agent's own brain and, for the organisation group, the org brains of its owner's units: six groups, each its unread count against the session's loads, its hint and its entries; no group where the agent keeps no brain.",
         "tags": [
           "Reference"
         ],

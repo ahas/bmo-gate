@@ -92,8 +92,8 @@ It answers `entries`, each `path`, `text` and `source` (`document`, `person`, `r
 `knowledge`, `memory`, `room` or `archive`).
 
 - **A turn's reference** is what attaches with no pick (`docs/reference-selection.md`, 「What a turn is
-  given」): the head of each speaker's sheet, at most three due memories and the rows the turn's events wake. It
-  asks no model. The envelope is read for the room, the speakers, the agent and the events; its other fields
+  given」): the head of each speaker's sheet, the org sheet of the person the agent serves, at most three due
+  memories and the rows the turn's events wake. It asks no model. The envelope is read for the room, the speakers, the agent and the events; its other fields
   change nothing a turn is given. The turn is read from the brain of the agent it names, the situation's
   `agentName` else `agent`, found by the account owning it (`docs/reference-selection.md`, 「Whose reference it
   is」); an agent keeping no brain is handed no entry. An envelope naming no agent, one whose `agent` and
@@ -108,12 +108,13 @@ It answers `entries`, each `path`, `text` and `source` (`document`, `person`, `r
 
 - **The index, a piece and a search** are the brain's reference as the agent reads it itself, with no model
   (`docs/reference-selection.md`, 「The index an agent reads」). `group` is `system-documents`, `room-rules`,
-  `knowledge`, `people` or `room-memories`; any other is 400 `bad-request`, as is a `limit` outside 1 to 24, an
-  empty `q` or a blank `agent`. Each is read from the named agent's own brain alone, found by the account owning
-  it (`docs/reference-selection.md`, 「Whose reference it is」); an agent keeping no brain is answered no group, no
+  `knowledge`, `people`, `room-memories` or `organisation`; any other is 400 `bad-request`, as is a `limit` outside 1 to 24, an
+  empty `q` or a blank `agent`. Each is read from the named agent's own brain, found by the account owning it, and
+  the `organisation` group from the org brains of the units its owner stands in (`docs/reference-selection.md`,
+  「Whose reference it is」); an agent keeping no brain is answered no group, no
   piece and no entry. An index asked with no `session` counts every entry unread. A slug its group does not hold is 404
   `not-found`. A piece read with `session` is recorded among the
-  session's loads; a call on the agency that fails is 502 `upstream-failed`.
+  session's loads; a call on the agency, the brain or the account service that fails is 502 `upstream-failed`.
 
 ## Translations
 

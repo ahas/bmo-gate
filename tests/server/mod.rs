@@ -13,6 +13,7 @@ mod work;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+use gate_ports::accounts::NoAccounts;
 use gate_ports::gateway::Ask;
 use gate_reference::Reference;
 use gate_runs::Runs;
@@ -72,6 +73,7 @@ pub async fn ground(test: &str, answer: impl Fn(&Ask) -> Option<String> + Send +
   let reference = Arc::new(Reference {
     stages: stages.clone(),
     brain: brain.clone(),
+    accounts: Arc::new(NoAccounts),
     receiver: Arc::new(FakeReceiver::default()),
     shipped: None,
   });

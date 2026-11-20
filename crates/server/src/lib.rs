@@ -19,6 +19,7 @@ use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use gate_codes::Code;
 use gate_ports::Peer;
+use gate_ports::accounts::{Accounts, HttpAccounts, NoAccounts};
 use gate_ports::agency::HttpAgency;
 use gate_ports::brain::HttpBrain;
 use gate_ports::gateway::HttpGateway;
@@ -111,12 +112,19 @@ pub fn stages(settings: &Settings, db: DatabaseConnection) -> Result<Arc<Stages>
   Ok(Arc::new(Stages::new(runs, reading)))
 }
 
-/// The reference road as the settings make it over the gates: the brain and the receiver it reads, and the folder
-/// the shipped pieces' bodies are read under.
+/// The reference road as the settings make it over the gates: the brain, the account service and the receiver it
+/// reads, and the folder the shipped pieces' bodies are read under. Settings naming no account service read no org
+/// brain.
 pub fn reference(settings: &Settings, stages: Arc<Stages>) -> Result<Arc<Reference>, Unread> {
+  let accounts: Arc<dyn Accounts> = match &settings.accounts {
+    Some(unit) => Arc::new(HttpAccounts::new(peer(&unit.address, settings.unit_token(unit)?)?)),
+    None => Arc::new(NoAccounts),
+  };
+
   Ok(Arc::new(Reference {
     stages,
     brain: Arc::new(HttpBrain::new(peer(&settings.brain.address, settings.unit_token(&settings.brain)?)?)),
+    accounts,
     receiver: Arc::new(HttpReceiver::new(peer(
       &settings.receiver.address,
       settings.unit_token(&settings.receiver)?,

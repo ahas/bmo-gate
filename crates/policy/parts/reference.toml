@@ -12,6 +12,11 @@ sheet_chars = 14000
 # brain's sheet orders them, with every name line carried ahead of them.
 sheet_lines = 8
 
+# What the org sheet may hold, in characters: its head line, then the lines of what stands for the person the agent
+# serves, a locked one, the nearer unit's and the more important kept first (docs/reference-selection.md,
+# 「What an organisation hands its members」).
+organisation_chars = 2000
+
 # How many of a room's due memories, the errands whose event has come, attach on a turn, the latest first.
 due = 3
 

@@ -76,12 +76,17 @@ pub fn due_first(rows: &[MemoryRow]) -> (Vec<MemoryRow>, Vec<MemoryRow>) {
 /// What a row's index line says of it: the first line of its words, cut to the policy's length with `…`; its kind
 /// where it has no words.
 pub fn index_title(memory: &MemoryRow) -> String {
-  let first = memory
-    .action
+  first_line(&memory.action, &memory.kind)
+}
+
+/// The first line of a text holding words, cut to the policy's length for an index line with `…`; `otherwise` where
+/// it holds none.
+pub fn first_line(text: &str, otherwise: &str) -> String {
+  let first = text
     .split(['\n', '\r', '\u{2028}', '\u{2029}'])
     .map(js::trim)
     .find(|line| !line.is_empty())
-    .unwrap_or(&memory.kind);
+    .unwrap_or(otherwise);
   let characters = js::chars(first);
   let limit = REFERENCE.index_chars;
 

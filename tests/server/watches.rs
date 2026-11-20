@@ -9,6 +9,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use gate_ports::Peer;
+use gate_ports::accounts::NoAccounts;
 use gate_ports::agency::HttpAgency;
 use gate_ports::receiver::{Drafted, HttpReceiver, Receiver};
 use gate_reference::Reference;
@@ -47,6 +48,7 @@ fn app_on(ground: &super::Ground, agency: &str, receiver: Arc<dyn Receiver>) -> 
     reference: Arc::new(Reference {
       stages,
       brain: Arc::new(FakeBrain::default()),
+      accounts: Arc::new(NoAccounts),
       receiver,
       shipped: None,
     }),

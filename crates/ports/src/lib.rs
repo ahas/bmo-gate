@@ -2,6 +2,7 @@
 //! unit, each unit's declared by a trait the gate's code is written against and made by an HTTP client, so a
 //! test hands the code a stand-in of its own.
 
+pub mod accounts;
 pub mod agency;
 pub mod brain;
 pub mod brain_rows;

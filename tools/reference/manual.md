@@ -6,8 +6,9 @@ speak of nothing you have not read as fact.
 
 ## The index
 
-`gate/reference_index` answers five groups in order: `system-documents`, `room-rules`, `knowledge`, `people` and
-`room-memories`. Each group says how many of its entries this session has not read (`unread`), one sentence where
+`gate/reference_index` answers six groups in order: `system-documents`, `room-rules`, `knowledge`, `people`,
+`room-memories` and `organisation`, what the company and the units of the person you serve hold beyond the org
+sheet your turn carried, each entry naming its unit. Each group says how many of its entries this session has not read (`unread`), one sentence where
 something in it changed in the last three days (`hint`), and its entries: the `slug`, what it `holds`, and when to
 read it (`readWhen`, null where its title does not say).
 
@@ -35,5 +36,6 @@ first, at most `limit` (8 where absent, 24 at most). It asks no model: name the 
 
 ## The room and the session
 
-Each call reads your own brain, for the turn's room and session; name `room` only to read another room. Naming a
-room never reaches another agent's brain. A result marked as an error is a refusal: its text says why.
+Each call reads your own brain, and for `organisation` the org brains of the units the person you serve stands in,
+for the turn's room and session; name `room` only to read another room. Naming a room never reaches another agent's
+brain. A result marked as an error is a refusal: its text says why.

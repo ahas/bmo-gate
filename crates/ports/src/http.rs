@@ -239,9 +239,39 @@ impl Caller {
     segments: &[&str],
     query: &[(&str, &str)],
   ) -> Answer<T> {
-    let response = self.send(call, self.request(Method::GET, segments).query(query)).await?;
+    self.get_with(call, segments, query, &[]).await
+  }
+
+  /// A read answered as `T`, sent with the headers named beside the token.
+  pub async fn get_with<T: DeserializeOwned>(
+    &self,
+    call: &'static str,
+    segments: &[&str],
+    query: &[(&str, &str)],
+    headers: &[(&str, &str)],
+  ) -> Answer<T> {
+    let request = headers
+      .iter()
+      .fold(self.request(Method::GET, segments).query(query), |request, (name, value)| {
+        request.header(*name, *value)
+      });
+    let response = self.send(call, request).await?;
 
     self.read(call, response).await
+  }
+
+  /// A read answered as `T`, or none where the unit holds nothing there: a 404, whatever its code.
+  pub async fn get_or_nothing<T: DeserializeOwned>(
+    &self,
+    call: &'static str,
+    segments: &[&str],
+    query: &[(&str, &str)],
+  ) -> Answer<Option<T>> {
+    match self.get(call, segments, query).await {
+      Ok(answer) => Ok(Some(answer)),
+      Err(PortError::Refused { status: 404, .. }) => Ok(None),
+      Err(failure) => Err(failure),
+    }
   }
 
   /// A read answered as plain text.

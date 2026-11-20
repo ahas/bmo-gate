@@ -1,8 +1,8 @@
 //! The brain's index as an agent reads it itself (`docs/reference-selection.md`, 「The index an agent reads」):
-//! five groups of entries from the agent's own brain alone (「Whose reference it is」), each entry what it holds and
-//! when it is read, the session's loads counted out of the unread, a piece read whole by its slug and recorded among
-//! the session's loads, and a search over every entry's words. An agent keeping no brain has no index. No model is
-//! asked.
+//! six groups of entries from the agent's own brain and its owner's org brains (「Whose reference it is」), each
+//! entry what it holds and when it is read, the session's loads counted out of the unread, a piece read whole by its
+//! slug and recorded among the session's loads, and a search over every entry's words. An agent keeping no brain has
+//! no index. No model is asked.
 
 use std::collections::HashSet;
 use std::sync::LazyLock;
@@ -13,11 +13,13 @@ use gate_ports::brain::{BrainKey, Condition, Load, MemoryRow, Reply};
 use regex::Regex;
 
 use crate::fragments::{self, Fragment};
+use crate::organisation::{self, UnitMemory};
 use crate::road::{KNOWLEDGE, LORE, PERSON_BOOK, ROOM_RULE, SYSTEM_DOCUMENT, held_sheet};
 use crate::{Reference, memories};
 
 /// The groups, in the order an index stands them in.
-pub const GROUPS: [&str; 5] = ["system-documents", "room-rules", "knowledge", "people", "room-memories"];
+pub const GROUPS: [&str; 6] =
+  ["system-documents", "room-rules", "knowledge", "people", "room-memories", "organisation"];
 
 /// How long ago a change still makes a group's hint, in milliseconds: three days.
 const FRESH_MS: i64 = 3 * 24 * 60 * 60 * 1000;
@@ -146,7 +148,19 @@ fn memory_entry(chat_id: i64, row: &MemoryRow) -> IndexEntry {
   }
 }
 
-/// One group's entries in the room from the agent's own brain, `key`, in the order the brain gives them.
+fn org_entry(row: &UnitMemory) -> IndexEntry {
+  IndexEntry {
+    slug: row.slug(),
+    holds: row.holds(),
+    read_when: row.memory.recall_condition.clone(),
+    path: row.path(),
+    changed_at: Some(row.memory.changed_at),
+    body: Body::Text(row.piece()),
+  }
+}
+
+/// One group's entries in the room from the agent's own brain, `key`, and for `organisation` from its owner's org
+/// brains, in the order the brain gives them.
 pub async fn entries(
   reference: &Reference,
   key: &BrainKey,
@@ -184,6 +198,12 @@ pub async fn entries(
       .await
       .iter()
       .map(|row| memory_entry(chat_id, row))
+      .collect(),
+    "organisation" => organisation::rest(reference, key)
+      .await
+      .map_err(Unanswered::Unit)?
+      .iter()
+      .map(org_entry)
       .collect(),
     other => return Err(Unanswered::NoGroup(other.to_owned())),
   })

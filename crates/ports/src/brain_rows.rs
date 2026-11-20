@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::brain::{Condition, Event, Fragment, MemoryRow};
+use crate::brain::{Condition, Event, Fragment, MemoryRow, OrgMemory};
 
 /// A brain, as the brain lists it.
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -71,6 +71,47 @@ pub struct Memory {
   pub labels: BTreeMap<String, String>,
   #[serde(default)]
   pub created_at: i64,
+  #[serde(default)]
+  pub recall_condition: Option<String>,
+  /// In an org brain, whether no lower unit overrides its topic.
+  #[serde(default)]
+  pub locked: bool,
+}
+
+/// One topic as it stands for a member of an organisation, as `GET /org-topics` answers it: the brain whose word
+/// on it holds, whether that word is locked, and its memories.
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TopicItem {
+  #[serde(default)]
+  pub topic: String,
+  #[serde(default)]
+  pub brain_id: i64,
+  #[serde(default)]
+  pub locked: bool,
+  #[serde(default)]
+  pub memories: Vec<Memory>,
+}
+
+/// The subject type an org memory names its topic by (the brain's `docs/design.md`, 「Org brains」).
+pub const TOPIC_TYPE: &str = "topic";
+
+/// An org memory as the reference reads it: its words, its marks, its topics and its recall condition.
+pub fn org_memory(memory: &Memory) -> OrgMemory {
+  OrgMemory {
+    id: memory.id,
+    text: memory.text.clone(),
+    importance: memory.importance,
+    locked: memory.locked,
+    recall_condition: memory.recall_condition.clone().filter(|when| !when.trim().is_empty()),
+    topics: memory
+      .subjects
+      .iter()
+      .filter(|subject| subject.kind == TOPIC_TYPE)
+      .map(|subject| subject.key.clone())
+      .collect(),
+    changed_at: memory.valid_from.max(memory.created_at),
+  }
 }
 
 /// A subject as the brain lists it: a person or a room by the caller's key, and the name the brain knows it by.

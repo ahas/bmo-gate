@@ -6,6 +6,7 @@
 pub mod fragments;
 pub mod index;
 pub mod memories;
+pub mod organisation;
 pub mod road;
 pub mod situation;
 
@@ -13,6 +14,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use gate_ports::PortError;
+use gate_ports::accounts::Accounts;
 use gate_ports::brain::{Brain, BrainKey, Event};
 use gate_ports::receiver::Receiver;
 use gate_stages::Stages;
@@ -78,11 +80,12 @@ pub struct SituationTurn {
 }
 
 /// What a turn's reference is composed on: the gates and their runs, the brain the rows and pieces come from, the
-/// receiver the names come from, and the folder a shipped piece's body is read under where the deployment places
-/// one.
+/// account service a person's units come from, the receiver the names come from, and the folder a shipped piece's
+/// body is read under where the deployment places one.
 pub struct Reference {
   pub stages: Arc<Stages>,
   pub brain: Arc<dyn Brain>,
+  pub accounts: Arc<dyn Accounts>,
   pub receiver: Arc<dyn Receiver>,
   pub shipped: Option<PathBuf>,
 }

@@ -200,7 +200,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The brain's index for an agent in a room, read from that agent's own brain alone: five groups, each its unread count against the session's loads, its hint and its entries; no group where the agent keeps no brain. */
+        /** The brain's index for an agent in a room, read from that agent's own brain and, for the organisation group, the org brains of its owner's units: six groups, each its unread count against the session's loads, its hint and its entries; no group where the agent keeps no brain. */
         get: operations["reference_index"];
         put?: never;
         post?: never;
@@ -468,8 +468,8 @@ export interface components {
             slug: string;
         };
         /**
-         * @description One group of the index: `system-documents`, `room-rules`, `knowledge`, `people` or `room-memories`, how many of
-         *     its entries the session has not read, one sentence of what changed in the last three days or null, and its
+         * @description One group of the index: `system-documents`, `room-rules`, `knowledge`, `people`, `room-memories` or
+         *     `organisation`, how many of its entries the session has not read, one sentence of what changed in the last three days or null, and its
          *     entries.
          */
         IndexGroup: {
