@@ -9,6 +9,7 @@ use std::sync::LazyLock;
 
 use gate_markup::js::bun_hash;
 use gate_ports::PortError;
+use gate_ports::audience::Audience;
 use gate_ports::brain::{BrainKey, Condition, Load, MemoryRow, Reply};
 use regex::Regex;
 
@@ -160,12 +161,14 @@ fn org_entry(row: &UnitMemory) -> IndexEntry {
 }
 
 /// One group's entries in the room from the agent's own brain, `key`, and for `organisation` from its owner's org
-/// brains, in the order the brain gives them.
+/// brains, in the order the brain gives them. `audience` is whom the org brains are read for, none to read the
+/// room's.
 pub async fn entries(
   reference: &Reference,
   key: &BrainKey,
   chat_id: i64,
   group: &str,
+  audience: Option<Audience>,
 ) -> Result<Vec<IndexEntry>, Unanswered> {
   let rows = |kind: &'static str| async move {
     fragments::rows(reference, key, chat_id, kind).await.map_err(Unanswered::Unit)
@@ -199,7 +202,7 @@ pub async fn entries(
       .iter()
       .map(|row| memory_entry(chat_id, row))
       .collect(),
-    "organisation" => organisation::rest(reference, key)
+    "organisation" => organisation::rest(reference, key, chat_id, audience)
       .await
       .map_err(Unanswered::Unit)?
       .iter()
@@ -220,12 +223,14 @@ async fn held(reference: &Reference, session: Option<&str>) -> Result<HashSet<St
 }
 
 /// The index in the room from the agent's own brain, `key`: every group in order, each with its unread count against
-/// the session's loads and its hint; no group at all where the agent keeps no brain.
+/// the session's loads and its hint, the org brains read for `audience`, none to read the room's; no group at all
+/// where the agent keeps no brain.
 pub async fn index(
   reference: &Reference,
   key: &BrainKey,
   chat_id: i64,
   session: Option<&str>,
+  audience: Option<Audience>,
   now: i64,
 ) -> Result<Vec<Group>, Unanswered> {
   if !reference.brain.kept(key).await.map_err(Unanswered::Unit)? {
@@ -236,7 +241,7 @@ pub async fn index(
   let mut groups = vec![];
 
   for group in GROUPS {
-    let entries = entries(reference, key, chat_id, group).await?;
+    let entries = entries(reference, key, chat_id, group, audience).await?;
     let unread = entries.iter().filter(|entry| !held.contains(&entry.path)).count();
     let changed = entries
       .iter()
@@ -259,7 +264,8 @@ pub async fn index(
   Ok(groups)
 }
 
-/// One piece read whole by its slug within its group, recorded among the session's loads where one is named.
+/// One piece read whole by its slug within its group, recorded among the session's loads where one is named; an
+/// org memory `audience` may not read, none to read the room's, is no piece.
 pub async fn piece(
   reference: &Reference,
   key: &BrainKey,
@@ -267,8 +273,9 @@ pub async fn piece(
   group: &str,
   slug: &str,
   session: Option<&str>,
+  audience: Option<Audience>,
 ) -> Result<Piece, Unanswered> {
-  let entry = entries(reference, key, chat_id, group)
+  let entry = entries(reference, key, chat_id, group, audience)
     .await?
     .into_iter()
     .find(|entry| entry.slug == slug)
@@ -347,20 +354,21 @@ fn words_of(text: &str) -> Vec<String> {
 }
 
 /// The entries of every group whose words match the query's, the ones holding the most of them first, at most
-/// `limit`.
+/// `limit`, the org brains read for `audience`, none to read the room's.
 pub async fn search(
   reference: &Reference,
   key: &BrainKey,
   chat_id: i64,
   query: &str,
   limit: usize,
+  audience: Option<Audience>,
 ) -> Result<Vec<(&'static str, IndexEntry)>, Unanswered> {
   let asked: HashSet<String> = words_of(query).into_iter().collect();
   let mut found: Vec<(usize, usize, &'static str, IndexEntry)> = vec![];
   let mut order = 0;
 
   for group in GROUPS {
-    for entry in entries(reference, key, chat_id, group).await? {
+    for entry in entries(reference, key, chat_id, group, audience).await? {
       let said: HashSet<String> = words_of(&format!(
         "{} {} {}",
         entry.slug,

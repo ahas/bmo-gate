@@ -4,6 +4,7 @@
 
 pub mod accounts;
 pub mod agency;
+pub mod audience;
 pub mod brain;
 pub mod brain_rows;
 pub mod gateway;

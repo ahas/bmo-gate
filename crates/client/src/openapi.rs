@@ -542,6 +542,14 @@ fn query_parameters(query: Schema) -> Vec<Value> {
     .map(|(name, schema)| {
       let mut schema = schema.as_object().cloned().unwrap_or_default();
       let description = schema.remove("description");
+      if let Some(Value::Array(choices)) = schema.get("anyOf") {
+        let choices: Vec<&Value> = choices.iter().filter(|choice| choice["type"] != "null").collect();
+        if let [single] = choices[..]
+          && let Some(single) = single.as_object()
+        {
+          schema = single.clone();
+        }
+      }
       if let Some(Value::Array(types)) = schema.get("type") {
         let types: Vec<Value> =
           types.iter().filter(|kind| kind.as_str() != Some("null")).cloned().collect();

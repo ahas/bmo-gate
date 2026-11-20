@@ -2,6 +2,7 @@
 //! events wake, held to the turn's total, with no model asked.
 
 use gate_policy::reference::REFERENCE;
+use gate_ports::audience::Audience;
 use gate_ports::brain::{Event, Sheet};
 use gate_reference::road::{Turn, handed, held_sheet};
 use gate_reference::{Entry, SituationTurn, Source};
@@ -15,6 +16,7 @@ fn turn() -> Turn {
     message_id: Some(9),
     speaker_ids: vec![5, 5],
     agent: "the-chat-agent".into(),
+    audience: Audience::Internal,
     situation: None,
   }
 }

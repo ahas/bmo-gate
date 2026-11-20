@@ -10,6 +10,7 @@ use bmo_gate_client::{
   ReferencePieceQuery, ReferenceSearch, ReferenceSearchQuery, SearchEntry, SituationEvent,
 };
 use gate_codes::Code;
+use gate_ports::audience::Audience;
 use gate_ports::brain::{BrainKey, Event};
 use gate_reference::SituationTurn;
 use gate_reference::index::{self as gate_index, IndexEntry, Unanswered};
@@ -38,9 +39,24 @@ fn named_agent(envelope: &ReferenceAsk) -> Result<String, Refused> {
   }
 }
 
-/// The turn the envelope stands for, refused where it names no agent or two.
+/// The audience a caller names, as the reference road reads it.
+fn audience_of(named: bmo_gate_client::Audience) -> Audience {
+  match named {
+    bmo_gate_client::Audience::Internal => Audience::Internal,
+    bmo_gate_client::Audience::External => Audience::External,
+  }
+}
+
+/// The turn the envelope stands for, refused where it names no agent or two. An envelope naming no audience is read
+/// `External` where it carries a situation, a room's chat turn, and `Internal` where it carries none
+/// (`docs/reference-selection.md`, 「What an organisation hands its members」).
 pub fn turn_of(envelope: ReferenceAsk) -> Result<Turn, Refused> {
   let agent = named_agent(&envelope)?;
+  let audience = match (envelope.audience, &envelope.situation) {
+    (Some(named), _) => audience_of(named),
+    (None, Some(_)) => Audience::External,
+    (None, None) => Audience::Internal,
+  };
   let situation = envelope.situation.map(|situation| SituationTurn {
     chat_id: envelope.room_id,
     agent: agent.clone(),
@@ -59,6 +75,7 @@ pub fn turn_of(envelope: ReferenceAsk) -> Result<Turn, Refused> {
     message_id: envelope.message_id,
     speaker_ids: envelope.speaker_ids,
     agent,
+    audience,
     situation,
   })
 }
@@ -126,9 +143,11 @@ pub async fn index(
 ) -> Answered<Json<ReferenceIndex>> {
   let key = brain_key(&app, &asked.agent).await?;
   let session = asked.session.as_deref().filter(|session| !session.trim().is_empty());
-  let groups = gate_index::index(&app.reference, &key, asked.room, session, gate_runs::records::now())
-    .await
-    .map_err(unanswered)?;
+  let audience = asked.audience.map(audience_of);
+  let groups =
+    gate_index::index(&app.reference, &key, asked.room, session, audience, gate_runs::records::now())
+      .await
+      .map_err(unanswered)?;
 
   Ok(Json(ReferenceIndex {
     groups: groups
@@ -151,7 +170,8 @@ pub async fn piece(
 ) -> Answered<Json<ReferencePiece>> {
   let key = brain_key(&app, &asked.agent).await?;
   let session = asked.session.as_deref().filter(|session| !session.trim().is_empty());
-  let piece = gate_index::piece(&app.reference, &key, asked.room, &asked.group, &slug, session)
+  let audience = asked.audience.map(audience_of);
+  let piece = gate_index::piece(&app.reference, &key, asked.room, &asked.group, &slug, session, audience)
     .await
     .map_err(unanswered)?;
 
@@ -183,7 +203,8 @@ pub async fn search(
     }
   };
   let key = brain_key(&app, &asked.agent).await?;
-  let found = gate_index::search(&app.reference, &key, asked.room, &asked.q, limit)
+  let audience = asked.audience.map(audience_of);
+  let found = gate_index::search(&app.reference, &key, asked.room, &asked.q, limit, audience)
     .await
     .map_err(unanswered)?;
 

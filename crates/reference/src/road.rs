@@ -6,6 +6,7 @@ use std::collections::HashSet;
 
 use gate_markup::js;
 use gate_policy::reference::REFERENCE;
+use gate_ports::audience::Audience;
 use gate_ports::brain::{BrainKey, MemoryRow};
 
 use crate::{Entry, Reference, SituationTurn, Source, memories, organisation, situation};
@@ -19,7 +20,7 @@ pub const KNOWLEDGE: &str = "library-knowledge";
 pub const PERSON_BOOK: &str = "person-book";
 
 /// What a turn is handed to compose its reference by: the room, the message it is about, who spoke, the agent whose
-/// turn it is, and the situation road where the turn has one.
+/// turn it is, the audience its org brains are read for, and the situation road where the turn has one.
 pub struct Turn {
   pub chat_id: i64,
   pub message_id: Option<i64>,
@@ -27,6 +28,8 @@ pub struct Turn {
   /// The supervisor whose brain alone the turn is read from (`docs/reference-selection.md`, 「Whose reference it
   /// is」).
   pub agent: String,
+  /// Whom the org brains are read for (`docs/reference-selection.md`, 「What an organisation hands its members」).
+  pub audience: Audience,
   pub situation: Option<SituationTurn>,
 }
 
@@ -154,7 +157,7 @@ pub async fn handed(reference: &Reference, turn: &Turn) -> Vec<Entry> {
     woken,
     memories::standing(reference, turn.chat_id, &key),
     standing_entries(reference, turn.chat_id, &turn.speaker_ids, &key),
-    organisation::sheet_entry(reference, turn.chat_id, &key)
+    organisation::sheet_entry(reference, turn.chat_id, &key, turn.audience)
   );
   let (due, _) = memories::due_first(&standing);
   let carried: Vec<&MemoryRow> = due.iter().collect();

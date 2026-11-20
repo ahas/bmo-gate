@@ -73,8 +73,18 @@ flowchart TD
   `GET /org-topics`): for each topic, the memories of the one unit whose word on it holds, the farthest holding a
   locked one, else the nearest holding one. A proposal and an episode never stand, and an org memory with no topic
   stands for nobody: it is read through the index alone.
-- **Read for the company's own people.** Every org brain is read for an audience inside the company, internal-only
-  memories among them (`docs/boundary-api.md`, 「Contract gaps」).
+- **Read for the room's audience.** An org memory may be internal-only, kept from a room where someone outside the
+  company sits (the brain's `docs/design.md`, 「Org brains」), so every org brain is read for one of two audiences:
+  `external` where someone outside the company of the supervisor's owner sits in the room, `internal` where everyone
+  there is of it. The caller names it, the receiver on a turn's envelope (`docs/api.md`, 「Reference」). An envelope
+  naming none is read `external` where it carries a situation, a room's chat turn, and `internal` where it carries
+  none, a turn read in no room. An index, a piece or a search naming none reads the room's audience as the receiver
+  answers it for the supervisor, asked only where an org brain is read, and `external` where the receiver cannot say
+  (`docs/boundary-api.md`, 「bmo-receiver」).
+- **What `external` leaves out:** every org memory marked internal-only, and every one the brain does not mark
+  either way. What stands for the person is asked of the brain for that audience, which leaves them out once each
+  topic's unit is decided, and the gate leaves out any it still answers; the `organisation` group, its pieces and a
+  search over it leave them out too, so a piece of one is not found. `internal` leaves nothing out.
 - **The org sheet** is one entry, under the path `organisation/sheet.md`, of the source `memory`: a head line saying
   what it is, then one line a standing memory, its number, its unit's name, its topic, a mark where it is locked,
   and its words. The lines go in the brain's order, the farthest unit first and the home unit last, each topic's
@@ -100,8 +110,8 @@ flowchart TD
   entry under `memories/<room>`; a turn on which nothing is due carries no memories entry.
 - **The rows the turn's events wake,** by the event alone (the brain's `docs/memories.md`, 「A row with an
   event」).
-- **The org sheet,** what the organisation of the person the supervisor serves holds for them on every topic
-  (「What an organisation hands its members」); a supervisor of no organisation has none.
+- **The org sheet,** what the organisation of the person the supervisor serves holds for them on every topic, read
+  for the room's audience (「What an organisation hands its members」); a supervisor of no organisation has none.
 - **Nothing else.** No room rule, no knowledge, no lore, no other person's sheet and no undue memory attaches to a
   turn: each stands in the index, for the agent to read where the turn needs it.
 - **Every turn is one designated agent's,** the agent its situation names, else its `agent`, and everything is
@@ -132,16 +142,17 @@ flowchart TD
 
 | Route | Query | Answer |
 |---|---|---|
-| `GET /reference/index` | `session?`, `room`, `agent` | `groups`, each `group`, `unread`, `hint` and `entries` (each `slug`, `holds`, `readWhen`, `path`) |
-| `GET /reference/pieces/{slug}` | `room`, `group`, `session?`, `agent` | `slug`, `group`, `path`, `text` |
-| `GET /reference/search` | `q`, `room`, `limit?`, `agent` | `entries`, each `slug`, `group`, `holds`, `readWhen` |
+| `GET /reference/index` | `session?`, `room`, `agent`, `audience?` | `groups`, each `group`, `unread`, `hint` and `entries` (each `slug`, `holds`, `readWhen`, `path`) |
+| `GET /reference/pieces/{slug}` | `room`, `group`, `session?`, `agent`, `audience?` | `slug`, `group`, `path`, `text` |
+| `GET /reference/search` | `q`, `room`, `limit?`, `agent`, `audience?` | `entries`, each `slug`, `group`, `holds`, `readWhen` |
 
 - **Six groups, in this order:** `system-documents` (the lore of the agent's brain, in a room that reads it; the
   brain holds no row of a shipped reference document, so no index lists one), `room-rules` (the room's rules and
   its situation rules), `knowledge`, `people` (everyone the brain knows facts of in the room), `room-memories`
   (the room's standing memories) and `organisation` (the org memories of the person the agent serves beyond its org
-  sheet, 「What an organisation hands its members」). Every other group is the named agent's own brain's (「Whose
-  reference it is」); an agent keeping no brain is answered no group at all.
+  sheet, read for the room's audience, 「What an organisation hands its members」). Every other group is the named
+  agent's own brain's (「Whose reference it is」), and the audience changes nothing of it; an agent keeping no brain is
+  answered no group at all.
 - **An entry** is the row's `slug`, what it `holds`, when to read it, `readWhen`, and its `path`, the path a piece
   read of it is recorded under among the session's loads, which is how a caller names what a session read. A knowledge piece's or a
   rule's title is split where it says when it is needed — at "; needed", "; consulted" and their kin up to the

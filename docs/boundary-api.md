@@ -100,8 +100,8 @@ no room at all.
 | lore read | `GET /brains/{brainId}/memories` | `type=lore`, `status=active`, paged | `items`, filtered by the slug asked; a piece's body is the row's text |
 | a subject found | `GET /brains/{brainId}/subjects` | `type` (`person` or `room`), `key` (the user's or the room's id), `limit=1` | `items`: the subject, or none where the brain holds none |
 | a unit's org brain | `GET /brains` | `kind=org`, `accountKey` the company's number, `agentKey` the unit's, `limit=1` | `items`: the unit's org brain, remembered once found, or none, where the unit is passed over |
-| what stands for a person | `GET /org-topics` | `brainIds`, the org brains of the person's units, the farthest first | one item a topic: `topic`, `brainId`, the brain whose word on it holds, `locked`, and its `memories`, each `id`, `text`, `importance` and `locked`; read for the company's own people, so no `audience` is named |
-| a unit's org memories | `GET /brains/{brainId}/memories` | `status=active`, `excludeTypes=rumor,episode`, paged | `items`: every live org memory of the unit that is neither a proposal nor an episode, each `id`, `text`, `recallCondition`, `subjects` (a topic is a subject of type `topic`, its key the topic) and `validFrom`; no type is named, so the read records no use |
+| what stands for a person | `GET /org-topics` | `brainIds`, the org brains of the person's units, the farthest first; `audience`, `internal` or `external`, always named, the room's audience (`docs/reference-selection.md`, 「What an organisation hands its members」) | one item a topic: `topic`, `brainId`, the brain whose word on it holds, `locked`, and its `memories`, each `id`, `text`, `importance`, `locked` and `internalOnly`; for `external`, a memory whose `internalOnly` is true or absent is left out |
+| a unit's org memories | `GET /brains/{brainId}/memories` | `status=active`, `excludeTypes=rumor,episode`, paged | `items`: every live org memory of the unit that is neither a proposal nor an episode, each `id`, `text`, `recallCondition`, `subjects` (a topic is a subject of type `topic`, its key the topic), `validFrom` and `internalOnly`, a memory whose `internalOnly` is absent read as internal-only; no type is named, so the read records no use |
 | a person's sheet | `GET /brains/{brainId}/subjects/{subjectId}/sheet` | `roomId`, the room's subject, where the brain holds one; `limit`, the head's count of fact lines, for a speaker's head (`docs/reference-selection.md`, 「What a turn is given」), and none for a whole sheet | `text/plain`: one line a name first, `- [#<id> name] <text>`, those about the room ahead of those about no room, every name whatever the `limit`; then one line a fact, `- [#<id> since <date>] <text>`, the most important first; empty where the brain knows no name and no fact of the person there |
 
 The system's reference documents are held nowhere in the brain, so the brain answers no rows of them, and the
@@ -134,11 +134,12 @@ index, and keeps neither answer, so a person moved between units reads their new
 
 ### bmo-receiver
 
-The receiver's event stream, which the gate reads the rows of each round's draft process off.
+The receiver's event stream, which the gate reads the rows of each round's draft process off, and a room's audience.
 
 | Call | Route | Body or query | Answer |
 |---|---|---|---|
 | draft rows | `GET /events`, held open | none | the receiver's event stream; the gate takes the frames whose data's `type` is `draft` and lets every other go |
+| a room's audience | `GET /rooms/{roomId}/audience` | `agent`, the supervisor the read is for | `room`, `agent` and `audience`: `external` where someone outside the company of the agent's owner sits in the room, or who sits there could not be read, `internal` where everyone there is of it; 404 `not-found` for a room the receiver does not hold, 400 for a blank `agent` |
 
 A `draft` frame of a row is one row of a round's draft process as the receiver's round log keeps it (the
 receiver's `docs/drafting.md`, 「The round log」): `chatId`, `round`, `agentName`, `number` (from 1, the round's own
@@ -150,6 +151,11 @@ judgements as the `draft` stage (`docs/gates.md`, 「What a turn records」). Th
 of recent events each time it is opened, and the gate opens it again five seconds after it drops; a row the gate
 has written already is not written twice, and a row that left the ring while the stream was down is not written
 at all.
+
+The gate asks a room's audience on a read of the index, a piece or a search that names none, where the
+`organisation` group is read and the supervisor's owner stands in a unit keeping an org brain, once a call; it
+keeps no answer. Where the call fails, refused, unanswered or answered with an audience other than the two, the
+read is `external` and the gate logs why (`docs/reference-selection.md`, 「What an organisation hands its members」).
 
 ### bmo-agency
 
@@ -345,9 +351,6 @@ Statements here that a sibling's document does not yet match, each for that sibl
   the order through `GET /gates`.
 - **The brain's knowledge read** answers the knowledge chunks a room may read; the gate reads a room rule's piece
   through it as well, for the brain to take the room's room-rule chunks there.
-- **Nothing tells the gate whether someone outside the company sits in a room,** so every org brain is read for the
-  company's own people and an internal-only memory reaches such a room too; for the receiver to say it on the
-  envelope and the index's calls, which the gate then reads with the brain's `audience` `external`.
 - **The receiver sends no `lore`** with a turn's reference, so every room's index lists the lore.
 - **The document viewer counts a part kept as failed and says no more:** the parts page answers each such part's
   `failure` (`docs/api.md`, 「Documents」), for the web unit to show beside the count.

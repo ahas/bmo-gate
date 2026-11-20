@@ -9,6 +9,7 @@ use serde::de::{DeserializeOwned, Error as _};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 
+use crate::audience::Audience;
 use crate::brain_rows::{
   BrainMember, FACT_TYPE, LORE_TYPE, Layer, Memory, Page, STANDING_TYPES, Subject, Tally, TopicItem,
   brain_type, conditions, fragment_row, in_room, label, lore_rows, lore_slug, memory_row, org_memory,
@@ -156,14 +157,16 @@ pub struct Load {
   pub version: String,
 }
 
-/// One live memory of an org brain: its number, its words, its importance, whether it is locked, its recall
-/// condition, the topics it stands for and when it last changed (the brain's `docs/design.md`, 「Org brains」).
+/// One live memory of an org brain: its number, its words, its importance, whether it is locked, whether it is
+/// kept from a room where someone outside the company sits, its recall condition, the topics it stands for and when
+/// it last changed (the brain's `docs/design.md`, 「Org brains」).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OrgMemory {
   pub id: i64,
   pub text: String,
   pub importance: i64,
   pub locked: bool,
+  pub internal_only: bool,
   pub recall_condition: Option<String>,
   pub topics: Vec<String>,
   pub changed_at: i64,
@@ -266,8 +269,12 @@ pub trait Brain: Send + Sync {
   fn org_brain(&self, company: i64, unit: i64) -> BoxFuture<'_, Answer<Option<i64>>>;
 
   /// What stands for a member of the units whose org brains are named, the farthest first: for each topic, the
-  /// memories of the one brain whose word on it holds, read for the company's own people.
-  fn org_topics<'a>(&'a self, brains: &'a [i64]) -> BoxFuture<'a, Answer<Vec<OrgTopic>>>;
+  /// memories of the one brain whose word on it holds, read for the audience named.
+  fn org_topics<'a>(
+    &'a self,
+    brains: &'a [i64],
+    audience: Audience,
+  ) -> BoxFuture<'a, Answer<Vec<OrgTopic>>>;
 
   /// Every live memory of an org brain that is neither a proposal nor an episode, in the brain's order.
   fn org_memories(&self, brain: i64) -> BoxFuture<'_, Answer<Vec<OrgMemory>>>;
@@ -727,15 +734,24 @@ impl Brain for HttpBrain {
     })
   }
 
-  fn org_topics<'a>(&'a self, brains: &'a [i64]) -> BoxFuture<'a, Answer<Vec<OrgTopic>>> {
+  fn org_topics<'a>(
+    &'a self,
+    brains: &'a [i64],
+    audience: Audience,
+  ) -> BoxFuture<'a, Answer<Vec<OrgTopic>>> {
     Box::pin(async move {
       if brains.is_empty() {
         return Ok(Vec::new());
       }
 
       let named = brains.iter().map(i64::to_string).collect::<Vec<_>>().join(",");
-      let items: Vec<TopicItem> =
-        self.get("what stands for a person", "org-topics", &[("brainIds", &named)]).await?;
+      let items: Vec<TopicItem> = self
+        .get(
+          "what stands for a person",
+          "org-topics",
+          &[("brainIds", &named), ("audience", audience.as_str())],
+        )
+        .await?;
 
       Ok(
         items

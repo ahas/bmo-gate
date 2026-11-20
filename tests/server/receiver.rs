@@ -1,7 +1,10 @@
 //! A turn's reference, a room's judgements written and a round's put under its answer, and a companion's options
 //! copied.
 
+use bmo_gate_client::ReferenceAsk;
+use gate_ports::audience::Audience;
 use gate_runs::records::now;
+use gate_server::routes::reference::turn_of;
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 
@@ -136,6 +139,53 @@ async fn a_turn_with_a_situation_and_holds_is_read_with_them() {
   assert_eq!(status, StatusCode::OK, "{body}");
   assert!(body["entries"].is_array());
   assert_eq!(ground.scratch.count("SELECT count(*) FROM reference_offers", vec![]).await, 0);
+}
+
+#[test]
+fn an_envelope_naming_no_audience_is_read_external_in_a_room_and_internal_in_none() {
+  let envelope = |situation: Option<Value>, audience: Option<&str>| {
+    let mut envelope = json!({
+      "roomId": ROOM, "lines": [], "speakerIds": [], "agent": "the-chat-agent", "peopleSpoke": false, "records": false,
+    });
+
+    if let Some(situation) = situation {
+      envelope["situation"] = situation;
+    }
+    if let Some(audience) = audience {
+      envelope["audience"] = json!(audience);
+    }
+
+    turn_of(serde_json::from_value::<ReferenceAsk>(envelope).unwrap()).unwrap().audience
+  };
+  let situation =
+    || Some(json!({ "agentName": "the-chat-agent", "roomKind": "group", "events": [], "nowAt": 1 }));
+
+  assert_eq!(envelope(situation(), None), Audience::External);
+  assert_eq!(envelope(None, None), Audience::Internal);
+  assert_eq!(envelope(situation(), Some("internal")), Audience::Internal);
+  assert_eq!(envelope(None, Some("external")), Audience::External);
+}
+
+#[tokio::test]
+async fn an_audience_other_than_internal_or_external_is_refused() {
+  let ground = ground("audience", |_| None).await;
+  let (status, body) = ground
+    .post(
+      "/reference/selected",
+      json!({
+        "roomId": ROOM, "lines": [], "speakerIds": [], "agent": "the-chat-agent", "audience": "everyone",
+        "peopleSpoke": false, "records": false,
+      }),
+    )
+    .await;
+
+  assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+
+  for (audience, status) in [("everyone", StatusCode::BAD_REQUEST), ("external", StatusCode::OK)] {
+    let asked = format!("/reference/index?room={ROOM}&agent=the-chat-agent&audience={audience}");
+
+    assert_eq!(ground.get(&asked).await.0, status, "{asked}");
+  }
 }
 
 #[tokio::test]

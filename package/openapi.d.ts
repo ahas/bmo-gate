@@ -347,6 +347,12 @@ export interface components {
              */
             since: number;
         };
+        /**
+         * @description Whom a room's org memories are read for: `external` where someone outside the company of the supervisor's owner
+         *     sits in the room, or who sits there could not be read; `internal` where everyone there is of it.
+         * @enum {string}
+         */
+        Audience: "internal" | "external";
         /** @description The values a blank setting stands for. */
         DefaultOptions: {
             /** Format: int64 */
@@ -612,6 +618,11 @@ export interface components {
              */
             agent?: string | null;
             answered?: string | null;
+            /**
+             * @description Whom the room's org memories are read for; where absent, `external` for a turn with a situation and
+             *     `internal` for one with none.
+             */
+            audience?: components["schemas"]["Audience"] | null;
             holds?: string[] | null;
             lines: string[];
             /** Format: int64 */
@@ -1087,6 +1098,8 @@ export interface operations {
         parameters: {
             query: {
                 agent: string;
+                /** @description Whom the room's org memories are read for; where absent, the room's, as the receiver answers it. */
+                audience?: components["schemas"]["Audience"];
                 room: number;
                 session?: string;
             };
@@ -1112,6 +1125,8 @@ export interface operations {
         parameters: {
             query: {
                 agent: string;
+                /** @description Whom the room's org memories are read for; where absent, the room's, as the receiver answers it. */
+                audience?: components["schemas"]["Audience"];
                 group: string;
                 room: number;
                 session?: string;
@@ -1140,6 +1155,8 @@ export interface operations {
         parameters: {
             query: {
                 agent: string;
+                /** @description Whom the room's org memories are read for; where absent, the room's, as the receiver answers it. */
+                audience?: components["schemas"]["Audience"];
                 limit?: number;
                 q: string;
                 room: number;

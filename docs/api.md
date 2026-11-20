@@ -82,6 +82,7 @@ written for one caller.
 | `speakerIds` | the people whose words the turn answers |
 | `situation?` | `agentName`, `roomKind` (`owner` or `group`), `events` (each `kind` and `itemId?`), `nowAt` |
 | `agent?` | the supervisor a turn with no situation is read for, a job's first prompt or its double's; where a situation stands too it names the same agent |
+| `audience?` | whom the room's org memories are read for: `external` where someone outside the company of the supervisor's owner sits in the room, or who sits there could not be read; `internal` where everyone there is of it |
 | `holds?` | names the turn is held to |
 | `round?` | the round the turn belongs to |
 | `peopleSpoke` | whether anyone spoke |
@@ -97,24 +98,30 @@ It answers `entries`, each `path`, `text` and `source` (`document`, `person`, `r
   change nothing a turn is given. The turn is read from the brain of the agent it names, the situation's
   `agentName` else `agent`, found by the account owning it (`docs/reference-selection.md`, 「Whose reference it
   is」); an agent keeping no brain is handed no entry. An envelope naming no agent, one whose `agent` and
-  situation name two, and a `roomKind` other than `owner` or `group` are 400 `bad-request`, and nothing is read
-  from the chat agent's brain in their place.
+  situation name two, a `roomKind` other than `owner` or `group` and an `audience` other than `internal` or
+  `external` are 400 `bad-request`, and nothing is read from the chat agent's brain in their place.
+- **The audience** decides which org memories the turn is handed (`docs/reference-selection.md`, 「What an
+  organisation hands its members」). Where the envelope names none, a turn with a situation, a room's chat turn,
+  is read `external`, and a turn with no situation, read in no room, `internal`.
 
 | Route | Query | Answer |
 |---|---|---|
-| `GET /reference/index` | `session?`, `room`, `agent` | `groups`, each `group`, `unread`, `hint` (or null) and `entries`, each `slug`, `holds`, `readWhen` (or null) and `path`, the path a piece read of it is recorded under among the session's loads |
-| `GET /reference/pieces/{slug}` | `room`, `group`, `session?`, `agent` | `slug`, `group`, `path`, `text` |
-| `GET /reference/search` | `q`, `room`, `limit?` (8 where absent, at most 24), `agent` | `entries`, each `slug`, `group`, `holds`, `readWhen` (or null) |
+| `GET /reference/index` | `session?`, `room`, `agent`, `audience?` | `groups`, each `group`, `unread`, `hint` (or null) and `entries`, each `slug`, `holds`, `readWhen` (or null) and `path`, the path a piece read of it is recorded under among the session's loads |
+| `GET /reference/pieces/{slug}` | `room`, `group`, `session?`, `agent`, `audience?` | `slug`, `group`, `path`, `text` |
+| `GET /reference/search` | `q`, `room`, `limit?` (8 where absent, at most 24), `agent`, `audience?` | `entries`, each `slug`, `group`, `holds`, `readWhen` (or null) |
 
 - **The index, a piece and a search** are the brain's reference as the agent reads it itself, with no model
   (`docs/reference-selection.md`, 「The index an agent reads」). `group` is `system-documents`, `room-rules`,
-  `knowledge`, `people`, `room-memories` or `organisation`; any other is 400 `bad-request`, as is a `limit` outside 1 to 24, an
-  empty `q` or a blank `agent`. Each is read from the named agent's own brain, found by the account owning it, and
-  the `organisation` group from the org brains of the units its owner stands in (`docs/reference-selection.md`,
-  「Whose reference it is」); an agent keeping no brain is answered no group, no
-  piece and no entry. An index asked with no `session` counts every entry unread. A slug its group does not hold is 404
-  `not-found`. A piece read with `session` is recorded among the
-  session's loads; a call on the agency, the brain or the account service that fails is 502 `upstream-failed`.
+  `knowledge`, `people`, `room-memories` or `organisation`; any other is 400 `bad-request`, as is a `limit` outside
+  1 to 24, an empty `q`, a blank `agent` or an `audience` other than `internal` or `external`. Each is read from the
+  named agent's own brain, found by the account owning it, and the `organisation` group from the org brains of the
+  units its owner stands in (`docs/reference-selection.md`, 「Whose reference it is」); an agent keeping no brain is
+  answered no group, no piece and no entry. `audience` is whom the room's org memories are read for, as on the
+  envelope; where a call names none and the `organisation` group is read, the gate asks the receiver whom the room
+  calls for, and reads `external` where the receiver cannot say (`docs/boundary-api.md`, 「bmo-receiver」). An index
+  asked with no `session` counts every entry unread. A slug its group does not hold is 404 `not-found`. A piece read
+  with `session` is recorded among the session's loads; a call on the agency, the brain or the account service that
+  fails is 502 `upstream-failed`.
 
 ## Translations
 

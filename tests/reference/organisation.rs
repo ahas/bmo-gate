@@ -1,12 +1,13 @@
 //! What an organisation hands its members (`docs/reference-selection.md`, 「What an organisation hands its
 //! members」): the org sheet a turn carries, held to its ceiling, and the index's `organisation` group, read for the
-//! owner of the supervisor alone.
+//! owner of the supervisor alone and for the room's audience.
 
 use gate_policy::reference::REFERENCE;
 use gate_ports::accounts::{OrgUnit, Placement};
 use gate_ports::agency::Supervisor;
+use gate_ports::audience::Audience;
 use gate_ports::brain::{OrgMemory, OrgTopic};
-use gate_reference::index::{entries, piece};
+use gate_reference::index::{Unanswered, entries, piece};
 use gate_reference::organisation::SHEET_PATH;
 use gate_reference::road::{Turn, handed};
 use gate_reference::{Entry, Source};
@@ -31,6 +32,7 @@ fn org_memory(id: i64, text: &str, importance: i64, topics: &[&str]) -> OrgMemor
     text: text.into(),
     importance,
     locked: false,
+    internal_only: false,
     recall_condition: None,
     topics: topics.iter().map(|topic| (*topic).to_owned()).collect(),
     changed_at: 0,
@@ -112,6 +114,7 @@ fn turn() -> Turn {
     message_id: None,
     speaker_ids: vec![],
     agent: "the-chat-agent".into(),
+    audience: Audience::Internal,
     situation: None,
   }
 }
@@ -140,7 +143,7 @@ async fn a_turn_carries_the_org_sheet_of_the_owners_units_the_farthest_first() {
     ]
   );
   // The post's unit off the home path is named first, then the company down to the home unit.
-  assert_eq!(*ground.brain.org_topics_asked.lock().unwrap(), [vec![40, 10, 30]]);
+  assert_eq!(*ground.brain.org_topics_asked.lock().unwrap(), [(vec![40, 10, 30], Audience::Internal)]);
 }
 
 #[tokio::test]
@@ -174,7 +177,9 @@ async fn the_organisation_group_lists_what_the_sheet_did_not_carry_less_what_ano
   furnish(&ground);
 
   let key = ground.reference.brain_key("the-chat-agent").await.unwrap();
-  let listed = entries(&ground.reference, &key, 7, "organisation").await.unwrap();
+  let listed = entries(&ground.reference, &key, 7, "organisation", Some(Audience::Internal))
+    .await
+    .unwrap();
   let slugs: Vec<&str> = listed.iter().map(|entry| entry.slug.as_str()).collect();
 
   // The company's working hours stand for nobody, the team's standing in their place; the sheet carried the rest.
@@ -183,7 +188,9 @@ async fn the_organisation_group_lists_what_the_sheet_did_not_carry_less_what_ano
   assert_eq!(listed[0].read_when.as_deref(), Some("a weekly report comes up"));
   assert_eq!(listed[0].path, "organisation/3/32");
 
-  let read = piece(&ground.reference, &key, 7, "organisation", "org-32", None).await.unwrap();
+  let read = piece(&ground.reference, &key, 7, "organisation", "org-32", None, Some(Audience::Internal))
+    .await
+    .unwrap();
 
   assert_eq!(read.text, "From Team:\n\nThe weekly report is due on Friday.\nAt three.");
 }
@@ -199,6 +206,82 @@ async fn a_supervisor_of_no_account_is_handed_nothing_of_an_organisation() {
   let key = ground.reference.brain_key("the-chat-agent").await.unwrap();
 
   assert!(org_sheet(&handed).is_none(), "{handed:?}");
-  assert!(entries(&ground.reference, &key, 7, "organisation").await.unwrap().is_empty());
+  assert!(entries(&ground.reference, &key, 7, "organisation", None).await.unwrap().is_empty());
   assert!(ground.brain.org_topics_asked.lock().unwrap().is_empty());
+  // No org brain is read, so whom the room calls for is never asked.
+  assert!(ground.receiver.audience_asked.lock().unwrap().is_empty());
+}
+
+// The company's locked rule on photographs and the team's weekly report marked internal-only.
+fn keep_internal(ground: &Ground) {
+  ground.brain.org_topics.lock().unwrap()[1].memories[0].internal_only = true;
+  ground.brain.org_memories.lock().unwrap().get_mut(&30).unwrap()[1].internal_only = true;
+}
+
+#[tokio::test]
+async fn an_external_turn_reads_what_stands_for_the_external_audience_less_the_internal_only() {
+  let ground = ground("org-external-sheet", |_| None).await;
+
+  furnish(&ground);
+  keep_internal(&ground);
+
+  let external = Turn {
+    audience: Audience::External,
+    ..turn()
+  };
+  let entries = handed(&ground.reference, &external).await;
+  let sheet = org_sheet(&entries).expect("the org sheet");
+
+  assert!(!sheet.text.contains("[#12 "), "{}", sheet.text);
+  assert!(sheet.text.contains("[#11 "), "{}", sheet.text);
+  assert_eq!(*ground.brain.org_topics_asked.lock().unwrap(), [(vec![40, 10, 30], Audience::External)]);
+}
+
+#[tokio::test]
+async fn an_external_read_leaves_the_internal_only_org_memories_out_of_the_group_and_its_pieces() {
+  let ground = ground("org-external-group", |_| None).await;
+
+  furnish(&ground);
+  keep_internal(&ground);
+
+  let key = ground.reference.brain_key("the-chat-agent").await.unwrap();
+  let external = Some(Audience::External);
+
+  assert!(entries(&ground.reference, &key, 7, "organisation", external).await.unwrap().is_empty());
+  assert!(matches!(
+    piece(&ground.reference, &key, 7, "organisation", "org-32", None, external).await,
+    Err(Unanswered::NoPiece)
+  ));
+}
+
+#[tokio::test]
+async fn a_read_naming_no_audience_asks_the_receiver_and_reads_external_where_it_cannot_say() {
+  let ground = ground("org-room-audience", |_| None).await;
+
+  furnish(&ground);
+  keep_internal(&ground);
+  ground.receiver.audiences.lock().unwrap().insert(7, Audience::Internal);
+
+  let key = ground.reference.brain_key("the-chat-agent").await.unwrap();
+  let held = entries(&ground.reference, &key, 7, "organisation", None).await.unwrap();
+
+  assert_eq!(held.iter().map(|entry| entry.slug.as_str()).collect::<Vec<_>>(), ["org-32"]);
+
+  // The receiver holds no room 8, so the read there is external.
+  assert!(entries(&ground.reference, &key, 8, "organisation", None).await.unwrap().is_empty());
+  assert_eq!(
+    *ground.receiver.audience_asked.lock().unwrap(),
+    [(7, "the-chat-agent".to_owned()), (8, "the-chat-agent".to_owned())]
+  );
+  assert_eq!(
+    ground
+      .brain
+      .org_topics_asked
+      .lock()
+      .unwrap()
+      .iter()
+      .map(|(_, audience)| *audience)
+      .collect::<Vec<_>>(),
+    [Audience::Internal, Audience::External]
+  );
 }

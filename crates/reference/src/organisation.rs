@@ -1,7 +1,7 @@
 //! What an organisation hands its members (`docs/reference-selection.md`, 「What an organisation hands its
 //! members」): the units the person a supervisor serves stands in, the farthest first, each unit's org brain, what
 //! stands there for the person by topic as the org sheet a turn carries, and every other live org memory as the
-//! index's `organisation` group. No model is asked.
+//! index's `organisation` group, each read for the room's audience. No model is asked.
 
 use std::collections::HashSet;
 
@@ -11,6 +11,7 @@ use gate_policy::organisation::ORGANISATION;
 use gate_policy::reference::REFERENCE;
 use gate_ports::PortError;
 use gate_ports::accounts::OrgUnit;
+use gate_ports::audience::Audience;
 use gate_ports::brain::{BrainKey, OrgMemory, OrgTopic};
 
 use crate::{Entry, Reference, Source, memories};
@@ -95,11 +96,46 @@ pub async fn units(reference: &Reference, key: &BrainKey) -> Result<Vec<HeldUnit
   Ok(held)
 }
 
-/// What stands for the person in their units, by topic, as the brain answers it.
-pub async fn standing(reference: &Reference, units: &[HeldUnit]) -> Result<Vec<OrgTopic>, PortError> {
+/// What stands for the person in their units, by topic, as the brain answers it for the audience: less any memory
+/// the audience may not read, and a topic left with none.
+pub async fn standing(
+  reference: &Reference,
+  units: &[HeldUnit],
+  audience: Audience,
+) -> Result<Vec<OrgTopic>, PortError> {
   let brains: Vec<i64> = units.iter().map(|held| held.brain).collect();
+  let mut standing = reference.brain.org_topics(&brains, audience).await?;
 
-  reference.brain.org_topics(&brains).await
+  for topic in &mut standing {
+    topic.memories.retain(|memory| audience.reads(memory.internal_only));
+  }
+
+  standing.retain(|topic| !topic.memories.is_empty());
+
+  Ok(standing)
+}
+
+/// The audience a read is for: the one the caller names, else the room's as the receiver answers it for the agent,
+/// and `External` where the receiver cannot say.
+pub async fn audience(
+  reference: &Reference,
+  chat_id: i64,
+  agent: &str,
+  named: Option<Audience>,
+) -> Audience {
+  if let Some(audience) = named {
+    return audience;
+  }
+
+  match reference.receiver.audience(chat_id, agent).await {
+    Ok(audience) => audience,
+    Err(why) => {
+      eprintln!(
+        "reference: chat {chat_id} the org brains are read as external, the room's audience could not be read: {why}"
+      );
+      Audience::External
+    }
+  }
 }
 
 // One line of the sheet as the policy writes it, the memory's words on one line.
@@ -186,9 +222,14 @@ pub fn sheet(units: &[HeldUnit], standing: &[OrgTopic]) -> Option<(String, HashS
   Some((text, carried))
 }
 
-/// The org sheet a turn carries for the person the agent serves; none where they stand in no organisation, nothing
-/// stands for them, or it cannot be read.
-pub async fn sheet_entry(reference: &Reference, chat_id: i64, key: &BrainKey) -> Option<Entry> {
+/// The org sheet a turn carries for the person the agent serves, read for the audience; none where they stand in no
+/// organisation, nothing stands for them, or it cannot be read.
+pub async fn sheet_entry(
+  reference: &Reference,
+  chat_id: i64,
+  key: &BrainKey,
+  audience: Audience,
+) -> Option<Entry> {
   let read = async {
     let units = units(reference, key).await?;
 
@@ -196,7 +237,7 @@ pub async fn sheet_entry(reference: &Reference, chat_id: i64, key: &BrainKey) ->
       return Ok(None);
     }
 
-    let standing = standing(reference, &units).await?;
+    let standing = standing(reference, &units, audience).await?;
 
     Ok::<_, PortError>(sheet(&units, &standing))
   };
@@ -215,16 +256,23 @@ pub async fn sheet_entry(reference: &Reference, chat_id: i64, key: &BrainKey) ->
   }
 }
 
-/// Every other live org memory of the person's units, the unit's order and then the brain's: less those the org
-/// sheet carries and those of a topic another unit's word holds.
-pub async fn rest(reference: &Reference, key: &BrainKey) -> Result<Vec<UnitMemory>, PortError> {
+/// Every other live org memory of the person's units the audience may read, the unit's order and then the brain's:
+/// less those the org sheet carries and those of a topic another unit's word holds. The audience is the one named,
+/// else the room's, asked of the receiver only where the person stands in a unit keeping an org brain.
+pub async fn rest(
+  reference: &Reference,
+  key: &BrainKey,
+  chat_id: i64,
+  named: Option<Audience>,
+) -> Result<Vec<UnitMemory>, PortError> {
   let units = units(reference, key).await?;
 
   if units.is_empty() {
     return Ok(vec![]);
   }
 
-  let standing = standing(reference, &units).await?;
+  let audience = audience(reference, chat_id, &key.agent, named).await;
+  let standing = standing(reference, &units, audience).await?;
   let carried = sheet(&units, &standing).map(|(_, carried)| carried).unwrap_or_default();
   let mut rest = vec![];
 
@@ -234,7 +282,7 @@ pub async fn rest(reference: &Reference, key: &BrainKey) -> Result<Vec<UnitMemor
     for memory in reference.brain.org_memories(held.brain).await? {
       let stands = memory.topics.is_empty() || memory.topics.iter().any(holds);
 
-      if stands && !carried.contains(&memory.id) {
+      if stands && audience.reads(memory.internal_only) && !carried.contains(&memory.id) {
         rest.push(UnitMemory {
           unit: held.unit.clone(),
           memory,

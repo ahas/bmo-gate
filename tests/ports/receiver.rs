@@ -1,8 +1,9 @@
 //! The receiver port: the draft rows read off the event stream and nothing else of it, a question's start among
-//! what is let go.
+//! what is let go; and a room's audience asked for an agent.
 
 use axum::http::Method;
 use futures_util::StreamExt;
+use gate_ports::audience::Audience;
 use gate_ports::receiver::{Drafted, HttpReceiver, Receiver};
 use serde_json::json;
 
@@ -51,4 +52,34 @@ async fn the_draft_rows_are_read_off_the_event_stream_and_nothing_else_is() {
     }
   );
   assert_eq!(stub.one("/events").bearer().as_deref(), Some("receiver-token"));
+}
+
+#[tokio::test]
+async fn a_rooms_audience_is_asked_for_an_agent_and_a_room_not_held_is_refused() {
+  let stub = Stub::start().await;
+  let receiver = HttpReceiver::new(peer(&stub, "receiver-token"));
+
+  stub.answer(
+    Method::GET,
+    "/rooms/7/audience",
+    200,
+    json!({ "room": 7, "agent": "the-chat-agent", "audience": "internal" }),
+  );
+  stub.answer(
+    Method::GET,
+    "/rooms/8/audience",
+    404,
+    json!({ "code": "not-found", "error": "no such room" }),
+  );
+
+  assert_eq!(receiver.audience(7, "the-chat-agent").await.unwrap(), Audience::Internal);
+
+  let asked = stub.one("/rooms/7/audience");
+
+  assert_eq!(asked.query.as_deref(), Some("agent=the-chat-agent"));
+  assert_eq!(asked.bearer().as_deref(), Some("receiver-token"));
+  assert_eq!(
+    receiver.audience(8, "the-chat-agent").await.unwrap_err().refused_with(),
+    Some("not-found")
+  );
 }

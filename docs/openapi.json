@@ -38,6 +38,14 @@
         ],
         "type": "object"
       },
+      "Audience": {
+        "description": "Whom a room's org memories are read for: `external` where someone outside the company of the supervisor's owner\nsits in the room, or who sits there could not be read; `internal` where everyone there is of it.",
+        "enum": [
+          "internal",
+          "external"
+        ],
+        "type": "string"
+      },
       "DefaultOptions": {
         "description": "The values a blank setting stands for.",
         "properties": {
@@ -868,6 +876,17 @@
               "string",
               "null"
             ]
+          },
+          "audience": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Audience"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whom the room's org memories are read for; where absent, `external` for a turn with a situation and\n`internal` for one with none."
           },
           "holds": {
             "items": {
@@ -1956,6 +1975,15 @@
             }
           },
           {
+            "description": "Whom the room's org memories are read for; where absent, the room's, as the receiver answers it.",
+            "in": "query",
+            "name": "audience",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Audience"
+            }
+          },
+          {
             "in": "query",
             "name": "room",
             "required": true,
@@ -2018,6 +2046,15 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "description": "Whom the room's org memories are read for; where absent, the room's, as the receiver answers it.",
+            "in": "query",
+            "name": "audience",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Audience"
             }
           },
           {
@@ -2084,6 +2121,15 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "description": "Whom the room's org memories are read for; where absent, the room's, as the receiver answers it.",
+            "in": "query",
+            "name": "audience",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Audience"
             }
           },
           {

@@ -7,7 +7,9 @@ use std::sync::Mutex;
 use futures_util::StreamExt;
 use futures_util::future::BoxFuture;
 use futures_util::stream::BoxStream;
+use gate_ports::PortError;
 use gate_ports::accounts::{Accounts, Placement};
+use gate_ports::audience::Audience;
 use gate_ports::brain::{
   Brain, BrainKey, Condition, Document, Event, Fragment, MemoryRow, OrgMemory, OrgTopic, Reply, Sheet,
 };
@@ -100,8 +102,8 @@ pub struct FakeBrain {
   pub org_brains: Mutex<HashMap<(i64, i64), i64>>,
   /// What stands, each topic answered where its brain is among those named.
   pub org_topics: Mutex<Vec<OrgTopic>>,
-  /// The org brains named on each read of what stands.
-  pub org_topics_asked: Mutex<Vec<Vec<i64>>>,
+  /// The org brains named on each read of what stands, and the audience it was read for.
+  pub org_topics_asked: Mutex<Vec<(Vec<i64>, Audience)>>,
   /// Each org brain's live memories.
   pub org_memories: Mutex<HashMap<i64, Vec<OrgMemory>>>,
 }
@@ -268,8 +270,12 @@ impl Brain for FakeBrain {
     Box::pin(async move { Ok(self.org_brains.lock().unwrap().get(&(company, unit)).copied()) })
   }
 
-  fn org_topics<'a>(&'a self, brains: &'a [i64]) -> BoxFuture<'a, Answer<Vec<OrgTopic>>> {
-    Box::pin(async move { Ok(self.standing_for(brains)) })
+  fn org_topics<'a>(
+    &'a self,
+    brains: &'a [i64],
+    audience: Audience,
+  ) -> BoxFuture<'a, Answer<Vec<OrgTopic>>> {
+    Box::pin(async move { Ok(self.standing_for(brains, audience)) })
   }
 
   fn org_memories(&self, brain: i64) -> BoxFuture<'_, Answer<Vec<OrgMemory>>> {
@@ -278,9 +284,9 @@ impl Brain for FakeBrain {
 }
 
 impl FakeBrain {
-  /// The brain answering `standing` for the brains named.
-  fn standing_for(&self, brains: &[i64]) -> Vec<OrgTopic> {
-    self.org_topics_asked.lock().unwrap().push(brains.to_vec());
+  /// The brain answering `standing` for the brains named, whatever the audience.
+  fn standing_for(&self, brains: &[i64], audience: Audience) -> Vec<OrgTopic> {
+    self.org_topics_asked.lock().unwrap().push((brains.to_vec(), audience));
     self
       .org_topics
       .lock()
@@ -304,11 +310,13 @@ impl Accounts for FakeAccounts {
   }
 }
 
-/// The stand-in receiver: the rooms it keeps, the names it knows people by, the messages it keeps by room and number,
-/// the chat agent's own number, the owner notices it was handed, and the draft rows its stream tells.
+/// The stand-in receiver: the draft rows its stream tells, the audience of each room it holds, every other room
+/// refused as one it does not hold, and each room and agent its audience was asked for.
 #[derive(Default)]
 pub struct FakeReceiver {
   pub drafted: Mutex<Vec<Drafted>>,
+  pub audiences: Mutex<HashMap<i64, Audience>>,
+  pub audience_asked: Mutex<Vec<(i64, String)>>,
 }
 
 impl Receiver for FakeReceiver {
@@ -317,6 +325,19 @@ impl Receiver for FakeReceiver {
       let drafted: Vec<Answer<Drafted>> = self.drafted.lock().unwrap().iter().cloned().map(Ok).collect();
 
       Ok(futures_util::stream::iter(drafted).boxed())
+    })
+  }
+
+  fn audience<'a>(&'a self, room: i64, agent: &'a str) -> BoxFuture<'a, Answer<Audience>> {
+    Box::pin(async move {
+      self.audience_asked.lock().unwrap().push((room, agent.to_owned()));
+      self.audiences.lock().unwrap().get(&room).copied().ok_or(PortError::Refused {
+        unit: "bmo-receiver",
+        call: "a room's audience",
+        status: 404,
+        code: "not-found".into(),
+        error: "no such room".into(),
+      })
     })
   }
 }

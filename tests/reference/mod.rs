@@ -28,6 +28,7 @@ pub struct Ground {
   _scratch: Scratch,
   pub brain: Arc<FakeBrain>,
   pub accounts: Arc<FakeAccounts>,
+  pub receiver: Arc<FakeReceiver>,
   pub agency: Arc<FakeAgency>,
   pub gateway: Arc<AnsweringGateway>,
   pub reference: Reference,
@@ -74,7 +75,7 @@ pub async fn paused_ground(
     stages,
     brain: brain.clone(),
     accounts: accounts.clone(),
-    receiver,
+    receiver: receiver.clone(),
     shipped: Some(shipped),
   };
 
@@ -82,6 +83,7 @@ pub async fn paused_ground(
     _scratch: scratch,
     brain,
     accounts,
+    receiver,
     agency,
     gateway,
     reference,

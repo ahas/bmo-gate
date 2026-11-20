@@ -271,6 +271,15 @@ pub struct Situation {
   pub now_at: i64,
 }
 
+/// Whom a room's org memories are read for: `external` where someone outside the company of the supervisor's owner
+/// sits in the room, or who sits there could not be read; `internal` where everyone there is of it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum Audience {
+  Internal,
+  External,
+}
+
 /// A turn's envelope, as the gate's reference road reads it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -286,6 +295,10 @@ pub struct ReferenceAsk {
   /// situation stands too, the same agent it names.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub agent: Option<String>,
+  /// Whom the room's org memories are read for; where absent, `external` for a turn with a situation and
+  /// `internal` for one with none.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub audience: Option<Audience>,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub holds: Option<Vec<String>>,
   #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -313,8 +326,8 @@ pub struct ReferenceAnswer {
   pub entries: Vec<Entry>,
 }
 
-/// The brain's index asked for: the room, the session whose loads count an entry read, and the agent whose own
-/// brain it is read from.
+/// The brain's index asked for: the room, the session whose loads count an entry read, the agent whose own brain it
+/// is read from, and whom the room's org memories are read for.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[schemars(inline)]
@@ -323,6 +336,9 @@ pub struct ReferenceIndexQuery {
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub session: Option<String>,
   pub agent: String,
+  /// Whom the room's org memories are read for; where absent, the room's, as the receiver answers it.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub audience: Option<Audience>,
 }
 
 /// One entry of the index: its slug, what it holds and when it is read, null where its title says not.
@@ -355,8 +371,8 @@ pub struct ReferenceIndex {
   pub groups: Vec<IndexGroup>,
 }
 
-/// A piece asked for by its slug: the room, its group, the session it is recorded among the loads of, and the
-/// agent whose own brain it is read from.
+/// A piece asked for by its slug: the room, its group, the session it is recorded among the loads of, the agent
+/// whose own brain it is read from, and whom the room's org memories are read for.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[schemars(inline)]
@@ -366,6 +382,9 @@ pub struct ReferencePieceQuery {
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub session: Option<String>,
   pub agent: String,
+  /// Whom the room's org memories are read for; where absent, the room's, as the receiver answers it.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub audience: Option<Audience>,
 }
 
 /// One piece read whole.
@@ -378,8 +397,8 @@ pub struct ReferencePiece {
   pub text: String,
 }
 
-/// A search of the index: its words, the room, at most how many entries (8 where absent, at most 24), and the
-/// agent whose own brain it is read from.
+/// A search of the index: its words, the room, at most how many entries (8 where absent, at most 24), the agent
+/// whose own brain it is read from, and whom the room's org memories are read for.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[schemars(inline)]
@@ -389,6 +408,9 @@ pub struct ReferenceSearchQuery {
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub limit: Option<u32>,
   pub agent: String,
+  /// Whom the room's org memories are read for; where absent, the room's, as the receiver answers it.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub audience: Option<Audience>,
 }
 
 /// One entry a search found, with its group.

@@ -76,6 +76,10 @@ pub struct Memory {
   /// In an org brain, whether no lower unit overrides its topic.
   #[serde(default)]
   pub locked: bool,
+  /// In an org brain, whether it is kept from a room where someone outside the company sits; none where the brain
+  /// does not say.
+  #[serde(default)]
+  pub internal_only: Option<bool>,
 }
 
 /// One topic as it stands for a member of an organisation, as `GET /org-topics` answers it: the brain whose word
@@ -96,13 +100,15 @@ pub struct TopicItem {
 /// The subject type an org memory names its topic by (the brain's `docs/design.md`, 「Org brains」).
 pub const TOPIC_TYPE: &str = "topic";
 
-/// An org memory as the reference reads it: its words, its marks, its topics and its recall condition.
+/// An org memory as the reference reads it: its words, its marks, its topics and its recall condition; a memory
+/// the brain does not say is internal-only or not is read as internal-only.
 pub fn org_memory(memory: &Memory) -> OrgMemory {
   OrgMemory {
     id: memory.id,
     text: memory.text.clone(),
     importance: memory.importance,
     locked: memory.locked,
+    internal_only: memory.internal_only.unwrap_or(true),
     recall_condition: memory.recall_condition.clone().filter(|when| !when.trim().is_empty()),
     topics: memory
       .subjects

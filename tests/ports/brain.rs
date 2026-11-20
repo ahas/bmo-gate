@@ -3,6 +3,7 @@
 //! hit posted by memory id.
 
 use axum::http::Method;
+use gate_ports::audience::Audience;
 use gate_ports::brain::{Brain, BrainKey, Event, HttpBrain, Reply};
 use serde_json::{Value, json};
 
@@ -518,7 +519,8 @@ async fn an_org_brain_is_found_by_its_company_and_unit_and_read_by_topic_and_who
     200,
     page(vec![json!({
       "id": 6, "type": "fact", "text": "Reports go out on Friday.", "subjects": [], "importance": 4,
-      "recallCondition": "a weekly report comes up", "validFrom": 200, "createdAt": 200, "status": "active"
+      "recallCondition": "a weekly report comes up", "validFrom": 200, "createdAt": 200, "status": "active",
+      "internalOnly": false
     })]),
   );
 
@@ -538,13 +540,17 @@ async fn an_org_brain_is_found_by_its_company_and_unit_and_read_by_topic_and_who
     found[0].contains("kind=org") && found[0].contains("accountKey=1") && found[0].contains("agentKey=3")
   );
 
-  let standing = brain.org_topics(&[10, 40]).await.unwrap();
+  let standing = brain.org_topics(&[10, 40], Audience::External).await.unwrap();
 
-  assert_eq!(stub.one("/org-topics").query.as_deref(), Some("brainIds=10%2C40"));
+  assert_eq!(stub.one("/org-topics").query.as_deref(), Some("brainIds=10%2C40&audience=external"));
   assert_eq!(standing.len(), 1);
   assert_eq!((standing[0].brain, standing[0].locked), (40, true));
   assert_eq!(standing[0].memories[0].topics, ["working-hours"]);
   assert!(standing[0].memories[0].locked);
+  assert!(
+    standing[0].memories[0].internal_only,
+    "a memory not marked either way is read as internal-only"
+  );
 
   let memories = brain.org_memories(40).await.unwrap();
   let asked = stub.one("/brains/40/memories").query.unwrap_or_default();
@@ -556,4 +562,5 @@ async fn an_org_brain_is_found_by_its_company_and_unit_and_read_by_topic_and_who
   assert!(!asked.contains("type="), "no type is named, so the read records no use: {asked}");
   assert_eq!(memories[0].recall_condition.as_deref(), Some("a weekly report comes up"));
   assert!(memories[0].topics.is_empty());
+  assert!(!memories[0].internal_only);
 }

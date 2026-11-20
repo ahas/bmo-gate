@@ -153,6 +153,7 @@ pub async fn answer(asked: &str, environment: impl Fn(&str) -> Option<String>) -
           room,
           session,
           agent,
+          audience: None,
         })
         .await
         .map(|index| serde_json::to_value(index).unwrap_or_default())
@@ -172,6 +173,7 @@ pub async fn answer(asked: &str, environment: impl Fn(&str) -> Option<String>) -
             group: given.group,
             session,
             agent,
+            audience: None,
           },
         )
         .await
@@ -190,6 +192,7 @@ pub async fn answer(asked: &str, environment: impl Fn(&str) -> Option<String>) -
           room,
           limit: given.limit,
           agent,
+          audience: None,
         })
         .await
         .map(|found| serde_json::to_value(found).unwrap_or_default())
