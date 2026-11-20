@@ -345,8 +345,6 @@ Statements here that a sibling's document does not yet match, each for that sibl
   the order through `GET /gates`.
 - **The brain's knowledge read** answers the knowledge chunks a room may read; the gate reads a room rule's piece
   through it as well, for the brain to take the room's room-rule chunks there.
-- **The receiver's turn names five groups of the index,** and not `organisation`, so a turn's index line counts no
-  unread org memory; the agent reaches the group through the index tools, for the receiver to name it.
 - **Nothing tells the gate whether someone outside the company sits in a room,** so every org brain is read for the
   company's own people and an internal-only memory reaches such a room too; for the receiver to say it on the
   envelope and the index's calls, which the gate then reads with the brain's `audience` `external`.
