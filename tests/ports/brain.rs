@@ -564,3 +564,28 @@ async fn an_org_brain_is_found_by_its_company_and_unit_and_read_by_topic_and_who
   assert!(memories[0].topics.is_empty());
   assert!(!memories[0].internal_only);
 }
+
+#[tokio::test]
+async fn an_org_brain_the_brain_no_longer_holds_is_let_go_and_found_afresh() {
+  let stub = Stub::start().await;
+  let brain = HttpBrain::new(peer(&stub, "t"));
+  let found = |id: i64| {
+    page(vec![
+      json!({ "id": id, "kind": "org", "accountKey": "1", "agentKey": "3", "name": "3", "createdAt": 1 }),
+    ])
+  };
+
+  stub.answer(Method::GET, "/brains", 200, found(40));
+  assert_eq!(brain.org_brain(1, 3).await.unwrap(), Some(40));
+
+  stub.answer(
+    Method::GET,
+    "/org-topics",
+    404,
+    json!({ "code": "not-found", "error": "There is no brain 40." }),
+  );
+  stub.answer(Method::GET, "/brains", 200, found(41));
+
+  assert!(brain.org_topics(&[40], Audience::Internal).await.is_err());
+  assert_eq!(brain.org_brain(1, 3).await.unwrap(), Some(41), "the unit's brain made again is found");
+}

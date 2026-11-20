@@ -9,6 +9,7 @@ use serde::de::{DeserializeOwned, Error as _};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 
+use crate::PortError;
 use crate::audience::Audience;
 use crate::brain_rows::{
   BrainMember, FACT_TYPE, LORE_TYPE, Layer, Memory, Page, STANDING_TYPES, Subject, Tally, TopicItem,
@@ -294,6 +295,18 @@ pub struct HttpBrain {
 }
 
 impl HttpBrain {
+  /// A read of org brains as it came back, every org brain remembered let go where the brain answers that one it
+  /// was asked of does not stand, so a unit whose org brain was removed and made again is found afresh.
+  fn forgetting_gone<T>(&self, read: Answer<T>) -> Answer<T> {
+    if matches!(read, Err(PortError::Refused { status: 404, .. }))
+      && let Ok(mut held) = self.org_brains.lock()
+    {
+      held.clear();
+    }
+
+    read
+  }
+
   pub fn new(peer: Peer) -> Self {
     Self {
       caller: Caller::new("bmo-brain", peer),
@@ -745,13 +758,15 @@ impl Brain for HttpBrain {
       }
 
       let named = brains.iter().map(i64::to_string).collect::<Vec<_>>().join(",");
-      let items: Vec<TopicItem> = self
-        .get(
-          "what stands for a person",
-          "org-topics",
-          &[("brainIds", &named), ("audience", audience.as_str())],
-        )
-        .await?;
+      let items: Vec<TopicItem> = self.forgetting_gone(
+        self
+          .get(
+            "what stands for a person",
+            "org-topics",
+            &[("brainIds", &named), ("audience", audience.as_str())],
+          )
+          .await,
+      )?;
 
       Ok(
         items
@@ -769,7 +784,7 @@ impl Brain for HttpBrain {
 
   fn org_memories(&self, brain: i64) -> BoxFuture<'_, Answer<Vec<OrgMemory>>> {
     Box::pin(async move {
-      let rows = self.memories(brain, &[("excludeTypes", "rumor,episode")]).await?;
+      let rows = self.forgetting_gone(self.memories(brain, &[("excludeTypes", "rumor,episode")]).await)?;
 
       Ok(rows.iter().map(org_memory).collect())
     })
