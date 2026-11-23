@@ -1,0 +1,100 @@
+# What installing the gate on a fresh machine needs, read by the testbed's install verb (bmo-testbed's
+# docs/install.md, 「The install declaration」).
+
+install = 1
+
+restart = "systemctl --user restart bmo-gate-server.service"
+
+[[needs]]
+program = "pg_isready"
+what = "PostgreSQL, the server the gate's store stands on, reached on its local socket by the user the install runs as: the `postgresql` package."
+
+[[needs]]
+check = 'test -x "$HOME/.bun/bin/bun" || command -v bun'
+what = "Bun, which a deployment installs the tooling's packages with: `curl -fsSL https://bun.sh/install | bash`."
+
+[[port]]
+name = "gate.server"
+number = 3260
+
+# The bearer every caller of the gate presents, read by the gate from this file under `env/`; the agency's
+# settings and the console name the same file and value.
+[[token]]
+name = "gate.service"
+file = "env/gate.token"
+
+[[database]]
+name = "bmo_gate"
+
+# The gate reads each peer's token from a file of its own under `env/`: the brain's service token and the web
+# server's token are copied into files the gate names; the agency's and the receiver's stand in their own
+# declarations' files, env/agency.token and env/receiver.token.
+[[settings]]
+file = "env/gate-brain.token"
+text = "{{token.brain.service}}"
+
+[[settings]]
+file = "env/gate-accounts.token"
+text = "{{token.web.server}}"
+
+# The service's settings (docs/boundary-api.md, 「Configuration」), which each release links as its settings.toml.
+[[settings]]
+file = "env/gate.toml"
+text = '''
+listen = "127.0.0.1:{{port.gate.server}}"
+address = "http://127.0.0.1:{{port.gate.server}}"
+token_file = "gate.token"
+database = "postgres:///bmo_gate?host=/var/run/postgresql"
+data_root = "{{data_root}}"
+chat_agent = "{{value.agent.name}}"
+session_folder = "{{data_root}}/gate/sessions"
+
+[agency]
+address = "http://127.0.0.1:{{port.agency.control}}"
+token_file = "agency.token"
+
+[brain]
+address = "http://127.0.0.1:{{port.brain.server}}"
+token_file = "gate-brain.token"
+
+[receiver]
+address = "http://127.0.0.1:{{port.receiver.server}}"
+token_file = "receiver.token"
+
+[accounts]
+address = "http://127.0.0.1:{{port.web.server}}"
+token_file = "gate-accounts.token"
+
+[gateway]
+address = "http://127.0.0.1:{{port.agency.gateway}}"
+key_file = "llm-gateway.key"
+
+[reading]
+set_aside = ["{{value.agent.label}}", "{{value.agent.name}}", "{{input.web.owner-name}}"]
+'''
+
+# The tooling's settings (docs/training.md, 「The tooling and its settings」), which each release links into its
+# tooling folder. Only the data root is named: the node and tunnel keys belong to an operator placing a model
+# on a node, and a command that needs one says so.
+[[settings]]
+file = "env/gate-tooling.toml"
+text = '''
+data_root = "{{data_root}}"
+'''
+
+# The console reads the verdicts a room's messages were judged by from the gate, under its service token.
+[[line]]
+file = "env/web-console.env"
+key = "GATE_ADDRESS"
+value = "http://127.0.0.1:{{port.gate.server}}"
+
+[[line]]
+file = "env/web-console.env"
+key = "GATE_TOKEN"
+value = "{{token.gate.service}}"
+
+# The folder a gate run's thrown-away session is started in.
+[[after]]
+id = "session-folder"
+run = '''mkdir -p "${BMO_DATA_DIR:-$HOME/.local/share/bmo/data}/gate/sessions"'''
+done = '''test -d "${BMO_DATA_DIR:-$HOME/.local/share/bmo/data}/gate/sessions"'''
