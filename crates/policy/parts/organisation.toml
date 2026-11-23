@@ -1,6 +1,10 @@
 # What an organisation hands its members (docs/reference-selection.md, 「What an organisation hands its members」): the
 # lines of the org sheet a turn carries and the words of the index's organisation group.
 
+# The name the platform's base goes by in a line of the sheet and an entry of the group, where a unit's name stands
+# for a unit's memory.
+base = "The platform's shared base"
+
 # The org sheet: its head line, and one line a standing memory (`{id}` its number, `{unit}` its unit's name,
 # `{topic}` its topic, `{locked}` the locked mark where it is locked, `{text}` its words).
 [sheet]

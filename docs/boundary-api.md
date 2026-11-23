@@ -99,9 +99,10 @@ no room at all.
 | knowledge read | `GET /brains/{brainId}/memories` | `type=knowledge`, `status=active`, paged | `items`, filtered by the slug asked |
 | lore read | `GET /brains/{brainId}/memories` | `type=lore`, `status=active`, paged | `items`, filtered by the slug asked; a piece's body is the row's text |
 | a subject found | `GET /brains/{brainId}/subjects` | `type` (`person` or `room`), `key` (the user's or the room's id), `limit=1` | `items`: the subject, or none where the brain holds none |
+| the base | `GET /brains` | `kind=org`, `accountKey=platform`, `agentKey=platform`, `limit=1` | `items`: the base (the brain's `docs/design.md`, 「The base」), remembered once found, or none, where no base is read; remembered as an org brain is and let go the same way; a memory of it whose `sourceBrainId` label names the agent's brain is left out |
 | a unit's org brain | `GET /brains` | `kind=org`, `accountKey` the company's number, `agentKey` the unit's, `limit=1` | `items`: the unit's org brain, remembered once found, or none, where the unit is passed over; every org brain remembered is let go where the brain answers 404 to a read of org brains below, so one removed and made again is found afresh |
-| what stands for a person | `GET /org-topics` | `brainIds`, the org brains of the person's units, the farthest first; `audience`, `internal` or `external`, always named, the room's audience (`docs/reference-selection.md`, 「What an organisation hands its members」) | one item a topic: `topic`, `brainId`, the brain whose word on it holds, `locked`, and its `memories`, each `id`, `text`, `importance`, `locked` and `internalOnly`; for `external`, a memory whose `internalOnly` is true or absent is left out |
-| a unit's org memories | `GET /brains/{brainId}/memories` | `status=active`, `excludeTypes=rumor,episode`, paged | `items`: every live org memory of the unit that is neither a proposal nor an episode, each `id`, `text`, `recallCondition`, `subjects` (a topic is a subject of type `topic`, its key the topic), `validFrom` and `internalOnly`, a memory whose `internalOnly` is absent read as internal-only; no type is named, so the read records no use |
+| what stands for a person | `GET /org-topics` | `brainIds`, the org brains of the person's units, the farthest first; `audience`, `internal` or `external`, always named, the room's audience (`docs/reference-selection.md`, 「What an organisation hands its members」) | one item a topic: `topic`, `brainId`, the brain whose word on it holds, `locked`, and its `memories`, each `id`, `text`, `importance`, `locked`, `internalOnly` and `labels`; for `external`, a memory whose `internalOnly` is true or absent is left out |
+| a unit's org memories | `GET /brains/{brainId}/memories` | `status=active`, `excludeTypes=rumor,episode`, paged | `items`: every live org memory of the unit that is neither a proposal nor an episode, each `id`, `text`, `recallCondition`, `subjects` (a topic is a subject of type `topic`, its key the topic), `validFrom`, `labels` and `internalOnly`, a memory whose `internalOnly` is absent read as internal-only; no type is named, so the read records no use |
 | a person's sheet | `GET /brains/{brainId}/subjects/{subjectId}/sheet` | `roomId`, the room's subject, where the brain holds one; `limit`, the head's count of fact lines, for a speaker's head (`docs/reference-selection.md`, 「What a turn is given」), and none for a whole sheet | `text/plain`: one line a name first, `- [#<id> name] <text>`, those about the room ahead of those about no room, every name whatever the `limit`; then one line a fact, `- [#<id> since <date>] <text>`, the most important first; empty where the brain knows no name and no fact of the person there |
 
 The system's reference documents are held nowhere in the brain, so the brain answers no rows of them, and the
@@ -128,9 +129,11 @@ token, a user named by the digits of their id.
 |---|---|---|---|
 | a person's unit | `GET /users/{user}/unit` | | `company` and `path`, the unit references from the company down to the person's home unit, each `id` and `name`; 404 is a person the service places in no unit, who reads no org brain |
 | a person's posts | `GET /users/{user}/posts` | `Owner-Key`, the person's own id | `posts`, each `unit` and its `path` from the company down to it |
+| whether a layer is read | `GET /chain/kinds/{key}/resolve` | `person`, the owner's id; `key`, `brain.organisation` or `brain.global` (the brain's `docs/design.md`, 「The layers a reading takes」) | `value`, false where the layer is not read; 404, the kind undeclared or the person not held, reads the layer, as the kinds' default does |
 
-The gate asks both for the owner of the supervisor whose reference it reads, on every turn and every read of the
-index, and keeps neither answer, so a person moved between units reads their new units at once.
+The gate asks these for the owner of the supervisor whose reference it reads, on every turn and every read of the
+index, and keeps no answer, so a person moved between units, or a layer turned off above them, reads as it stands
+at once.
 
 ### bmo-receiver
 

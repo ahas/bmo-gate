@@ -106,6 +106,10 @@ pub struct FakeBrain {
   pub org_topics_asked: Mutex<Vec<(Vec<i64>, Audience)>>,
   /// Each org brain's live memories.
   pub org_memories: Mutex<HashMap<i64, Vec<OrgMemory>>>,
+  /// The base, where it keeps one.
+  pub base: Mutex<Option<i64>>,
+  /// The id of each agent's own brain, where a test names one.
+  pub ids: Mutex<HashMap<BrainKey, i64>>,
 }
 
 impl FakeBrain {
@@ -122,6 +126,14 @@ impl FakeBrain {
 impl Brain for FakeBrain {
   fn kept<'a>(&'a self, key: &'a BrainKey) -> BoxFuture<'a, Answer<bool>> {
     Box::pin(async move { Ok(self.reads(key)) })
+  }
+
+  fn own<'a>(&'a self, key: &'a BrainKey) -> BoxFuture<'a, Answer<Option<i64>>> {
+    Box::pin(async move { Ok(self.ids.lock().unwrap().get(key).copied()) })
+  }
+
+  fn base(&self) -> BoxFuture<'_, Answer<Option<i64>>> {
+    Box::pin(async move { Ok(*self.base.lock().unwrap()) })
   }
 
   fn standing<'a>(&'a self, key: &'a BrainKey, _chat: i64) -> BoxFuture<'a, Answer<Vec<MemoryRow>>> {
@@ -298,15 +310,23 @@ impl FakeBrain {
   }
 }
 
-/// The stand-in account service: where each person stands, every person it holds none of standing in no unit.
+/// The stand-in account service: where each person stands, every person it holds none of standing in no unit, and
+/// the layers each person's chain turns off, every other layer read.
 #[derive(Default)]
 pub struct FakeAccounts {
   pub placements: Mutex<HashMap<i64, Placement>>,
+  pub layers_off: Mutex<Vec<(i64, String)>>,
 }
 
 impl Accounts for FakeAccounts {
   fn placement(&self, user: i64) -> BoxFuture<'_, Answer<Option<Placement>>> {
     Box::pin(async move { Ok(self.placements.lock().unwrap().get(&user).cloned()) })
+  }
+
+  fn reads<'a>(&'a self, user: i64, layer: &'a str) -> BoxFuture<'a, Answer<bool>> {
+    Box::pin(async move {
+      Ok(!self.layers_off.lock().unwrap().iter().any(|(who, off)| *who == user && off == layer))
+    })
   }
 }
 

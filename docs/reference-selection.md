@@ -14,7 +14,8 @@ Every account has supervisors of its own, each with a brain of its own, and a su
 another supervisor's memories, rooms or people, of its own account or another.
 
 - **A reference is one supervisor's, read from its own brain** and, beside it, from the org brains of the units the
-  person it serves belongs to (「What an organisation hands its members」); no other brain is read. The supervisor is
+  person it serves belongs to and from the platform's base (「What an organisation hands its members」); no other
+  brain is read. The supervisor is
   the agent the caller
   names: the situation's agent on a chat turn, the envelope's `agent` on a turn with no situation, and `agent` on
   the index, a piece and a search. A turn with no situation is a supervisor's instruction outside any room, a
@@ -44,8 +45,9 @@ another supervisor's memories, rooms or people, of its own account or another.
 ## What an organisation hands its members
 
 An org brain holds what holds for everyone in one unit of an organisation, a company or a unit under it (the brain's
-`docs/design.md`, 「Org brains」). A supervisor's reference reads the org brains of the units the person it serves
-stands in, so what a company, a division or a team says of itself reaches every member's agent.
+`docs/design.md`, 「Org brains」), and the base holds what holds for any agent anywhere (its 「The base」). A
+supervisor's reference reads the base and the org brains of the units the person it serves stands in, so what the
+platform, a company, a division or a team says reaches every member's agent.
 
 ```mermaid
 flowchart TD
@@ -59,8 +61,19 @@ flowchart TD
 
 - **Whose organisation it is.** The person is the supervisor's owner, its `ownerAccount` (「Whose reference it
   is」). A supervisor of no account, an owner the account service places in no unit, and a deployment whose
-  settings name no account service read no org brain: the turn carries no org sheet and the `organisation` group
-  stands empty.
+  settings name no account service read no org brain.
+- **Which layers the person reads is the delegation chain's** (the brain's `docs/design.md`, 「The layers a reading
+  takes」): the gate resolves `brain.organisation` and `brain.global` for the owner on the account service as it
+  reads (`docs/boundary-api.md`, 「The account service」), and reads the org brains only where the first holds and
+  the base only where the second does. A kind the service does not hold, or a person it does not, holds, as its
+  default does. A supervisor of no account reads the base, as the platform's own, and no org brain.
+- **The base is the farthest unit.** It is the brain's org brain keyed `platform` and `platform`, read where the
+  brain keeps one, named first, ahead of every unit of the person's, so a unit's word on a topic stands in place of
+  the base's and a topic the base locks stands over every unit's. Its name in a line and an entry is the policy's
+  name for it. A memory of the base raised from the supervisor's own brain, its `sourceBrainId` label naming that
+  brain, is left out wherever the base is read: the supervisor holds its source.
+- **No layer, no organisation.** Where neither the base nor an org brain is read, the turn carries no org sheet and
+  the `organisation` group stands empty.
 - **The person's units, the farthest first.** The account service answers the person's home unit with the path
   from the company down to it, and the posts they hold in other units of the company, each with its own path
   (`docs/boundary-api.md`, 「The account service」). The units are named in the order the brain reads them by: first
@@ -97,7 +110,7 @@ flowchart TD
   active rows of their org brains that are neither a proposal nor an episode, the unit's order and then the brain's,
   less those the org sheet carried and those of a topic another unit's word holds. An entry's slug is `org-<memory
   id>`, what it holds the unit's name and the first line of its words, when to read it the memory's recall
-  condition, and its path `organisation/<unit>/<memory id>`. A piece is the memory's words under the name of the unit
+  condition, and its path `organisation/<unit>/<memory id>`, `organisation/platform/<memory id>` for the base's. A piece is the memory's words under the name of the unit
   it is from, so the agent tells which unit said what where two disagree.
 
 ## What a turn is given

@@ -22,6 +22,8 @@ pub struct IndexWords {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Organisation {
+  /// The name the platform's base goes by.
+  pub base: String,
   pub sheet: SheetLines,
   pub index: IndexWords,
 }

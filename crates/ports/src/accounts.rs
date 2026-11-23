@@ -1,6 +1,6 @@
 //! The account service port (`docs/boundary-api.md`, 「The account service」): where a person stands in their
-//! organisation, read from bmo-web's server in its conventions — camelCase bodies, its server's token, a user named
-//! by the digits of their id.
+//! organisation, and whether the delegation chain lets them read a shared layer of brains, read from bmo-web's
+//! server in its conventions — camelCase bodies, its server's token, a user named by the digits of their id.
 
 use futures_util::future::BoxFuture;
 use serde::Deserialize;
@@ -42,19 +42,41 @@ impl Placement {
   }
 }
 
+/// The chain's kind saying whether the org brains are read for a person (the brain's `docs/design.md`, 「The layers
+/// a reading takes」).
+pub const ORGANISATION_LAYER: &str = "brain.organisation";
+
+/// The chain's kind saying whether the platform's base is read for a person.
+pub const BASE_LAYER: &str = "brain.global";
+
 /// Every call the gate makes on the account service.
 pub trait Accounts: Send + Sync {
   /// Where the person stands, or none where the service places them in no unit.
   fn placement(&self, user: i64) -> BoxFuture<'_, Answer<Option<Placement>>>;
+
+  /// Whether the layer the chain's kind names is read for the person: what the kind resolves to, and read where
+  /// the service holds no such kind or no such person, as the kind's default is.
+  fn reads<'a>(&'a self, user: i64, layer: &'a str) -> BoxFuture<'a, Answer<bool>>;
 }
 
-/// No account service: every person stands in no unit, so no org brain is read.
+/// No account service: every person stands in no unit, so no org brain is read, and every layer reads as its
+/// default does.
 pub struct NoAccounts;
 
 impl Accounts for NoAccounts {
   fn placement(&self, _user: i64) -> BoxFuture<'_, Answer<Option<Placement>>> {
     Box::pin(async { Ok(None) })
   }
+
+  fn reads<'a>(&'a self, _user: i64, _layer: &'a str) -> BoxFuture<'a, Answer<bool>> {
+    Box::pin(async { Ok(true) })
+  }
+}
+
+#[derive(Deserialize)]
+struct Resolved {
+  #[serde(default)]
+  value: Option<serde_json::Value>,
 }
 
 #[derive(Deserialize)]
@@ -108,6 +130,27 @@ impl Accounts for HttpAccounts {
         path: home.path,
         posts: posts.posts.into_iter().map(|post| post.path).collect(),
       }))
+    })
+  }
+
+  fn reads<'a>(&'a self, user: i64, layer: &'a str) -> BoxFuture<'a, Answer<bool>> {
+    Box::pin(async move {
+      let person = user.to_string();
+      let resolved = self
+        .caller
+        .get_or_nothing::<Resolved>(
+          "whether a layer is read",
+          &["chain", "kinds", layer, "resolve"],
+          &[("person", &person)],
+        )
+        .await?;
+
+      Ok(
+        resolved
+          .and_then(|resolved| resolved.value)
+          .and_then(|value| value.as_bool())
+          .unwrap_or(true),
+      )
     })
   }
 }

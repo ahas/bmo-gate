@@ -1,6 +1,7 @@
 //! What an organisation hands its members (`docs/reference-selection.md`, 「What an organisation hands its
 //! members」): the org sheet a turn carries, held to its ceiling, and the index's `organisation` group, read for the
-//! owner of the supervisor alone and for the room's audience.
+//! owner of the supervisor alone and for the room's audience, with the platform's base the farthest unit, and each
+//! shared layer read where the owner's delegation chain lets them read it.
 
 use gate_policy::reference::REFERENCE;
 use gate_ports::accounts::{OrgUnit, Placement};
@@ -36,6 +37,7 @@ fn org_memory(id: i64, text: &str, importance: i64, topics: &[&str]) -> OrgMemor
     recall_condition: None,
     topics: topics.iter().map(|topic| (*topic).to_owned()).collect(),
     changed_at: 0,
+    source_brain: None,
   }
 }
 
@@ -283,5 +285,110 @@ async fn a_read_naming_no_audience_asks_the_receiver_and_reads_external_where_it
       .map(|(_, audience)| *audience)
       .collect::<Vec<_>>(),
     [Audience::Internal, Audience::External]
+  );
+}
+
+const BASE: i64 = 90;
+const OWN_BRAIN: i64 = 5;
+
+// The base beside the owner's units: its word on formatting, and a tip it raised from the supervisor's own brain.
+fn furnish_base(ground: &Ground) {
+  *ground.brain.base.lock().unwrap() = Some(BASE);
+  ground.brain.org_topics.lock().unwrap().push(topic(
+    "formatting",
+    BASE,
+    false,
+    vec![org_memory(91, "Run the formatter before the linter.", 5, &["formatting"])],
+  ));
+
+  let mut raised = org_memory(92, "Read the whole log before retrying.", 5, &[]);
+
+  raised.source_brain = Some(OWN_BRAIN);
+  ground.brain.org_memories.lock().unwrap().insert(
+    BASE,
+    vec![
+      org_memory(91, "Run the formatter before the linter.", 5, &["formatting"]),
+      raised,
+      org_memory(93, "Pin a library's exact version where its minor releases break.", 4, &[]),
+    ],
+  );
+}
+
+#[tokio::test]
+async fn the_base_is_read_as_the_farthest_unit_less_what_it_raised_from_the_supervisors_own_brain() {
+  let ground = ground("org-base", |_| None).await;
+
+  furnish(&ground);
+  furnish_base(&ground);
+
+  let key = ground.reference.brain_key("the-chat-agent").await.unwrap();
+
+  ground.brain.ids.lock().unwrap().insert(key.clone(), OWN_BRAIN);
+
+  let entries_handed = handed(&ground.reference, &turn()).await;
+  let sheet = org_sheet(&entries_handed).expect("the org sheet");
+
+  assert!(
+    sheet
+      .text
+      .lines()
+      .any(|line| line
+        == "- [#91 The platform's shared base · formatting] Run the formatter before the linter."),
+    "{}",
+    sheet.text
+  );
+  assert_eq!(
+    ground.brain.org_topics_asked.lock().unwrap()[0],
+    (vec![BASE, 40, 10, 30], Audience::Internal)
+  );
+
+  let listed = entries(&ground.reference, &key, 7, "organisation", Some(Audience::Internal))
+    .await
+    .unwrap();
+  let slugs: Vec<&str> = listed.iter().map(|entry| entry.slug.as_str()).collect();
+
+  assert_eq!(slugs, ["org-93", "org-32"]);
+  assert_eq!(listed[0].path, "organisation/platform/93");
+  assert_eq!(
+    listed[0].holds,
+    "The platform's shared base: Pin a library's exact version where its minor releases break."
+  );
+}
+
+#[tokio::test]
+async fn the_owners_chain_turns_the_base_or_the_org_brains_off() {
+  let ground = ground("org-layers-off", |_| None).await;
+
+  furnish(&ground);
+  furnish_base(&ground);
+  ground.accounts.layers_off.lock().unwrap().push((OWNER, "brain.global".into()));
+  handed(&ground.reference, &turn()).await;
+  assert_eq!(
+    ground.brain.org_topics_asked.lock().unwrap().pop(),
+    Some((vec![40, 10, 30], Audience::Internal))
+  );
+
+  *ground.accounts.layers_off.lock().unwrap() = vec![(OWNER, "brain.organisation".into())];
+  handed(&ground.reference, &turn()).await;
+  assert_eq!(
+    ground.brain.org_topics_asked.lock().unwrap().pop(),
+    Some((vec![BASE], Audience::Internal))
+  );
+}
+
+#[tokio::test]
+async fn a_supervisor_of_no_account_reads_the_base_and_no_org_brain() {
+  let ground = ground("org-base-unowned", |_| None).await;
+
+  furnish(&ground);
+  furnish_base(&ground);
+  ground.agency.supervisors.lock().unwrap().clear();
+
+  let entries_handed = handed(&ground.reference, &turn()).await;
+
+  assert!(org_sheet(&entries_handed).is_some(), "{entries_handed:?}");
+  assert_eq!(
+    ground.brain.org_topics_asked.lock().unwrap().as_slice(),
+    [(vec![BASE], Audience::Internal)]
   );
 }

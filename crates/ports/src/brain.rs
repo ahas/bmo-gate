@@ -171,6 +171,8 @@ pub struct OrgMemory {
   pub recall_condition: Option<String>,
   pub topics: Vec<String>,
   pub changed_at: i64,
+  /// The brain a memory of the base was raised from, as its `sourceBrainId` label names it; none for any other.
+  pub source_brain: Option<i64>,
 }
 
 /// One topic as it stands for a member of an organisation: the org brain whose word on it holds, whether that word is
@@ -221,6 +223,13 @@ pub trait Brain: Send + Sync {
   /// Whether the agent keeps a brain: none where the brain lists no brain of the key, and none where an agent of no
   /// account has its key on brains of more than one account.
   fn kept<'a>(&'a self, key: &'a BrainKey) -> BoxFuture<'a, Answer<bool>>;
+
+  /// The agent's own brain, none where it keeps none.
+  fn own<'a>(&'a self, key: &'a BrainKey) -> BoxFuture<'a, Answer<Option<i64>>>;
+
+  /// The platform's base, the org brain keyed by the platform (the brain's `docs/design.md`, 「The base」); none
+  /// where the brain keeps none.
+  fn base(&self) -> BoxFuture<'_, Answer<Option<i64>>>;
 
   /// The room's open rows that wait on nothing, and the errands whose event has come.
   fn standing<'a>(&'a self, key: &'a BrainKey, chat: i64) -> BoxFuture<'a, Answer<Vec<MemoryRow>>>;
@@ -291,17 +300,24 @@ pub struct HttpBrain {
   caller: Caller,
   brains: std::sync::Arc<std::sync::Mutex<BTreeMap<BrainKey, i64>>>,
   org_brains: std::sync::Arc<std::sync::Mutex<BTreeMap<(i64, i64), i64>>>,
+  base: std::sync::Arc<std::sync::Mutex<Option<i64>>>,
   subjects: std::sync::Arc<std::sync::Mutex<BTreeMap<SubjectKey, i64>>>,
 }
+
+/// The account key and the agent key the base is filed under.
+pub const BASE_KEY: &str = "platform";
 
 impl HttpBrain {
   /// A read of org brains as it came back, every org brain remembered let go where the brain answers that one it
   /// was asked of does not stand, so a unit whose org brain was removed and made again is found afresh.
   fn forgetting_gone<T>(&self, read: Answer<T>) -> Answer<T> {
-    if matches!(read, Err(PortError::Refused { status: 404, .. }))
-      && let Ok(mut held) = self.org_brains.lock()
-    {
-      held.clear();
+    if matches!(read, Err(PortError::Refused { status: 404, .. })) {
+      if let Ok(mut held) = self.org_brains.lock() {
+        held.clear();
+      }
+      if let Ok(mut held) = self.base.lock() {
+        *held = None;
+      }
     }
 
     read
@@ -312,6 +328,7 @@ impl HttpBrain {
       caller: Caller::new("bmo-brain", peer),
       brains: std::sync::Arc::new(std::sync::Mutex::new(BTreeMap::new())),
       org_brains: std::sync::Arc::new(std::sync::Mutex::new(BTreeMap::new())),
+      base: std::sync::Arc::new(std::sync::Mutex::new(None)),
       subjects: std::sync::Arc::new(std::sync::Mutex::new(BTreeMap::new())),
     }
   }
@@ -554,6 +571,40 @@ impl HttpBrain {
 impl Brain for HttpBrain {
   fn kept<'a>(&'a self, key: &'a BrainKey) -> BoxFuture<'a, Answer<bool>> {
     Box::pin(async move { Ok(self.brain(key).await?.is_some()) })
+  }
+
+  fn own<'a>(&'a self, key: &'a BrainKey) -> BoxFuture<'a, Answer<Option<i64>>> {
+    Box::pin(async move { self.brain(key).await })
+  }
+
+  fn base(&self) -> BoxFuture<'_, Answer<Option<i64>>> {
+    Box::pin(async move {
+      if let Some(id) = self.base.lock().ok().and_then(|held| *held) {
+        return Ok(Some(id));
+      }
+
+      let page: Page<BrainMember> = self
+        .get(
+          "the base",
+          "brains",
+          &[("kind", "org"), ("accountKey", BASE_KEY), ("agentKey", BASE_KEY), ("limit", "1")],
+        )
+        .await?;
+      let Some(id) = page
+        .items
+        .iter()
+        .find(|brain| brain.account_key == BASE_KEY && brain.agent_key == BASE_KEY)
+        .map(|brain| brain.id)
+      else {
+        return Ok(None);
+      };
+
+      if let Ok(mut held) = self.base.lock() {
+        *held = Some(id);
+      }
+
+      Ok(Some(id))
+    })
   }
 
   fn standing<'a>(&'a self, key: &'a BrainKey, chat: i64) -> BoxFuture<'a, Answer<Vec<MemoryRow>>> {

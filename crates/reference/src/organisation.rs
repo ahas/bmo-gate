@@ -1,7 +1,8 @@
 //! What an organisation hands its members (`docs/reference-selection.md`, 「What an organisation hands its
-//! members」): the units the person a supervisor serves stands in, the farthest first, each unit's org brain, what
-//! stands there for the person by topic as the org sheet a turn carries, and every other live org memory as the
-//! index's `organisation` group, each read for the room's audience. No model is asked.
+//! members」): the platform's base and the units the person a supervisor serves stands in, the farthest first, each
+//! read where the delegation chain lets the person read that layer, what stands for the person by topic as the org
+//! sheet a turn carries, and every other live org memory as the index's `organisation` group, each read for the
+//! room's audience, less what the base raised from the supervisor's own brain. No model is asked.
 
 use std::collections::HashSet;
 
@@ -10,7 +11,7 @@ use gate_policy::fill_marks;
 use gate_policy::organisation::ORGANISATION;
 use gate_policy::reference::REFERENCE;
 use gate_ports::PortError;
-use gate_ports::accounts::OrgUnit;
+use gate_ports::accounts::{BASE_LAYER, ORGANISATION_LAYER, OrgUnit};
 use gate_ports::audience::Audience;
 use gate_ports::brain::{BrainKey, OrgMemory, OrgTopic};
 
@@ -19,17 +20,39 @@ use crate::{Entry, Reference, Source, memories};
 /// The path the org sheet is handed under.
 pub const SHEET_PATH: &str = "organisation/sheet.md";
 
-/// One unit of the person's that keeps an org brain.
+/// One unit of the person's that keeps an org brain, or the platform's base, the farthest of them.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HeldUnit {
   pub unit: OrgUnit,
   pub brain: i64,
+  /// Whether it is the base rather than a unit.
+  pub base: bool,
 }
 
-/// One org memory read from a unit, as the index's `organisation` group lists it.
+impl HeldUnit {
+  /// The base as the farthest unit, under the policy's name for it.
+  pub fn base(brain: i64) -> Self {
+    Self {
+      unit: OrgUnit {
+        id: 0,
+        name: ORGANISATION.base.clone(),
+      },
+      brain,
+      base: true,
+    }
+  }
+
+  /// The word a path names it by: the unit's number, or `platform` for the base.
+  fn path_word(&self) -> String {
+    if self.base { "platform".to_owned() } else { self.unit.id.to_string() }
+  }
+}
+
+/// One org memory read from a unit or the base, as the index's `organisation` group lists it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UnitMemory {
   pub unit: OrgUnit,
+  pub base: bool,
   pub memory: OrgMemory,
 }
 
@@ -41,7 +64,13 @@ impl UnitMemory {
 
   /// The path a piece read of it is recorded under.
   pub fn path(&self) -> String {
-    format!("organisation/{}/{}", self.unit.id, self.memory.id)
+    let held = HeldUnit {
+      unit: self.unit.clone(),
+      brain: 0,
+      base: self.base,
+    };
+
+    format!("organisation/{}/{}", held.path_word(), self.memory.id)
   }
 
   /// What the entry holds: its unit's name and the first line of its words.
@@ -71,43 +100,72 @@ struct SheetLine {
   text: String,
 }
 
-/// The person's units that keep an org brain, the farthest first; none for a supervisor of no account, for one the
-/// brain keeps no brain for, and for a person the account service places in no unit.
+/// The base and the person's units that keep an org brain, the farthest first, each where the delegation chain lets
+/// the person read its layer: none for an agent the brain keeps no brain for; the base alone for a supervisor of no
+/// account; and no unit for a person the account service places in none.
 pub async fn units(reference: &Reference, key: &BrainKey) -> Result<Vec<HeldUnit>, PortError> {
-  let Some(owner) = key.owner() else {
-    return Ok(vec![]);
-  };
-
   if !reference.brain.kept(key).await? {
     return Ok(vec![]);
   }
 
-  let Some(placement) = reference.accounts.placement(owner).await? else {
-    return Ok(vec![]);
+  let owner = key.owner();
+  let reads_base = match owner {
+    Some(owner) => reference.accounts.reads(owner, BASE_LAYER).await?,
+    None => true,
   };
   let mut held = vec![];
 
+  if reads_base && let Some(base) = reference.brain.base().await? {
+    held.push(HeldUnit::base(base));
+  }
+
+  let Some(owner) = owner else {
+    return Ok(held);
+  };
+
+  if !reference.accounts.reads(owner, ORGANISATION_LAYER).await? {
+    return Ok(held);
+  }
+
+  let Some(placement) = reference.accounts.placement(owner).await? else {
+    return Ok(held);
+  };
+
   for unit in placement.farthest_first() {
     if let Some(brain) = reference.brain.org_brain(placement.company.id, unit.id).await? {
-      held.push(HeldUnit { unit, brain });
+      held.push(HeldUnit {
+        unit,
+        brain,
+        base: false,
+      });
     }
   }
 
   Ok(held)
 }
 
+/// Whether a memory read from the shared layers is handed to the agent whose brain is named: not one the base raised
+/// from that brain, which holds its source.
+fn handed(memory: &OrgMemory, own: Option<i64>) -> bool {
+  own.is_none() || memory.source_brain != own
+}
+
 /// What stands for the person in their units, by topic, as the brain answers it for the audience: less any memory
 /// the audience may not read, and a topic left with none.
 pub async fn standing(
   reference: &Reference,
+  key: &BrainKey,
   units: &[HeldUnit],
   audience: Audience,
 ) -> Result<Vec<OrgTopic>, PortError> {
   let brains: Vec<i64> = units.iter().map(|held| held.brain).collect();
+  let own = reference.brain.own(key).await?;
   let mut standing = reference.brain.org_topics(&brains, audience).await?;
 
   for topic in &mut standing {
-    topic.memories.retain(|memory| audience.reads(memory.internal_only));
+    topic
+      .memories
+      .retain(|memory| audience.reads(memory.internal_only) && handed(memory, own));
   }
 
   standing.retain(|topic| !topic.memories.is_empty());
@@ -237,7 +295,7 @@ pub async fn sheet_entry(
       return Ok(None);
     }
 
-    let standing = standing(reference, &units, audience).await?;
+    let standing = standing(reference, key, &units, audience).await?;
 
     Ok::<_, PortError>(sheet(&units, &standing))
   };
@@ -272,8 +330,9 @@ pub async fn rest(
   }
 
   let audience = audience(reference, chat_id, &key.agent, named).await;
-  let standing = standing(reference, &units, audience).await?;
+  let standing = standing(reference, key, &units, audience).await?;
   let carried = sheet(&units, &standing).map(|(_, carried)| carried).unwrap_or_default();
+  let own = reference.brain.own(key).await?;
   let mut rest = vec![];
 
   for held in &units {
@@ -282,9 +341,14 @@ pub async fn rest(
     for memory in reference.brain.org_memories(held.brain).await? {
       let stands = memory.topics.is_empty() || memory.topics.iter().any(holds);
 
-      if stands && audience.reads(memory.internal_only) && !carried.contains(&memory.id) {
+      if stands
+        && audience.reads(memory.internal_only)
+        && !carried.contains(&memory.id)
+        && handed(&memory, own)
+      {
         rest.push(UnitMemory {
           unit: held.unit.clone(),
+          base: held.base,
           memory,
         });
       }

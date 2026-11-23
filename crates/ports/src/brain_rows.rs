@@ -117,8 +117,13 @@ pub fn org_memory(memory: &Memory) -> OrgMemory {
       .map(|subject| subject.key.clone())
       .collect(),
     changed_at: memory.valid_from.max(memory.created_at),
+    source_brain: memory.labels.get(SOURCE_BRAIN_LABEL).and_then(|source| source.parse().ok()),
   }
 }
+
+/// The label naming the brain a memory of the base was raised from (the brain's `docs/design.md`, 「Raising a memory
+/// to the base」).
+pub const SOURCE_BRAIN_LABEL: &str = "sourceBrainId";
 
 /// A subject as the brain lists it: a person or a room by the caller's key, and the name the brain knows it by.
 #[derive(Clone, Debug, Default, Deserialize)]
