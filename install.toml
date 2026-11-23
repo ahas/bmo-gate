@@ -44,7 +44,7 @@ text = '''
 listen = "127.0.0.1:{{port.gate.server}}"
 address = "http://127.0.0.1:{{port.gate.server}}"
 token_file = "gate.token"
-database = "postgres:///bmo_gate?host=/var/run/postgresql"
+database = "postgres:///bmo_gate?host={{postgres.host}}&port={{postgres.port}}"
 data_root = "{{data_root}}"
 chat_agent = "{{value.agent.name}}"
 session_folder = "{{data_root}}/gate/sessions"
