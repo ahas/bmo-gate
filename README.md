@@ -1,3 +1,5 @@
+**English** | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md)
+
 # bmo-gate
 
 The gate stage of a turn, as one service of its own. Between the moment a chat receiver has built a turn's
@@ -20,8 +22,8 @@ Every other unit is reached through standard APIs alone, and of other repositori
 
 | Folder | What it holds |
 |---|---|
-| `crates/` | The Rust crates the root package is built from: the contract and its client, the store, the codes, the ports to the other units, the policy, the words, the markup, the runs, the reference road, the service's routes and the unit command |
-| `deploy/` | The service unit the testbed's deployment keeps on the operations machine |
+| `crates/` | The Rust crates the root package is built from: the contract and its client, the store, the codes, the ports to the other units, the policy, the words, the markup, the runs, the translation stages, the reference road, the service's routes and the unit command |
+| `deploy/` | The service unit the testbed's deployment keeps on the operations machine, `bmo-gate-server.service`, and the units marked `retire` that the deployment stops, disables and unlinks |
 | `docs/` | The documents, which come before the code: start with `docs/layout.md`, and read `docs/api.md` for the public API and `docs/openapi.json` for its machine form |
 | `package/` | The TypeScript client generated from `docs/openapi.json` |
 | `runtime/` | The GGUF engine's unit templates and node setup (`docs/gguf-llm.md`) |
