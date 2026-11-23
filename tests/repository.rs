@@ -1,6 +1,6 @@
 //! Checks that span the repository: what its manifests may depend on, its layout and manifests, its one
-//! version, where tests stand, and what no tracked file may hold (Hangul outside the
-//! prompts past the ledger, and the names a list kept outside the repository gives). Personal data is held by
+//! version, where tests stand, and what no tracked file may hold (Hangul outside the prompts and the root
+//! READMEs past the ledger, and the names a list kept outside the repository gives). Personal data is held by
 //! the testbed's `personal-data` check, which the declaration enables.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -130,6 +130,11 @@ fn is_hangul(character: char) -> bool {
   HANGUL.iter().any(|&(first, last)| (first..=last).contains(&point))
 }
 
+/// Whether `path` is one of the root READMEs, which name the Korean one in their language line and give it whole.
+fn is_root_readme(path: &str) -> bool {
+  !path.contains('/') && path.starts_with("README") && path.ends_with(".md")
+}
+
 /// How many lines of `text` hold Hangul.
 fn hangul_lines(text: &str) -> usize {
   text.lines().filter(|line| line.chars().any(is_hangul)).count()
@@ -250,7 +255,7 @@ fn no_file_outside_the_prompts_holds_more_hangul_than_the_ledger_allows() {
   let ledger = ledger();
   let found: Vec<String> = tracked_texts()
     .into_iter()
-    .filter(|(path, _)| !path.starts_with("prompts/"))
+    .filter(|(path, _)| !path.starts_with("prompts/") && !is_root_readme(path))
     .filter_map(|(path, text)| {
       let held = hangul_lines(&text);
       let allowed = ledger.get(&path).copied().unwrap_or(0);

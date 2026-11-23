@@ -29,8 +29,8 @@ These rules hold every change to this repository.
 - Everything in this repository is English: code, comments, strings, tests, documents, commit messages
   and branch names, with the one exception below.
 - Korean stands only in what a test feeds the code, a pattern reads or a bench sends as a sample state, written
-  by its unicode escapes and recorded in `korean-ledger.json`, which the testbed's language check reads. Nothing
-  else holds Korean.
+  by its unicode escapes and recorded in `korean-ledger.json`, which the testbed's language check reads, and in
+  the root READMEs: the Korean `README.ko.md` and the language line atop each of them. Nothing else holds Korean.
 - No personal data: no user names, home directories, machine names, domains, network addresses or names
   of any agent. What the gate needs at runtime comes from its settings and the other units' answers.
   Tests and documents use neutral names.
