@@ -7,9 +7,7 @@
 use std::str::FromStr;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use gate_store::migration::Migrator;
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement, Value};
-use sea_orm_migration::MigratorTrait;
 use sqlx::postgres::{PgConnectOptions, PgConnection};
 use sqlx::{Connection as _, Executor};
 
@@ -76,7 +74,7 @@ async fn template() -> String {
 
       let db = connect(&name).await;
 
-      Migrator::up(&db, None).await.expect("the template migrates");
+      gate_store::migration::up(&db).await.expect("the template migrates");
       db.close().await.expect("the template's connection closes");
 
       name

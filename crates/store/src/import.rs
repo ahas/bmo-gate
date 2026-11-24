@@ -13,12 +13,9 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use sea_orm::Database;
-use sea_orm_migration::MigratorTrait;
 use serde_json::Value;
 use sqlx::Row;
 use sqlx::postgres::{PgPool, PgPoolOptions};
-
-use crate::migration::Migrator;
 
 /// One table the import moves: its source name, its target name, and its columns.
 pub struct TableMap {
@@ -482,7 +479,7 @@ pub async fn run(database: &str, export: &Path, dry_run: bool) -> Result<Report,
   let migrated = Database::connect(database)
     .await
     .map_err(|error| format!("{database} could not be opened: {error}"))?;
-  Migrator::up(&migrated, None)
+  crate::migration::up(&migrated)
     .await
     .map_err(|error| format!("the migrations: {error}"))?;
   migrated

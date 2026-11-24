@@ -283,6 +283,15 @@ and nothing behind it (`docs/gates.md`, 「Where a gate's runs go out」):
 `gate_options` names its agent. `reference_offers` and `reference_verdicts` hold records the history reads
 (`docs/api.md`, 「Judgements」) and nothing writes.
 
+- **The schema starts at the 1.0.0 baseline,** one migration that makes every table and index; every later
+  change to the schema is a migration after it, run by the service as it starts, and its record of what ran
+  is the table `gate_migrations`.
+- **An install from before 1.0.0 is taken as it stands.** A database whose record names every migration of the
+  last release before 1.0.0, and nothing else, already holds the baseline's schema: the service rewrites that
+  record to name the baseline alone, in one transaction, and touches no table and no row. A database whose
+  record names only part of them is refused at start, with the migration it stopped at; it is brought to the
+  last release before 1.0.0 by that release first.
+
 ### Its gates and their instructions
 
 - **The gate order** — which gates stand, the part and step each takes against a turn, and each gate's profile

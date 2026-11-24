@@ -30,7 +30,6 @@ use gate_stages::document_translation::Queue;
 use gate_stages::translator::Intake;
 use gate_stages::{Reading, Stages};
 use sea_orm::DatabaseConnection;
-use sea_orm_migration::MigratorTrait;
 
 use crate::answer::Refused;
 use crate::settings::{Settings, Unread};
@@ -137,7 +136,7 @@ pub fn reference(settings: &Settings, stages: Arc<Stages>) -> Result<Arc<Referen
 pub async fn stand(settings: &Settings) -> Result<Arc<App>, Unread> {
   let db = database(settings, 16).await?;
 
-  gate_store::migration::Migrator::up(&db, None)
+  gate_store::migration::up(&db)
     .await
     .map_err(|why| Unread(format!("the migration: {why}")))?;
 
