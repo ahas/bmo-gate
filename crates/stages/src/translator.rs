@@ -7,9 +7,10 @@
 //! every part that came back read and the rest in its original, and nothing is kept for it, so the next reading asks
 //! again.
 //!
-//! Two readers stand: into the language a worker reads, the line's `worker` purpose; and into the owner's language,
-//! its `record` purpose, with the checks a record is held to (`crate::records`). Which language each reads into is
-//! the policy's (`gate_policy::translation`).
+//! Three readers stand: into the language a worker reads, the line's `worker` purpose; into the owner's language,
+//! its `record` purpose, with the checks a record is held to (`crate::records`); and into any other language the
+//! policy names the scripts of, for a person reading the console in it, its `document` purpose with the structure a
+//! document's part is held to. Which language each reads into is the policy's (`gate_policy::translation`).
 
 use std::sync::Arc;
 
@@ -22,7 +23,7 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 use crate::Stages;
 use crate::document_translation::{Kept, Outcome, translate_part};
-use crate::markdown::{TRANSLATION_PART_TOKENS, korean_parts, shown_part, translation_parts};
+use crate::markdown::{Scripts, TRANSLATION_PART_TOKENS, korean_parts, shown_part, translation_parts};
 use crate::records::Record;
 use crate::sql::{one, run};
 
@@ -90,7 +91,7 @@ impl Intake {
 /// What a part is translated for, as the agency's translation line takes it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Purpose {
-  /// A part of a document the viewer asked for.
+  /// A part of a document the viewer asked for, or of a text read into a language a person reads the console in.
   Document,
   /// A text read into the language a worker reads.
   Worker,
@@ -163,11 +164,13 @@ pub fn by_agency(stages: Arc<Stages>) -> Ask {
 }
 
 /// Who reads a text into a language: the worker's reader into the language a worker reads, the record's into the
-/// owner's language, each as the policy names it.
+/// owner's language, and the viewer's into any other language the policy names the scripts of, each as the policy
+/// names it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Reader {
   Worker,
   Record,
+  Viewer,
 }
 
 impl Reader {
@@ -183,15 +186,16 @@ impl Reader {
     } else if language == policy.owner_language {
       Some(Self::Record)
     } else {
-      None
+      policy.language_scripts(language).and_then(Scripts::of).map(|_| Self::Viewer)
     }
   }
 
-  /// The language this reader reads into under `policy`.
-  pub fn language(self, policy: &Translation) -> &str {
+  /// What the agency's translation line is asked to translate a part for, for this reader.
+  pub fn purpose(self) -> Purpose {
     match self {
-      Self::Worker => &policy.worker_language,
-      Self::Record => &policy.owner_language,
+      Self::Worker => Purpose::Worker,
+      Self::Record => Purpose::Record,
+      Self::Viewer => Purpose::Document,
     }
   }
 }
@@ -313,14 +317,6 @@ async fn part_into(
   ask: &Ask,
 ) -> Option<String> {
   match reader {
-    Reader::Worker => match translate_part(part, language, Purpose::Worker, Kept::Whole, None, ask).await {
-      Outcome::Translated(text) => Some(text),
-      Outcome::Mismatch(lost) => {
-        eprintln!("{STAGE}: a part stays in its original: {lost}");
-        None
-      }
-      Outcome::Unanswered => None,
-    },
     Reader::Record => match record.korean_part(part, None).await {
       Ok(text) => Some(text),
       Err(fault) => {
@@ -328,6 +324,16 @@ async fn part_into(
         None
       }
     },
+    Reader::Worker | Reader::Viewer => {
+      match translate_part(part, language, reader.purpose(), Kept::Whole, None, ask).await {
+        Outcome::Translated(text) => Some(text),
+        Outcome::Mismatch(lost) => {
+          eprintln!("{STAGE}: a part stays in its original: {lost}");
+          None
+        }
+        Outcome::Unanswered => None,
+      }
+    }
   }
 }
 
@@ -344,10 +350,13 @@ pub async fn readings(
 ) -> Option<Vec<Read>> {
   let reader = Reader::of(language)?;
   let english = stages.reading.english();
+  let scripts = TRANSLATION.language_scripts(language).and_then(Scripts::of);
   let foreign = |text: &str, parts: &[String]| -> Vec<bool> {
-    match reader {
-      Reader::Worker => korean_parts(text, parts),
-      Reader::Record => parts.iter().map(|part| english.written(part)).collect(),
+    match (reader, &scripts) {
+      (Reader::Worker, _) => korean_parts(text, parts),
+      (Reader::Record, _) => parts.iter().map(|part| english.written(part)).collect(),
+      (Reader::Viewer, Some(scripts)) => scripts.foreign_parts(text, parts),
+      (Reader::Viewer, None) => vec![false; parts.len()],
     }
   };
   let cuts: Vec<(Vec<String>, Vec<bool>)> = originals

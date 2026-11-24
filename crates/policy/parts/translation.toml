@@ -25,3 +25,13 @@ lanes = 4
 [language_names]
 en = "English"
 ko = "Korean"
+ja = "Japanese"
+"zh-CN" = "Simplified Chinese"
+
+# The scripts each language other than the worker's and the owner's is written in, by their Unicode names, so a
+# text can be told to stand in it already: a language named here is one a person reads the console in, read into
+# with a document's instructions (docs/api.md, 「Translations」). A language with no name above is none the
+# translator takes, whatever its scripts.
+[language_scripts]
+ja = ["Hiragana", "Katakana", "Han"]
+"zh-CN" = ["Han"]

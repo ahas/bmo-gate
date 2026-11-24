@@ -19,6 +19,7 @@ static STRONG: LazyLock<[Regex; 3]> = LazyLock::new(|| {
 });
 static HANGUL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[\x{AC00}-\x{D7A3}]").expect("a syllable"));
 static LATIN: LazyLock<Regex> = LazyLock::new(|| Regex::new("[A-Za-z]").expect("a letter"));
+static LETTER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\p{L}").expect("any letter"));
 static INLINE_CODE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"`[^`\n]*`").expect("inline code"));
 static CODE_SPAN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"`[^`\n]+`").expect("a code span"));
 
@@ -300,6 +301,63 @@ pub fn korean_parts(text: &str, parts: &[String]) -> Vec<bool> {
       (hangul, latin) => hangul * 4 >= latin,
     })
     .collect()
+}
+
+/// The letters of a language other than Korean and English, by the Unicode scripts the translation policy names
+/// for it (`docs/api.md`, 「Translations」).
+pub struct Scripts(Regex);
+
+impl Scripts {
+  /// The letters of `scripts`, each a Unicode script's name; none where the list is empty or names something that
+  /// is no script.
+  pub fn of(scripts: &[String]) -> Option<Self> {
+    if scripts.is_empty()
+      || scripts
+        .iter()
+        .any(|name| name.is_empty() || !name.chars().all(|char| char.is_ascii_alphabetic() || char == '_'))
+    {
+      return None;
+    }
+
+    let class: String = scripts.iter().map(|name| format!(r"\p{{{name}}}")).collect();
+
+    Regex::new(&format!("[{class}]")).ok().map(Self)
+  }
+
+  // A text's letters outside code: those of these scripts, its Latin letters, and every other.
+  fn letters(&self, text: &str) -> (usize, usize, usize) {
+    let prose = without_fences(text);
+    let prose = INLINE_CODE.replace_all(&prose, "");
+    let own = self.0.find_iter(&prose).count();
+    let latin = LATIN.find_iter(&prose).count();
+    let every = LETTER.find_iter(&prose).count();
+
+    (own, latin, every.saturating_sub(own + latin))
+  }
+
+  /// Whether a text stands in these scripts, by its letters outside code: they weigh at least as much as every
+  /// other letter it holds, a Latin letter weighing a quarter of any other. A text with no letters stands in them.
+  pub fn hold(&self, text: &str) -> bool {
+    let (own, latin, other) = self.letters(text);
+
+    own * 4 >= latin + other * 4
+  }
+
+  /// Which of a text's parts, as `translation_parts` cut it, stand in another language than these scripts write:
+  /// each by its own letters outside code, and one with none there to count by the whole text's, as
+  /// `korean_parts` reads them. A blank part is none.
+  pub fn foreign_parts(&self, text: &str, parts: &[String]) -> Vec<bool> {
+    let whole = !self.hold(text);
+
+    parts
+      .iter()
+      .map(|part| match self.letters(part) {
+        _ if part.trim().is_empty() => false,
+        (0, 0, 0) => whole,
+        _ => !self.hold(part),
+      })
+      .collect()
+  }
 }
 
 /// One part as it stands once read: its translation, ending as the original ended where the original

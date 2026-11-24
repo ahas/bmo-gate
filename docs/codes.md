@@ -39,5 +39,5 @@ the camelCase keys.
 | Code | Status | When |
 |---|---|---|
 | `document-unknown` | 422 | a document name that is no root and path |
-| `language-unknown` | 422 | a language the translator does not take: for a translation neither the worker's nor the owner's, for a document's translation one the policy names no language for (`docs/api.md`, 「Translations」 and 「Documents」) |
+| `language-unknown` | 422 | a language the translator does not take: for a translation neither the worker's, the owner's nor one whose scripts the policy names, for a document's translation one the policy names no language for (`docs/api.md`, 「Translations」 and 「Documents」) |
 | `too-many-originals` | 400 | a translation names more originals than one call carries (`docs/api.md`, 「Translations」) |

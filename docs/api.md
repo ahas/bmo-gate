@@ -133,10 +133,16 @@ It answers `entries`, each `path`, `text` and `source` (`document`, `person`, `r
 
 - **A language** is a language tag. A translation is kept under its original and its language, so the same
   original is never translated twice into one language.
-- **The translator takes two languages,** each the gate's policy's (its translation part), so a deployment whose
-  owner reads another language changes the policy and no code: the language a worker reads, which the worker
-  instructions put a text into, and the owner's language, which the record instructions put a text into and a
-  record's checks hold it to. Any other language is 422 `language-unknown`.
+- **The translator takes the languages the gate's policy names** (its translation part), so a deployment whose
+  owner or whose readers read another language changes the policy and no code. Three readers stand: the
+  language a worker reads, which the worker instructions put a text into; the owner's language, which the record
+  instructions put a text into and a record's checks hold it to; and every other language the policy names the
+  scripts of, read for a person reading the console in it, which a document's instructions put a text into and
+  whose answer is held to its part's structure as a document's part is (「Documents」). A part stands in such a
+  language where its letters outside code of the scripts the policy names for it weigh at least as much as every
+  other letter it holds, a Latin letter weighing a quarter of any other: so a text written in Han characters alone
+  stands in Japanese as much as in Chinese, and is read as it is into either. Any other language is 422
+  `language-unknown`.
 - **Reading kept translations** never asks the translator. Each original is named by its digest, the SHA-256 of
   the original exactly as written in lowercase hex, so an original of any length and holding any character is
   read the same way; the page holds one entry for each digest with a translation kept in the language, in the

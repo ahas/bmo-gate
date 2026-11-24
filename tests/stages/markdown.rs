@@ -1,9 +1,58 @@
-//! The viewer's reading of a markdown text: its headings outside fences, its halves, its sections, and which of its
-//! parts are Korean. Hangul is written by its escapes.
+//! The viewer's reading of a markdown text: its headings outside fences, its halves, its sections, which of its
+//! parts are Korean, and which stand in a language another script writes. Hangul is written by its escapes; kana and
+//! Han characters are counted out of their blocks.
 
 use gate_stages::markdown::{
-  halve_text, heading_shape, is_korean, korean_parts, sections, translation_parts,
+  Scripts, halve_text, heading_shape, is_korean, korean_parts, sections, translation_parts,
 };
+
+// So many characters of a Unicode block, counted out from its start.
+fn counted(from: u32, many: u32) -> String {
+  (0..many).map(|at| char::from_u32(from + at).unwrap()).collect()
+}
+
+fn scripts(names: &[&str]) -> Scripts {
+  Scripts::of(&names.iter().map(|name| (*name).to_owned()).collect::<Vec<_>>()).unwrap()
+}
+
+#[test]
+fn a_text_stands_in_a_languages_scripts_where_they_outweigh_its_other_letters() {
+  let japanese = scripts(&["Hiragana", "Katakana", "Han"]);
+  let chinese = scripts(&["Han"]);
+  let kana_and_han = format!("{}{} React {}", counted(0x3042, 6), counted(0x4e00, 4), counted(0x30a2, 3));
+  let han = format!("{} React {}", counted(0x4e00, 3), counted(0x4e10, 2));
+
+  assert!(japanese.hold(&kana_and_han), "kana and Han with an English word are Japanese");
+  assert!(!chinese.hold(&kana_and_han), "a text of more kana than Han is no Chinese");
+  assert!(chinese.hold(&han), "Han characters with an English word are Chinese");
+  assert!(japanese.hold(&han), "Han characters alone stand in Japanese as well");
+  assert!(!japanese.hold("The build finished and the release is live."));
+  assert!(!chinese.hold(&counted(0xac00, 8)), "Hangul is no Chinese");
+  assert!(
+    chinese.hold("`some code` 42"),
+    "a text with no letters outside code stands in any language"
+  );
+}
+
+#[test]
+fn a_part_with_no_letters_stands_as_the_whole_text_does_and_a_blank_part_is_none() {
+  let chinese = scripts(&["Han"]);
+  let text = "An English line.\n\n```\nlet x = 1;\n```\n\n   \n";
+  let parts = vec![
+    "An English line.\n\n".to_owned(),
+    "```\nlet x = 1;\n```\n\n".to_owned(),
+    "   \n".to_owned(),
+  ];
+
+  assert_eq!(chinese.foreign_parts(text, &parts), vec![true, true, false]);
+}
+
+#[test]
+fn a_script_list_naming_no_script_is_none() {
+  assert!(Scripts::of(&[]).is_none());
+  assert!(Scripts::of(&["Han}]".to_owned()]).is_none());
+  assert!(Scripts::of(&["Nowhere".to_owned()]).is_none());
+}
 
 #[test]
 fn only_atx_headings_outside_fences_count() {

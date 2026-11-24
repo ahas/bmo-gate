@@ -183,7 +183,8 @@ The gate registers no hook at any of the agency's hook points and answers none.
 - **Every translation the gate makes is one ask of the agency's translation line,** `POST /translation-runs`, a
   part at a time: the agency runs it as a run apart on its translator role's provider order, under the instructions
   of the purpose asked, which are the agency's (its `docs/launch-lines.md`, 「Translate runner」). The purpose is
-  `document` for a part of a document the viewer asked for, `worker` for a text read into the worker's language and
+  `document` for a part of a document the viewer asked for and for a text read into a language other than the
+  worker's and the owner's (`docs/api.md`, 「Translations」), `worker` for a text read into the worker's language and
   `record` for a worker's record read into the owner's language.
 - **What stays the gate's:** the translations route, the kept translations, a document's queue, the cutting into
   parts, the structure each answer is held to and the asks again, how many parts stand out at once, and the

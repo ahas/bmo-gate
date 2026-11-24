@@ -46,6 +46,24 @@ fn the_reference_and_translation_parts_read() {
   }
 
   assert_eq!(TRANSLATION.language_name("xx"), None);
+
+  for language in ["ja", "zh-CN"] {
+    let scripts = TRANSLATION
+      .language_scripts(language)
+      .expect("a language a person reads the console in");
+
+    assert!(
+      gate_stages::markdown::Scripts::of(scripts).is_some(),
+      "{language} names a script the reading does not know"
+    );
+  }
+
+  for language in TRANSLATION.language_scripts.keys() {
+    assert!(
+      TRANSLATION.language_name(language).is_some(),
+      "{language} has scripts and no name the translator is asked for it by"
+    );
+  }
 }
 
 #[test]

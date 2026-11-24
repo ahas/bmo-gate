@@ -74,6 +74,37 @@ async fn originals_are_read_in_the_language_asked_in_their_order() {
 }
 
 #[tokio::test]
+async fn an_english_original_is_read_into_each_language_a_person_reads_the_console_in() {
+  for (language, name) in [("ja", "Japanese"), ("zh-CN", "Simplified Chinese")] {
+    let ground = ground(&format!("console-{language}"), |_| None).await;
+
+    ground.agency.translated.lock().unwrap().push_back("A reading.".to_owned());
+
+    let (status, body) = ground
+      .post(
+        "/translations",
+        json!({ "language": language, "originals": ["The build finished and the release is live."] }),
+      )
+      .await;
+
+    assert_eq!(status, StatusCode::OK, "{language}: {body}");
+    assert_eq!(body["readings"][0]["whole"], json!(true), "{language}: {body}");
+    assert_eq!(body["readings"][0]["text"], json!("A reading."), "{language}: {body}");
+
+    {
+      let asked = ground.agency.translations.lock().unwrap();
+
+      assert_eq!(asked.len(), 1);
+      assert_eq!((asked[0].purpose.as_str(), asked[0].language.as_str()), ("document", name));
+    }
+
+    let (status, body) = ground.get(&format!("/translations/kept?language={language}&digests=")).await;
+
+    assert_eq!(status, StatusCode::OK, "{language}: {body}");
+  }
+}
+
+#[tokio::test]
 async fn a_language_no_reader_takes_is_refused() {
   let ground = ground("language", |_| None).await;
 

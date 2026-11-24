@@ -1,9 +1,10 @@
 //! The translator's readings: a text with no part in another language stands as it is, a Korean one is read into
 //! English part by part and kept, read back rather than asked again, and left unwhole and unkept where a part did
 //! not come back; a reading kept by hand reads back in its language alone; a language no reader takes is none, and
-//! which language each reader takes is the policy's. The intake takes no more originals in one reading than one
+//! which language each reader takes is the policy's. A text in neither the worker's nor the owner's language is read
+//! into another language a person reads the console in, with a document's purpose. The intake takes no more originals in one reading than one
 //! carries, none past the bound of those standing, and holds the parts out at once across readings to its lanes.
-//! Hangul is counted out, never written into the test.
+//! Hangul, kana and Han characters are counted out, never written into the test.
 
 use std::sync::{Arc, Mutex};
 
@@ -18,6 +19,14 @@ use super::ground;
 
 fn hangul(syllables: u32) -> String {
   (0..syllables).map(|at| char::from_u32(0xac00 + at * 29).unwrap()).collect()
+}
+
+fn kana(many: u32) -> String {
+  (0..many).map(|at| char::from_u32(0x3042 + at * 2).unwrap()).collect()
+}
+
+fn han(many: u32) -> String {
+  (0..many).map(|at| char::from_u32(0x4e00 + at * 7).unwrap()).collect()
 }
 
 // A stand-in translation line answering each part asked as `answer` makes it, and the parts asked.
@@ -174,17 +183,83 @@ fn a_deployment_whose_owner_reads_another_language_has_the_record_reader_take_th
     latin_per_hangul: TRANSLATION.latin_per_hangul,
     record_attempts: TRANSLATION.record_attempts,
     lanes: TRANSLATION.lanes,
-    language_names: [("en", "English"), ("ja", "Japanese")]
+    language_names: [("en", "English"), ("ja", "Japanese"), ("ko", "Korean"), ("fr", "French")]
       .into_iter()
       .map(|(tag, name)| (tag.to_owned(), name.to_owned()))
+      .collect(),
+    language_scripts: [("ko", vec!["Hangul".to_owned()]), ("de", vec!["Latin".to_owned()])]
+      .into_iter()
+      .map(|(tag, scripts)| (tag.to_owned(), scripts))
       .collect(),
   };
 
   assert_eq!(Reader::under(&policy, "ja"), Some(Reader::Record));
   assert_eq!(Reader::under(&policy, "en"), Some(Reader::Worker));
-  assert_eq!(Reader::under(&policy, "ko"), None);
-  assert_eq!(Reader::Record.language(&policy), "ja");
-  assert_eq!(Reader::Worker.language(&policy), "en");
+  assert_eq!(Reader::under(&policy, "ko"), Some(Reader::Viewer));
+  assert_eq!(
+    Reader::under(&policy, "fr"),
+    None,
+    "a language named with no scripts is none a reader takes"
+  );
+  assert_eq!(
+    Reader::under(&policy, "de"),
+    None,
+    "a language with scripts and no name is none a reader takes"
+  );
+}
+
+#[tokio::test]
+async fn a_text_in_another_language_is_read_into_a_language_a_person_reads_the_console_in() {
+  let ground = ground("viewer", Default::default()).await;
+  let stages = &ground.stages;
+  let japanese = format!("{}{}.", kana(5), han(3));
+  let answer = japanese.clone();
+  let (ask, asked) = gate(move |_| Some(answer.clone()));
+  let english = "The build finished and the release is live.".to_owned();
+  let korean = format!("{} {}.", hangul(4), hangul(3));
+  let originals = vec![english.clone(), korean.clone(), japanese.clone()];
+
+  let read = readings(stages, &Intake::of_policy(), "ja", &originals, &ask).await.unwrap();
+
+  assert!(read.iter().all(|one| one.whole && one.text == japanese), "{read:?}");
+  assert_eq!(
+    asked
+      .lock()
+      .unwrap()
+      .iter()
+      .map(|one| (one.purpose, one.target.clone(), one.text.clone()))
+      .collect::<Vec<_>>(),
+    [
+      (Purpose::Document, "ja".to_owned(), english.clone()),
+      (Purpose::Document, "ja".to_owned(), korean.clone())
+    ],
+    "the English and the Korean go to the line with a document's purpose; the Japanese stands as it is"
+  );
+  assert_eq!(recalled(stages, "ja", &english).await.as_deref(), Some(japanese.as_str()));
+  assert_eq!(recalled(stages, "zh-CN", &english).await, None);
+}
+
+#[tokio::test]
+async fn a_japanese_text_is_read_into_chinese_and_a_chinese_one_stands() {
+  let ground = ground("chinese", Default::default()).await;
+  let chinese = format!("{}.", han(6));
+  let answer = chinese.clone();
+  let (ask, asked) = gate(move |_| Some(answer.clone()));
+  let japanese = format!("{}{}.", kana(6), han(2));
+  let read = readings(
+    &ground.stages,
+    &Intake::of_policy(),
+    "zh-CN",
+    &[japanese.clone(), chinese.clone()],
+    &ask,
+  )
+  .await
+  .unwrap();
+
+  assert_eq!(read[0].text, chinese);
+  assert_eq!(read[1].text, chinese);
+  assert_eq!(asked.lock().unwrap().len(), 1);
+  assert_eq!(asked.lock().unwrap()[0].text, japanese);
 }
 
 #[tokio::test]
