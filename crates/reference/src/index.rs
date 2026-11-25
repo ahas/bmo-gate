@@ -15,7 +15,7 @@ use regex::Regex;
 
 use crate::fragments::{self, Fragment};
 use crate::organisation::{self, UnitMemory};
-use crate::road::{KNOWLEDGE, LORE, PERSON_BOOK, ROOM_RULE, SYSTEM_DOCUMENT, held_sheet};
+use crate::road::{KNOWLEDGE, LORE, PERSON_BOOK, SYSTEM_DOCUMENT, held_sheet};
 use crate::{Reference, memories};
 
 /// The groups, in the order an index stands them in.
@@ -185,16 +185,13 @@ pub async fn entries(
         .chain(lore.iter().map(|row| fragment_entry(row, Body::Lore)))
         .collect()
     }
-    "room-rules" => {
-      let rules = rows(ROOM_RULE).await?;
-      let conditions = memories::candidates(reference, chat_id, key).await.map_err(Unanswered::Unit)?;
-
-      rules
-        .iter()
-        .map(|row| fragment_entry(row, Body::Knowledge))
-        .chain(conditions.iter().map(|row| condition_entry(chat_id, row)))
-        .collect()
-    }
+    // The owner's room rules are the room block's, which the receiver composes, and no entry here.
+    "room-rules" => memories::candidates(reference, chat_id, key)
+      .await
+      .map_err(Unanswered::Unit)?
+      .iter()
+      .map(|row| condition_entry(chat_id, row))
+      .collect(),
     "knowledge" => rows(KNOWLEDGE).await?.iter().map(|row| fragment_entry(row, Body::Knowledge)).collect(),
     "people" => rows(PERSON_BOOK).await?.iter().map(person_entry).collect(),
     "room-memories" => memories::standing(reference, chat_id, key)

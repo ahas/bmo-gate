@@ -173,7 +173,6 @@ pub fn brain_type(kind: &str) -> Option<(&'static str, &'static str)> {
   match kind {
     "person-book" | "person" => Some((FACT_TYPE, PERSON_BOOK)),
     "library-knowledge" | "knowledge" => Some(("knowledge", "library-knowledge")),
-    "room-rule" => Some(("rule", "room-rule")),
     "lore" => Some((LORE_TYPE, "lore")),
     _ => None,
   }

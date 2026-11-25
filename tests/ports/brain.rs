@@ -91,16 +91,16 @@ fn errand(id: i64, met: bool) -> Value {
   })
 }
 
-fn rule() -> Value {
+fn chunk() -> Value {
   json!({
-    "id": 3, "brainId": 9, "key": "bmo:rooms:7:rules:quiet", "type": "rule", "text": "quiet", "layerId": null,
+    "id": 3, "brainId": 9, "key": "bmo:rooms:7:knowledge:quiet", "type": "knowledge", "text": "quiet", "layerId": null,
     "position": 1, "subjects": [room("7")], "status": "active", "lineageId": 3, "supersededBy": null,
     "validFrom": 9, "validTo": null, "importance": 5, "hits": 3, "lastHitAt": null, "lastConfirmedAt": null,
     "strength": 1.0, "retrievalStrength": 0.0, "consolidatedAt": null, "actorName": "move",
     "labels": {
-      "kind": "room-rule", "slug": "quiet", "agent": "chat-agent", "chat_id": "7", "position": "1",
+      "kind": "library-knowledge", "slug": "quiet", "agent": "chat-agent", "chat_id": "7", "position": "1",
       "keywords": "[\"quiet\"]", "items": "[12]", "status": "open", "written_on": "2026-10-01",
-      "all_agents": "0", "title": "Quiet hours", "path": "rooms/7/rules/quiet.md"
+      "all_agents": "0", "title": "Quiet hours", "path": "knowledge/quiet.md"
     },
     "createdAt": 9
   })
@@ -219,21 +219,21 @@ async fn the_fragment_reads_ask_the_brain_by_type() {
   let brain = HttpBrain::new(peer(&stub, "t"));
 
   stub.answer(Method::GET, "/brains", 200, brains());
-  served(&stub, "rule", vec![rule()]);
+  served(&stub, "knowledge", vec![chunk()]);
 
-  let offered = brain.offered(&chat_agent(), 7, &["room-rule".to_owned()]).await.unwrap();
+  let offered = brain.offered(&chat_agent(), 7, &["library-knowledge".to_owned()]).await.unwrap();
 
   assert_eq!(offered[0].slug, "quiet");
   assert_eq!(offered[0].items, vec![12]);
   assert_eq!(offered[0].hits, 3);
   assert_eq!(offered[0].key, "3");
-  assert_eq!(offered[0].kind, "room-rule");
-  assert_eq!(offered[0].path, "rooms/7/rules/quiet.md");
+  assert_eq!(offered[0].kind, "library-knowledge");
+  assert_eq!(offered[0].path, "knowledge/quiet.md");
   assert_eq!(offered[0].chat_id, Some(7));
 
   let asked = stub.one("/brains/9/memories");
   let query = asked.query.as_deref().unwrap_or_default();
-  assert!(query.contains("type=rule"), "{query}");
+  assert!(query.contains("type=knowledge"), "{query}");
 }
 
 #[tokio::test]
@@ -452,11 +452,11 @@ async fn each_supervisor_is_read_from_its_own_accounts_brain_and_a_name_on_two_a
       listed(31, "8", "helper"),
     ]),
   );
-  stub.answer(Method::GET, "/brains/22/memories", 200, page(vec![rule()]));
-  stub.answer(Method::GET, "/brains/23/memories", 200, page(vec![rule()]));
+  stub.answer(Method::GET, "/brains/22/memories", 200, page(vec![chunk()]));
+  stub.answer(Method::GET, "/brains/23/memories", 200, page(vec![chunk()]));
 
-  let rules = ["room-rule".to_owned()];
-  let first = brain.offered(&BrainKey::owned("u7", 7), 7, &rules).await.unwrap();
+  let chunks = ["library-knowledge".to_owned()];
+  let first = brain.offered(&BrainKey::owned("u7", 7), 7, &chunks).await.unwrap();
 
   assert_eq!(first.len(), 1);
 
@@ -467,7 +467,7 @@ async fn each_supervisor_is_read_from_its_own_accounts_brain_and_a_name_on_two_a
   );
   assert!(stub.one("/brains").query.unwrap_or_default().contains("accountKey=7"));
 
-  let second = brain.offered(&BrainKey::owned("u8", 8), 7, &rules).await.unwrap();
+  let second = brain.offered(&BrainKey::owned("u8", 8), 7, &chunks).await.unwrap();
 
   assert_eq!(second.len(), 1);
   assert!(stub.seen().iter().any(|seen| seen.path == "/brains/23/memories"));
@@ -480,7 +480,7 @@ async fn each_supervisor_is_read_from_its_own_accounts_brain_and_a_name_on_two_a
     let before = stub.seen().len();
 
     assert!(!brain.kept(&key).await.unwrap(), "{why}");
-    assert!(brain.offered(&key, 7, &rules).await.unwrap().is_empty(), "{why}");
+    assert!(brain.offered(&key, 7, &chunks).await.unwrap().is_empty(), "{why}");
     assert!(brain.standing(&key, 7).await.unwrap().is_empty(), "{why}");
     assert!(brain.sheets(&key, 7, &[31], None).await.unwrap().is_empty(), "{why}");
     assert!(

@@ -3,6 +3,7 @@
 
 use bmo_gate_client::ReferenceAsk;
 use gate_ports::audience::Audience;
+use gate_ports::brain::Condition;
 use gate_runs::records::now;
 use gate_server::routes::reference::turn_of;
 use reqwest::StatusCode;
@@ -115,6 +116,48 @@ async fn the_index_counts_what_the_session_read_a_piece_records_its_read_and_a_s
     assert_eq!(ground.get(&asked).await.0, code, "{asked}");
   }
   assert!(ground.gateway.asked.lock().unwrap().is_empty(), "no model was asked");
+}
+
+#[tokio::test]
+async fn the_room_rules_group_is_the_rooms_situation_rules_and_each_reads_as_a_piece() {
+  let ground = ground("room-rules", |_| None).await;
+
+  ground.brain.fragments.lock().unwrap().push(crate::reference::fakes::fragment(
+    "room-rule",
+    "quiet-hours",
+    "Quiet hours",
+    Some(ROOM),
+    None,
+  ));
+  ground.brain.conditions.lock().unwrap().push(Condition {
+    slug: "late-question".to_owned(),
+    condition: "someone asks after midnight".to_owned(),
+    action: "answer in one line".to_owned(),
+  });
+
+  let (status, index) = ground.get(&format!("/reference/index?room={ROOM}&agent=the-chat-agent")).await;
+
+  assert_eq!(status, StatusCode::OK, "{index}");
+
+  let rules = &index["groups"][1];
+  let slugs: Vec<&str> = rules["entries"]
+    .as_array()
+    .unwrap()
+    .iter()
+    .map(|entry| entry["slug"].as_str().unwrap())
+    .collect();
+
+  assert_eq!((rules["group"].as_str(), slugs), (Some("room-rules"), vec!["late-question"]), "{index}");
+
+  let (status, piece) = ground
+    .get(&format!(
+      "/reference/pieces/late-question?room={ROOM}&agent=the-chat-agent&group=room-rules"
+    ))
+    .await;
+
+  assert_eq!(status, StatusCode::OK, "{piece}");
+  assert_eq!(piece["text"], "When someone asks after midnight: answer in one line");
+  assert_eq!(piece["path"], format!("rooms/{ROOM}/situations/late-question"));
 }
 
 #[tokio::test]

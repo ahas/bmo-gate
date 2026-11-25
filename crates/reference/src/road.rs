@@ -11,11 +11,10 @@ use gate_ports::brain::{BrainKey, MemoryRow};
 
 use crate::{Entry, Reference, SituationTurn, Source, memories, organisation, situation};
 
-/// The brain's kinds the index lists: the shipped reference documents and the lore of the agent's brain, the room's
-/// rules, the knowledge and the person book.
+/// The brain's kinds the index lists: the shipped reference documents and the lore of the agent's brain, the
+/// knowledge and the person book.
 pub const SYSTEM_DOCUMENT: &str = "system-document";
 pub const LORE: &str = "lore";
-pub const ROOM_RULE: &str = "room-rule";
 pub const KNOWLEDGE: &str = "library-knowledge";
 pub const PERSON_BOOK: &str = "person-book";
 

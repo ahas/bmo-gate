@@ -125,8 +125,9 @@ flowchart TD
   event」).
 - **The org sheet,** what the organisation of the person the supervisor serves holds for them on every topic, read
   for the room's audience (「What an organisation hands its members」); a supervisor of no organisation has none.
-- **Nothing else.** No room rule, no knowledge, no lore, no other person's sheet and no undue memory attaches to a
-  turn: each stands in the index, for the agent to read where the turn needs it.
+- **Nothing else.** No situation rule, no knowledge, no lore, no other person's sheet and no undue memory attaches
+  to a turn: each stands in the index, for the agent to read where the turn needs it. The owner's room rules are
+  the room block's, which the receiver composes, and neither a turn's reference nor the index carries them.
 - **Every turn is one designated agent's,** the agent its situation names, else its `agent`, and everything is
   read from that agent's own brain and the org brains of the person it serves (「Whose reference it is」). An agent
   keeping no brain is given no sheet and no memory, never the chat agent's.
@@ -160,15 +161,16 @@ flowchart TD
 | `GET /reference/search` | `q`, `room`, `limit?`, `agent`, `audience?` | `entries`, each `slug`, `group`, `holds`, `readWhen` |
 
 - **Six groups, in this order:** `system-documents` (the lore of the agent's brain, in a room that reads it; the
-  brain holds no row of a shipped reference document, so no index lists one), `room-rules` (the room's rules and
-  its situation rules), `knowledge`, `people` (everyone the brain knows facts of in the room), `room-memories`
-  (the room's standing memories) and `organisation` (the org memories of the person the agent serves beyond its org
+  brain holds no row of a shipped reference document, so no index lists one), `room-rules` (the room's situation
+  rules; the owner's room rules, the brain's `rule` memories about the room, are no entry of it, since the room's
+  block carries them whole, the receiver's `docs/unified-bmo.md`, 「Delegations」), `knowledge`, `people` (everyone
+  the brain knows facts of in the room), `room-memories` (the room's standing memories) and `organisation` (the org memories of the person the agent serves beyond its org
   sheet, read for the room's audience, 「What an organisation hands its members」). Every other group is the named
   agent's own brain's (「Whose reference it is」), and the audience changes nothing of it; an agent keeping no brain is
   answered no group at all.
 - **An entry** is the row's `slug`, what it `holds`, when to read it, `readWhen`, and its `path`, the path a piece
   read of it is recorded under among the session's loads, which is how a caller names what a session read. A knowledge piece's or a
-  rule's title is split where it says when it is needed — at "; needed", "; consulted" and their kin up to the
+  document's title is split where it says when it is needed — at "; needed", "; consulted" and their kin up to the
   "when" that follows — what stands before being `holds` and the rest `readWhen`; a title that says no such thing
   is all `holds`, with `readWhen` null. A situation rule holds its action and is read when its condition holds; a
   memory holds its words and is read when its condition holds; a person holds their name, and is read when they

@@ -362,8 +362,6 @@ Statements here that a sibling's document does not yet match, each for that sibl
 - **The agency keeps a copy of the gate order:** its `policy/gates.toml` and the policy crate's module of it. Its
   gate switch route validates a gate's name against its own copy; the copy is for the agency to retire, reading
   the order through `GET /gates`.
-- **The brain's knowledge read** answers the knowledge chunks a room may read; the gate reads a room rule's piece
-  through it as well, for the brain to take the room's room-rule chunks there.
 - **The receiver sends no `lore`** with a turn's reference, so every room's index lists the lore.
 - **The document viewer counts a part kept as failed and says no more:** the parts page answers each such part's
   `failure` (`docs/api.md`, 「Documents」), for the web unit to show beside the count.
