@@ -666,9 +666,9 @@ impl Brain for HttpBrain {
         return Ok(Vec::new());
       };
 
-      // What a holder left stands while it stands: a row the holder withdrew or rewrote is out of the sheet
-      // with the rest of its status, so the read names the live statuses the brain lists none by default.
-      let rows = self.memories(brain, &[("held", "true"), ("status", "active,pending")]).await?;
+      // The live rows of the brain, of the kind a holder left: a row the holder withdrew or rewrote is out of
+      // the sheet with the rest of its status, which this read names for every brain it reads.
+      let rows = self.memories(brain, &[("held", "true")]).await?;
 
       Ok(rows.iter().filter_map(held_row).collect())
     })
