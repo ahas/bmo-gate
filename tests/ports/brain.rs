@@ -237,6 +237,33 @@ async fn the_fragment_reads_ask_the_brain_by_type() {
 }
 
 #[tokio::test]
+async fn what_a_holder_left_is_read_by_its_live_rows_alone() {
+  let stub = Stub::start().await;
+  let brain = HttpBrain::new(peer(&stub, "t"));
+  let mut left = chunk();
+  left["heldBy"] = json!("schedule-service");
+  left["key"] = json!("routes");
+  left["text"] = json!("A schedule goes to the schedule service, never the calendar.");
+
+  stub.answer(Method::GET, "/brains", 200, brains());
+  stub.answer(Method::GET, "/brains/9/memories", 200, page(vec![left]));
+
+  let rows = brain.held_rows(&chat_agent()).await.unwrap();
+
+  assert_eq!(rows.len(), 1);
+  assert_eq!(rows[0].holder, "schedule-service");
+  assert_eq!(rows[0].key, "routes");
+
+  // A row its holder withdrew or rewrote leaves the turn with the rest of its status, so the read names the
+  // live statuses: the brain's list holds rows of every status where the caller names none.
+  let asked = stub.one("/brains/9/memories");
+  let query = asked.query.as_deref().unwrap_or_default();
+  assert!(query.contains("held=true"), "{query}");
+  assert!(query.contains("status=active"), "{query}");
+  assert!(query.contains("pending"), "{query}");
+}
+
+#[tokio::test]
 async fn the_document_read_filters_the_knowledge_by_its_slug() {
   let stub = Stub::start().await;
   let brain = HttpBrain::new(peer(&stub, "t"));
