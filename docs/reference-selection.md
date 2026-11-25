@@ -125,6 +125,15 @@ flowchart TD
   event」).
 - **The org sheet,** what the organisation of the person the supervisor serves holds for them on every topic, read
   for the room's audience (「What an organisation hands its members」); a supervisor of no organisation has none.
+- **What the services of the deployment left,** every row a holder left standing in the turn's agent's own brain
+  (the brain's `docs/design.md`, 「What a holder leaves」), as one sheet under `holders/sheet.md`: a head line
+  naming it, then one line a row — its holder's key, the row's number and its words — the rows ordered by holder,
+  then by the key the holder gave the row, then by its number, each line standing whole or not at all under the
+  sheet's own ceiling. It goes out whatever the turn says and outside the turn's budget, as the sheets do, so an
+  agent always knows what the services it works among stand for; the sheet is handed by none where the agent keeps
+  no brain, nothing stands, the brain cannot be read, or no line fits its ceiling. A service's usage skill is one
+  of these rows: the line carried into the turn says when to reach for the whole of it, and the whole stands in
+  the same brain under the same key, which the agent reads with its own memory tools.
 - **Nothing else.** No situation rule, no knowledge, no lore, no other person's sheet and no undue memory attaches
   to a turn: each stands in the index, for the agent to read where the turn needs it. The owner's room rules are
   the room block's, which the receiver composes, and neither a turn's reference nor the index carries them.
