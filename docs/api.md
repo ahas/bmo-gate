@@ -1,6 +1,6 @@
 # The gate's API
 
-**Fixed at 0.1.0-rev.1.** This document and `docs/openapi.json` are the gate's canonical public API. The
+**Fixed at the release the commit is tagged with.** This document and `docs/openapi.json` are the gate's canonical public API. The
 OpenAPI document is generated from the contract's own types and a test fails where the committed document
 differs from what the code generates. The Rust crate `bmo-gate-client` and the TypeScript package under
 `package/` are made from that one document; a caller uses them and writes no client of its own.

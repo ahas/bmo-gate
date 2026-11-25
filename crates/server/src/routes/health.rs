@@ -19,7 +19,11 @@ pub async fn health(State(app): State<Arc<App>>) -> Json<Health> {
   })
 }
 
-/// The service's version, the workspace's.
+/// The service's version: the set's version the build was made at, which the testbed hands the build as
+/// `BMO_VERSION`, else the manifest's placeholder (bmo-chat's `docs/conventions.md`, 「Versions」).
 pub fn bmo_version() -> &'static str {
-  env!("CARGO_PKG_VERSION")
+  match option_env!("BMO_VERSION") {
+    Some(version) => version,
+    None => env!("CARGO_PKG_VERSION"),
+  }
 }

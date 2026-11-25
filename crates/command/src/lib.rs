@@ -13,6 +13,14 @@ use clap::{Parser, Subcommand};
 use gate_server::settings::Settings;
 use sea_orm::DatabaseConnection;
 
+/// The version `bmo-gate --version` prints: the set's version the build was made at, which the testbed
+/// hands the build as `BMO_VERSION`, else the manifest's placeholder (bmo-chat's `docs/conventions.md`,
+/// 「Versions」).
+pub const VERSION: &str = match option_env!("BMO_VERSION") {
+  Some(version) => version,
+  None => env!("CARGO_PKG_VERSION"),
+};
+
 /// The variable naming the settings file, and the file read where it names none, in the folder the command runs in.
 pub const SETTINGS_VARIABLE: &str = "BMO_GATE_SETTINGS";
 pub const SETTINGS_FILE: &str = "settings.toml";
@@ -47,7 +55,7 @@ pub type Answered = Result<Vec<String>, Fault>;
 
 /// The command's words: `nouns`, or one of its own.
 #[derive(Parser, Debug)]
-#[command(name = "bmo-gate", version, about = "The gate's health, records and archive import")]
+#[command(name = "bmo-gate", version = VERSION, about = "The gate's health, records and archive import")]
 pub struct Cli {
   #[command(subcommand)]
   pub noun: Noun,

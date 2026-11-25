@@ -44,7 +44,8 @@ instead, and the check that holds it.
 
 ## Version
 
-The version stands in `VERSION` and in the workspace manifest, which hold the same number. It moves only at a
+The version is the set's, read off the git tag when a build is made; the workspace manifest's version is a
+placeholder that never moves. It moves only at a
 release the owner declares, as bmo-chat's `docs/conventions.md` 「Versions」 states; a commit, a deploy, a fix or a
 contract change moves none, and a deployment is told apart by its commit.
 

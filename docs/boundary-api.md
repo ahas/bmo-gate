@@ -340,9 +340,11 @@ The service binary itself is `gate-server`, which is installed under no `bmo-` n
 
 ## Versioning
 
-The version stands in `VERSION`. A change that takes a field, a route or a code away from this boundary, or
-changes what one means, is a major change; a change that adds to it is a minor one; a change inside the gate is a
-patch.
+The version is the set's, read off the git tag when a build is made and handed to the build as `BMO_VERSION`
+(bmo-chat's `docs/conventions.md`, 「Versions」); the health and `--version` answer it, and the manifests'
+versions are a placeholder that never moves. Toward the next release, a change that takes a field, a route or a
+code away from this boundary, or changes what one means, counts as a major step; a change that adds to it as a
+minor one; a change inside the gate as a patch.
 
 ## Contract gaps
 

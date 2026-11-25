@@ -38,7 +38,7 @@
 
 ## 版本
 
-版本号同时写在 `VERSION` 和工作区清单中,两者一致。按照 bmo-chat 的 `docs/conventions.md`「Versions」,版本只在所有者
+版本号属于整个套件,在构建时从 git 标签读取;工作区清单中的版本只是永不变动的占位值。按照 bmo-chat 的 `docs/conventions.md`「Versions」,版本只在所有者
 宣布发布时才变动;提交、部署、修复或契约变更都不会改变它,部署通过提交来区分。
 
 ## 许可证
