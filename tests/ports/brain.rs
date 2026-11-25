@@ -254,13 +254,13 @@ async fn what_a_holder_left_is_read_by_its_live_rows_alone() {
   assert_eq!(rows[0].holder, "schedule-service");
   assert_eq!(rows[0].key.as_deref(), Some("routes"));
 
-  // A row its holder withdrew or rewrote leaves the turn with the rest of its status, so the read names the
-  // live statuses: the brain's list holds rows of every status where the caller names none.
+  // A row its holder withdrew or rewrote leaves the turn with the rest of its status: the read of a brain's
+  // memories is the layer's live one, which names the standing status for every reader of it, once.
   let asked = stub.one("/brains/9/memories");
   let query = asked.query.as_deref().unwrap_or_default();
   assert!(query.contains("held=true"), "{query}");
   assert!(query.contains("status=active"), "{query}");
-  assert!(query.contains("pending"), "{query}");
+  assert!(!query.contains("active,pending"), "the status is named once: {query}");
 }
 
 #[tokio::test]
