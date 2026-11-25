@@ -1,6 +1,8 @@
 //! The road a turn's reference is composed on (`docs/reference-selection.md`, 「What a turn is given」): the head of
-//! the sheet of everyone who spoke, as the brain renders it from their names and facts, the room's due memories and
-//! the rows the turn's events wake, held to the turn's total. No model is asked.
+//! the sheet of everyone who spoke, as the brain renders it from their names and facts, the room's due memories,
+//! the rows the turn's events wake and the holders' sheet of what a holder left in the agent's brain. The memories
+//! and the woken rows are held to the turn's total; the sheets, the org sheet and the holders' sheet stand on the
+//! turn whatever it says, each held to a ceiling of its own. No model is asked.
 
 use std::collections::HashSet;
 
@@ -9,7 +11,7 @@ use gate_policy::reference::REFERENCE;
 use gate_ports::audience::Audience;
 use gate_ports::brain::{BrainKey, MemoryRow};
 
-use crate::{Entry, Reference, SituationTurn, Source, memories, organisation, situation};
+use crate::{Entry, Reference, SituationTurn, Source, holders, memories, organisation, situation};
 
 /// The brain's kinds the index lists: the shipped reference documents and the lore of the agent's brain, the
 /// knowledge and the person book.
@@ -132,8 +134,9 @@ fn within_turn_budget(chat_id: i64, taken: Vec<Entry>) -> Vec<Entry> {
 }
 
 /// What a turn is handed (`docs/api.md`, 「Reference」): the head of each speaker's sheet, the org sheet of the person
-/// the agent serves, the room's due memories and the rows the turn's events wake, the memories and the woken rows
-/// held to the turn's total, all from the turn's agent's own brain and its owner's org brains; nothing where whose
+/// the agent serves, the holders' sheet of what a holder left in the agent's brain, the room's due memories and the
+/// rows the turn's events wake, the memories and the woken rows held to the turn's total and the three sheets each
+/// to a ceiling of its own, all from the turn's agent's own brain and its owner's org brains; nothing where whose
 /// brain it is cannot be told.
 pub async fn handed(reference: &Reference, turn: &Turn) -> Vec<Entry> {
   let key = match reference.brain_key(&turn.agent).await {
@@ -152,11 +155,12 @@ pub async fn handed(reference: &Reference, turn: &Turn) -> Vec<Entry> {
       None => vec![],
     }
   };
-  let (woken, standing, sheets, org_sheet) = tokio::join!(
+  let (woken, standing, sheets, org_sheet, holders_sheet) = tokio::join!(
     woken,
     memories::standing(reference, turn.chat_id, &key),
     standing_entries(reference, turn.chat_id, &turn.speaker_ids, &key),
-    organisation::sheet_entry(reference, turn.chat_id, &key, turn.audience)
+    organisation::sheet_entry(reference, turn.chat_id, &key, turn.audience),
+    holders::sheet_entry(reference, turn.chat_id, &key)
   );
   let (due, _) = memories::due_first(&standing);
   let carried: Vec<&MemoryRow> = due.iter().collect();
@@ -169,6 +173,7 @@ pub async fn handed(reference: &Reference, turn: &Turn) -> Vec<Entry> {
   for entry in sheets
     .into_iter()
     .chain(org_sheet)
+    .chain(holders_sheet)
     .chain(kept.into_iter().filter(|entry| memory.as_ref() != Some(entry)))
   {
     if seen.insert(entry.path.clone()) {

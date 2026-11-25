@@ -11,7 +11,7 @@ use gate_ports::PortError;
 use gate_ports::accounts::{Accounts, Placement};
 use gate_ports::audience::Audience;
 use gate_ports::brain::{
-  Brain, BrainKey, Condition, Document, Event, Fragment, MemoryRow, OrgMemory, OrgTopic, Reply, Sheet,
+  Brain, BrainKey, Condition, Document, Event, Fragment, HeldRow, MemoryRow, OrgMemory, OrgTopic, Reply, Sheet,
 };
 use gate_ports::gateway::{Ask, Completion, Gateway};
 use gate_ports::http::Answer;
@@ -77,10 +77,20 @@ pub fn memory(id: i64, kind: &str, slug: &str, action: &str) -> MemoryRow {
   }
 }
 
+/// A row a holder left: its number, the holder's key, the key the holder gave the row, and its words.
+pub fn held_row(id: i64, holder: &str, key: &str, text: &str) -> HeldRow {
+  HeldRow {
+    id,
+    holder: holder.into(),
+    key: Some(key.into()),
+    text: text.into(),
+  }
+}
+
 /// The stand-in brain: what it answers each read with, every brain it was asked to read, and what it was handed
 /// back. Where `own` holds brains, only they are kept, and each answers the fragments it holds; where it holds none,
 /// every agent keeps one brain answering `fragments`. A brain `standing_of` holds answers its own standing rows in
-/// place of `standing`.
+/// place of `standing`. `held_rows` are the rows a holder left, answered in the order given.
 #[derive(Default)]
 pub struct FakeBrain {
   pub own: Mutex<HashMap<BrainKey, Vec<Fragment>>>,
@@ -89,6 +99,7 @@ pub struct FakeBrain {
   pub standing_of: Mutex<HashMap<BrainKey, Vec<MemoryRow>>>,
   pub conditions: Mutex<Vec<Condition>>,
   pub woken: Mutex<Vec<MemoryRow>>,
+  pub held_rows: Mutex<Vec<HeldRow>>,
   pub fragments: Mutex<Vec<Fragment>>,
   pub documents: Mutex<HashMap<String, String>>,
   pub lore: Mutex<HashMap<String, String>>,
@@ -167,6 +178,16 @@ impl Brain for FakeBrain {
 
       self.events.lock().unwrap().extend(events.iter().cloned());
       Ok(self.woken.lock().unwrap().clone())
+    })
+  }
+
+  fn held_rows<'a>(&'a self, key: &'a BrainKey) -> BoxFuture<'a, Answer<Vec<HeldRow>>> {
+    Box::pin(async move {
+      if !self.reads(key) {
+        return Ok(vec![]);
+      }
+
+      Ok(self.held_rows.lock().unwrap().clone())
     })
   }
 

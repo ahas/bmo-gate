@@ -17,6 +17,11 @@ sheet_lines = 8
 # 「What an organisation hands its members」).
 organisation_chars = 2000
 
+# What the holders' sheet may hold, in characters: its head line, then one line a row a holder left in the agent's
+# brain, the holder's key first and the key the holder gave the row next ordering them; a row whose line does not
+# fit is left out whole (docs/reference-selection.md, 「What a turn is given」).
+holder_chars = 4000
+
 # How many of a room's due memories, the errands whose event has come, attach on a turn, the latest first.
 due = 3
 

@@ -1,14 +1,16 @@
-//! A turn's reference on the road: the room's due memories, the heads of the speakers' sheets and the rows the turn's
-//! events wake, held to the turn's total, with no model asked.
+//! A turn's reference on the road: the room's due memories, the heads of the speakers' sheets, the holders' sheet of
+//! what a holder left in the agent's brain and the rows the turn's events wake, held to the turn's total, with no
+//! model asked.
 
 use gate_policy::reference::REFERENCE;
 use gate_ports::audience::Audience;
 use gate_ports::brain::{Event, Sheet};
+use gate_reference::holders::SHEET_PATH;
 use gate_reference::road::{Turn, handed, held_sheet};
 use gate_reference::{Entry, SituationTurn, Source};
 
 use super::{Ground, ground};
-use crate::reference::fakes::memory;
+use crate::reference::fakes::{held_row, memory};
 
 fn turn() -> Turn {
   Turn {
@@ -50,6 +52,24 @@ fn carried(entry: &Entry) -> Vec<i64> {
 
 fn memories_of(entries: &[Entry]) -> Option<&Entry> {
   entries.iter().find(|entry| entry.path == "memories/7")
+}
+
+// The holders' sheet a turn was handed.
+fn holders_sheet(entries: &[Entry]) -> &Entry {
+  entries
+    .iter()
+    .find(|entry| entry.path == SHEET_PATH)
+    .expect("a turn is handed the holders' sheet")
+}
+
+// The holder and row number each line of a sheet names, in the order they stand.
+fn held_marks(text: &str) -> Vec<String> {
+  text
+    .lines()
+    .skip(1)
+    .filter_map(|line| line.strip_prefix("- ["))
+    .filter_map(|line| line.split_once("] ").map(|(mark, _)| mark.to_owned()))
+    .collect()
 }
 
 #[tokio::test]
@@ -131,6 +151,87 @@ fn a_sheet_over_its_ceiling_keeps_its_lines_from_the_top() {
   assert!(held.chars().count() + line(lines.len() + 1).chars().count() + 1 > REFERENCE.sheet_chars);
   assert_eq!(held_sheet("- [#1 since 2026-01-02] Short.\n"), "- [#1 since 2026-01-02] Short.");
   assert_eq!(held_sheet(&"x".repeat(REFERENCE.sheet_chars + 1)), "");
+}
+
+#[tokio::test]
+async fn a_turn_is_handed_a_held_row_whose_words_say_nothing_of_the_turn() {
+  let ground = ground("holders-beside-sheets", |_| Some("yes".into())).await;
+
+  furnish_memories(&ground);
+  ground.brain.sheets.lock().unwrap().push(long_sheet(5, 30));
+  ground
+    .brain
+    .held_rows
+    .lock()
+    .unwrap()
+    .push(held_row(900, "holder-a", "rule-1", "Say nothing of a deploy before its notice."));
+
+  let entries = handed(&ground.reference, &turn()).await;
+
+  assert_eq!(
+    entries.iter().map(|entry| entry.path.as_str()).collect::<Vec<_>>(),
+    ["memories/7", "rooms/7/people/5/sheet.md", SHEET_PATH]
+  );
+
+  let held = holders_sheet(&entries);
+
+  assert_eq!(held.source, Source::Memory);
+  assert_eq!(
+    held.text.lines().skip(1).collect::<Vec<_>>(),
+    ["- [holder-a #900] Say nothing of a deploy before its notice."]
+  );
+}
+
+#[tokio::test]
+async fn held_rows_stand_on_a_turn_that_holds_nothing_else() {
+  let quiet = ground("holders-alone", |_| None).await;
+
+  quiet
+    .brain
+    .held_rows
+    .lock()
+    .unwrap()
+    .push(held_row(901, "holder-a", "rule-1", "Answer in the room's own language."));
+
+  let entries = handed(&quiet.reference, &turn()).await;
+
+  assert_eq!(entries.iter().map(|entry| entry.path.as_str()).collect::<Vec<_>>(), [SHEET_PATH]);
+}
+
+#[tokio::test]
+async fn the_holders_sheet_leaves_out_a_row_that_does_not_fit_whole() {
+  let ground = ground("holders-ceiling", |_| None).await;
+  let over = format!("{}ends.", "longw".repeat(REFERENCE.holder_chars / 2));
+
+  ground.brain.held_rows.lock().unwrap().extend([
+    held_row(910, "holder-a", "rule-1", "One short standing rule."),
+    held_row(911, "holder-b", "rule-1", &over),
+  ]);
+
+  let held = holders_sheet(&handed(&ground.reference, &turn()).await);
+  let lines: Vec<&str> = held.text.lines().collect();
+
+  assert_eq!(lines.len(), 2, "only the row that fits stands, and stands whole");
+  assert_eq!(lines[1], "- [holder-a #910] One short standing rule.");
+  assert!(!held.text.contains("longw"), "a row over the ceiling is not cut in half");
+  assert!(held.text.chars().count() <= REFERENCE.holder_chars);
+}
+
+#[tokio::test]
+async fn the_holders_sheet_orders_its_rows_by_holder_then_key_then_number() {
+  let ground = ground("holders-order", |_| None).await;
+
+  ground.brain.held_rows.lock().unwrap().extend([
+    held_row(930, "holder-b", "alpha", "The second holder's rule."),
+    held_row(921, "holder-a", "beta", "The first holder's other rule."),
+    held_row(920, "holder-a", "alpha", "The first holder's rule."),
+    held_row(911, "holder-a", "alpha", "The first holder's first rule."),
+  ]);
+
+  assert_eq!(
+    held_marks(&holders_sheet(&handed(&ground.reference, &turn()).await).text),
+    ["holder-a #911", "holder-a #920", "holder-a #921", "holder-b #930"]
+  );
 }
 
 // A speaker's sheet of so many facts, one line each.

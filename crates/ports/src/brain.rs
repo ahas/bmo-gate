@@ -13,7 +13,7 @@ use crate::PortError;
 use crate::audience::Audience;
 use crate::brain_rows::{
   BrainMember, FACT_TYPE, LORE_TYPE, Layer, Memory, Page, STANDING_TYPES, Subject, Tally, TopicItem,
-  brain_type, conditions, fragment_row, in_room, label, lore_rows, lore_slug, memory_row, org_memory,
+  brain_type, conditions, fragment_row, held_row, in_room, label, lore_rows, lore_slug, memory_row, org_memory,
   path_of, person_row, sheet_path, slug_of, standing, woken_by,
 };
 use crate::http::{Answer, Caller, Peer};
@@ -87,6 +87,16 @@ pub struct MemoryRow {
   pub event: Option<Event>,
   pub event_met_at: Option<i64>,
   pub moved_at: Option<i64>,
+}
+
+/// One row a holder left in an agent's brain and that stands there now: the brain's number, the holder's key, the
+/// key the holder gave the row, and its words (the brain's `docs/design.md`, 「What a holder leaves」).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HeldRow {
+  pub id: i64,
+  pub holder: String,
+  pub key: Option<String>,
+  pub text: String,
 }
 
 /// A row with a condition, as the brain's index lists it among the room's rules.
@@ -242,6 +252,10 @@ pub trait Brain: Send + Sync {
     chat: i64,
     events: &'a [Event],
   ) -> BoxFuture<'a, Answer<Vec<MemoryRow>>>;
+
+  /// The rows a holder left in the agent's brain that stand there now, as the brain lists them; none where the
+  /// agent keeps no brain (the brain's `docs/design.md`, 「What a holder leaves」).
+  fn held_rows<'a>(&'a self, key: &'a BrainKey) -> BoxFuture<'a, Answer<Vec<HeldRow>>>;
 
   /// The active fragment rows of the kinds named the turn's agent may be offered in the room.
   fn offered<'a>(
@@ -643,6 +657,16 @@ impl Brain for HttpBrain {
           .map(|memory| memory_row(&key.agent, memory))
           .collect(),
       )
+    })
+  }
+
+  fn held_rows<'a>(&'a self, key: &'a BrainKey) -> BoxFuture<'a, Answer<Vec<HeldRow>>> {
+    Box::pin(async move {
+      let Some(brain) = self.brain(key).await? else {
+        return Ok(Vec::new());
+      };
+
+      Ok(self.memories(brain, &[("held", "true")]).await?.iter().filter_map(held_row).collect())
     })
   }
 
