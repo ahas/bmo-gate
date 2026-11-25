@@ -252,7 +252,7 @@ async fn what_a_holder_left_is_read_by_its_live_rows_alone() {
 
   assert_eq!(rows.len(), 1);
   assert_eq!(rows[0].holder, "schedule-service");
-  assert_eq!(rows[0].key, "routes");
+  assert_eq!(rows[0].key.as_deref(), Some("routes"));
 
   // A row its holder withdrew or rewrote leaves the turn with the rest of its status, so the read names the
   // live statuses: the brain's list holds rows of every status where the caller names none.

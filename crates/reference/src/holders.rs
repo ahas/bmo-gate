@@ -31,7 +31,11 @@ fn sheet(rows: &[HeldRow]) -> Option<Entry> {
   let mut order: Vec<&HeldRow> = rows.iter().collect();
 
   order.sort_by(|left, right| {
-    left.holder.cmp(&right.holder).then_with(|| left.key.cmp(&right.key)).then(left.id.cmp(&right.id))
+    left
+      .holder
+      .cmp(&right.holder)
+      .then_with(|| left.key.cmp(&right.key))
+      .then(left.id.cmp(&right.id))
   });
 
   let head = &HOLDERS.sheet.head;

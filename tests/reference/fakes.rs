@@ -11,7 +11,8 @@ use gate_ports::PortError;
 use gate_ports::accounts::{Accounts, Placement};
 use gate_ports::audience::Audience;
 use gate_ports::brain::{
-  Brain, BrainKey, Condition, Document, Event, Fragment, HeldRow, MemoryRow, OrgMemory, OrgTopic, Reply, Sheet,
+  Brain, BrainKey, Condition, Document, Event, Fragment, HeldRow, MemoryRow, OrgMemory, OrgTopic, Reply,
+  Sheet,
 };
 use gate_ports::gateway::{Ask, Completion, Gateway};
 use gate_ports::http::Answer;

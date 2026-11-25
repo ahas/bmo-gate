@@ -13,8 +13,8 @@ use crate::PortError;
 use crate::audience::Audience;
 use crate::brain_rows::{
   BrainMember, FACT_TYPE, LORE_TYPE, Layer, Memory, Page, STANDING_TYPES, Subject, Tally, TopicItem,
-  brain_type, conditions, fragment_row, held_row, in_room, label, lore_rows, lore_slug, memory_row, org_memory,
-  path_of, person_row, sheet_path, slug_of, standing, woken_by,
+  brain_type, conditions, fragment_row, held_row, in_room, label, lore_rows, lore_slug, memory_row,
+  org_memory, path_of, person_row, sheet_path, slug_of, standing, woken_by,
 };
 use crate::http::{Answer, Caller, Peer};
 

@@ -159,12 +159,12 @@ async fn a_turn_is_handed_a_held_row_whose_words_say_nothing_of_the_turn() {
 
   furnish_memories(&ground);
   ground.brain.sheets.lock().unwrap().push(long_sheet(5, 30));
-  ground
-    .brain
-    .held_rows
-    .lock()
-    .unwrap()
-    .push(held_row(900, "holder-a", "rule-1", "Say nothing of a deploy before its notice."));
+  ground.brain.held_rows.lock().unwrap().push(held_row(
+    900,
+    "holder-a",
+    "rule-1",
+    "Say nothing of a deploy before its notice.",
+  ));
 
   let entries = handed(&ground.reference, &turn()).await;
 
@@ -186,12 +186,12 @@ async fn a_turn_is_handed_a_held_row_whose_words_say_nothing_of_the_turn() {
 async fn held_rows_stand_on_a_turn_that_holds_nothing_else() {
   let quiet = ground("holders-alone", |_| None).await;
 
-  quiet
-    .brain
-    .held_rows
-    .lock()
-    .unwrap()
-    .push(held_row(901, "holder-a", "rule-1", "Answer in the room's own language."));
+  quiet.brain.held_rows.lock().unwrap().push(held_row(
+    901,
+    "holder-a",
+    "rule-1",
+    "Answer in the room's own language.",
+  ));
 
   let entries = handed(&quiet.reference, &turn()).await;
 
@@ -208,7 +208,8 @@ async fn the_holders_sheet_leaves_out_a_row_that_does_not_fit_whole() {
     held_row(911, "holder-b", "rule-1", &over),
   ]);
 
-  let held = holders_sheet(&handed(&ground.reference, &turn()).await);
+  let handed = handed(&ground.reference, &turn()).await;
+  let held = holders_sheet(&handed);
   let lines: Vec<&str> = held.text.lines().collect();
 
   assert_eq!(lines.len(), 2, "only the row that fits stands, and stands whole");
