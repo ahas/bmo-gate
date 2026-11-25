@@ -309,8 +309,6 @@ pub fn memory_row(agent: &str, memory: &Memory) -> MemoryRow {
     last_hit_at: memory.last_hit_at,
     hits: memory.hits,
     done_at: memory.valid_to.filter(|_| memory.status == "done"),
-    done_text: label(labels, "done_text"),
-    down_reason: label(labels, "down_reason"),
     down_at: memory.valid_to.filter(|_| memory.status == "invalidated"),
     candidate_why: label(labels, "candidate_why"),
     candidate_at: label_i64(labels, "candidate_at"),

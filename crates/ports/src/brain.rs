@@ -81,8 +81,6 @@ pub struct MemoryRow {
   pub last_hit_at: Option<i64>,
   pub hits: i64,
   pub done_at: Option<i64>,
-  pub done_text: Option<String>,
-  pub down_reason: Option<String>,
   pub down_at: Option<i64>,
   pub candidate_why: Option<String>,
   pub candidate_at: Option<i64>,

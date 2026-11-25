@@ -68,8 +68,6 @@ pub fn memory(id: i64, kind: &str, slug: &str, action: &str) -> MemoryRow {
     last_hit_at: None,
     hits: 0,
     done_at: None,
-    done_text: None,
-    down_reason: None,
     down_at: None,
     candidate_why: None,
     candidate_at: None,
