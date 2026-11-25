@@ -1,9 +1,12 @@
 //! A turn's reference (`docs/reference-selection.md`; `docs/boundary-api.md`, `POST /reference/selected`): what a
-//! chat turn is given to read beside the conversation — the room's due memories, the rows the turn's events wake
-//! and the standing sheets of everyone who spoke, which no model chooses, held to the turn's total — and the brain's
-//! index an agent reads the rest through itself. The brain answers the rows and reads the pieces.
+//! chat turn is given to read beside the conversation — the room's due memories, the rows the turn's events wake,
+//! the standing sheets of everyone who spoke and the holders' sheet of what a host service left standing in the
+//! agent's brain, which no model chooses, the memories and the woken rows held to the turn's total and every sheet
+//! to a ceiling of its own — and the brain's index an agent reads the rest through itself. The brain answers the
+//! rows and reads the pieces.
 
 pub mod fragments;
+pub mod holders;
 pub mod index;
 pub mod memories;
 pub mod organisation;

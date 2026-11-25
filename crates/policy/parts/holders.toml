@@ -1,0 +1,8 @@
+# What a holder leaves in an agent's brain (docs/reference-selection.md, 「What a turn is given」): the lines of the
+# holders' sheet a turn carries. How much the sheet holds stands in reference.toml; the rows are the brain's.
+
+# The holders' sheet: its head line, and one line a row a holder left (`{holder}` the holder's key, `{id}` the
+# row's number, `{text}` its words).
+[sheet]
+head = "Standing instructions the services of this deployment left in your brain, by holder, none of them yours to change:"
+line = "- [{holder} #{id}] {text}"

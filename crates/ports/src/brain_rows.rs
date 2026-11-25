@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::brain::{Condition, Event, Fragment, MemoryRow, OrgMemory};
+use crate::brain::{Condition, Event, Fragment, HeldRow, MemoryRow, OrgMemory};
 
 /// A brain, as the brain lists it.
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -80,6 +80,10 @@ pub struct Memory {
   /// does not say.
   #[serde(default)]
   pub internal_only: Option<bool>,
+  /// The key of the holder that left the row (the brain's `docs/design.md`, 「What a holder leaves」); none for a
+  /// row the brain's own writers wrote.
+  #[serde(default)]
+  pub held_by: Option<String>,
 }
 
 /// One topic as it stands for a member of an organisation, as `GET /org-topics` answers it: the brain whose word
@@ -316,6 +320,17 @@ pub fn memory_row(agent: &str, memory: &Memory) -> MemoryRow {
     event_met_at: label_i64(labels, "event_met_at"),
     moved_at: label_i64(labels, "moved_at"),
   }
+}
+
+/// A memory of the brain as the row a holder left it: its number, the holder's key, the key the holder gave it and
+/// its words. A row the brain says no holder left is the brain's own and answers nothing.
+pub fn held_row(memory: &Memory) -> Option<HeldRow> {
+  memory.held_by.clone().map(|holder| HeldRow {
+    id: memory.id,
+    holder,
+    key: memory.key.clone(),
+    text: memory.text.clone(),
+  })
 }
 
 /// The conditions these memories carry: each old condition a moved row kept, and a

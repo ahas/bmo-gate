@@ -14,6 +14,8 @@ pub struct Reference {
   pub sheet_lines: usize,
   /// What the org sheet may hold, in characters.
   pub organisation_chars: usize,
+  /// What the holders' sheet may hold, in characters.
+  pub holder_chars: usize,
   /// How many of a room's due memories attach.
   pub due: usize,
   /// How long a standing row's line in the brain's index runs, in characters.
