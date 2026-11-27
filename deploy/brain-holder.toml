@@ -3,7 +3,7 @@
 held_by = "gate"
 
 [[memory]]
-key = "when"
+key = "gate.when"
 type = "tip"
 recall_condition = "translate a text, or knowledge the turn lacks"
 text = "Translate with gate/translate and answer its readings as returned; look up missing knowledge with gate/reference_search before stating it."
