@@ -256,7 +256,7 @@ dependencies = [
 
 [[package]]
 name = "bmo-gate"
-version = "0.1.0-rev.1"
+version = "0.0.0"
 dependencies = [
  "axum",
  "bmo-gate-client",
@@ -294,7 +294,7 @@ dependencies = [
 
 [[package]]
 name = "bmo-gate-client"
-version = "0.1.0-rev.1"
+version = "0.0.0"
 dependencies = [
  "futures-util",
  "gate-codes",
@@ -815,11 +815,11 @@ dependencies = [
 
 [[package]]
 name = "gate-codes"
-version = "0.1.0-rev.1"
+version = "0.0.0"
 
 [[package]]
 name = "gate-command"
-version = "0.1.0-rev.1"
+version = "0.0.0"
 dependencies = [
  "clap",
  "gate-server",
@@ -832,7 +832,7 @@ dependencies = [
 
 [[package]]
 name = "gate-markup"
-version = "0.1.0-rev.1"
+version = "0.0.0"
 dependencies = [
  "gate-policy",
  "pulldown-cmark",
@@ -843,7 +843,7 @@ dependencies = [
 
 [[package]]
 name = "gate-policy"
-version = "0.1.0-rev.1"
+version = "0.0.0"
 dependencies = [
  "serde",
  "toml",
@@ -851,7 +851,7 @@ dependencies = [
 
 [[package]]
 name = "gate-ports"
-version = "0.1.0-rev.1"
+version = "0.0.0"
 dependencies = [
  "futures-util",
  "gate-codes",
@@ -864,7 +864,7 @@ dependencies = [
 
 [[package]]
 name = "gate-reference"
-version = "0.1.0-rev.1"
+version = "0.0.0"
 dependencies = [
  "chrono",
  "futures-util",
@@ -883,7 +883,7 @@ dependencies = [
 
 [[package]]
 name = "gate-reference-tool"
-version = "0.1.0-rev.1"
+version = "0.0.0"
 dependencies = [
  "bmo-gate-client",
  "serde",
@@ -893,7 +893,7 @@ dependencies = [
 
 [[package]]
 name = "gate-runs"
-version = "0.1.0-rev.1"
+version = "0.0.0"
 dependencies = [
  "futures-util",
  "gate-codes",
@@ -911,7 +911,7 @@ dependencies = [
 
 [[package]]
 name = "gate-server"
-version = "0.1.0-rev.1"
+version = "0.0.0"
 dependencies = [
  "axum",
  "bmo-gate-client",
@@ -934,7 +934,7 @@ dependencies = [
 
 [[package]]
 name = "gate-stages"
-version = "0.1.0-rev.1"
+version = "0.0.0"
 dependencies = [
  "futures-util",
  "gate-markup",
@@ -955,7 +955,7 @@ dependencies = [
 
 [[package]]
 name = "gate-store"
-version = "0.1.0-rev.1"
+version = "0.0.0"
 dependencies = [
  "async-trait",
  "sea-orm",
@@ -966,7 +966,7 @@ dependencies = [
 
 [[package]]
 name = "gate-translate-tool"
-version = "0.1.0-rev.1"
+version = "0.0.0"
 dependencies = [
  "bmo-gate-client",
  "serde",
@@ -976,7 +976,7 @@ dependencies = [
 
 [[package]]
 name = "gate-words"
-version = "0.1.0-rev.1"
+version = "0.0.0"
 
 [[package]]
 name = "generic-array"
