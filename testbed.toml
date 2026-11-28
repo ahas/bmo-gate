@@ -43,6 +43,13 @@ binaries = ["gate-server", "bmo-gate", "gate-translate-tool", "gate-reference-to
 
 # The gate's own deploy tree and the shared data root its settings, its runtime data and the tooling's settings
 # stand under (docs/layout.md, 「The deployment」). The units are deploy/'s alone.
+# The tooling's packages, which a release's tooling commands run on, installed in the build tree and written into
+# the release, so a release and an artifact packed from one (bmo-testbed's docs/artifacts.md) carry them.
+[[build.step]]
+id = "tooling-packages"
+dir = "training/tooling"
+command = "bun install --frozen-lockfile && release=\"$(git rev-parse --show-toplevel)/../deploy-releases/$(git rev-parse HEAD | cut -c1-12)/training/tooling\" && mkdir -p \"$release\" && rm -rf \"$release/node_modules\" && cp -r node_modules \"$release/\""
+
 [deploy]
 root = "~/.local/share/bmo-gate"
 link = "deploy"
@@ -80,11 +87,6 @@ chmod 755 "$script"
 mv "$script" "$bmo_dir/bmo-gate"
 '''
 
-# The tooling's packages, which a release's tooling commands run on.
-[[deploy.step]]
-id = "tooling-packages"
-phase = "before-flip"
-command = "cd training/tooling && bun install --frozen-lockfile"
 
 # The translator's tool placed as one folder, its release executable beside its manifest, schemas and manual, and
 # registered with the tool host as this repository's own, allowing the capability its entry asks for (docs/layout.md,
@@ -123,3 +125,8 @@ brain="$HOME/.local/share/bmo-brain/deploy/bin/bmo-brain"
 [ -x "$brain" ] || exit 0
 "$brain" holder declare deploy/brain-holder.toml
 '''
+
+# the release a person's machine runs, packed as an artifact (bmo-testbed's docs/artifacts.md)
+[artifact]
+keep = ["training/tooling", "runtime"]
+runtimes = ["bun"]

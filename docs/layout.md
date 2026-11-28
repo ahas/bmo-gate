@@ -58,7 +58,7 @@ The testbed deploys the repository as `testbed.toml` declares it (the testbed's 
 - **Two files each release links to the data root's `env/`:** its `settings.toml`, the service's settings
   (`docs/boundary-api.md`, 「Configuration」), to `env/gate.toml`, and the tooling's
   `training/tooling/tooling.toml` (`docs/training.md`, 「The tooling and its settings」) to `env/gate-tooling.toml`.
-  The tooling's packages are installed into the release before it is put live.
+  The tooling's packages are installed in the build tree and written into the release, which carries them built.
 - **The unit is `deploy/`'s:** `bmo-gate-server.service`, the service, is the one the deployment waits on,
   through `bmo-gate health`. Four units stand marked `retire` — `bmo-laya-relay.service`, `bmo-gate.service`,
   `bmo-gate-judge.service` and `bmo-gate-train.service` — which the deployment stops, disables and unlinks once

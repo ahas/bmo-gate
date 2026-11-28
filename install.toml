@@ -10,6 +10,7 @@ program = "pg_isready"
 what = "PostgreSQL, the server the gate's store stands on, reached on its local socket by the user the install runs as: the `postgresql` package."
 
 [[needs]]
+build = true
 check = 'test -x "$HOME/.bun/bin/bun" || command -v bun'
 what = "Bun, which a deployment installs the tooling's packages with: `curl -fsSL https://bun.sh/install | bash`."
 
