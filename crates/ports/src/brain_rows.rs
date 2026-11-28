@@ -84,6 +84,13 @@ pub struct Memory {
   /// row the brain's own writers wrote.
   #[serde(default)]
   pub held_by: Option<String>,
+  /// Whether a held row stands on every turn; true where the brain does not say.
+  #[serde(default = "standing_default")]
+  pub every_turn: bool,
+}
+
+fn standing_default() -> bool {
+  true
 }
 
 /// One topic as it stands for a member of an organisation, as `GET /org-topics` answers it: the brain whose word

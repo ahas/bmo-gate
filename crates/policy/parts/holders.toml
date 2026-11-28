@@ -6,3 +6,8 @@
 [sheet]
 head = "Standing instructions the services of this deployment left in your brain, by holder, none of them yours to change:"
 line = "- [{holder} #{id}] {text}"
+
+# The sheet of the rows a holder keyed to what the turn meets: its room, the kinds of the notices it carries. Its
+# lines are the holders' sheet's.
+[keyed]
+head = "Standing instructions keyed to this room and to what this turn carries, by holder, none of them yours to change:"

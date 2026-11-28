@@ -134,7 +134,8 @@ fn within_turn_budget(chat_id: i64, taken: Vec<Entry>) -> Vec<Entry> {
 }
 
 /// What a turn is handed (`docs/api.md`, 「Reference」): the head of each speaker's sheet, the org sheet of the person
-/// the agent serves, the holders' sheet of what a holder left in the agent's brain, the room's due memories and the
+/// the agent serves, the holders' sheet of what a holder left in the agent's brain to stand on every turn, the sheet
+/// of what a holder keyed to the turn's room and its notices' kinds, the room's due memories and the
 /// rows the turn's events wake, the memories and the woken rows held to the turn's total and the three sheets each
 /// to a ceiling of its own, all from the turn's agent's own brain and its owner's org brains; nothing where whose
 /// brain it is cannot be told.
@@ -155,12 +156,15 @@ pub async fn handed(reference: &Reference, turn: &Turn) -> Vec<Entry> {
       None => vec![],
     }
   };
-  let (woken, standing, sheets, org_sheet, holders_sheet) = tokio::join!(
+  let events: &[gate_ports::brain::Event] =
+    turn.situation.as_ref().map_or(&[], |situation| &situation.events);
+  let (woken, standing, sheets, org_sheet, holders_sheet, keyed_sheet) = tokio::join!(
     woken,
     memories::standing(reference, turn.chat_id, &key),
     standing_entries(reference, turn.chat_id, &turn.speaker_ids, &key),
     organisation::sheet_entry(reference, turn.chat_id, &key, turn.audience),
-    holders::sheet_entry(reference, turn.chat_id, &key)
+    holders::sheet_entry(reference, turn.chat_id, &key),
+    holders::keyed_entry(reference, turn.chat_id, &key, events)
   );
   let (due, _) = memories::due_first(&standing);
   let carried: Vec<&MemoryRow> = due.iter().collect();
@@ -174,6 +178,7 @@ pub async fn handed(reference: &Reference, turn: &Turn) -> Vec<Entry> {
     .into_iter()
     .chain(org_sheet)
     .chain(holders_sheet)
+    .chain(keyed_sheet)
     .chain(kept.into_iter().filter(|entry| memory.as_ref() != Some(entry)))
   {
     if seen.insert(entry.path.clone()) {

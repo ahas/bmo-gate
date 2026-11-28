@@ -264,6 +264,38 @@ async fn what_a_holder_left_is_read_by_its_live_rows_alone() {
 }
 
 #[tokio::test]
+async fn a_held_row_off_every_turn_leaves_the_sheet_and_is_read_by_its_trigger() {
+  let stub = Stub::start().await;
+  let brain = HttpBrain::new(peer(&stub, "t"));
+  let mut keyed = chunk();
+  keyed["heldBy"] = json!("receiver");
+  keyed["key"] = json!("room-7.tone");
+  keyed["everyTurn"] = json!(false);
+
+  stub.answer(Method::GET, "/brains", 200, brains());
+  stub.answer(Method::GET, "/brains/9/memories", 200, page(vec![keyed]));
+
+  assert!(
+    brain.held_rows(&chat_agent()).await.unwrap().is_empty(),
+    "it stands on no turn by itself"
+  );
+
+  let rows = brain
+    .keyed_rows(&chat_agent(), &["room:7".to_owned(), "job-review".to_owned()])
+    .await
+    .unwrap();
+  assert_eq!(rows.len(), 1);
+  let asked: Vec<_> = stub.seen().into_iter().filter(|seen| seen.path == "/brains/9/memories").collect();
+  let query = asked.last().and_then(|one| one.query.clone()).unwrap_or_default();
+  assert!(query.contains("trigger=room%3A7%2Cjob-review"), "{query}");
+  assert!(query.contains("held=true"), "{query}");
+  assert!(
+    brain.keyed_rows(&chat_agent(), &[]).await.unwrap().is_empty(),
+    "no trigger reads nothing"
+  );
+}
+
+#[tokio::test]
 async fn the_document_read_filters_the_knowledge_by_its_slug() {
   let stub = Stub::start().await;
   let brain = HttpBrain::new(peer(&stub, "t"));

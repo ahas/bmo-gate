@@ -5,7 +5,7 @@
 use gate_policy::reference::REFERENCE;
 use gate_ports::audience::Audience;
 use gate_ports::brain::{Event, Sheet};
-use gate_reference::holders::SHEET_PATH;
+use gate_reference::holders::{KEYED_PATH, SHEET_PATH};
 use gate_reference::road::{Turn, handed, held_sheet};
 use gate_reference::{Entry, SituationTurn, Source};
 
@@ -232,6 +232,55 @@ async fn the_holders_sheet_orders_its_rows_by_holder_then_key_then_number() {
   assert_eq!(
     held_marks(&holders_sheet(&handed(&ground.reference, &turn()).await).text),
     ["holder-a #911", "holder-a #920", "holder-a #921", "holder-b #930"]
+  );
+}
+
+#[tokio::test]
+async fn the_rows_keyed_to_the_turns_room_and_notices_are_fetched_by_those_keys_into_their_own_sheet() {
+  let keyed_ground = ground("holders-keyed", |_| None).await;
+
+  keyed_ground.brain.keyed_rows.lock().unwrap().push(held_row(
+    940,
+    "receiver",
+    "room-7.tone",
+    "In this room answer in short lines.",
+  ));
+
+  let mut keyed_turn = turn();
+  keyed_turn.situation = Some(SituationTurn {
+    chat_id: 7,
+    agent: "the-chat-agent".into(),
+    events: vec![
+      Event {
+        kind: "job-review".into(),
+        item: Some(12),
+      },
+      Event {
+        kind: "job-review".into(),
+        item: Some(13),
+      },
+    ],
+  });
+  let entries = handed(&keyed_ground.reference, &keyed_turn).await;
+
+  assert_eq!(
+    keyed_ground.brain.triggers_asked.lock().unwrap().last().cloned().unwrap_or_default(),
+    ["room:7", "job-review"],
+    "the room's key and each notice's kind, once"
+  );
+  let keyed = entries.iter().find(|entry| entry.path == KEYED_PATH).expect("the keyed sheet stands");
+  assert_eq!(
+    keyed.text.lines().skip(1).collect::<Vec<_>>(),
+    ["- [receiver #940] In this room answer in short lines."]
+  );
+
+  // A turn in a room nothing is keyed to carries no keyed sheet, and still asks by the room's key.
+  let empty = ground("holders-keyed-none", |_| None).await;
+  let none = handed(&empty.reference, &turn()).await;
+  assert!(none.iter().all(|entry| entry.path != KEYED_PATH));
+  assert_eq!(
+    empty.brain.triggers_asked.lock().unwrap().last().cloned().unwrap_or_default(),
+    ["room:7"]
   );
 }
 

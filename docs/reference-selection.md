@@ -125,18 +125,27 @@ flowchart TD
   event」).
 - **The org sheet,** what the organisation of the person the supervisor serves holds for them on every topic, read
   for the room's audience (「What an organisation hands its members」); a supervisor of no organisation has none.
-- **What the services of the deployment left,** every row a holder left standing in the turn's agent's own brain
-  (the brain's `docs/design.md`, 「What a holder leaves」), as one sheet under `holders/sheet.md`: a head line
+- **What the services of the deployment left to stand on every turn,** every row a holder left in the turn's
+  agent's own brain that stands on every turn (the brain's `docs/design.md`, 「What a holder leaves」), as one sheet
+  under `holders/sheet.md`: a head line
   naming it, then one line a row — its holder's key, the row's number and its words — the rows ordered by holder,
   then by the key the holder gave the row, then by its number, each line standing whole or not at all under the
   sheet's own ceiling. It goes out whatever the turn says and outside the turn's budget, as the sheets do, so an
   agent always knows what the services it works among stand for; the sheet is handed by none where the agent keeps
-  no brain, nothing stands, the brain cannot be read, or no line fits its ceiling. A service's usage skill is one
-  of these rows: the line carried into the turn says when to reach for the whole of it, and the whole stands in
-  the same brain under the same key, which the agent reads with its own memory tools.
+  no brain, nothing stands, the brain cannot be read, or no line fits its ceiling. A service's one line of when
+  to reach for it is one of these rows.
+- **What a holder keyed to this turn,** the rows of the turn's agent's own brain a holder marked off every turn
+  and keyed to what the turn meets, fetched by those keys with no search and no model: the room's own key,
+  `room:<id>`, and the kind of each event the turn carries (a queue notice's kind among them), each once. They go
+  as one sheet under `holders/keyed.md`, its head the policy's and its lines the holders' sheet's, ordered and held
+  to the same ceiling the same way. A room's own guidance stands in the brain as such a row about the room and
+  keyed to it, so every turn in that room is handed it exactly and no other room's turn is; a notice's procedure
+  is keyed to its kind, so the turn carrying that notice is handed it. A turn whose keys fetch nothing carries no
+  such sheet. The tool a turn is about to call is a key too, met at the call itself rather than here (the
+  agency's `docs/agent-control.md`, 「The tool brief」).
 - **Nothing else.** No situation rule, no knowledge, no lore, no other person's sheet and no undue memory attaches
-  to a turn: each stands in the index, for the agent to read where the turn needs it. The owner's room rules are
-  the room block's, which the receiver composes, and neither a turn's reference nor the index carries them.
+  to a turn: each stands in the index, for the agent to read where the turn needs it. No room carries rules of its
+  own outside the brain: what differs in a room is a memory about it, keyed as above.
 - **Every turn is one designated agent's,** the agent its situation names, else its `agent`, and everything is
   read from that agent's own brain and the org brains of the person it serves (「Whose reference it is」). An agent
   keeping no brain is given no sheet and no memory, never the chat agent's.
@@ -171,8 +180,8 @@ flowchart TD
 
 - **Six groups, in this order:** `system-documents` (the lore of the agent's brain, in a room that reads it; the
   brain holds no row of a shipped reference document, so no index lists one), `room-rules` (the room's situation
-  rules; the owner's room rules, the brain's `rule` memories about the room, are no entry of it, since the room's
-  block carries them whole, the receiver's `docs/unified-bmo.md`, 「Delegations」), `knowledge`, `people` (everyone
+  rules; a held row keyed to the room is no entry of it, since every turn in the room is handed it by its key,
+  「What a turn is given」), `knowledge`, `people` (everyone
   the brain knows facts of in the room), `room-memories` (the room's standing memories) and `organisation` (the org memories of the person the agent serves beyond its org
   sheet, read for the room's audience, 「What an organisation hands its members」). Every other group is the named
   agent's own brain's (「Whose reference it is」), and the audience changes nothing of it; an agent keeping no brain is

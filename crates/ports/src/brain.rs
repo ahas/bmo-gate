@@ -253,9 +253,17 @@ pub trait Brain: Send + Sync {
     events: &'a [Event],
   ) -> BoxFuture<'a, Answer<Vec<MemoryRow>>>;
 
-  /// The rows a holder left in the agent's brain that stand there now, as the brain lists them; none where the
-  /// agent keeps no brain (the brain's `docs/design.md`, 「What a holder leaves」).
+  /// The rows a holder left in the agent's brain that stand there now on every turn, as the brain lists them; none
+  /// where the agent keeps no brain (the brain's `docs/design.md`, 「What a holder leaves」).
   fn held_rows<'a>(&'a self, key: &'a BrainKey) -> BoxFuture<'a, Answer<Vec<HeldRow>>>;
+
+  /// The rows a holder left in the agent's brain that carry one of these triggers, fetched by the key alone; none
+  /// where the agent keeps no brain or no trigger is named.
+  fn keyed_rows<'a>(
+    &'a self,
+    key: &'a BrainKey,
+    triggers: &'a [String],
+  ) -> BoxFuture<'a, Answer<Vec<HeldRow>>>;
 
   /// The active fragment rows of the kinds named the turn's agent may be offered in the room.
   fn offered<'a>(
@@ -669,6 +677,26 @@ impl Brain for HttpBrain {
       // The live rows of the brain, of the kind a holder left: a row the holder withdrew or rewrote is out of
       // the sheet with the rest of its status, which this read names for every brain it reads.
       let rows = self.memories(brain, &[("held", "true")]).await?;
+
+      Ok(rows.iter().filter(|row| row.every_turn).filter_map(held_row).collect())
+    })
+  }
+
+  fn keyed_rows<'a>(
+    &'a self,
+    key: &'a BrainKey,
+    triggers: &'a [String],
+  ) -> BoxFuture<'a, Answer<Vec<HeldRow>>> {
+    Box::pin(async move {
+      if triggers.is_empty() {
+        return Ok(Vec::new());
+      }
+      let Some(brain) = self.brain(key).await? else {
+        return Ok(Vec::new());
+      };
+      let named = triggers.join(",");
+      // A read by trigger is an explicit read the brain records as a use of each row it answers, as a hand-out is.
+      let rows = self.memories(brain, &[("held", "true"), ("trigger", named.as_str())]).await?;
 
       Ok(rows.iter().filter_map(held_row).collect())
     })

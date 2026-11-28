@@ -91,7 +91,8 @@ pub fn held_row(id: i64, holder: &str, key: &str, text: &str) -> HeldRow {
 /// The stand-in brain: what it answers each read with, every brain it was asked to read, and what it was handed
 /// back. Where `own` holds brains, only they are kept, and each answers the fragments it holds; where it holds none,
 /// every agent keeps one brain answering `fragments`. A brain `standing_of` holds answers its own standing rows in
-/// place of `standing`. `held_rows` are the rows a holder left, answered in the order given.
+/// place of `standing`. `held_rows` are the rows a holder left to stand on every turn, answered in the order given,
+/// and `keyed_rows` those a read by trigger answers.
 #[derive(Default)]
 pub struct FakeBrain {
   pub own: Mutex<HashMap<BrainKey, Vec<Fragment>>>,
@@ -101,6 +102,9 @@ pub struct FakeBrain {
   pub conditions: Mutex<Vec<Condition>>,
   pub woken: Mutex<Vec<MemoryRow>>,
   pub held_rows: Mutex<Vec<HeldRow>>,
+  /// The rows a read by trigger answers, and the triggers each such read named.
+  pub keyed_rows: Mutex<Vec<HeldRow>>,
+  pub triggers_asked: Mutex<Vec<Vec<String>>>,
   pub fragments: Mutex<Vec<Fragment>>,
   pub documents: Mutex<HashMap<String, String>>,
   pub lore: Mutex<HashMap<String, String>>,
@@ -189,6 +193,21 @@ impl Brain for FakeBrain {
       }
 
       Ok(self.held_rows.lock().unwrap().clone())
+    })
+  }
+
+  fn keyed_rows<'a>(
+    &'a self,
+    key: &'a BrainKey,
+    triggers: &'a [String],
+  ) -> BoxFuture<'a, Answer<Vec<HeldRow>>> {
+    Box::pin(async move {
+      if !self.reads(key) {
+        return Ok(vec![]);
+      }
+      self.triggers_asked.lock().unwrap().push(triggers.to_vec());
+
+      Ok(self.keyed_rows.lock().unwrap().clone())
     })
   }
 

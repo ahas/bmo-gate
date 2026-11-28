@@ -15,6 +15,14 @@ pub struct SheetLines {
 #[serde(deny_unknown_fields)]
 pub struct Holders {
   pub sheet: SheetLines,
+  pub keyed: KeyedHead,
+}
+
+/// The head of the sheet of the rows keyed to what a turn meets; its lines are the holders' sheet's.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct KeyedHead {
+  pub head: String,
 }
 
 crate::part!(pub HOLDERS: Holders = "holders.toml");
